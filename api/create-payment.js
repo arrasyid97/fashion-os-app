@@ -1,11 +1,8 @@
 const { Xendit } = require('xendit-node');
 
-// Inisialisasi Xendit dengan Secret Key dari Vercel Environment Variables
 const x = new Xendit({
   secretKey: process.env.XENDIT_SECRET_KEY,
 });
-
-// Perhatikan: Tidak ada lagi "new Invoice({})" di sini
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -13,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { plan, userId, email } = req.body; // Ambil juga email dari frontend
+    const { plan, userId, email } = req.body;
 
     let amount = 0;
     let description = '';
@@ -29,14 +26,16 @@ export default async function handler(req, res) {
     }
 
     // --- INI BAGIAN YANG DIPERBAIKI ---
-    // Panggil createInvoice langsung dari instance 'x.Invoice'
+    // Perhatikan: semua detail invoice sekarang "dibungkus" di dalam properti 'data'
     const invoice = await x.Invoice.createInvoice({
-      externalID: `FASHION-OS-${userId}-${Date.now()}`,
-      amount: amount,
-      description: description,
-      payerEmail: email, // Gunakan email pengguna yang login
-      successRedirectURL: 'https://fashion-os-app.vercel.app/payment-success', // Pastikan ini halaman yg ada
-      failureRedirectURL: 'https://fashion-os-app.vercel.app/payment-failed', // Pastikan ini halaman yg ada
+      data: {
+        externalID: `FASHION-OS-${userId}-${Date.now()}`,
+        amount: amount,
+        description: description,
+        payerEmail: email,
+        successRedirectURL: 'https://fashion-os-app.vercel.app/payment-success',
+        failureRedirectURL: 'https://fashion-os-app.vercel.app/payment-failed',
+      }
     });
     // ---------------------------------
 
