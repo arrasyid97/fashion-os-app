@@ -25,19 +25,17 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Paket tidak valid.' });
     }
 
-    // --- INI BAGIAN YANG DIPERBAIKI ---
-    // Perhatikan: semua detail invoice sekarang "dibungkus" di dalam properti 'data'
     const invoice = await x.Invoice.createInvoice({
       data: {
         externalID: `FASHION-OS-${userId}-${Date.now()}`,
         amount: amount,
-        description: description,
         payerEmail: email,
+        description: description,
+        currency: 'IDR', // <-- PERBAIKAN ADA DI SINI
         successRedirectURL: 'https://fashion-os-app.vercel.app/payment-success',
         failureRedirectURL: 'https://fashion-os-app.vercel.app/payment-failed',
       }
     });
-    // ---------------------------------
 
     res.status(200).json({ paymentUrl: invoice.invoiceUrl });
 
