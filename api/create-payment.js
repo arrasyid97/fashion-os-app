@@ -40,7 +40,14 @@ export default async function handler(req, res) {
     res.status(200).json({ paymentUrl: invoice.invoiceUrl });
 
   } catch (error) {
-    console.error('Error creating Xendit invoice:', error);
-    res.status(500).json({ error: 'Gagal membuat invoice pembayaran.', details: error.message });
-  }
+  console.error('--- FULL XENDIT ERROR ---');
+  // Baris ini akan mencetak seluruh detail error ke log Vercel
+  console.error(JSON.stringify(error, null, 2)); 
+
+  res.status(500).json({ 
+    error: 'Gagal membuat invoice pembayaran.', 
+    // Kita juga kirim detail errornya ke browser untuk diinspeksi
+    details: error.response || error.message 
+  });
+}
 }
