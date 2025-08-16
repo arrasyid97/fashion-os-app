@@ -162,7 +162,8 @@ async function handleSubscription(plan) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 plan: plan,
-                userId: currentUser.value.uid
+                userId: currentUser.value.uid,
+                email: currentUser.value.email
             })
         });
 
