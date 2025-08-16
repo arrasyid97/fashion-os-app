@@ -157,7 +157,7 @@ async function handleSubscription(plan) {
         console.log(`Mengirim permintaan langganan untuk paket: ${plan}`);
 
         // Kirim permintaan ke Serverless Function kita
-        const response = await fetch('/api/create-payment', {
+        const response = await fetch('/api/generate-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
