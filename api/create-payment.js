@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
     const invoice = await x.Invoice.createInvoice({
       data: {
-        externalID: `FASHION-OS-${userId}-${Date.now()}`,
+        external_id: `FASHION-OS-${userId}-${Date.now()}`, // <-- PERBAIKAN FINAL DI SINI
         amount: amount,
         payerEmail: email,
         description: description,
@@ -40,7 +40,6 @@ export default async function handler(req, res) {
     res.status(200).json({ paymentUrl: invoice.invoiceUrl });
 
   } catch (error) {
-    // Ini adalah blok catch untuk debugging, biarkan saja seperti ini
     console.error('--- XENDIT VALIDATION ERRORS ---');
     if (error.response && error.response.errors) {
       console.error(JSON.stringify(error.response.errors, null, 2));
