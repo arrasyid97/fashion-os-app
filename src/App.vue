@@ -150,9 +150,36 @@ function generateUniqueCode() {
     }
     return `${numbers}${result}`;
 }
-function handleSubscription(plan) {
-    alert(`Anda memilih paket: ${plan}. Fitur pembayaran akan segera diintegrasikan.`);
-    // Di sinilah nanti kode untuk memanggil Firebase Functions akan ditempatkan.
+async function handleSubscription(plan) {
+    if (!currentUser.value) return alert("Silakan login terlebih dahulu.");
+
+    try {
+        console.log(`Mengirim permintaan langganan untuk paket: ${plan}`);
+
+        // Kirim permintaan ke Serverless Function kita
+        const response = await fetch('/api/create-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plan: plan,
+                userId: currentUser.value.uid
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Gagal menghubungi server.');
+        }
+
+        const data = await response.json();
+
+        // Arahkan pengguna ke halaman pembayaran yang diberikan oleh backend
+        alert(`Anda akan diarahkan ke halaman pembayaran...`);
+        window.location.href = data.paymentUrl;
+
+    } catch (error) {
+        console.error("Gagal membuat link pembayaran:", error);
+        alert("Gagal memproses langganan. Silakan coba lagi.");
+    }
 }
 async function handleRegister() {
     try {
@@ -2614,7 +2641,7 @@ onMounted(() => {
 </script>
 
 <template>
- <div> <div v-if="!currentUser && !isLoading" class="flex items-center justify-center h-screen bg-slate-100">
+    <div v-if="!currentUser && !isLoading" class="flex items-center justify-center h-screen bg-slate-100">
             <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
                 <h2 class="text-2xl font-bold text-center text-slate-800">Login ke {{ state.settings.brandName }}</h2>
                 <form @submit.prevent="handleLogin" class="space-y-4">
@@ -2640,7 +2667,9 @@ onMounted(() => {
                 </form>
             </div>
         </div>
-  <div>
+
+        
+  <div v-if="currentUser">
     <div class="flex h-screen bg-slate-100">
       <!-- Sidebar -->
       <aside class="w-64 bg-slate-800 text-slate-200 flex-shrink-0 hidden md:flex md:flex-col">
@@ -2659,6 +2688,7 @@ onMounted(() => {
     <a href="#" @click.prevent="changePage('keuangan')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'keuangan' }"><span class="mr-3 text-xl">💰</span> Keuangan</a>
     <a href="#" @click.prevent="changePage('retur')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'retur' }"><span class="mr-3 text-xl">↩️</span> Manajemen Retur</a>
     <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'pengaturan' }"><span class="mr-3 text-xl">⚙️</span> Pengaturan</a>
+    <a href="#" @click.prevent="changePage('langganan')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'langganan' }"><span class="mr-3 text-xl">💎</span> Langganan</a>
     <a href="#" @click.prevent="changePage('panduan')" class="sidebar-link flex items-center py-3 px-5 mt-4 border-t border-slate-700" :class="{ active: activePage === 'panduan' }"><span class="mr-3 text-xl">❓</span> Panduan Aplikasi</a>
 </nav>
       
@@ -5157,7 +5187,7 @@ onMounted(() => {
       </div>
     </div>
   </div>
-  </div>
+  
 </template>
 
 <style scoped>
