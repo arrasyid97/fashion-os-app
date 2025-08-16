@@ -31,7 +31,7 @@ export default async function handler(req, res) {
         amount: amount,
         payerEmail: email,
         description: description,
-        currency: 'IDR', // <-- PERBAIKAN ADA DI SINI
+        currency: 'IDR',
         successRedirectURL: 'https://fashion-os-app.vercel.app/payment-success',
         failureRedirectURL: 'https://fashion-os-app.vercel.app/payment-failed',
       }
@@ -40,14 +40,17 @@ export default async function handler(req, res) {
     res.status(200).json({ paymentUrl: invoice.invoiceUrl });
 
   } catch (error) {
-  console.error('--- FULL XENDIT ERROR ---');
-  // Baris ini akan mencetak seluruh detail error ke log Vercel
-  console.error(JSON.stringify(error, null, 2)); 
+    // Ini adalah blok catch untuk debugging, biarkan saja seperti ini
+    console.error('--- XENDIT VALIDATION ERRORS ---');
+    if (error.response && error.response.errors) {
+      console.error(JSON.stringify(error.response.errors, null, 2));
+    } else {
+      console.error(JSON.stringify(error, null, 2));
+    }
 
-  res.status(500).json({ 
-    error: 'Gagal membuat invoice pembayaran.', 
-    // Kita juga kirim detail errornya ke browser untuk diinspeksi
-    details: error.response || error.message 
-  });
-}
+    res.status(500).json({ 
+      error: 'Gagal membuat invoice pembayaran.', 
+      details: error.response || error.message
+    });
+  }
 }
