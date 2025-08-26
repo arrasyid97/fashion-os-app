@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Kode Aktivasi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full text-center">
+        <h1 class="text-2xl font-bold text-slate-800 mb-4">Generator Kode Aktivasi</h1>
+        <p class="text-slate-600 mb-6">Gunakan halaman ini untuk membuat kode aktivasi unik sekali pakai.</p>
+        <button id="generate-btn" class="bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 transition-colors">
+            Buat Kode Baru
+        </button>
+        <div id="result" class="mt-8 p-4 bg-slate-100 border border-slate-300 rounded-lg hidden">
+            <p class="text-sm text-slate-500 mb-2">Kode Aktivasi Anda:</p>
+            <p id="code-output" class="text-3xl font-mono font-bold text-indigo-800"></p>
+            <p class="mt-4 text-xs text-slate-500">
+                Salin kode ini dan berikan ke pelanggan. Kode ini hanya bisa digunakan satu kali.
+            </p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        
+        // Konfigurasi Firebase Anda dari firebase.js
+        const firebaseConfig = {
+            apiKey: "AIzaSyACoc4vE2aq3-zuhKmzx0TsV79GoD5202o",
+            authDomain: "fashion-os-app.firebaseapp.com",
+            projectId: "fashion-os-app",
+            storageBucket: "fashion-os-app.firebasestorage.app",
+            messagingSenderId: "498193441506",
+            appId: "1:498193441506:web:4b6f4914f1fbda8bf9f4bb"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        function generateActivationCode() {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            const length = 8;
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return result;
+        }
+
+        document.getElementById('generate-btn').addEventListener('click', async () => {
+            const newCode = generateActivationCode();
+            try {
+                const codeRef = doc(db, "activation_codes", newCode);
+                await setDoc(codeRef, {
+                    createdAt: new Date(),
+                    status: 'unused'
+                });
+                document.getElementById('code-output').textContent = newCode;
+                document.getElementById('result').classList.remove('hidden');
+                alert(`Kode aktivasi baru berhasil dibuat dan disimpan: ${newCode}`);
+            } catch (error) {
+                console.error("Gagal membuat kode aktivasi:", error);
+                alert("Gagal membuat kode aktivasi. Cek console untuk detail.");
+            }
+        });
+    </script>
+</body>
+</html>
