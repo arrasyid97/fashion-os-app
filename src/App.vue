@@ -5,17 +5,22 @@ import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 
 // Impor dari file konfigurasi Firebase Anda
-import { db, auth } from './firebase.js'; 
+
+import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore'
-
-// Impor fungsi-fungsi BARU untuk Autentikasi (Login/Register)
-import { 
-    onAuthStateChanged, 
-    signOut, 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword 
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
+let onSnapshotListener = null;
+// Impor fungsi-fungsi BARU untuk Autentikasi
+import { 
+    onAuthStateChanged, 
+    signOut,
+    GoogleAuthProvider, // <-- Impor Google Provider
+    
+    signInWithPopup, // <-- Impor signInWithPopup
+    
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword 
 } from "firebase/auth";
 
 // --- STATE MANAGEMENT ---
@@ -27,25 +32,91 @@ const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengatura
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
-const userUnsubscribe = ref(null);
-const authForm = reactive({
-    email: '',
-    password: '',
-    error: '',
-    activationCode: ''
+
+const isDashboardLocked = ref(true);
+const dashboardPinInput = ref('');
+const dashboardPinError = ref('');
+const ADMIN_UID = '6m4bgRlZMDhL8niVyD4lZmGuarF3'; 
+
+// Properti ini akan otomatis bernilai 'true' jika yang login adalah Anda (Admin)
+const isAdmin = computed(() => {
+  return currentUser.value && currentUser.value.uid === ADMIN_UID;
 });
+
+// Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
+async function fetchAllUsers() {
+    if (!isAdmin.value) return; // Hanya jalankan jika admin
+    try {
+        const usersCollection = collection(db, 'users');
+        const userSnapshots = await getDocs(usersCollection);
+        uiState.allUsers = userSnapshots.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error("Gagal mengambil daftar pengguna:", error);
+        alert("Gagal mengambil daftar pengguna.");
+    }
+}
+
+// Fungsi untuk mengekspor semua data milik satu pengguna
+async function exportAllDataForUser(userId, userEmail) {
+    if (!isAdmin.value) return; // Hanya jalankan jika admin
+    if (!userId) {
+        alert("Silakan pilih pelanggan terlebih dahulu.");
+        return;
+    }
+    if (!confirm(`Anda akan mengunduh semua data untuk ${userEmail}. Lanjutkan?`)) {
+        return;
+    }
+
+    uiState.isExportingUserData = true;
+    try {
+        const collectionsToExport = [
+            'products', 'transactions', 'keuangan', 'production_batches',
+            'gudangKain', 'returns', 'settings', 'promotions', 'categories', 'fabric_stock'
+        ];
+
+        const workbook = XLSX.utils.book_new();
+
+        for (const collName of collectionsToExport) {
+            // PERBAIKAN DI SINI:
+            // Ambil SEMUA dokumen di koleksi, karena admin diizinkan
+            const q = collection(db, collName);
+            const snapshot = await getDocs(q);
+            
+            // Filter data secara manual di sisi aplikasi
+            const data = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(item => item.userId === userId || item.id === userId); // Tambahkan filter untuk koleksi seperti 'settings' dan 'promotions'
+
+            if (data.length > 0) {
+                const cleanData = JSON.parse(JSON.stringify(data));
+                const worksheet = XLSX.utils.json_to_sheet(cleanData);
+                XLSX.utils.book_append_sheet(workbook, worksheet, collName.substring(0, 31));
+            }
+        }
+
+        const fileName = `Export_Data_${userEmail}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+        alert('Data berhasil diekspor!');
+
+    } catch (error) {
+        console.error("Gagal mengekspor data pelanggan:", error);
+        alert("Terjadi kesalahan saat mengekspor data.");
+    } finally {
+        uiState.isExportingUserData = false;
+    }
+}
+
 const state = reactive({
     settings: { 
         brandName: 'FASHION OS', 
         minStok: 10,
         marketplaces: [],
-        modelBaju: [],
+        modelProduk: [],
         categories: [],
     },
     produk: [],
     transaksi: [],
-    biaya: [],
-    keuanganLain: [],
+    keuangan: [],
     retur: [
     { id: 'RET-001', tanggal: '2025-07-21', sku: 'FSH-TSH-BL-M', qty: 1, alasan: 'Ukuran tidak sesuai', tindakLanjut: 'Tukar Ukuran', channelId: 'shopee-a' },
     { id: 'RET-002', tanggal: '2025-07-22', sku: 'FSH-KJM-NV-L', qty: 1, alasan: 'Cacat produksi', tindakLanjut: 'Refund', channelId: 'tiktok-shop' },
@@ -63,40 +134,49 @@ const yearlyPrice = ref(2000000);
 async function submitAddProduct() {
     const form = uiState.modalData;
     if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian || !form.hpp || !form.hargaJualDefault) {
-        alert('SKU, Nama, Model Baju, Warna, Varian, HPP, dan Harga Jual Default wajib diisi.');
+        alert('SKU, Nama, Model produk, Warna, Varian, HPP, dan Harga Jual Default wajib diisi.');
         return;
     }
     const skuUpperCase = form.sku.toUpperCase();
     const productRef = doc(db, "products", skuUpperCase);
+    
     const productData = {
         product_name: form.nama,
-        model_id: form.modelId, // BARIS KUNCI: Menghubungkan produk ke model baju
+        model_id: form.modelId,
         color: form.warna || '',
         variant: form.varian || '',
         physical_stock: 0,
         hpp: form.hpp,
         userId: currentUser.value.uid
     };
+    
     try {
+        // Langkah 1: Simpan dokumen produk utama terlebih dahulu dengan setDoc
+        // Ini memastikan Firestore memprosesnya sebagai operasi 'create' yang jelas
         await setDoc(productRef, productData);
-        const batch = writeBatch(db);
+        
+        // Langkah 2: Simpan dokumen harga di batch terpisah
+        const priceBatch = writeBatch(db);
         state.settings.marketplaces.forEach(channel => {
             const priceDocId = `${skuUpperCase}-${channel.id}`;
             const priceRef = doc(db, "product_prices", priceDocId);
-            batch.set(priceRef, {
+            priceBatch.set(priceRef, {
                 product_sku: skuUpperCase,
                 marketplace_id: channel.id,
                 price: form.hargaJualDefault,
                 userId: currentUser.value.uid
             });
         });
-        await batch.commit();
+        await priceBatch.commit();
+
         alert(`Produk "${form.nama}" berhasil ditambahkan ke database!`);
+        
+        // Memuat ulang data setelah operasi berhasil
         await loadAllDataFromFirebase();
         hideModal();
     } catch (error) {
-        console.error('Error menyimpan produk ke Firebase:', error);
-        alert('Gagal menyimpan produk ke database. Cek console untuk detail.');
+        console.error('Error menyimpan produk ke Database:', error);
+        alert('Gagal menyimpan produk ke database. Cek console untuk detail. Error: ' + error.message);
     }
 }
 function generateUniqueCode() {
@@ -108,6 +188,8 @@ function generateUniqueCode() {
     }
     return `${numbers}${result}`;
 }
+
+
 
 async function handleSubscriptionMidtrans(plan) {
     if (!currentUser.value) {
@@ -241,6 +323,102 @@ async function handleSubscriptionMidtrans(plan) {
     }
 }
 
+const voucherTokoComputed = (channel) => computed({
+    get() { return state.promotions.perChannel[channel.id]?.voucherToko ? state.promotions.perChannel[channel.id].voucherToko + '%' : ''; },
+    set(newValue) { state.promotions.perChannel[channel.id].voucherToko = parseFloat(newValue.replace(/[^0-9.]/g, '')) || null; }
+});
+const voucherSemuaProdukComputed = (channel) => computed({
+    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk ? 'Rp ' + formatInputNumber(state.promotions.perChannel[channel.id].voucherSemuaProduk) : ''; },
+    set(newValue) { state.promotions.perChannel[channel.id].voucherSemuaProduk = parseInputNumber(newValue) || null; }
+});
+const voucherProdukComputed = (modelName, channelId) => computed({
+    get() { return state.promotions.perModel[modelName]?.[channelId]?.voucherProduk ? state.promotions.perModel[modelName][channelId].voucherProduk + '%' : ''; },
+    set(newValue) { state.promotions.perModel[modelName][channelId].voucherProduk = parseFloat(newValue.replace(/[^0-9.]/g, '')) || null; }
+});
+const tieredMinComputed = (tier) => computed({
+    get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
+    set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
+});
+const tieredDiskonComputed = (tier) => computed({
+    get() { return tier.diskon ? tier.diskon + '%' : ''; },
+    set(newValue) { tier.diskon = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0; }
+});
+
+async function activateSubscriptionWithCode() {
+    const code = authForm.activationCode;
+    if (!code) {
+        alert("Kode aktivasi tidak boleh kosong.");
+        return;
+    }
+
+    try {
+        const codeRef = doc(db, "activation_codes", code);
+        const codeDoc = await getDoc(codeRef);
+
+        if (codeDoc.exists() && codeDoc.data().status === 'unused') {
+            const userRef = doc(db, "users", currentUser.value.uid);
+            const now = new Date();
+            const nextMonth = new Date(now.setMonth(now.getMonth() + 1));
+
+            // PERBAIKAN: Gunakan `setDoc` dengan `merge: true`
+            // Ini akan menambahkan/mengupdate data langganan tanpa menghapus data PIN yang sudah ada
+            await setDoc(userRef, {
+                subscriptionStatus: 'active',
+                subscriptionEndDate: nextMonth,
+                trialEndDate: null
+            }, { merge: true }); // <--- BARIS PENTING DITAMBAHKAN
+
+            await updateDoc(codeRef, { status: 'used', usedBy: currentUser.value.uid, usedAt: new Date() });
+            
+            alert('Langganan Anda berhasil diaktifkan selama 30 hari!');
+            activePage.value = 'dashboard';
+        } else {
+            alert('Kode aktivasi tidak valid atau sudah digunakan.');
+        }
+    } catch (error) {
+        console.error("Error mengaktifkan langganan:", error);
+        alert(`Terjadi kesalahan: ${error.message}`);
+    }
+}
+
+async function handleAuth(user) {
+    currentUser.value = user;
+
+    try {
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            currentUser.value.userData = userData;
+            state.settings.dashboardPin = userData.dashboardPin || '';
+
+            const now = new Date();
+            const endDate = userData.subscriptionEndDate?.toDate();
+            const trialDate = userData.trialEndDate?.toDate();
+
+            const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+                                         (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+
+            if (isSubscriptionValid) {
+                await loadAllDataFromFirebase();
+                const storedPage = localStorage.getItem('lastActivePage');
+                activePage.value = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+            } else {
+                activePage.value = 'langganan';
+            }
+        } else {
+            console.error("Data user tidak ditemukan di Firestore. Mengarahkan ke logout.");
+            handleLogout();
+        }
+    } catch (error) {
+        console.error("Gagal memuat data user:", error);
+        alert("Gagal memuat data user. Silakan coba lagi.");
+        handleLogout();
+    }
+}
+
+
 async function addCategory() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.nestedModalData;
@@ -304,58 +482,75 @@ async function deleteCategory(categoryId) {
     }
 }
 
+// GANTI SELURUH FUNGSI handleRegister INI
 async function handleRegister() {
     try {
-        // 1. Buat akun pengguna di Firebase Authentication
         const userCredential = await createUserWithEmailAndPassword(auth, authForm.email, authForm.password);
         const user = userCredential.user;
-
-        // 2. Siapkan dokumen baru untuk pengguna di koleksi 'users'
+        const now = new Date();
         const userDocRef = doc(db, "users", user.uid);
+
         let newUserData = {
             email: user.email,
-            subscriptionStatus: '', // Akan kita isi di bawah
+            subscriptionStatus: 'trial',
             subscriptionEndDate: null,
-            trialEndDate: null
+            trialEndDate: null,
+            dashboardPin: authForm.dashboardPin || null // <-- Ambil PIN dari form register
         };
-
-        const now = new Date();
         
-        // 3. Cek apakah ada Kode Aktivasi yang dimasukkan
-        if (authForm.activationCode === 'BAYAR30HARI') { 
-            // LOGIKA UNTUK PEMBELI ONLINE (SHOPEE)
-            // Anda akan memberikan kode 'BAYAR30HARI' kepada pembeli Shopee Anda
-            newUserData.subscriptionStatus = 'active';
-            const nextMonth = new Date(now.setMonth(now.getMonth() + 1));
-            newUserData.subscriptionEndDate = nextMonth;
-            alert('Registrasi berhasil! Langganan Anda aktif selama 30 hari.');
+        if (authForm.activationCode) {
+            const codeRef = doc(db, "activation_codes", authForm.activationCode);
+            const codeDoc = await getDoc(codeRef);
 
+            if (codeDoc.exists() && codeDoc.data().status === 'unused') {
+                newUserData.subscriptionStatus = 'active';
+                const nextMonth = new Date(now.setMonth(now.getMonth() + 1));
+                newUserData.subscriptionEndDate = nextMonth;
+                alert('Registrasi berhasil! Langganan Anda aktif selama 30 hari.');
+                await updateDoc(codeRef, { status: 'used', usedBy: user.uid, usedAt: new Date() });
+            } else {
+                const sevenDaysLater = new Date(now.setDate(now.getDate() + 7));
+                newUserData.trialEndDate = sevenDaysLater;
+                alert('Kode aktivasi tidak valid atau sudah digunakan. Anda mendapatkan free trial selama 7 hari.');
+            }
         } else {
-            // LOGIKA UNTUK PENGGUNA OFFLINE (FREE TRIAL)
-            // Jika kode aktivasi kosong atau salah
-            newUserData.subscriptionStatus = 'trial';
             const sevenDaysLater = new Date(now.setDate(now.getDate() + 7));
             newUserData.trialEndDate = sevenDaysLater;
             alert('Registrasi berhasil! Anda mendapatkan free trial selama 7 hari.');
         }
 
-        // 4. Simpan data pengguna ke Firestore
-        await setDoc(userDocRef, newUserData);
-
+        // SIMPAN PIN BARU BERSAMAAN DENGAN DATA PENGGUNA BARU
+        await setDoc(userDocRef, newUserData, { merge: true });
         authForm.error = '';
-        // Pengguna akan otomatis login
-
     } catch (error) {
-        authForm.error = error.message;
+        if (error.code === 'auth/email-already-in-use') {
+            authForm.error = 'Alamat email ini sudah terdaftar. Silakan gunakan email lain atau login.';
+        } else if (error.code === 'auth/invalid-email') {
+            authForm.error = 'Format alamat email tidak valid.';
+        } else if (error.code === 'auth/weak-password') {
+            authForm.error = 'Kata sandi terlalu lemah. Minimal 6 karakter.';
+        } else {
+            authForm.error = 'Terjadi kesalahan saat mendaftar. Silakan coba lagi.';
+        }
     }
 }
-
 async function handleLogin() {
     try {
-        await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
+        const userCredential = await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
+        const user = userCredential.user;
         authForm.error = '';
+
+        alert('Selamat datang kembali!');
+        
+        // Panggil fungsi pemuatan dan navigasi utama di sini
+        await handleAuth(user);
+
     } catch (error) {
-        authForm.error = error.message;
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            authForm.error = 'Email atau kata sandi salah.';
+        } else {
+            authForm.error = 'Terjadi kesalahan saat login.';
+        }
     }
 }
 
@@ -368,24 +563,21 @@ async function deleteGroup(variants) {
         alert("Anda harus login untuk menghapus produk.");
         return;
     }
-
     if (!confirm(`Anda yakin ingin menghapus SEMUA varian produk ini? Data ini tidak bisa dikembalikan.`)) {
         return;
     }
-
     try {
-        const batch = writeBatch(db);
         const productSKUs = variants.map(v => v.sku);
+        const batch = writeBatch(db);
 
-        // Loop untuk menghapus setiap varian produk satu per satu
         for (const sku of productSKUs) {
             const productRef = doc(db, "products", sku);
             batch.delete(productRef);
 
-            const priceQuery = query(collection(db, "product_prices"), where("product_sku", "==", sku));
-            const priceSnapshots = await getDocs(priceQuery);
-            priceSnapshots.forEach(priceDoc => {
-                batch.delete(priceDoc.ref);
+            state.settings.marketplaces.forEach(mp => {
+                const priceDocId = `${sku}-${mp.id}`;
+                const priceRef = doc(db, "product_prices", priceDocId);
+                batch.delete(priceRef);
             });
 
             const allocationRef = doc(db, "stock_allocations", sku);
@@ -394,15 +586,54 @@ async function deleteGroup(variants) {
         
         await batch.commit();
 
-        // Perbarui state lokal setelah semua berhasil dihapus
         state.produk = state.produk.filter(p => !productSKUs.includes(p.sku));
         alert(`Semua varian produk berhasil dihapus.`);
-
     } catch (error) {
         console.error("Error menghapus grup produk:", error);
         alert("Gagal menghapus grup produk dari database. Cek console untuk detail.");
     }
 }
+
+// Metode untuk login dengan Google
+async function signInWithGoogle() {
+    const provider = new GoogleAuthProvider();
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        
+        // Cek apakah ini pengguna baru atau lama
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (!userDocSnap.exists()) {
+            // Jika pengguna baru, inisialisasi data dan berikan trial
+            const now = new Date();
+            const sevenDaysLater = new Date(now.setDate(now.getDate() + 7));
+            const newUserData = {
+                email: user.email,
+                subscriptionStatus: 'trial',
+                subscriptionEndDate: null,
+                trialEndDate: sevenDaysLater,
+            };
+            await setDoc(userDocRef, newUserData);
+            alert('Selamat datang! Anda mendapatkan free trial selama 7 hari.');
+        } else {
+            // Jika pengguna lama, tidak perlu melakukan apa-apa
+            alert('Selamat datang kembali!');
+        }
+    } catch (error) {
+        console.error("Error login dengan Google:", error);
+        alert(error.message);
+    }
+}
+
+const authForm = reactive({
+    email: '',
+    password: '',
+    error: '',
+    dashboardPin: '',
+    activationCode: ''
+});
 
 function addProgram() {
     const marketplace = uiState.modalData;
@@ -529,14 +760,14 @@ const uiState = reactive({
         statusProses: 'Dalam Proses',
         kainBahan: [{
             idUnik: '',
-            modelBajuId: '',
+            modelProdukId: '',
             namaKain: '',
             tokoKain: '',
             warnaKain: '',
             ukuran: '',
             totalYard: null,
             hargaKainPerYard: null,
-            yardPerBaju: null,
+            yardPermodel: null,
             aktualJadi: null,
             aktualJadiLabelType: 'Aktual Jadi',
             hargaMaklunPerPcs: null,
@@ -550,7 +781,7 @@ const uiState = reactive({
         orangMemproses: '',
     },
     pengaturanMarketplaceSearch: '',
-    pengaturanModelBajuSearch: '',
+    pengaturanModelProdukSearch: '',
     posDateFilter: 'today',
     posStartDate: '',
     posEndDate: '',
@@ -581,6 +812,23 @@ const uiState = reactive({
     returSearchRecommendations: [],
     ringkasanStatusSelected: 'Selesai',
     selectedPlan: null,
+    oldPin: '',
+    newPin: '',
+    confirmNewPin: '',
+    pinError: '',
+    pengaturanTab: 'umum',
+    isKeuanganInfoVisible: false,
+    priceCalculator: {
+    hpp: null,
+    targetMargin: 0,
+    selectedMarketplace: null,
+    selectedModelName: null,
+    result: null
+},
+    allUsers: [],
+    selectedUserForExport: null,
+    isExportingUserData: false,
+    
     stockInSearchRecommendations: [],
 });
 
@@ -589,7 +837,48 @@ const uiState = reactive({
 let profitExpenseChart = null;
 let salesChannelChart = null;
 // --- UTILITY FUNCTIONS ---
-const formatCurrency = (value) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value || 0);
+const formatCurrency = (value) => {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0, // <-- DIUBAH MENJADI 1
+        maximumFractionDigits: 1, // <-- DIUBAH MENJADI 1
+    }).format(value || 0);
+};
+
+const targetMarginComputed = computed({
+    get() {
+        // Tampilkan nilai dengan simbol % di input
+        return uiState.priceCalculator.targetMargin ? uiState.priceCalculator.targetMargin + '%' : '';
+    },
+    set(newValue) {
+        // Hapus simbol % dan pastikan nilai yang disimpan adalah angka
+        const parsedValue = parseInt(newValue.replace(/[^0-9]/g, '')) || 0;
+        uiState.priceCalculator.targetMargin = parsedValue;
+    }
+});
+
+const admComputed = computed({
+    get() { return uiState.modalData.adm ? uiState.modalData.adm + '%' : ''; },
+    set(newValue) { uiState.modalData.adm = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0; }
+});
+const komisiComputed = computed({
+    get() { return uiState.modalData.komisi ? uiState.modalData.komisi + '%' : ''; },
+    set(newValue) { uiState.modalData.komisi = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0; }
+});
+const layananComputed = computed({
+    get() { return uiState.modalData.layanan ? uiState.modalData.layanan + '%' : ''; },
+    set(newValue) { uiState.modalData.layanan = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0; }
+});
+const programRateComputed = (program) => ({
+    get value() {
+        return program.rate ? program.rate + '%' : '';
+    },
+    setValue(newValue) {
+        program.rate = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0;
+    }
+});
+
 const formatNumber = (value) => (value === null || value === undefined) ? '' : new Intl.NumberFormat('id-ID').format(value);
 const getProductBySku = (sku) => {
     // Pertama, pastikan 'sku' yang dicari tidak kosong
@@ -677,9 +966,13 @@ const parseInputNumber = (value) => {
 
 
 // --- COMPUTED PROPERTIES ---
-const dashboardFilteredData = computed(() => ({
-    transaksi: filterDataByDate(
-        state.transaksi, 
+const dashboardFilteredData = computed(() => {
+    // Memastikan state.keuangan dan state.transaksi adalah array, bahkan jika masih kosong
+    const keuanganData = state.keuangan || [];
+    const transaksiData = state.transaksi || [];
+
+    const filteredKeuangan = filterDataByDate(
+        keuanganData, 
         uiState.dashboardDateFilter, 
         uiState.dashboardStartDate, 
         uiState.dashboardEndDate,
@@ -687,9 +980,10 @@ const dashboardFilteredData = computed(() => ({
         uiState.dashboardStartYear,
         uiState.dashboardEndMonth,
         uiState.dashboardEndYear
-    ),
-    biaya: filterDataByDate(
-        state.biaya, 
+    );
+
+    const filteredTransaksi = filterDataByDate(
+        transaksiData, 
         uiState.dashboardDateFilter, 
         uiState.dashboardStartDate, 
         uiState.dashboardEndDate,
@@ -697,18 +991,9 @@ const dashboardFilteredData = computed(() => ({
         uiState.dashboardStartYear,
         uiState.dashboardEndMonth,
         uiState.dashboardEndYear
-    ),
-    keuanganLain: filterDataByDate(
-        state.keuanganLain, 
-        uiState.dashboardDateFilter, 
-        uiState.dashboardStartDate, 
-        uiState.dashboardEndDate,
-        uiState.dashboardStartMonth,
-        uiState.dashboardStartYear,
-        uiState.dashboardEndMonth,
-        uiState.dashboardEndYear
-    ),
-    retur: filterDataByDate(
+    );
+
+    const filteredRetur = filterDataByDate(
         state.retur, 
         uiState.dashboardDateFilter, 
         uiState.dashboardStartDate, 
@@ -717,31 +1002,73 @@ const dashboardFilteredData = computed(() => ({
         uiState.dashboardStartYear,
         uiState.dashboardEndMonth,
         uiState.dashboardEndYear
-    )
-}));
+    );
+
+    return {
+        transaksi: filteredTransaksi,
+        keuangan: filteredKeuangan,
+        retur: filteredRetur
+    };
+});
+
+// GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    const { transaksi, biaya, keuanganLain, retur } = dashboardFilteredData.value;
-    let totalOmsetBersih = 0, totalHppTerjual = 0, totalBiayaTransaksi = 0;
-    transaksi.forEach(trx => {
-        totalOmsetBersih += trx.total;
-        trx.items.forEach(item => {
-            totalHppTerjual += (item.hpp || 0) * item.qty;
-        });
-        if (trx.biaya && trx.biaya.total) {
-            // PERBAIKAN: Sekarang hanya menjumlahkan 'trx.biaya.total' yang sudah benar.
-            totalBiayaTransaksi += trx.biaya.total;
+    // Memberikan nilai default array kosong jika data belum dimuat
+    const { transaksi = [], keuangan = [], retur = [] } = dashboardFilteredData.value || {};
+    let totalOmsetKotor = 0;
+    let totalHppTerjual = 0;
+    let totalDiskon = 0;
+    let totalBiayaOperasional = 0;
+    let totalBiayaTransaksi = 0;
+    let saldoKas = 0;
+
+    // Menghitung saldo kas dari semua pemasukan dan pengeluaran
+    keuangan.forEach(item => {
+        if (item.jenis === 'pemasukan_lain') {
+            saldoKas += (item.jumlah || 0);
+        } else if (item.jenis === 'pengeluaran') {
+            saldoKas -= (item.jumlah || 0);
+            totalBiayaOperasional += (item.jumlah || 0);
         }
     });
-    const totalBiayaOperasional = biaya.reduce((sum, b) => sum + b.jumlah, 0);
-    const totalModalMasuk = keuanganLain.filter(i => i.tipe === 'Modal Masuk').reduce((s, i) => s + i.jumlah, 0);
-    const totalAmbilanPribadi = keuanganLain.filter(i => i.tipe === 'Ambilan Pribadi').reduce((s, i) => s + i.jumlah, 0);
-    const totalNilaiRetur = retur.reduce((sum, r) => { const p = getProductBySku(r.sku); const hargaJual = p && p.hargaJual ? (Object.values(p.hargaJual)[0] || p.hpp) : 0; return sum + (hargaJual * r.qty); }, 0);
-    const labaKotor = totalOmsetBersih - totalHppTerjual;
-    const labaBersihEst = labaKotor - totalBiayaOperasional - totalBiayaTransaksi;
-    const saldoKas = totalOmsetBersih - totalBiayaOperasional - totalAmbilanPribadi + totalModalMasuk - totalBiayaTransaksi;
-    const totalUnitStok = state.produk.reduce((sum, p) => sum + (p.stokFisik || 0), 0);
-    const totalNilaiStokHPP = state.produk.reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
-    return { saldoKas, totalOmsetBersih, labaKotor, labaBersihEst, totalBiayaOperasional, totalUnitStok, totalNilaiStokHPP, totalNilaiRetur };
+
+    transaksi.forEach(trx => {
+        totalOmsetKotor += (trx.subtotal || 0);
+        totalDiskon += (trx.diskon?.totalDiscount || 0);
+        totalBiayaTransaksi += (trx.biaya?.total || 0);
+        (trx.items || []).forEach(item => {
+            totalHppTerjual += (item.hpp || 0) * (item.qty || 0);
+        });
+    });
+
+    const omsetBersih = totalOmsetKotor - totalDiskon;
+    const labaKotor = omsetBersih - totalHppTerjual;
+    const labaBersihOperasional = labaKotor - totalBiayaOperasional - totalBiayaTransaksi;
+
+    saldoKas += omsetBersih - totalBiayaTransaksi;
+    
+    const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
+    const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
+    const totalNilaiRetur = (retur || []).reduce((sum, r) => {
+        const p = getProductBySku(r.sku);
+        const hargaJual = p && p.hargaJual ? (Object.values(p.hargaJual)[0] || p.hpp) : 0;
+        return sum + (hargaJual * (r.qty || 0));
+    }, 0);
+
+    return {
+        saldoKas,
+        omsetBersih,
+        labaKotor,
+        labaBersihOperasional,
+        totalBiayaOperasional,
+        totalUnitStok,
+        totalNilaiStokHPP,
+        totalNilaiRetur,
+        totalOmsetKotor,
+        totalDiskon,
+        totalHppTerjual,
+        totalBiayaTransaksi
+    };
 });
 const namaKainHistory = computed(() => {
     const uniqueNames = new Set(state.gudangKain.map(k => k.namaKain).filter(Boolean));
@@ -896,8 +1223,10 @@ const laporanTotalBiayaJasa = computed(() => {
 
 
 const filteredPengeluaran = computed(() => {
+    // Perbaikan: Ambil data dari state.keuangan
+    const filteredData = state.keuangan.filter(item => item.jenis === 'pengeluaran');
     return filterDataByDate(
-        state.biaya, 
+        filteredData, 
         uiState.keuanganPengeluaranFilter, 
         uiState.keuanganPengeluaranStartDate, 
         uiState.keuanganPengeluaranEndDate,
@@ -908,8 +1237,10 @@ const filteredPengeluaran = computed(() => {
     ).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 });
 const filteredPemasukan = computed(() => {
+    // Perbaikan: Ambil data dari state.keuangan
+    const filteredData = state.keuangan.filter(item => item.jenis === 'pemasukan_lain');
     return filterDataByDate(
-        state.keuanganLain, 
+        filteredData, 
         uiState.keuanganPemasukanFilter, 
         uiState.keuanganPemasukanStartDate, 
         uiState.keuanganPemasukanEndDate,
@@ -960,28 +1291,29 @@ const filteredRetur = computed(() => {
 });
 
 const filteredMarketplaces = computed(() => {
+    // Memberikan nilai default array kosong jika state.settings.marketplaces undefined
+    const marketplacesData = state.settings.marketplaces || [];
     const query = uiState.pengaturanMarketplaceSearch.toLowerCase();
     if (!query) {
-        return state.settings.marketplaces;
+        return marketplacesData;
     }
-    return state.settings.marketplaces.filter(mp => 
+    return marketplacesData.filter(mp => 
         (mp.name || '').toLowerCase().includes(query)
     );
 });
 
-const filteredModelBaju = computed(() => {
-    const query = uiState.pengaturanModelBajuSearch.toLowerCase();
+// GANTI SELURUH COMPUTED PROPERTY INI
+const filteredModelProduk = computed(() => {
+    // Memberikan nilai default array kosong jika state.settings.modelProduk undefined
+    const modelProdukData = state.settings.modelProduk || [];
+    const query = uiState.pengaturanModelProdukSearch.toLowerCase();
     if (!query) {
-        return state.settings.modelBaju;
+        return modelProdukData;
     }
-    return state.settings.modelBaju.filter(model => 
-        // TAMBAHKAN (model.namaModel || '')
-        // Ini berarti: "gunakan model.namaModel, TAPI jika tidak ada, gunakan string kosong ''"
+    return modelProdukData.filter(model => 
         (model.namaModel || '').toLowerCase().includes(query)
     );
 });
-
-
 
 const filteredProduksiBatches = computed(() => {
     if (!state.produksi) {
@@ -1047,7 +1379,7 @@ const ringkasanJadiData = computed(() => {
     filteredBatches.forEach(batch => {
         (batch.kainBahan || []).forEach(kb => {
             if (kb.aktualJadi > 0) {
-                const modelName = state.settings.modelBaju.find(m => m.id === kb.modelBajuId)?.namaModel || 'N/A';
+                const modelName = state.settings.modelProduk.find(m => m.id === kb.modelProdukId)?.namaModel || 'N/A';
                 const key = `${batch.tanggal}|${batch.namaPemaklun}|${modelName}|${kb.namaKain}|${kb.warnaKain}|${kb.ukuran}`;
                 if (!summary[key]) {
                     summary[key] = { tanggal: batch.tanggal, pemaklun: batch.namaPemaklun, model: modelName, kain: kb.namaKain, warna: kb.warnaKain, ukuran: kb.ukuran, total: 0 };
@@ -1107,7 +1439,7 @@ const laporanSemuanyaData = computed(() => {
     );
 
     const tableData = filteredData.map(item => {
-        const modelInfo = state.settings.modelBaju.find(m => m.id === item.modelBajuId) || {};
+        const modelInfo = state.settings.modelProduk.find(m => m.id === item.modelProdukId) || {};
         const totalBiayaKain = (item.totalYard || 0) * (item.hargaKainPerYard || 0);
         const hargaJasaPerPcs = item.produksiType === 'penjahit' ? (item.hargaJahitPerPcs || 0) : (item.hargaMaklunPerPcs || 0);
         const totalBiayaJasa = (item.aktualJadi || 0) * hargaJasaPerPcs;
@@ -1132,23 +1464,25 @@ const laporanSemuanyaData = computed(() => {
 const laporanSemuaKpis = computed(() => {
     const tableData = laporanSemuanyaData.value.tableData;
     if (!tableData || tableData.length === 0) {
-        return { totalBajuSelesai: 0, totalBiaya: 0, avgHpp: 0, totalBatch: 0 };
+        return { totalModelSelesai: 0, totalBiaya: 0, avgHpp: 0, totalBatch: 0 };
     }
 
     // =================================================================
     // INI BAGIAN KUNCI YANG DIPERBAIKI:
     // Secara eksplisit HANYA menjumlahkan nilai dari `item.aktualJadi`
     // =================================================================
-    const totalBajuSelesai = tableData.reduce((sum, item) => sum + (item.aktualJadi || 0), 0);
+    const totalModelSelesai = tableData.reduce((sum, item) => sum + (item.aktualJadi || 0), 0);
     
     const totalBiaya = tableData.reduce((sum, item) => sum + item.totalBiayaProduksi, 0);
-    const avgHpp = totalBajuSelesai > 0 ? totalBiaya / totalBajuSelesai : 0;
+    const avgHpp = totalModelSelesai > 0 ? totalBiaya / totalModelSelesai : 0;
     const totalBatch = new Set(tableData.map(item => item.batchId)).size;
 
-    return { totalBajuSelesai, totalBiaya, avgHpp, totalBatch };
+    return { totalModelSelesai, totalBiaya, avgHpp, totalBatch };
 });
 const analisisModelData = computed(() => {
-    const dataPerKain = state.produksi.flatMap(batch => 
+    console.log("--- MEMULAI ANALISIS ---");
+
+    const dataPerKain = state.produksi.flatMap(batch =>
         (batch.kainBahan || []).map(kain => ({
             ...kain,
             batchId: batch.id,
@@ -1158,16 +1492,25 @@ const analisisModelData = computed(() => {
             statusProses: batch.statusProses,
         }))
     );
+    console.log("1. Total item produksi yang ditemukan:", dataPerKain.length, dataPerKain);
+    console.log("2. Filter yang sedang aktif:", { 
+        filterMode: uiState.analisisModelFilter,
+        selectedModelId: uiState.analisisModelSelectedModel, 
+        workerType: uiState.produksiFilterType,
+        actualType: uiState.analisisModelSelectedType
+    });
+
     let filteredData = dataPerKain.filter(item => {
-        // BARIS KUNCI: Gabungkan logika filter jenis pekerja
         const matchesType = uiState.produksiFilterType === 'all' || item.produksiType === uiState.produksiFilterType;
-        const matchesModel = uiState.analisisModelFilter === 'all' || (uiState.analisisModelFilter === 'model' && item.modelBajuId === uiState.analisisModelSelectedModel);
+        const matchesModel = uiState.analisisModelFilter === 'all' || (uiState.analisisModelFilter === 'model' && item.modelProdukId === uiState.analisisModelSelectedModel);
         return matchesType && matchesModel;
     });
+    console.log("3. Data setelah difilter berdasarkan Model & Jenis Status:", filteredData.length, filteredData);
+
     const processedData = filteredData.map(item => {
-        const modelInfo = state.settings.modelBaju.find(m => m.id === item.modelBajuId) || {};
+        const modelInfo = state.settings.modelProduk.find(m => m.id === item.modelProdukId) || {};
         const totalBiayaKain = (item.totalYard || 0) * (item.hargaKainPerYard || 0);
-        const yardStandar = modelInfo.yardPerBaju || 1;
+        const yardStandar = modelInfo.yardPerModel || 1;
         const hargaJasaPerPcs = item.produksiType === 'penjahit' ? (item.hargaJahitPerPcs || 0) : (item.hargaMaklunPerPcs || 0);
         const targetQty = Math.floor((item.totalYard || 0) / yardStandar);
         let aktualFinal = 0;
@@ -1193,22 +1536,33 @@ const analisisModelData = computed(() => {
             selisih: selisih,
             hpp: hpp,
         };
-    }).filter(item => item.aktualFinal > 0);
-    const sortedData = processedData.sort((a, b) => a.selisih - b.selisih);
+    });
+    console.log("4. Data setelah diproses (sebelum filter aktual > 0):", processedData.length, processedData);
+    
+    const finalData = processedData.filter(item => item.aktualFinal > 0);
+    console.log("5. Data FINAL yang akan ditampilkan di tabel:", finalData.length, finalData);
+
+    const sortedData = finalData.sort((a, b) => a.selisih - b.selisih);
     const limit = parseInt(uiState.analisisModelLimit, 10);
-    return limit > 0 ? sortedData.slice(0, limit) : sortedData;
+    const finalResult = limit > 0 ? sortedData.slice(0, limit) : sortedData;
+    console.log("--- ANALISIS SELESAI ---");
+    return finalResult;
 });
 
-
 const kpiExplanations = {
-    'saldo-kas': { title: 'Saldo Kas Saat Ini', formula: 'Omset Bersih - Biaya Operasional - Ambilan Pribadi + Modal Masuk', description: 'Estimasi uang tunai yang tersedia.' },
-    'omset': { title: 'Omset Bersih', formula: 'Total Penjualan dari Semua Transaksi', description: 'Total pendapatan kotor dari penjualan.' },
-    'laba-kotor': { title: 'Laba Kotor', formula: 'Omset Bersih - Total HPP Barang Terjual', description: 'Keuntungan sebelum dikurangi biaya operasional.' },
-    'laba-bersih': { title: 'Laba Bersih (Est.)', formula: 'Laba Kotor - Biaya Operasional - Biaya Transaksi', description: 'Estimasi keuntungan bersih.' },
-    'biaya-operasional': { title: 'Biaya Operasional', formula: 'Jumlah semua item di Riwayat Pengeluaran', description: 'Total semua biaya operasional.' },
-    'total-stok': { title: 'Total Unit Stok', formula: 'Jumlah Stok Akhir dari Semua Produk', description: 'Jumlah total unit di inventaris.' },
-    'nilai-stok': { title: 'Total Nilai Stok (HPP)', formula: 'Jumlah (Stok Akhir Produk x HPP Produk)', description: 'Total nilai moneter dari semua stok.' },
-    'nilai-retur': { title: 'Total Nilai Retur', formula: 'Jumlah (Qty Retur x Harga Jual Produk)', description: 'Total nilai dari produk yang dikembalikan.' }
+    'saldo-kas': { title: 'Saldo Kas Saat Ini', formula: 'Omset Bersih - Biaya Operasional - Ambilan Pribadi + Modal Masuk', description: 'Estimasi uang tunai yang tersedia saat ini.' },
+    'omset': { title: 'Omset Bersih', formula: 'Total Penjualan dari Semua Transaksi', description: 'Total pendapatan dari penjualan setelah dikurangi diskon dan voucher.' },
+    'laba-kotor': { title: 'Laba Kotor', formula: 'Omset Bersih - Total HPP Barang Terjual', description: 'Keuntungan kotor dari penjualan sebelum dikurangi biaya operasional dan biaya transaksi marketplace.' },
+    'laba-bersih': { title: 'Laba Bersih (Est.)', formula: 'Laba Kotor - Biaya Operasional - Biaya Transaksi', description: 'Estimasi keuntungan bersih setelah dikurangi semua biaya.' },
+    'biaya-operasional': { title: 'Biaya Operasional', formula: 'Jumlah semua item di Riwayat Pengeluaran', description: 'Total semua biaya operasional yang tidak terkait langsung dengan transaksi.' },
+    'biaya-transaksi': { title: 'Biaya Transaksi Marketplace', formula: 'Penjumlahan semua biaya di marketplace', description: 'Total biaya yang dikeluarkan untuk setiap transaksi di marketplace, seperti biaya admin, komisi, dan program.' },
+    'total-stok': { title: 'Total Unit Stok', formula: 'Jumlah Stok Akhir dari Semua Produk', description: 'Jumlah total unit produk di inventaris gudang.' },
+    'nilai-stok': { title: 'Total Nilai Stok (HPP)', formula: 'Jumlah (Stok Akhir Produk x HPP Produk)', description: 'Total nilai moneter dari semua stok yang tersisa di gudang.' },
+    'nilai-retur': { title: 'Total Nilai Retur', formula: 'Jumlah (Qty Retur x Harga Jual Produk)', description: 'Total nilai dari produk yang dikembalikan oleh pelanggan.' },
+    'omset-kotor': { title: 'Omset Kotor', formula: 'Total Harga Jual Tanpa Diskon', description: 'Total pendapatan kotor dari penjualan sebelum dikurangi diskon, biaya, dan HPP.' },
+    'diskon': { title: 'Diskon', formula: 'Total Diskon dan Voucher', description: 'Total nilai diskon dan voucher yang diberikan kepada pelanggan dalam transaksi.' },
+    'hpp-terjual': { title: 'Total HPP Terjual', formula: 'Jumlah (HPP Produk x Qty Terjual)', description: 'Total biaya modal dari semua produk yang berhasil terjual.' },
+    'laba-bersih-operasional': { title: 'Laba Bersih Operasional', formula: 'Laba Kotor - Biaya Operasional - Biaya Transaksi', description: 'Estimasi keuntungan bersih setelah dikurangi semua biaya operasional dan transaksi.' },
 };
 
 
@@ -1226,7 +1580,7 @@ async function saveData() {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
             marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
-            modelBaju: JSON.parse(JSON.stringify(state.settings.modelBaju)),
+            modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
             userId: userId
         };
         batch.set(settingsRef, settingsData);
@@ -1257,7 +1611,7 @@ async function saveData() {
         }
 
         await batch.commit();
-        console.log('Perubahan berhasil disimpan ke Firebase!');
+        console.log('Perubahan berhasil disimpan ke Database!');
         alert('Semua perubahan berhasil disimpan!'); // <-- NOTIFIKASI DITAMBAHKAN DI SINI
     } catch (error) {
         console.error("Gagal menyimpan data ke Firebase:", error);
@@ -1270,19 +1624,49 @@ async function saveGeneralSettings() {
     if (!currentUser.value) return alert("Anda harus login untuk menyimpan pengaturan.");
     
     isSavingSettings.value = true;
+    uiState.pinError = '';
+
+    const isPinSet = !!state.settings.dashboardPin;
+    let newPinToSave = state.settings.dashboardPin;
+
+    if (uiState.newPin) {
+        if (isPinSet && uiState.oldPin !== state.settings.dashboardPin) {
+            uiState.pinError = 'PIN lama salah.';
+            isSavingSettings.value = false;
+            return;
+        }
+        if (uiState.newPin !== uiState.confirmNewPin) {
+            uiState.pinError = 'PIN baru dan konfirmasi tidak cocok.';
+            isSavingSettings.value = false;
+            return;
+        }
+        if (uiState.newPin.length < 4 || uiState.newPin.length > 6) {
+            uiState.pinError = 'PIN harus 4-6 karakter.';
+            isSavingSettings.value = false;
+            return;
+        }
+        newPinToSave = uiState.newPin;
+    }
+
     try {
         const userId = currentUser.value.uid;
-        // Simpan ke dokumen yang namanya adalah ID pengguna
-        const settingsRef = doc(db, "settings", userId); 
-
+        const settingsRef = doc(db, "settings", userId);
         const dataToUpdate = {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
-            userId: userId // Selalu pastikan ada userId
+            dashboardPin: newPinToSave,
+            userId: userId
         };
 
-        // Gunakan setDoc dengan merge:true agar membuat dokumen jika belum ada
+        // SIMPAN DATA PENGATURAN UMUM KE DATABASE
         await setDoc(settingsRef, dataToUpdate, { merge: true });
+        
+        // Perbarui state lokal setelah berhasil
+        state.settings.dashboardPin = newPinToSave;
+        uiState.oldPin = '';
+        uiState.newPin = '';
+        uiState.confirmNewPin = '';
+        
         alert('Pengaturan umum berhasil disimpan ke database!');
 
     } catch (error) {
@@ -1292,17 +1676,46 @@ async function saveGeneralSettings() {
         isSavingSettings.value = false;
     }
 }
-function changePage(pageName) { activePage.value = pageName; }
+
+function changePage(pageName) { 
+    activePage.value = pageName;
+    if (pageName === 'dashboard') {
+        if (state.settings.dashboardPin && state.settings.dashboardPin !== '') {
+            isDashboardLocked.value = true;
+            dashboardPinInput.value = '';
+            dashboardPinError.value = '';
+        } else {
+            isDashboardLocked.value = false;
+        }
+    } else {
+        isDashboardLocked.value = false;
+    }
+}
+function unlockDashboard() {
+  // Cek PIN yang dimasukkan dengan PIN yang sudah ada di state
+  if (dashboardPinInput.value === state.settings.dashboardPin) {
+    isDashboardLocked.value = false;
+    dashboardPinError.value = '';
+    // Simpan status terkunci ke localStorage (opsional, tapi disarankan)
+    localStorage.setItem('isDashboardUnlocked', 'true');
+  } else {
+    dashboardPinError.value = 'PIN salah. Silakan coba lagi.';
+  }
+}
 
 function showModal(type, data = {}) {
     // Logika utama untuk menampilkan modal
     uiState.isModalVisible = true;
     uiState.modalType = type;
 
-    // Logika perbaikan di sini
+    if (type === 'keuanganInfo') {
+      uiState.isModalVisible = false; // Hindari konflik dengan modal utama
+      uiState.isKeuanganInfoVisible = true;
+      return;
+    }
+
     if (type === 'editMarketplace') {
         const marketplaceData = JSON.parse(JSON.stringify(data));
-        // Pastikan properti programs ada, jika tidak, inisialisasi sebagai array kosong
         if (!marketplaceData.programs) {
             marketplaceData.programs = [];
         }
@@ -1312,8 +1725,8 @@ function showModal(type, data = {}) {
     }
     
     if (type === 'addProduksi') {
-        if (!state.settings.modelBaju || state.settings.modelBaju.length === 0) {
-            alert("Data 'Model Baju' belum selesai dimuat. Coba lagi sesaat.");
+        if (!state.settings.modelProduk || state.settings.modelProduk.length === 0) {
+            alert("Data 'Model Produk' belum selesai dimuat. Coba lagi sesaat.");
             hideModal();
             return;
         }
@@ -1408,7 +1821,7 @@ function exportLaporanSemuaToExcel() {
     const dataToExport = laporanSemuanyaData.value.tableData.map(item => ({
         "Tanggal": new Date(item.tanggal),
         "Pemaklun": item.namaPemaklun,
-        "Model Baju": item.modelNama,
+        "Model Produk": item.modelNama,
         "Status": item.statusProses,
         "Nama Kain": item.namaKain,
         "Warna": item.warnaKain,
@@ -1427,7 +1840,16 @@ function exportLaporanSemuaToExcel() {
     worksheet["!cols"] = Array(13).fill({ wch: 20 });
     XLSX.writeFile(workbook, `Laporan_Produksi_Menyeluruh_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
-function hideModal() { uiState.isModalVisible = false; }
+function hideModal() {
+    uiState.isModalVisible = false;
+    uiState.modalType = '';
+    uiState.modalData = {};
+}
+
+// TAMBAHKAN FUNGSI BARU INI
+function hideKeuanganInfoModal() {
+    uiState.isKeuanganInfoVisible = false;
+}
 
 let posSearchDebounceTimer;
 function handlePosSearch() {
@@ -1473,7 +1895,14 @@ function removeFromCart(sku) {
     const itemIndex = activeCart.value.findIndex(i => i.sku === sku);
     if (itemIndex > -1) activeCart.value.splice(itemIndex, 1);
 }
-function confirmCompleteTransaction() { showModal('confirmTransaction', { channelName: getMarketplaceById(uiState.activeCartChannel).name, ...cartSummary.value }); }
+function confirmCompleteTransaction() {
+    const marketplace = getMarketplaceById(uiState.activeCartChannel);
+    if (!marketplace) {
+        alert("Silakan pilih channel penjualan terlebih dahulu.");
+        return;
+    }
+    showModal('confirmTransaction', { channelName: marketplace.name, ...cartSummary.value });
+}
 async function executeCompleteTransaction() {
     if (!currentUser.value) {
         return alert("Anda harus login untuk menyelesaikan transaksi.");
@@ -1487,18 +1916,43 @@ async function executeCompleteTransaction() {
         return;
     }
 
-    // Kalkulasi biaya yang lebih detail
-    const biaya = {
-        adm: (marketplace.adm / 100) * summary.finalTotal,
-        program: (marketplace.program / 100) * summary.finalTotal,
-        layanan: (marketplace.layanan / 100) * summary.finalTotal,
-        komisi: (marketplace.komisi / 100) * summary.finalTotal,
-        voucher: (marketplace.voucher / 100) * summary.finalTotal,
-        perPesanan: marketplace.perPesanan || 0,
-    };
-    biaya.total = Object.values(biaya).reduce((sum, val) => sum + val, 0);
+    // Gunakan array untuk menyimpan setiap item biaya secara rapi
+    const biayaList = [];
+    let totalBiaya = 0;
 
-    // Siapkan objek data transaksi yang akan disimpan
+    // Menghitung biaya-biaya standar yang ada di marketplace
+    if (marketplace.adm > 0) {
+        const val = (marketplace.adm / 100) * summary.finalTotal;
+        biayaList.push({ name: 'Administrasi', value: val });
+        totalBiaya += val;
+    }
+    if (marketplace.komisi > 0) {
+        const val = (marketplace.komisi / 100) * summary.finalTotal;
+        biayaList.push({ name: 'Komisi', value: val });
+        totalBiaya += val;
+    }
+    if (marketplace.perPesanan > 0) {
+        const val = marketplace.perPesanan;
+        biayaList.push({ name: 'Per Pesanan', value: val });
+        totalBiaya += val;
+    }
+    // Perbaikan: Menghitung biaya layanan yang terpisah dari program
+    if (marketplace.layanan > 0) {
+        const val = (marketplace.layanan / 100) * summary.finalTotal;
+        biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val });
+        totalBiaya += val;
+    }
+    // Perbaikan: Menghitung biaya program yang terpisah
+    if (marketplace.programs && marketplace.programs.length > 0) {
+        marketplace.programs.forEach(p => {
+            if (p.rate > 0) {
+                const val = (p.rate / 100) * summary.finalTotal;
+                biayaList.push({ name: p.name, value: val });
+                totalBiaya += val;
+            }
+        });
+    }
+    
     const newTransactionData = {
         tanggal: new Date(),
         items: activeCart.value.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
@@ -1507,8 +1961,10 @@ async function executeCompleteTransaction() {
         total: summary.finalTotal,
         channel: marketplace.name,
         channelId: marketplace.id,
-        biaya: biaya,
-        // --- BARIS BARU DITAMBAHKAN DI SINI ---
+        biaya: {
+            rincian: biayaList,
+            total: totalBiaya
+        },
         userId: currentUser.value.uid
     };
 
@@ -1543,7 +1999,7 @@ async function executeCompleteTransaction() {
         
         state.carts[uiState.activeCartChannel] = [];
         hideModal();
-        alert("Transaksi berhasil disimpan ke Firebase!");
+        alert("Transaksi berhasil disimpan ke Database!");
 
     } catch (error) {
         console.error("Error saat menyimpan transaksi:", error);
@@ -1551,7 +2007,7 @@ async function executeCompleteTransaction() {
     }
 }
 function calculateBestDiscount(cart, channelId) {
-    if (!cart || cart.length === 0) return { totalDiscount: 0, description: '' };
+    if (!cart || cart.length === 0) return { totalDiscount: 0, description: '', rate: 0 };
 
     const promotions = [];
     const cartSubtotal = cart.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
@@ -1561,7 +2017,8 @@ function calculateBestDiscount(cart, channelId) {
     if (channelPromos.voucherToko > 0) {
         promotions.push({
             totalDiscount: (channelPromos.voucherToko / 100) * cartSubtotal,
-            description: `Voucher Ikuti Toko (${channelPromos.voucherToko}%)`
+            description: `Voucher Ikuti Toko (${channelPromos.voucherToko}%)`,
+            rate: channelPromos.voucherToko
         });
     }
 
@@ -1576,54 +2033,174 @@ function calculateBestDiscount(cart, channelId) {
         return acc;
     }, {});
 
-    for (const modelName in itemsByModel) {
+    for (const modelName in itemsByModel) { // <-- PERHATIKAN PEMBUKA { INI
         const modelData = itemsByModel[modelName];
         const modelPromosForChannel = (allModelPromos[modelName] || {})[channelId] || {};
 
         if (modelPromosForChannel.voucherProduk > 0) {
             promotions.push({
                 totalDiscount: (modelPromosForChannel.voucherProduk / 100) * modelData.subtotal,
-                description: `Voucher ${modelName} (${modelPromosForChannel.voucherProduk}%)`
+                description: `Voucher ${modelName} (${modelPromosForChannel.voucherProduk}%)`,
+                rate: modelPromosForChannel.voucherProduk
             });
         }
 
         if (modelPromosForChannel.diskonBertingkat && modelPromosForChannel.diskonBertingkat.length > 0) {
-            // Urutkan tingkatan dari yang paling besar minimal belanjanya
             const sortedTiers = [...modelPromosForChannel.diskonBertingkat].sort((a, b) => b.min - a.min);
             for (const tier of sortedTiers) {
                 if (modelData.subtotal >= tier.min) {
                     promotions.push({
                         totalDiscount: (tier.diskon / 100) * modelData.subtotal,
-                        description: `Diskon ${modelName} ${tier.diskon}%`
+                        description: `Diskon ${modelName} ${tier.diskon}%`,
+                        rate: tier.diskon
                     });
-                    break; // Hanya ambil tingkatan terbaik yang tercapai
+                    break;
                 }
             }
         }
-    }
+    } // <-- DAN PASTIKAN PENUTUP } INI ADA
 
     // 3. Cari promosi terbaik dari semua yang terkumpul
     if (promotions.length === 0) {
-        return { totalDiscount: 0, description: '' };
+        return { totalDiscount: 0, description: '', rate: 0 };
     }
-
     return promotions.reduce((best, current) => {
         return current.totalDiscount > best.totalDiscount ? current : best;
-    }, { totalDiscount: 0, description: '' });
+    }, { totalDiscount: 0, description: '', rate: 0 });
 }
+
+function calculateSellingPrice() {
+    const { hpp, targetMargin, selectedMarketplace, selectedModelName } = uiState.priceCalculator;
+
+    if (!hpp || !selectedMarketplace || !selectedModelName) {
+        uiState.priceCalculator.result = null;
+        return;
+    }
+
+    const mp = state.settings.marketplaces.find(m => m.id === selectedMarketplace);
+    if (!mp) {
+        uiState.priceCalculator.result = null;
+        return;
+    }
+
+    const dummyProduct = {
+        sku: 'calc-dummy',
+        nama: selectedModelName,
+        hargaJualAktual: hpp * 2,
+        qty: 1
+    };
+    const discountInfo = calculateBestDiscount([dummyProduct], selectedMarketplace);
+    const bestDiscountRate = (discountInfo.rate || 0) / 100;
+
+    const totalMarketplacePercentageFees = (mp.adm || 0) + (mp.komisi || 0) + (mp.layanan || 0);
+    const perOrderFee = mp.perPesanan || 0;
+    const targetProfitPercentage = targetMargin / 100;
+
+    const itemizedProgramFeesBase = (mp.programs || []).map(p => (parseFloat(p.rate) || 0) / 100);
+    const totalProgramPercentage = itemizedProgramFeesBase.reduce((sum, rate) => sum + rate, 0);
+
+    const allPercentageFees = (totalMarketplacePercentageFees / 100) + targetProfitPercentage + bestDiscountRate + totalProgramPercentage;
+    
+    const calculatedPrice = (hpp + perOrderFee) / (1 - allPercentageFees);
+
+    const adminFee = calculatedPrice * (mp.adm || 0) / 100;
+    const commission = calculatedPrice * (mp.komisi || 0) / 100;
+    const serviceFee = calculatedPrice * (mp.layanan || 0) / 100;
+    const bestDiscount = calculatedPrice * bestDiscountRate;
+
+    const itemizedProgramFees = (mp.programs || []).map(program => {
+        const rate = parseFloat(program.rate) || 0;
+        return { name: program.name, rate: rate, fee: calculatedPrice * (rate / 100) };
+    });
+    const totalProgramFeeValue = itemizedProgramFees.reduce((sum, item) => sum + item.fee, 0);
+
+    const totalFees = adminFee + commission + serviceFee + totalProgramFeeValue + perOrderFee;
+    const netProfit = calculatedPrice - hpp - bestDiscount - totalFees;
+    const totalSemuaBiaya = hpp + bestDiscount + totalFees;
+    const labaKotor = calculatedPrice - bestDiscount - hpp;
+
+    uiState.priceCalculator.result = {
+        calculatedPrice,
+        totalFees,
+        netProfit,
+        bestDiscount,
+        totalSemuaBiaya,
+        labaKotor,
+        bestDiscountRatePercentage: discountInfo.rate || 0, // <-- TAMBAHAN BARU
+        breakdown: {
+            hpp,
+            adminFee,
+            admRate: mp.adm || 0, // <-- TAMBAHAN BARU
+            commission,
+            komisiRate: mp.komisi || 0, // <-- TAMBAHAN BARU
+            serviceFee,
+            layananRate: mp.layanan || 0, // <-- TAMBAHAN BARU
+            programFee: itemizedProgramFees,
+            perOrderFee
+        }
+    };
+}
+
 function renderCharts() {
     if (profitExpenseChart) profitExpenseChart.destroy();
     if (salesChannelChart) salesChannelChart.destroy();
-    const { transaksi, biaya } = dashboardFilteredData.value;
+    
+    // Gunakan nilai default array kosong untuk mencegah error
+    const { transaksi = [], keuangan = [] } = dashboardFilteredData.value || {};
     const ctxProfit = document.getElementById('profitExpenseChart')?.getContext('2d');
     const ctxSales = document.getElementById('salesChannelChart')?.getContext('2d');
-    if (!ctxProfit || !ctxSales) return;
-    const dates = [...new Set([...transaksi.map(t => new Date(t.tanggal).toDateString()), ...biaya.map(b => new Date(b.tanggal).toDateString())])].sort((a,b) => new Date(a) - new Date(b));
-    const profitData = dates.map(d => transaksi.filter(t => new Date(t.tanggal).toDateString() === d).reduce((s,t) => s + (t.total - t.items.reduce((ts,i)=>ts+i.hpp*i.qty,0)), 0));
-    const expenseData = dates.map(d => biaya.filter(b => new Date(b.tanggal).toDateString() === d).reduce((s,b) => s + b.jumlah, 0));
-    profitExpenseChart = new Chart(ctxProfit, { type: 'line', data: { labels: dates, datasets: [{ label: 'Laba Kotor', data: profitData, borderColor: '#4f46e5', fill: true }, { label: 'Biaya Operasional', data: expenseData, borderColor: '#ef4444', fill: true }] }, options: { responsive: true, maintainAspectRatio: false } });
-    const salesByChannel = transaksi.reduce((acc, trx) => { acc[trx.channel] = (acc[trx.channel] || 0) + trx.total; return acc; }, {});
-    salesChannelChart = new Chart(ctxSales, { type: 'doughnut', data: { labels: Object.keys(salesByChannel), datasets: [{ data: Object.values(salesByChannel), backgroundColor: ['#4f46e5', '#3b82f6', '#10b981', '#f97316', '#ef4444'] }] }, options: { responsive: true, maintainAspectRatio: false } });
+    
+    if (!ctxProfit || !ctxSales) {
+        return;
+    }
+    
+    // --- GRAFIK 1: LABA KOTOR VS BIAYA OPERASIONAL ---
+    const dates = [...new Set([
+        ...transaksi.map(t => new Date(t.tanggal).toDateString()), 
+        ...keuangan.map(b => new Date(b.tanggal).toDateString())
+    ])].sort((a,b) => new Date(a) - new Date(b));
+
+    const profitData = dates.map(d => transaksi.filter(t => new Date(t.tanggal).toDateString() === d).reduce((s, t) => s + (t.total - t.items.reduce((ts, i) => ts + (i.hpp || 0) * (i.qty || 0), 0)), 0));
+    const expenseData = dates.map(d => keuangan.filter(b => new Date(b.tanggal).toDateString() === d && b.jenis === 'pengeluaran').reduce((s, b) => s + (b.jumlah || 0), 0));
+    
+    profitExpenseChart = new Chart(ctxProfit, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{ 
+                label: 'Laba Kotor', 
+                data: profitData, 
+                borderColor: '#10b981', 
+                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                fill: true 
+            }, { 
+                label: 'Biaya Operasional', 
+                data: expenseData, 
+                borderColor: '#ef4444', 
+                backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                fill: true 
+            }] 
+        }, 
+        options: { responsive: true, maintainAspectRatio: false } 
+    });
+    
+    // --- GRAFIK 2: PENJUALAN PER CHANNEL ---
+    const salesByChannel = transaksi.reduce((acc, trx) => {
+        acc[trx.channel] = (acc[trx.channel] || 0) + (trx.total || 0);
+        return acc;
+    }, {});
+    
+    salesChannelChart = new Chart(ctxSales, {
+        type: 'doughnut',
+        data: { 
+            labels: Object.keys(salesByChannel), 
+            datasets: [{ 
+                data: Object.values(salesByChannel), 
+                backgroundColor: ['#4f46e5', '#3b82f6', '#10b981', '#f97316', '#ef4444'] 
+            }] 
+        }, 
+        options: { responsive: true, maintainAspectRatio: false } 
+    });
 }
 
 function exportTransactionsToExcel() {
@@ -1657,37 +2234,32 @@ function setupNewProduksiBatch() {
     uiState.newProduksiBatch = reactive({
         tanggal: new Date().toISOString().split('T')[0],
         produksiType: 'pemaklun',
-        namaStatus: '',
+        namaStatus: '', // <-- DIUBAH KEMBALI KE namaStatus
         statusProses: 'Dalam Proses',
-        kuantitasJadi: 0,
-        kuantitasPerbaikan: 0,
-        admin: '',
-        statusPembayaran: 'Belum Dibayar',
-        jumlahPembayaran: null,
-        tanggalPembayaran: '',
-        totalBiayaMaterial: 0,
-        totalHargaJasaMaklun: 0,
-        catatan: '',
         kainBahan: [{
             idUnik: generateUniqueCode(),
-            modelBajuId: '',
+            modelProdukId: '',
             namaKain: '',
             tokoKain: '',
             warnaKain: '',
             ukuran: '',
             totalYard: null,
             hargaKainPerYard: null,
-            yardPerBaju: null,
+            yardPerModel: null,
             aktualJadi: null,
             hargaMaklunPerPcs: null,
+            hargaJahitPerPcs: null,
             biayaAlat: null,
             aktualJadiKombinasi: null,
             isInventoried: false,
         }],
+        statusPembayaran: 'Belum Dibayar',
+        jumlahPembayaran: null,
+        tanggalPembayaran: '',
+        catatan: '',
+        orangMemproses: '',
     });
 }
-
-
 
 async function submitNewProduksiBatch() {
     if (!currentUser.value) {
@@ -1695,38 +2267,45 @@ async function submitNewProduksiBatch() {
     }
 
     const newBatchData = JSON.parse(JSON.stringify(uiState.newProduksiBatch));
+    
+    if (!newBatchData.namaStatus) { // <-- Menggunakan namaStatus untuk validasi
+        return alert("Nama Pemaklun/Penjahit wajib diisi.");
+    }
+    
     let totalQty = 0;
     let totalBiayaMaterial = 0;
-    let totalHargaJasaMaklun = 0;
+    let totalHargaJasa = 0;
 
     (newBatchData.kainBahan || []).forEach(item => {
         totalBiayaMaterial += (item.totalYard || 0) * (item.hargaKainPerYard || 0);
         totalQty += (item.aktualJadi || 0);
-        totalHargaJasaMaklun += (item.aktualJadi || 0) * (item.hargaMaklunPerPcs || 0);
+        
+        const hargaJasaPerPcs = newBatchData.produksiType === 'penjahit' 
+            ? (item.hargaJahitPerPcs || 0) 
+            : (item.hargaMaklunPerPcs || 0);
+        totalHargaJasa += (item.aktualJadi || 0) * hargaJasaPerPcs;
     });
 
     const batchId = `PROD-${Date.now()}`;
-    const finalBatchForState = {
+    
+    const dataToSave = {
         ...newBatchData,
         id: batchId,
         totalQty,
         totalBiayaMaterial,
-        totalHargaJasaMaklun,
+        totalHargaJasaMaklun: totalHargaJasa,
+        tanggal: new Date(newBatchData.tanggal),
+        userId: currentUser.value.uid,
     };
     
-    const dataToSave = { ...finalBatchForState };
-    delete dataToSave.id;
-    dataToSave.tanggal = new Date(dataToSave.tanggal);
-    dataToSave.userId = currentUser.value.uid;
-    dataToSave.produksiType = newBatchData.produksiType;
-    dataToSave.namaStatus = newBatchData.namaStatus;
     try {
         const batchRef = doc(db, "production_batches", batchId);
         await setDoc(batchRef, dataToSave);
 
-        state.produksi.unshift(finalBatchForState);
+        state.produksi.unshift(dataToSave); 
+        
         hideModal();
-        alert('Batch produksi baru berhasil disimpan ke Firebase!');
+        alert('Batch produksi baru berhasil disimpan ke Database!');
 
     } catch (error) {
         console.error("Error menyimpan batch produksi baru:", error);
@@ -1902,7 +2481,7 @@ function calculateRowSummary(item, batchType) {
     }
     
     // Pastikan item memiliki properti yang relevan
-    const modelInfo = state.settings.modelBaju.find(m => m.id === item.modelBajuId) || {};
+    const modelInfo = state.settings.modelProduk.find(m => m.id === item.modelProdukId) || {};
     const totalYard = parseFloat(item.totalYard) || 0;
     const hargaKainPerYard = parseFloat(item.hargaKainPerYard) || 0;
     const aktualJadi = parseFloat(item.aktualJadi) || 0;
@@ -1910,7 +2489,7 @@ function calculateRowSummary(item, batchType) {
     const hargaJahitPerPcs = parseFloat(item.hargaJahitPerPcs) || 0;
     const hargaMaklunPerPcs = parseFloat(item.hargaMaklunPerPcs) || 0;
     const biayaAlat = parseFloat(item.biayaAlat) || 0;
-    const yardPerBaju = parseFloat(item.yardPerBaju) || (modelInfo.yardPerBaju || 1);
+    const yardPerModel = parseFloat(item.yardPerModel) || (modelInfo.yardPerModel || 1);
 
     const totalBiayaKain = totalYard * hargaKainPerYard;
     
@@ -1921,7 +2500,7 @@ function calculateRowSummary(item, batchType) {
         hargaJasa = hargaMaklunPerPcs;
     }
 
-    const targetQty = Math.floor(totalYard / yardPerBaju);
+    const targetQty = Math.floor(totalYard / yardPerModel);
     
     let aktualFinal = 0;
     if (aktualJadi > 0) {
@@ -2031,10 +2610,10 @@ function printProduksiDetail(batch) {
 
 function exportProduksiDetailToExcel(batch) {
     const dataForExcel = (batch.kainBahan || []).map(kb => {
-        const modelName = state.settings.modelBaju.find(m => m.id === kb.modelBajuId)?.namaModel || 'N/A';
+        const modelName = state.settings.modelProduk.find(m => m.id === kb.modelProdukId)?.namaModel || 'N/A';
         return {
             "ID Batch": batch.id, "Tanggal Produksi": new Date(batch.tanggal), "Nama Pemaklun": batch.namaPemaklun,
-            "Status Proses": batch.statusProses, "Nama Model Baju": modelName, "Nama Kain": kb.namaKain || '',
+            "Status Proses": batch.statusProses, "Nama Model Produk": modelName, "Nama Kain": kb.namaKain || '',
             "Aktual Jadi (Pcs)": kb.aktualJadi || 0, "Harga Maklun/Pcs": kb.hargaMaklunPerPcs || 0,
         };
     });
@@ -2051,10 +2630,10 @@ function exportGroupedProduksiToExcel() {
     const data = uiState.laporanData.laporanPerStatus;
     if (data.length === 0) { alert(`Tidak ada data dengan status "${status}" untuk diekspor.`); return; }
     const dataForExcel = data.flatMap(batch => (batch.kainBahan || []).map(kb => {
-        const modelName = state.settings.modelBaju.find(m => m.id === kb.modelBajuId)?.namaModel || 'N/A';
+        const modelName = state.settings.modelProduk.find(m => m.id === kb.modelProdukId)?.namaModel || 'N/A';
         return {
             "ID Batch": batch.id, "Tanggal Produksi": new Date(batch.tanggal), "Nama Pemaklun": batch.namaPemaklun,
-            "Status Proses": batch.statusProses, "Nama Model Baju": modelName, "Nama Kain": kb.namaKain || '',
+            "Status Proses": batch.statusProses, "Nama Model Produk": modelName, "Nama Kain": kb.namaKain || '',
             "Aktual Jadi (Pcs)": kb.aktualJadi || 0, "Harga Maklun/Pcs": kb.hargaMaklunPerPcs || 0,
         };
     }));
@@ -2064,108 +2643,100 @@ function exportGroupedProduksiToExcel() {
     worksheet["!cols"] = [ { wch: 20 }, { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 20 } ];
     XLSX.writeFile(workbook, `Laporan_Produksi_${status}_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
-async function submitBiaya(isEditing = false) {
-    if (!currentUser.value) {
-        return alert("Anda harus login untuk mengelola biaya.");
-    }
-    const form = uiState.modalData;
-    if (!form.kategori || !form.jumlah) {
-        alert('Kategori dan Jumlah wajib diisi.');
-        return;
-    }
-
-    const dataToSave = { ...form, tanggal: new Date(form.tanggal) };
-
+async function submitBiaya() {
+    if (!currentUser.value) return alert("Anda harus login untuk mengelola biaya.");
+    isLoading.value = true;
     try {
-        if (isEditing) {
-            // Logika EDIT
-            const expenseRef = doc(db, "expenses", dataToSave.id);
-            const updateData = { ...dataToSave };
-            delete updateData.id;
-            await updateDoc(expenseRef, updateData);
+        const docRef = await addDoc(collection(db, "keuangan"), {
+            kategori: uiState.modalData.kategori,
+            jumlah: uiState.modalData.jumlah,
+            catatan: uiState.modalData.catatan,
+            jenis: 'pengeluaran',
+            userId: currentUser.value.uid,
+            tanggal: new Date(uiState.modalData.tanggal)
+        });
 
-            const index = state.biaya.findIndex(b => b.id === form.id);
-            if (index !== -1) state.biaya[index] = dataToSave;
-            alert('Data pengeluaran berhasil diperbarui.');
-        } else {
-            // Logika TAMBAH BARU
-            dataToSave.userId = currentUser.value.uid; // <-- TAMBAHKAN userId DI SINI
-            const collectionRef = collection(db, "expenses");
-            const newDocRef = await addDoc(collectionRef, dataToSave);
-            state.biaya.unshift({ ...dataToSave, id: newDocRef.id });
-            alert('Pengeluaran baru berhasil dicatat.');
-        }
+        // PERBAIKAN: Tambahkan data baru ke array lokal setelah berhasil
+        state.keuangan.push({
+            id: docRef.id,
+            kategori: uiState.modalData.kategori,
+            jumlah: uiState.modalData.jumlah,
+            catatan: uiState.modalData.catatan,
+            jenis: 'pengeluaran',
+            tanggal: new Date(uiState.modalData.tanggal)
+        });
+        
         hideModal();
-    } catch (error) {
-        console.error("Error menyimpan biaya:", error);
+        alert('Data pengeluaran berhasil disimpan!');
+    } catch (e) {
+        console.error("Error menyimpan biaya:", e);
         alert("Gagal menyimpan data pengeluaran.");
+    } finally {
+        isLoading.value = false;
     }
 }
 
 async function deleteBiaya(id) {
-    if (confirm('Anda yakin ingin menghapus data pengeluaran ini?')) {
-        try {
-            await deleteDoc(doc(db, "expenses", id));
-            state.biaya = state.biaya.filter(b => b.id !== id);
-            alert('Data pengeluaran berhasil dihapus.');
-        } catch (error) {
-            console.error("Error menghapus biaya:", error);
-            alert("Gagal menghapus data pengeluaran.");
-        }
+    if (!currentUser.value) return alert("Anda harus login untuk mengelola biaya.");
+    if (!confirm('Anda yakin ingin menghapus data pengeluaran ini?')) return;
+    try {
+        // PERBAIKAN: Hapus dari koleksi 'keuangan'
+        await deleteDoc(doc(db, "keuangan", id)); 
+        // Perbarui state lokal
+        state.keuangan = state.keuangan.filter(b => b.id !== id);
+        alert('Data pengeluaran berhasil dihapus.');
+    } catch (error) {
+        console.error("Error menghapus biaya:", error);
+        alert("Gagal menghapus data pengeluaran.");
     }
 }
-
-async function submitPemasukan(isEditing = false) {
-    if (!currentUser.value) {
-        return alert("Anda harus login untuk mengelola pemasukan.");
-    }
-    const form = uiState.modalData;
-    if (!form.tipe || !form.jumlah) {
-        alert('Tipe dan Jumlah wajib diisi.');
-        return;
-    }
-
-    const dataToSave = { ...form, tanggal: new Date(form.tanggal) };
-
+async function submitPemasukan() {
+    if (!currentUser.value) return alert("Anda harus login untuk mengelola pemasukan.");
+    isLoading.value = true;
     try {
-        if (isEditing) {
-            // Logika EDIT
-            const incomeRef = doc(db, "other_incomes", dataToSave.id);
-            const updateData = { ...dataToSave };
-            delete updateData.id;
-            await updateDoc(incomeRef, updateData);
+        const docRef = await addDoc(collection(db, "keuangan"), {
+            tipe: uiState.modalData.tipe,
+            jumlah: uiState.modalData.jumlah,
+            catatan: uiState.modalData.catatan,
+            jenis: 'pemasukan_lain',
+            userId: currentUser.value.uid,
+            tanggal: new Date(uiState.modalData.tanggal)
+        });
 
-            const index = state.keuanganLain.findIndex(p => p.id === form.id);
-            if (index !== -1) state.keuanganLain[index] = dataToSave;
-            alert('Data pemasukan berhasil diperbarui.');
-        } else {
-            // Logika TAMBAH BARU
-            dataToSave.userId = currentUser.value.uid; // <-- TAMBAHKAN userId DI SINI
-            const collectionRef = collection(db, "other_incomes");
-            const newDocRef = await addDoc(collectionRef, dataToSave);
-            state.keuanganLain.unshift({ ...dataToSave, id: newDocRef.id });
-            alert('Pemasukan baru berhasil dicatat.');
-        }
+        // PERBAIKAN: Tambahkan data baru ke array lokal setelah berhasil
+        state.keuangan.push({
+            id: docRef.id,
+            tipe: uiState.modalData.tipe,
+            jumlah: uiState.modalData.jumlah,
+            catatan: uiState.modalData.catatan,
+            jenis: 'pemasukan_lain',
+            tanggal: new Date(uiState.modalData.tanggal)
+        });
+
         hideModal();
-    } catch (error) {
-        console.error("Error menyimpan pemasukan:", error);
+        alert('Data pemasukan berhasil disimpan!');
+    } catch (e) {
+        console.error("Error menyimpan pemasukan:", e);
         alert("Gagal menyimpan data pemasukan.");
+    } finally {
+        isLoading.value = false;
     }
 }
 
 async function deletePemasukan(id) {
-    if (confirm('Anda yakin ingin menghapus data pemasukan ini?')) {
-        try {
-            await deleteDoc(doc(db, "other_incomes", id));
-            state.keuanganLain = state.keuanganLain.filter(p => p.id !== id);
-            alert('Data pemasukan berhasil dihapus.');
-        } catch (error) {
-            console.error("Error menghapus pemasukan:", error);
-            alert("Gagal menghapus data pemasukan.");
-        }
+    if (!currentUser.value) return alert("Anda harus login untuk mengelola pemasukan.");
+    if (!confirm('Anda yakin ingin menghapus data pemasukan ini?')) return;
+    try {
+        // PERBAIKAN: Hapus dari koleksi 'keuangan'
+        await deleteDoc(doc(db, "keuangan", id)); 
+        // Perbarui state lokal
+        state.keuangan = state.keuangan.filter(p => p.id !== id);
+        alert('Data pemasukan berhasil dihapus.');
+    } catch (error) {
+        console.error("Error menghapus pemasukan:", error);
+        alert("Gagal menghapus data pemasukan.");
     }
 }
-
 
 function exportKeuangan(type) {
     const data = type === 'pengeluaran' ? filteredPengeluaran.value : filteredPemasukan.value;
@@ -2463,43 +3034,43 @@ async function saveMarketplaceEdit() {
     alert('Perubahan marketplace berhasil disimpan.');
 }
 
-async function addModelBaju() {
+async function addModelProduk() {
     if (!currentUser.value) return alert("Anda harus login.");
     const newModel = {
         id: `MODEL-${Date.now()}`,
         namaModel: 'Model Baru',
-        yardPerBaju: 0,
+        yardPerModel: 0,
         hargaMaklun: 0,
         hargaJahit: 0, // Tambahkan properti ini
     };
-    state.settings.modelBaju.push(newModel);
+    state.settings.modelProduk.push(newModel);
     await saveData();
-    alert('Model baju baru berhasil ditambahkan.');
+    alert('Model Produk baru berhasil ditambahkan.');
 }
 
-async function removeModelBaju(modelId) {
+async function removeModelProduk(modelId) {
     if (!currentUser.value) return alert("Anda harus login.");
-    if (!confirm('Anda yakin ingin menghapus model baju ini?')) return;
+    if (!confirm('Anda yakin ingin menghapus model Produk ini?')) return;
 
-    const index = state.settings.modelBaju.findIndex(m => m.id === modelId);
+    const index = state.settings.modelProduk.findIndex(m => m.id === modelId);
     if (index > -1) {
-        state.settings.modelBaju.splice(index, 1);
+        state.settings.modelProduk.splice(index, 1);
         await saveData(); // Panggil saveData untuk menyimpan
-        alert('Model baju berhasil dihapus.');
+        alert('Model Produk berhasil dihapus.');
     }
 }
 
-async function saveModelBajuEdit() {
+async function saveModelProdukEdit() {
     if (!currentUser.value) return alert("Anda harus login.");
     const editedModel = uiState.modalData;
-    const index = state.settings.modelBaju.findIndex(model => model.id === editedModel.id);
+    const index = state.settings.modelProduk.findIndex(model => model.id === editedModel.id);
     if (index !== -1) {
         // Pastikan properti hargaJahit juga tersimpan
-        state.settings.modelBaju[index] = { ...editedModel, hargaJahit: editedModel.hargaJahit || 0 };
+        state.settings.modelProduk[index] = { ...editedModel, hargaJahit: editedModel.hargaJahit || 0 };
     }
     await saveData();
     hideModal();
-    alert('Perubahan model baju berhasil disimpan.');
+    alert('Perubahan model Produk berhasil disimpan.');
 }
 
 
@@ -2540,35 +3111,32 @@ async function saveStockAllocation() {
 }
 
 async function removeProductVariant(sku) {
+    if (!currentUser.value) {
+        alert("Anda harus login untuk menghapus produk.");
+        return;
+    }
     if (!confirm(`Anda yakin ingin menghapus produk dengan SKU: ${sku}? Data ini tidak bisa dikembalikan.`)) {
         return;
     }
-
     try {
         const batch = writeBatch(db);
 
-        // Hapus dokumen produk utama
         const productRef = doc(db, "products", sku);
         batch.delete(productRef);
 
-        // Hapus semua dokumen harga yang terhubung dengan SKU ini
-        const priceQuery = query(collection(db, "product_prices"), where("product_sku", "==", sku));
-        const priceSnapshots = await getDocs(priceQuery);
-        priceSnapshots.forEach(priceDoc => {
-            batch.delete(priceDoc.ref);
+        state.settings.marketplaces.forEach(mp => {
+            const priceDocId = `${sku}-${mp.id}`;
+            const priceRef = doc(db, "product_prices", priceDocId);
+            batch.delete(priceRef);
         });
 
-        // Hapus dokumen alokasi stok yang terhubung dengan SKU ini
         const allocationRef = doc(db, "stock_allocations", sku);
         batch.delete(allocationRef);
-
-        // Jalankan semua operasi penghapusan sebagai satu batch
+        
         await batch.commit();
 
-        // Jika berhasil di database, baru hapus dari state lokal untuk update UI
         state.produk = state.produk.filter(p => p.sku !== sku);
         alert(`Produk dengan SKU: ${sku} beserta data terkaitnya berhasil dihapus.`);
-
     } catch (error) {
         console.error("Error menghapus produk:", error);
         alert("Gagal menghapus produk dari database. Cek console untuk detail.");
@@ -2586,7 +3154,7 @@ const transactionDetails = computed(() => {
     }
     const trx = uiState.modalData;
     const totalHPP = trx.items.reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
-    const totalBiayaMarketplace = trx.biaya.total || 0;
+    const totalBiayaMarketplace = (trx.biaya?.total || 0); // Mengambil total yang sudah dihitung
     const labaBersih = trx.total - totalHPP - totalBiayaMarketplace;
 
     return {
@@ -2629,7 +3197,7 @@ const panduanData = [
     },
     {
         icon: '📦',
-        title: 'Manajemen Inventaris',
+        title: 'Inventaris',
         subtitle: 'Kendalikan Aset Digital dan Fisik Anda Secara Terpusat.',
         content: `
             <p>Halaman ini memberi Anda kendali penuh dengan memisahkan dua konsep kunci:</p>
@@ -2660,7 +3228,7 @@ const panduanData = [
     },
     {
         icon: '🏭',
-        title: 'Manajemen Produksi',
+        title: 'Produksi',
         subtitle: 'Visibilitas Penuh dari Bahan Baku hingga Produk Jadi.',
         content: `
             <p>Modul ini mengubah proses produksi yang kompleks menjadi alur kerja yang transparan dan terukur. Lacak setiap perintah jahit (maklun) sebagai sebuah <strong>Batch Produksi</strong> yang terkontrol.</p>
@@ -2736,7 +3304,7 @@ const panduanData = [
             <ul>
                 <li><strong>Identitas Brand:</strong> Atur nama brand dan batas minimum stok untuk pengingat otomatis.</li>
                 <li><strong>Struktur Biaya Marketplace:</strong> Definisikan semua kanal penjualan beserta struktur biayanya (admin, program, layanan, dll.) agar perhitungan laba per transaksi selalu akurat.</li>
-                <li><strong>Model Baju Default:</strong> Tetapkan "resep" standar produksi Anda. Data <strong>Yard/Baju</strong>, <strong>Harga Maklun</strong>, dan <strong>Harga Jahit</strong> di sini akan menjadi acuan utama di modul Produksi.</li>
+                <li><strong>Model Produk Default:</strong> Tetapkan "resep" standar produksi Anda. Data <strong>Yard/Model</strong>, <strong>Harga Maklun</strong>, dan <strong>Harga Jahit</strong> di sini akan menjadi acuan utama di modul Produksi.</li>
             </ul>
         `
     },
@@ -2791,11 +3359,11 @@ async function deleteTransaction(transactionId) {
 }
 
 
-function handleModelBajuChange(item) {
-    const selectedModel = state.settings.modelBaju.find(m => m.id === item.modelBajuId);
+function handleModelProdukChange(item) {
+    const selectedModel = state.settings.modelProduk.find(m => m.id === item.modelProdukId);
     if (selectedModel) {
         // BARIS KUNCI: Set properti yang relevan
-        item.yardPerBaju = selectedModel.yardPerBaju;
+        item.yardPerModel = selectedModel.yardPerModel;
         item.hargaMaklunPerPcs = selectedModel.hargaMaklun;
         item.hargaJahitPerPcs = selectedModel.hargaJahit;
         
@@ -2805,7 +3373,7 @@ function handleModelBajuChange(item) {
         item.warnaKain = '';
         item.ukuran = '';
     } else {
-        item.yardPerBaju = null;
+        item.yardPerModel = null;
         item.hargaMaklunPerPcs = null;
         item.hargaJahitPerPcs = null;
         
@@ -2817,7 +3385,7 @@ function handleProductSkuChange(item) {
         
         item.warnaKain = selectedProduct.warna;
         item.ukuran = selectedProduct.varian;
-        item.modelBajuId = selectedProduct.model_id;
+        item.modelProdukId = selectedProduct.model_id;
     }
 }
 function addKainBahanItem(batch) {
@@ -2826,14 +3394,14 @@ function addKainBahanItem(batch) {
     }
     batch.kainBahan.push({
         idUnik: generateUniqueCode(), // <-- BARIS BARU: Tambahkan kode unik
-        modelBajuId: '',
+        modelProdukId: '',
         namaKain: '',
         tokoKain: '',
         warnaKain: '',
         ukuran: '',
         totalYard: null,
         hargaKainPerYard: null,
-        yardPerBaju: null,
+        yardPerModel: null,
         targetQty: null,
         aktualJadi: null,
         aktualJadiLabelType: 'Aktual Jadi',
@@ -2934,7 +3502,11 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
         });
     }
 });
-
+watch(() => uiState.pengaturanTab, (newTab) => {
+    if (newTab === 'admin' && isAdmin.value && uiState.allUsers.length === 0) {
+        fetchAllUsers();
+    }
+});
 // GANTI DENGAN KODE BARU INI
 async function loadAllDataFromFirebase() {
     isLoading.value = true;
@@ -2944,10 +3516,6 @@ async function loadAllDataFromFirebase() {
         return;
     }
     try {
-        const settingsRef = doc(db, "settings", userId);
-        const promotionsRef = doc(db, "promotions", userId);
-
-        // --- Perbaikan: Menyederhanakan semua panggilan ke dalam satu Promise.all
         const [
             settingsSnap,
             promotionsSnap,
@@ -2955,79 +3523,35 @@ async function loadAllDataFromFirebase() {
             pricesSnap,
             allocationsSnap,
             transactionsSnap,
-            expensesSnap,
-            otherIncomesSnap,
+            keuanganSnap, // <-- Perbaikan: Ambil data dari koleksi 'keuangan'
             returnsSnap,
             productionSnap,
             fabricSnap,
-            categoriesSnap // <-- Menambahkan categoriesSnap di sini
+            categoriesSnap
         ] = await Promise.all([
-            getDoc(settingsRef),
-            getDoc(promotionsRef),
+            getDoc(doc(db, "settings", userId)),
+            getDoc(doc(db, "promotions", userId)),
             getDocs(query(collection(db, "products"), where("userId", "==", userId))),
             getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
             getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
             getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "expenses"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "other_incomes"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))), // <-- Perbaikan: Ambil dari koleksi 'keuangan'
             getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
             getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
             getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "categories"), where("userId", "==", userId))), // <-- Menambahkan query untuk categories
+            getDocs(query(collection(db, "categories"), where("userId", "==", userId))),
         ]);
 
-        // --- Logika pemrosesan data, sekarang semua snap sudah ada
         if (settingsSnap.exists()) {
             const appSettings = settingsSnap.data();
-            state.settings.brandName = appSettings.brandName || 'FASHION OS';
-            state.settings.minStok = appSettings.minStok || 10;
-            state.settings.marketplaces = appSettings.marketplaces || [];
-            state.settings.modelBaju = appSettings.modelBaju || [];
-        } else {
-            console.log("Membuat dokumen settings baru untuk pengguna:", userId);
-            const newSettings = {
-                brandName: 'Brand Anda',
-                minStok: 10,
-                marketplaces: [
-  // Contoh struktur baru untuk setiap marketplace
-  { 
-    id: 'shopee',
-    name: 'Shopee',
-    adm: 2,
-    programs: [
-      { id: 'program1', name: 'Gratis Ongkir', rate: 4 },
-      { id: 'program2', name: 'Cashback', rate: 3 }
-    ],
-    // ... properti lainnya
-  }
-],
-                modelBaju: [],
-                userId: userId
-            };
-            await setDoc(settingsRef, newSettings);
-            Object.assign(state.settings, newSettings);
+            Object.assign(state.settings, appSettings);
         }
-        
-        state.settings.marketplaces.forEach(mp => {
-            if (!state.promotions.perChannel[mp.id]) {
-                state.promotions.perChannel[mp.id] = { voucherToko: null, voucherSemuaProduk: null };
-            }
-        });
 
         if (promotionsSnap.exists()) {
             const promotionsData = promotionsSnap.data();
-            if (promotionsData.perChannel) {
-                state.promotions.perChannel = { ...state.promotions.perChannel, ...promotionsData.perChannel };
-            }
-            if (promotionsData.perModel) {
-                state.promotions.perModel = promotionsData.perModel;
-            }
-        } else {
-            await setDoc(promotionsRef, {
-                perChannel: {}, perModel: {}, userId: userId
-            });
+            Object.assign(state.promotions, promotionsData);
         }
-        
+
         const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
 
@@ -3048,24 +3572,24 @@ async function loadAllDataFromFirebase() {
             };
         });
         
-        state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal.toDate() }));
-        state.biaya = expensesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal.toDate() }));
-        state.keuanganLain = otherIncomesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal.toDate() }));
-        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal.toDate() }));
+        state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        
+        // Perbaikan: Langsung isi state.keuangan dengan data yang diambil
+        state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+
+        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.produksi = productionSnap.docs.map(doc => {
             const data = doc.data();
             if (data.tanggalPembayaran && data.tanggalPembayaran.toDate) {
                 data.tanggalPembayaran = data.tanggalPembayaran.toDate();
             }
-            return { id: doc.id, ...data, tanggal: data.tanggal.toDate() };
+            return { id: doc.id, ...data, tanggal: data.tanggal?.toDate() };
         });
-        state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli.toDate() }));
-        
-        // --- Baris yang sudah Anda tambahkan, sekarang berada di tempat yang benar
+        state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
         state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     } catch (error) {
-        console.error("Error besar saat mengambil data dari Firebase:", error);
+        console.error("Error besar saat memuat data dari Firebase:", error);
         alert("Gagal memuat data dari database. Mohon periksa koneksi internet Anda.");
         handleLogout();
     } finally {
@@ -3073,161 +3597,215 @@ async function loadAllDataFromFirebase() {
     }
 }
 
+// GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
-    // Membaca halaman terakhir dari localStorage saat aplikasi dimulai
-    const storedPage = localStorage.getItem('lastActivePage');
-    if (storedPage && storedPage !== 'login') {
-        activePage.value = storedPage;
-    }
-document.addEventListener('click', (event) => {
-        const isClickInsidePlan = event.target.closest('.plan-card');
-        if (!isClickInsidePlan) {
-            uiState.selectedPlan = null;
-        }
-    });
+    // Panggil listener onAuthStateChanged saat komponen dimuat
     onAuthStateChanged(auth, async (user) => {
-        if (user) {
-            currentUser.value = user;
+        isLoading.value = true;
 
-            if (userUnsubscribe.value) {
-                userUnsubscribe.value();
-                userUnsubscribe.value = null;
-            }
+        if (user) {
+            // Jika pengguna login, muat data pengguna dan listener real-time
+            currentUser.value = user;
 
             try {
                 const userDocRef = doc(db, "users", user.uid);
-                
-                // Menggunakan onSnapshot untuk mendengarkan perubahan real-time pada dokumen pengguna
-                userUnsubscribe.value = onSnapshot(userDocRef, (userDocSnap) => {
+
+                // Hentikan listener sebelumnya jika ada, untuk menghindari duplikasi
+                if (onSnapshotListener) {
+                    onSnapshotListener();
+                }
+
+                // BUAT LISTENER REAL-TIME untuk dokumen pengguna
+                onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
                     if (userDocSnap.exists()) {
                         const userData = userDocSnap.data();
                         currentUser.value.userData = userData;
+                        state.settings.dashboardPin = userData.dashboardPin || '';
 
                         const now = new Date();
-                        
-                        const isSubscriptionValid = (userData.subscriptionStatus === 'active' && now <= userData.subscriptionEndDate?.toDate()) ||
-                                                  (userData.subscriptionStatus === 'trial' && now <= userData.trialEndDate?.toDate());
+                        const endDate = userData.subscriptionEndDate?.toDate();
+                        const trialDate = userData.trialEndDate?.toDate();
+
+                        const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+                                                    (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
                         if (isSubscriptionValid) {
-                            loadAllDataFromFirebase();
-                            // Jika langganan valid, pastikan tidak ada pengalihan yang tidak diinginkan
-                            if (activePage.value === 'langganan') {
-                                activePage.value = 'dashboard';
-                            }
+                            // PENTING: Muat semua data lain setelah memastikan langganan valid
+                            await loadAllDataFromFirebase();
+                            const storedPage = localStorage.getItem('lastActivePage');
+                            activePage.value = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         } else {
                             activePage.value = 'langganan';
-                            isLoading.value = false;
                         }
                     } else {
-                        console.log("Data pengguna tidak ditemukan di koleksi 'users'.");
+                        console.error("Data user tidak ditemukan di Firestore. Mengarahkan ke logout.");
+                        handleLogout();
                     }
                     isLoading.value = false;
                 });
-                
             } catch (error) {
-                console.error("Gagal memuat data dari Firebase:", error);
-                alert("Gagal memuat data dari database. Mohon periksa koneksi internet Anda.");
+                console.error("Gagal memuat data user:", error);
+                alert("Gagal memuat data user. Silakan coba lagi.");
+                isLoading.value = false;
                 handleLogout();
             }
-
         } else {
-            if (userUnsubscribe.value) {
-                userUnsubscribe.value();
-                userUnsubscribe.value = null;
+            // Logika logout
+            if (onSnapshotListener) {
+                onSnapshotListener();
+                onSnapshotListener = null;
             }
-            console.log("Tidak ada pengguna yang login.");
             currentUser.value = null;
-            isLoading.value = false;
-            // Jika tidak ada pengguna yang login, selalu tampilkan halaman login
             activePage.value = 'login';
+            isLoading.value = false;
         }
     });
 });
-
-// Watcher untuk menyimpan halaman aktif ke localStorage
+// Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
-
 </script>
 
 <template>
-    <div v-if="!currentUser && !isLoading" class="flex items-center justify-center h-screen bg-slate-50">
-    <div class="w-full max-w-md p-8 sm:p-10 space-y-8 bg-white rounded-2xl shadow-xl transition-all duration-300 transform scale-95 md:scale-100">
+    <div v-if="!currentUser && !isLoading" class="flex items-center justify-center h-screen bg-slate-100 p-4">
+    <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8 sm:p-12 space-y-8 animate-fade-in">
         <div class="text-center">
-            <h2 class="text-3xl font-extrabold text-slate-900">Selamat Datang di</h2>
+            <h2 class="text-4xl font-extrabold text-slate-800">Selamat Datang di</h2>
             <p class="mt-2 text-2xl font-bold text-indigo-600">{{ state.settings.brandName }}</p>
         </div>
+
+        <div class="space-y-4">
+            <button type="button" @click="signInWithGoogle" class="w-full flex items-center justify-center py-3.5 px-4 rounded-xl shadow-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
+                <img src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="Google" class="w-6 h-6 mr-3">
+                Login dengan Google
+            </button>
+        </div>
+
+        <div class="relative py-4">
+            <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-slate-300"></div>
+            </div>
+            <div class="relative flex justify-center text-sm text-slate-500">
+                <span class="bg-white px-2">Atau</span>
+            </div>
+        </div>
+
         <form @submit.prevent="activePage === 'login' ? handleLogin() : handleRegister()" class="space-y-6">
             <div>
                 <label for="email" class="block text-sm font-medium text-slate-700">Alamat Email</label>
-                <input type="email" v-model="authForm.email" id="email" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                <input type="email" v-model="authForm.email" id="email" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
             </div>
             <div>
-                <label for="password" class="block text-sm font-medium text-slate-700">Password</label>
-                <input type="password" v-model="authForm.password" id="password" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                <label for="password" class="block text-sm font-medium text-slate-700 mt-4">Password</label>
+                <input type="password" v-model="authForm.password" id="password" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+            </div>
+            
+            <div v-if="activePage === 'register'">
+                <label for="dashboard-pin" class="block text-sm font-medium text-slate-700 mt-4">PIN Dasbor (4-6 angka)</label>
+                <input type="password" v-model="authForm.dashboardPin" id="dashboard-pin" maxlength="6" minlength="4" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                <p class="mt-1 text-xs text-slate-500">PIN ini akan digunakan untuk membuka halaman Dasbor Anda.</p>
             </div>
             <div v-if="activePage === 'register'">
-                <label for="activation-code" class="block text-sm font-medium text-slate-700">Kode Aktivasi (Opsional)</label>
-                <input type="text" v-model="authForm.activationCode" id="activation-code" class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                <label for="activation-code" class="block text-sm font-medium text-slate-700 mt-4">Kode Aktivasi (Opsional)</label>
+                <input type="text" v-model="authForm.activationCode" id="activation-code" class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
                 <p class="mt-2 text-xs text-slate-500">Masukkan kode aktivasi untuk mendapatkan langganan premium.</p>
             </div>
-            <div v-if="authForm.error" class="p-3 text-sm text-red-700 bg-red-100 rounded-lg border border-red-300">
+
+            <div v-if="authForm.error" class="p-3 mt-4 text-sm text-red-700 bg-red-100 rounded-md border border-red-300">
                 {{ authForm.error }}
             </div>
-            <div class="flex flex-col gap-4">
-                <button type="submit" class="w-full flex justify-center py-3 px-4 rounded-lg shadow-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+            <div id="recaptcha-container"></div>
+            
+            <div class="mt-6 space-y-3">
+                <button type="submit" class="w-full py-3.5 rounded-xl shadow-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 transition-colors">
                     <span v-if="activePage === 'login'">Login</span>
                     <span v-else>Daftar Akun Baru</span>
                 </button>
-                <button type="button" @click="changePage(activePage === 'login' ? 'register' : 'login')" class="w-full flex justify-center py-3 px-4 rounded-lg shadow-lg font-bold text-indigo-600 bg-white border-2 border-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors">
-                    <span v-if="activePage === 'login'">Daftar Akun Baru</span>
-                    <span v-else>Sudah Punya Akun? Login</span>
-                </button>
+                <p class="text-center text-sm text-slate-600">
+                    <button type="button" @click="changePage(activePage === 'login' ? 'register' : 'login')" class="text-indigo-600 hover:underline transition-colors">
+                        <span v-if="activePage === 'login'">Belum Punya Akun? Daftar</span>
+                        <span v-else>Sudah Punya Akun? Login</span>
+                    </button>
+                </p>
             </div>
         </form>
     </div>
 </div>
-
         
   <div v-if="currentUser">
     <div class="flex h-screen bg-slate-100">
       <!-- Sidebar -->
-      <aside class="w-64 bg-slate-800 text-slate-200 flex-shrink-0 hidden md:flex md:flex-col">
-        <div class="p-5 border-b border-slate-700">
-            <h1 class="text-2xl font-bold text-white text-center">{{ state.settings.brandName }}</h1>
-            <p class="text-xs text-slate-400 text-center">Pusat Kendali Bisnis</p>
-        </div>
-        <nav class="mt-4 flex-1 overflow-y-auto">
-    <a href="#" @click.prevent="changePage('dashboard')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'dashboard' }"><span class="mr-3 text-xl">📊</span> Dashboard</a>
-    <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'transaksi' }"><span class="mr-3 text-xl">🛒</span> Kasir (POS)</a>
-    <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'inventaris' }"><span class="mr-3 text-xl">📦</span> Inventaris</a>
-    <a href="#" @click.prevent="changePage('harga-hpp')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'harga-hpp' }"><span class="mr-3 text-xl">💲</span> Harga & HPP</a>
-    <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'promosi' }"><span class="mr-3 text-xl">🏷️</span> Promosi & Voucher</a>
-    <a href="#" @click.prevent="changePage('produksi')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'produksi' }"><span class="mr-3 text-xl">🏭</span> Produksi</a>
-    <a href="#" @click.prevent="changePage('gudang-kain')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'gudang-kain' }"><span class="mr-3 text-xl">🧵</span> Stok Kain</a>
-    <a href="#" @click.prevent="changePage('keuangan')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'keuangan' }"><span class="mr-3 text-xl">💰</span> Keuangan</a>
-    <a href="#" @click.prevent="changePage('retur')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'retur' }"><span class="mr-3 text-xl">↩️</span> Manajemen Retur</a>
-    <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'pengaturan' }"><span class="mr-3 text-xl">⚙️</span> Pengaturan</a>
-    <a href="#" @click.prevent="changePage('langganan')" class="sidebar-link flex items-center py-3 px-5" :class="{ active: activePage === 'langganan' }"><span class="mr-3 text-xl">💎</span> Langganan</a>
-    <a href="#" @click.prevent="changePage('panduan')" class="sidebar-link flex items-center py-3 px-5 mt-4 border-t border-slate-700" :class="{ active: activePage === 'panduan' }"><span class="mr-3 text-xl">❓</span> Panduan Aplikasi</a>
-</nav>
-      
-      <div class="p-5 border-t border-slate-700 space-y-3">
-    <a href="#" @click.prevent="changePage('tentang')" 
-       class="w-full flex items-center justify-center text-sm bg-slate-700 text-slate-300 font-bold py-2 px-4 rounded-lg hover:bg-slate-600 transition-colors">
-        <span class="mr-2">©️</span> Tentang Aplikasi
-    </a>
-
-    <div v-if="currentUser" class="text-center">
-        
-        <button @click="handleLogout" class="w-full bg-red-600 text-white font-bold py-1.5 px-3 rounded-lg hover:bg-red-700 transition-colors text-xs">
-            Logout
-        </button>
+      <aside class="w-64 bg-gray-900 text-gray-300 flex-shrink-0 hidden md:flex md:flex-col">
+    <div class="h-16 flex items-center justify-center px-4 border-b border-gray-700/50">
+        <h1 class="text-xl font-bold text-white tracking-wider">{{ state.settings.brandName }}</h1>
     </div>
-</div>
-  </aside>
+    <div class="flex-1 flex flex-col overflow-y-auto">
+        <nav class="flex-1 px-2 py-4 space-y-1">
+            <a href="#" @click.prevent="changePage('dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'dashboard' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                Dashboard
+            </a>
+            <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                Kasir (POS)
+            </a>
+            <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7s0 4 8 4 8-4 8-4"/></svg>
+                Inventaris
+            </a>
+            <a href="#" @click.prevent="changePage('harga-hpp')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'harga-hpp' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01"/></svg>
+                Harga & HPP
+            </a>
+            <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'promosi' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 8v-3c0-1.105.895-2 2-2z"/></svg>
+                Promosi
+            </a>
+            <a href="#" @click.prevent="changePage('produksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'produksi' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                Produksi
+            </a>
+            <a href="#" @click.prevent="changePage('gudang-kain')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'gudang-kain' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121M12 12l2.879 2.879M12 12L9.121 14.879M12 12L14.879 9.121M12 12L19 5"/></svg>
+                Stok Kain
+            </a>
+            <a href="#" @click.prevent="changePage('keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'keuangan' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                Keuangan
+            </a>
+            <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2"/></svg>
+                Manajemen Retur
+            </a>
+            <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'pengaturan' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.82 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.82 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.82-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.82-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Pengaturan
+            </a>
+            <a href="#" @click.prevent="changePage('langganan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'langganan' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v1h-14v-1zM14 11h-4a1 1 0 00-1 1v2a1 1 0 001 1h4a1 1 0 001-1v-2a1 1 0 00-1-1zM5 19h14a2 2 0 002-2v-5H3v5a2 2 0 002 2z"/></svg>
+                Langganan
+            </a>
+        </nav>
+        
+        <div class="mt-auto p-2">
+            <hr class="border-gray-700 mx-2 my-2">
+            <a href="#" @click.prevent="changePage('panduan')" class="sidebar-link text-sm" :class="{ 'sidebar-link-active': activePage === 'panduan' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Panduan Aplikasi
+            </a>
+            <a href="#" @click.prevent="changePage('tentang')" class="sidebar-link text-sm" :class="{ 'sidebar-link-active': activePage === 'tentang' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Tentang Aplikasi
+            </a>
+            <button @click="handleLogout" class="w-full mt-2 sidebar-link hover:bg-red-500/20 hover:text-red-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                Logout
+            </button>
+        </div>
+    </div>
+</aside>
 
       <!-- Main Content -->
       <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
@@ -3244,142 +3822,220 @@ watch(activePage, (newPage) => {
 
     <div v-else>
 
-    <div v-if="activePage === 'dashboard'">
-    <div class="flex flex-wrap justify-between items-center mb-8 gap-4">
-        <div class="flex items-center gap-4">
-            <h2 class="text-3xl font-bold text-slate-800">Dashboard Analitik</h2>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 p-3 bg-white rounded-lg border">
-            <select v-model="uiState.dashboardDateFilter" class="w-full sm:w-auto bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                <option value="today">hari ini</option>
-                <option value="last_7_days">1 minggu terakhir</option>
-                <option value="last_30_days">1 bulan terakhir</option>
-                <option value="this_year">1 tahun terakhir</option>
-                <option value="by_date_range">rentang tanggal</option>
-                <option value="by_month_range">rentang bulan</option>
-                <option value="by_year_range">rentang tahun</option>
-                <option value="all_time">semua</option>
-            </select>
-            <div v-if="uiState.dashboardDateFilter === 'by_date_range'" class="flex items-center gap-2">
-                <input type="date" v-model="uiState.dashboardStartDate" class="border-slate-300 text-sm rounded-lg p-2">
-                <span>s/d</span>
-                <input type="date" v-model="uiState.dashboardEndDate" class="border-slate-300 text-sm rounded-lg p-2">
-            </div>
-            <div v-if="uiState.dashboardDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
-                <select v-model.number="uiState.dashboardStartMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                <input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
-                <span class="mx-2">s/d</span>
-                <select v-model.number="uiState.dashboardEndMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                <input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
-            </div>
-            <div v-if="uiState.dashboardDateFilter === 'by_year_range'" class="flex items-center gap-2">
-                <input type="number" v-model.number="uiState.dashboardStartYear" placeholder="Dari Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
-                <span>s/d</span>
-                <input type="number" v-model.number="uiState.dashboardEndYear" placeholder="Sampai Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
-            </div>
+<div v-if="activePage === 'dashboard'">
+    <div v-if="state.settings.dashboardPin && isDashboardLocked" class="flex items-center justify-center h-screen p-4">
+        <div class="bg-white rounded-xl shadow-lg p-8 max-w-sm w-full text-center">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">Dasbor Terkunci</h3>
+            <p class="text-sm text-slate-600 mb-4">Masukkan PIN untuk melihat data dasbor.</p>
+            <form @submit.prevent="unlockDashboard">
+                <input type="password" v-model="dashboardPinInput" placeholder="Masukkan PIN" class="w-full p-2 border rounded-md text-center text-lg mb-2">
+                <p v-if="dashboardPinError" class="text-red-500 text-xs mb-2">{{ dashboardPinError }}</p>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg">Buka Dasbor</button>
+            </form>
         </div>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
-            <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
+    
+    <div v-else>
+        <div class="flex flex-wrap justify-between items-center mb-8 gap-4">
+            <h2 class="text-3xl font-bold text-slate-800">Dashboard Analitik</h2>
+            <div class="flex flex-wrap items-center gap-2 p-3 bg-white rounded-lg border shadow-sm">
+                <select v-model="uiState.dashboardDateFilter" class="w-full sm:w-auto bg-white border-slate-300 text-sm rounded-lg p-2.5 capitalize">
+                    <option value="today">hari ini</option>
+                    <option value="last_7_days">7 hari terakhir</option>
+                    <option value="last_30_days">30 hari terakhir</option>
+                    <option value="this_year">tahun ini</option>
+                    <option value="by_date_range">rentang tanggal</option>
+                    <option value="by_month_range">rentang bulan</option>
+                    <option value="by_year_range">rentang tahun</option>
+                    <option value="all_time">semua</option>
+                </select>
+                <div v-if="uiState.dashboardDateFilter === 'by_date_range'" class="flex items-center gap-2">
+                    <input type="date" v-model="uiState.dashboardStartDate" class="border-slate-300 text-sm rounded-lg p-2">
+                    <span>s/d</span>
+                    <input type="date" v-model="uiState.dashboardEndDate" class="border-slate-300 text-sm rounded-lg p-2">
+                </div>
+                <div v-if="uiState.dashboardDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
+                    <select v-model.number="uiState.dashboardStartMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                    <input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                    <span class="mx-2">s/d</span>
+                    <select v-model.number="uiState.dashboardEndMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                    <input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                </div>
+                <div v-if="uiState.dashboardDateFilter === 'by_year_range'" class="flex items-center gap-2">
+                    <input type="number" v-model.number="uiState.dashboardStartYear" placeholder="Dari Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
+                    <span>s/d</span>
+                    <input type="number" v-model.number="uiState.dashboardEndYear" placeholder="Sampai Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
+            <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500 flex items-center">
-                    Saldo Kas Saat Ini
-                    <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="ml-1 w-5 h-5 rounded-full flex items-center justify-center text-xs bg-slate-200 text-slate-600 hover:bg-slate-300">?</button>
-                </h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
+                <h3 class="text-sm font-medium text-slate-500">Saldo Kas Saat Ini</h3>
+                <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
             </div>
         </div>
-        <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
-            <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
+        <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="help-icon-button">?</button>
+    </div>
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
+            <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500 flex items-center">
-                    Omset Bersih
-                    <button @click="showModal('kpiHelp', kpiExplanations['omset'])" class="ml-1 w-5 h-5 rounded-full flex items-center justify-center text-xs bg-slate-200 text-slate-600 hover:bg-slate-300">?</button>
-                </h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.totalOmsetBersih) }}</p>
+                <h3 class="text-sm font-medium text-slate-500">Omset Bersih</h3>
+                <p class="kpi-value text-2xl font-bold mt-1 text-green-600">{{ formatCurrency(dashboardKpis.omsetBersih) }}</p>
             </div>
         </div>
-        <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
+        <button @click="showModal('kpiHelp', kpiExplanations['omset'])" class="help-icon-button">?</button>
+    </div>
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
             <div class="bg-emerald-100 text-emerald-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500 flex items-center">
-                    Laba Kotor
-                    <button @click="showModal('kpiHelp', kpiExplanations['laba-kotor'])" class="ml-1 w-5 h-5 rounded-full flex items-center justify-center text-xs bg-slate-200 text-slate-600 hover:bg-slate-300">?</button>
-                </h3>
+                <h3 class="text-sm font-medium text-slate-500">Laba Kotor</h3>
                 <p class="kpi-value text-2xl font-bold mt-1 text-emerald-600">{{ formatCurrency(dashboardKpis.labaKotor) }}</p>
             </div>
         </div>
-        <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
-            <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
+        <button @click="showModal('kpiHelp', kpiExplanations['laba-kotor'])" class="help-icon-button">?</button>
+    </div>
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
+            <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500 flex items-center">
-                    Laba Bersih (Est.)
-                    <button @click="showModal('kpiHelp', kpiExplanations['laba-bersih'])" class="ml-1 w-5 h-5 rounded-full flex items-center justify-center text-xs bg-slate-200 text-slate-600 hover:bg-slate-300">?</button>
-                </h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-green-600">{{ formatCurrency(dashboardKpis.labaBersihEst) }}</p>
+                <h3 class="text-sm font-medium text-slate-500">Laba Bersih Operasional</h3>
+                <p class="kpi-value text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(dashboardKpis.labaBersihOperasional) }}</p>
             </div>
         </div>
-        <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
-            <div class="bg-orange-100 text-orange-600 p-3 rounded-lg flex-shrink-0">
+        <button @click="showModal('kpiHelp', kpiExplanations['laba-bersih-operasional'])" class="help-icon-button">?</button>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
+            <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-medium text-slate-500">Omset Kotor</h3>
+                <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.totalOmsetKotor) }}</p>
+            </div>
+        </div>
+        <button @click="showModal('kpiHelp', kpiExplanations['omset-kotor'])" class="help-icon-button">?</button>
+    </div>
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
+            <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-medium text-slate-500">Diskon</h3>
+                <p class="kpi-value text-2xl font-bold mt-1 text-red-600">{{ formatCurrency(dashboardKpis.totalDiskon) }}</p>
+            </div>
+        </div>
+        <button @click="showModal('kpiHelp', kpiExplanations['diskon'])" class="help-icon-button">?</button>
+    </div>
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
+            <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12H5m0 0l4-4m-4 4l4 4m6-10h4m0 0l-4-4m4 4l-4 4" /></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-medium text-slate-500">Total HPP Terjual</h3>
+                <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">{{ formatCurrency(dashboardKpis.totalHppTerjual) }}</p>
+            </div>
+        </div>
+        <button @click="showModal('kpiHelp', kpiExplanations['hpp-terjual'])" class="help-icon-button">?</button>
+    </div>
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
+            <div class="bg-purple-100 text-purple-600 p-3 rounded-lg flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500 flex items-center">
-                    Biaya Operasional
-                    <button @click="showModal('kpiHelp', kpiExplanations['biaya-operasional'])" class="ml-1 help-btn">?</button>
-                </h3>
+                <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi Marketplace</h3>
+                <p class="kpi-value text-2xl font-bold mt-1 text-purple-600">{{ formatCurrency(dashboardKpis.totalBiayaTransaksi) }}</p>
+            </div>
+        </div>
+        <button @click="showModal('kpiHelp', kpiExplanations['biaya-transaksi'])" class="help-icon-button">?</button>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
+            <div class="bg-orange-100 text-orange-600 p-3 rounded-lg flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-medium text-slate-500">Biaya Operasional</h3>
                 <p class="kpi-value text-2xl font-bold mt-1 text-orange-600">{{ formatCurrency(dashboardKpis.totalBiayaOperasional) }}</p>
             </div>
         </div>
-        <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
+        <button @click="showModal('kpiHelp', kpiExplanations['biaya-operasional'])" class="help-icon-button">?</button>
+    </div>
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
             <div class="bg-cyan-100 text-cyan-600 p-3 rounded-lg flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500 flex items-center">
-                    Total Unit Stok
-                    <button @click="showModal('kpiHelp', kpiExplanations['total-stok'])" class="ml-1 help-btn">?</button>
-                </h3>
+                <h3 class="text-sm font-medium text-slate-500">Total Unit Stok</h3>
                 <p class="kpi-value text-2xl font-bold mt-1 text-cyan-600">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p>
             </div>
         </div>
-        <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
+        <button @click="showModal('kpiHelp', kpiExplanations['total-stok'])" class="help-icon-button">?</button>
+    </div>
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
             <div class="bg-amber-100 text-amber-600 p-3 rounded-lg flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500 flex items-center">
-                    Total Nilai Stok (HPP)
-                    <button @click="showModal('kpiHelp', kpiExplanations['nilai-stok'])" class="ml-1 help-btn">?</button>
-                </h3>
+                <h3 class="text-sm font-medium text-slate-500">Total Nilai Stok (HPP)</h3>
                 <p class="kpi-value text-2xl font-bold mt-1 text-amber-600">{{ formatCurrency(dashboardKpis.totalNilaiStokHPP) }}</p>
             </div>
         </div>
-        <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
+        <button @click="showModal('kpiHelp', kpiExplanations['nilai-stok'])" class="help-icon-button">?</button>
+    </div>
+    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+        <div class="flex items-start gap-4">
             <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2" /></svg>
             </div>
             <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500 flex items-center">
-                    Total Nilai Retur
-                    <button @click="showModal('kpiHelp', kpiExplanations['nilai-retur'])" class="ml-1 help-btn">?</button>
-                </h3>
+                <h3 class="text-sm font-medium text-slate-500">Total Nilai Retur</h3>
                 <p class="kpi-value text-2xl font-bold mt-1 text-red-600">{{ formatCurrency(dashboardKpis.totalNilaiRetur) }}</p>
             </div>
         </div>
+        <button @click="showModal('kpiHelp', kpiExplanations['nilai-retur'])" class="help-icon-button">?</button>
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div class="lg:col-span-3 bg-white p-6 rounded-xl border"><h3 class="text-lg font-semibold text-slate-800 mb-4">Laba Kotor vs Biaya Operasional</h3><div class="chart-container"><canvas id="profitExpenseChart"></canvas></div></div>
-        <div class="lg:col-span-2 bg-white p-6 rounded-xl border"><h3 class="text-lg font-semibold text-slate-800 mb-4">Penjualan per Channel</h3><div class="chart-container"><canvas id="salesChannelChart"></canvas></div></div>
+</div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div class="lg:col-span-3 bg-white p-6 rounded-xl border">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Laba Kotor vs Biaya Operasional</h3>
+                <div class="chart-container">
+                    <canvas id="profitExpenseChart"></canvas>
+                </div>
+            </div>
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl border">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Penjualan per Channel</h3>
+                <div class="chart-container">
+                    <canvas id="salesChannelChart"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -3636,10 +4292,13 @@ watch(activePage, (newPage) => {
             <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga Jual & HPP</h2>
             <p class="text-slate-600 mt-1">Atur modal (HPP) dan harga jual untuk setiap varian di semua channel.</p>
         </div>
-        <button @click="saveData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:cursor-not-allowed">
-    <span v-if="isSaving">Menyimpan...</span>
-    <span v-else>Simpan Semua Perubahan</span>
-</button>
+        <div class="flex gap-2">
+            <button @click="showModal('priceCalculator')" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 transition-colors shadow">Kalkulator Harga</button>
+            <button @click="saveData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:cursor-not-allowed">
+                <span v-if="isSaving">Menyimpan...</span>
+                <span v-else>Simpan Semua Perubahan</span>
+            </button>
+        </div>
     </div>
 
     <div class="bg-white p-6 rounded-xl border">
@@ -3672,11 +4331,11 @@ watch(activePage, (newPage) => {
                         <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
                         <div class="flex items-center gap-2">
                             <span class="text-xs font-bold px-2 py-0.5 rounded-full" 
-                                  :class="{
-                                    'bg-green-100 text-green-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 40, 
-                                    'bg-yellow-100 text-yellow-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 20 && ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 40, 
-                                    'bg-red-100 text-red-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 20
-                                  }">
+                                    :class="{
+                                     'bg-green-100 text-green-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 40, 
+                                     'bg-yellow-100 text-yellow-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 20 && ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 40, 
+                                     'bg-red-100 text-red-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 20
+                                    }">
                                 {{ (varian.hargaJual[marketplace.id] && varian.hpp ? (((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}%
                             </span>
                             <div class="relative w-36">
@@ -3693,74 +4352,79 @@ watch(activePage, (newPage) => {
 
     <div v-if="activePage === 'promosi'">
     <div class="flex items-center gap-4 mb-6">
-    <h2 class="text-3xl font-bold">Manajemen Promosi & Voucher</h2>
-    <button @click="showModal('panduanPromosi')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-        Informasi
-    </button>
-</div>
-    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm col-span-full">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div>
-                <h4 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-3">Promosi per Akun Penjualan</h4>
-                <p class="text-sm text-slate-500 mb-4">Voucher ini berlaku untuk semua produk yang dijual di akun yang bersangkutan.</p>
-                <div class="space-y-4">
-                    <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border rounded-lg bg-slate-50">
-                        <p class="font-semibold text-slate-700">{{ channel.name }}</p>
-                        <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko (%)</label>
-                                <input type="number" placeholder="Contoh: 5" v-model.number="state.promotions.perChannel[channel.id].voucherToko" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (Rp)</label>
-                                <input type="number" placeholder="Contoh: 10000" v-model.number="state.promotions.perChannel[channel.id].voucherSemuaProduk" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
-                            </div>
+        <h2 class="text-3xl font-bold">Manajemen Promosi & Voucher</h2>
+        <button @click="showModal('panduanPromosi')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+            Informasi
+        </button>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Promosi per Akun Penjualan -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h4 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-3">Promosi per Akun Penjualan</h4>
+            <p class="text-sm text-slate-500 mb-4">Voucher ini berlaku untuk semua produk yang dijual di akun yang bersangkutan.</p>
+            <div class="space-y-4">
+                <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border rounded-lg bg-slate-50">
+                    <p class="font-semibold text-slate-700">{{ channel.name }}</p>
+                    <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko (%)</label>
+                            <input type="text" placeholder="Contoh: 5%" v-model="voucherTokoComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (Rp)</label>
+                            <input type="text" placeholder="Contoh: Rp 10.000" v-model="voucherSemuaProdukComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
                         </div>
                     </div>
                 </div>
             </div>
-            <div>
-                <h4 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-3">Promosi Spesifik per Model Produk</h4>
-                <p class="text-sm text-slate-500 mb-4">Atur diskon dan voucher yang hanya berlaku untuk model produk tertentu di setiap akun.</p>
-                <div class="mb-4">
-                    <label for="promo-model-filter" class="block text-sm font-medium text-slate-700">Pilih Model Produk</label>
-                    <select v-model="uiState.promosiSelectedModel" id="promo-model-filter" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm">
-                        <option value="">-- Pilih Model untuk Diatur --</option>
-                        <option v-for="modelName in promosiProductModels" :key="modelName" :value="modelName">{{ modelName }}</option>
-                    </select>
-                </div>
-                <div v-if="uiState.promosiSelectedModel" class="space-y-4">
-                    <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border rounded-lg bg-slate-50">
-                        <p class="font-semibold text-slate-700">{{ channel.name }}</p>
-                        <div class="mt-2 space-y-3">
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu (%)</label>
-                                <input type="number" placeholder="Contoh: 10" v-model.number="state.promotions.perModel[uiState.promosiSelectedModel][channel.id].voucherProduk" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                  </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
-                                <div class="space-y-2 mt-1">
-                                    <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].diskonBertingkat" :key="index" class="flex items-center gap-2">
-                                        <input type="number" placeholder="Min. Belanja (Rp)" v-model.number="tier.min" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                        <input type="number" placeholder="Diskon (%)" v-model.number="tier.diskon" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                        <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-                                    </div>
+        </div>
+        
+        <!-- Promosi Spesifik per Model Produk -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h4 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-3">Promosi Spesifik per Model Produk</h4>
+            <p class="text-sm text-slate-500 mb-4">Atur diskon dan voucher yang hanya berlaku untuk model produk tertentu di setiap akun.</p>
+            <div class="mb-4">
+                <label for="promo-model-filter" class="block text-sm font-medium text-slate-700">Pilih Model Produk</label>
+                <select v-model="uiState.promosiSelectedModel" id="promo-model-filter" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                    <option value="">-- Pilih Model untuk Diatur --</option>
+                    <option v-for="modelName in promosiProductModels" :key="modelName" :value="modelName">{{ modelName }}</option>
+                </select>
+            </div>
+            <div v-if="uiState.promosiSelectedModel" class="space-y-4">
+                <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border rounded-lg bg-slate-50">
+                    <p class="font-semibold text-slate-700">{{ channel.name }}</p>
+                    <div class="mt-2 space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu (%)</label>
+                            <input type="text" placeholder="Contoh: 10%" v-model="voucherProdukComputed(uiState.promosiSelectedModel, channel.id).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
+                            <div class="space-y-2 mt-1">
+                                <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].diskonBertingkat" :key="index" class="flex items-center gap-2">
+                                    <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                    <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                    <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
                                 </div>
-                                <button @click="addPromotionTier(uiState.promosiSelectedModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
                             </div>
+                            <button @click="addPromotionTier(uiState.promosiSelectedModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
                         </div>
                     </div>
                 </div>
-                <p v-else class="text-center text-slate-500 py-4">Pilih model produk di atas untuk melihat pengaturannya.</p>
             </div>
+            <p v-else class="text-center text-slate-500 py-4">Pilih model produk di atas untuk melihat pengaturannya.</p>
         </div>
-         <div class="mt-6 border-t pt-4 flex justify-end">
-            <button @click="saveData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:cursor-not-allowed">
-    <span v-if="isSaving">Menyimpan...</span>
-    <span v-else>Simpan Semua Pengaturan Promosi</span>
-</button>
-        </div>
+
+    </div>
+    
+    <div class="mt-6 border-t pt-4 flex justify-end">
+        <button @click="saveData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400">
+            <span v-if="isSaving">Menyimpan...</span>
+            <span v-else>Simpan Semua Pengaturan Promosi</span>
+        </button>
     </div>
 </div>
 
@@ -3923,9 +4587,15 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 <div v-if="activePage === 'keuangan'">
-    <h2 class="text-3xl font-bold mb-6">Manajemen Keuangan</h2>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-
+    <div class="flex items-center justify-between gap-4 mb-6">
+        <h2 class="text-3xl font-bold">Manajemen Keuangan</h2>
+        <button @click="uiState.isKeuanganInfoVisible = true" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+            Informasi
+        </button>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm">
             <div class="p-4 border-b bg-slate-50 rounded-t-xl">
                 <div class="flex justify-between items-center">
@@ -3935,35 +4605,6 @@ watch(activePage, (newPage) => {
                         <button @click="showModal('addBiaya', { tanggal: new Date().toISOString().split('T')[0], kategori: '', jumlah: null, catatan: '' })" class="bg-rose-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-rose-600 text-sm">Tambah Baru</button>
                     </div>
                 </div>
-                <div class="mt-3">
-    <select v-model="uiState.keuanganPengeluaranFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2 shadow-sm capitalize">
-        <option value="today">hari ini</option>
-        <option value="last_7_days">1 minggu terakhir</option>
-        <option value="last_30_days">1 bulan terakhir</option>
-        <option value="this_year">1 tahun terakhir</option>
-        <option value="by_date_range">rentang tanggal</option>
-        <option value="by_month_range">rentang bulan</option>
-        <option value="by_year_range">rentang tahun</option>
-        <option value="all_time">semua</option>
-    </select>
-    <div v-if="uiState.keuanganPengeluaranFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
-        <input type="date" v-model="uiState.keuanganPengeluaranStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-        <span>s/d</span>
-        <input type="date" v-model="uiState.keuanganPengeluaranEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-    </div>
-    <div v-if="uiState.keuanganPengeluaranFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
-        <select v-model.number="uiState.keuanganPengeluaranStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-        <input type="number" v-model.number="uiState.keuanganPengeluaranStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-        <span class="mx-2">s/d</span>
-        <select v-model.number="uiState.keuanganPengeluaranEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-        <input type="number" v-model.number="uiState.keuanganPengeluaranEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-    </div>
-    <div v-if="uiState.keuanganPengeluaranFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
-        <input type="number" v-model.number="uiState.keuanganPengeluaranStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-        <span class="text-slate-500">s/d</span>
-        <input type="number" v-model.number="uiState.keuanganPengeluaranEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-    </div>
-</div>
             </div>
             <div class="relative max-h-[60vh] overflow-y-auto">
                 <table class="w-full text-sm text-left text-slate-500">
@@ -4005,35 +4646,6 @@ watch(activePage, (newPage) => {
                         <button @click="showModal('addPemasukan', { tanggal: new Date().toISOString().split('T')[0], tipe: 'Modal Masuk', jumlah: null, catatan: '' })" class="bg-sky-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-sky-600 text-sm">Tambah Baru</button>
                     </div>
                 </div>
-                 <div class="mt-3">
-    <select v-model="uiState.keuanganPemasukanFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2 shadow-sm capitalize">
-        <option value="today">hari ini</option>
-        <option value="last_7_days">1 minggu terakhir</option>
-        <option value="last_30_days">1 bulan terakhir</option>
-        <option value="this_year">1 tahun terakhir</option>
-        <option value="by_date_range">rentang tanggal</option>
-        <option value="by_month_range">rentang bulan</option>
-        <option value="by_year_range">rentang tahun</option>
-        <option value="all_time">semua</option>
-    </select>
-    <div v-if="uiState.keuanganPemasukanFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
-        <input type="date" v-model="uiState.keuanganPemasukanStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-        <span>s/d</span>
-        <input type="date" v-model="uiState.keuanganPemasukanEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-    </div>
-    <div v-if="uiState.keuanganPemasukanFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
-        <select v-model.number="uiState.keuanganPemasukanStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-        <input type="number" v-model.number="uiState.keuanganPemasukanStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-        <span class="mx-2">s/d</span>
-        <select v-model.number="uiState.keuanganPemasukanEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-        <input type="number" v-model.number="uiState.keuanganPemasukanEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-    </div>
-    <div v-if="uiState.keuanganPemasukanFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
-        <input type="number" v-model.number="uiState.keuanganPemasukanStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-        <span class="text-slate-500">s/d</span>
-        <input type="number" v-model.number="uiState.keuanganPemasukanEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-    </div>
-</div>
             </div>
             <div class="relative max-h-[60vh] overflow-y-auto">
                 <table class="w-full text-sm text-left text-slate-500">
@@ -4046,9 +4658,7 @@ watch(activePage, (newPage) => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <tr v-if="filteredPemasukan.length === 0">
-                            <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td>
-                        </tr>
+                        <tr v-if="filteredPemasukan.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
                         <tr v-for="item in filteredPemasukan" :key="item.id">
                             <td class="px-4 py-3">
                                 <p class="font-semibold">{{ item.tipe }}</p>
@@ -4072,7 +4682,34 @@ watch(activePage, (newPage) => {
                 </table>
             </div>
         </div>
-        
+    </div>
+</div>
+
+<div v-if="uiState.isKeuanganInfoVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full">
+        <div class="flex justify-between items-start pb-4 border-b">
+            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                Informasi & Logika
+            </h3>
+        </div>
+        <div class="space-y-4 text-slate-700 py-4">
+            <p class="text-sm text-slate-600">Halaman ini berfungsi sebagai buku kas digital Anda. Setiap data yang Anda masukkan di sini akan secara langsung memengaruhi metrik di Dashboard Analitik.</p>
+            <div class="space-y-4">
+                <div class="p-4 bg-slate-50 rounded-lg">
+                    <p class="font-semibold text-slate-700">Pemasukan & Pengeluaran</p>
+                    <p class="text-sm text-slate-500 mt-1">Data dari tabel ini akan diperhitungkan dalam kalkulasi **Saldo Kas** di dasbor.</p>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg">
+                    <p class="font-semibold text-slate-700">Kategori Pengeluaran</p>
+                    <p class="text-sm text-slate-500 mt-1">Semua data di sini akan diklasifikasikan sebagai **Biaya Operasional**, yang digunakan untuk menghitung **Laba Bersih Operasional** di dasbor.</p>
+                </div>
+                
+            </div>
+        </div>
+        <div class="flex justify-end gap-3 pt-4 border-t">
+            <button @click="hideKeuanganInfoModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+        </div>
     </div>
 </div>
 
@@ -4198,115 +4835,195 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="activePage === 'pengaturan'">
-    <h2 class="text-3xl font-bold text-slate-800 mb-6">Pengaturan Aplikasi</h2>
+<div v-if="activePage === 'pengaturan'" class="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
     
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+    <div class="col-span-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4 sticky top-4">
+        <h3 class="text-xl font-bold text-slate-800 mb-4">Pengaturan</h3>
+        <ul class="space-y-1 text-base font-medium">
+            <li>
+                <button @click="uiState.pengaturanTab = 'umum'" class="w-full text-left p-3 rounded-lg transition-colors" :class="{'bg-indigo-600 text-white': uiState.pengaturanTab === 'umum', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'umum'}">
+                    Pengaturan Umum
+                </button>
+            </li>
+            <li>
+                <button @click="uiState.pengaturanTab = 'marketplace'" class="w-full text-left p-3 rounded-lg transition-colors" :class="{'bg-indigo-600 text-white': uiState.pengaturanTab === 'marketplace', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'marketplace'}">
+                    Aturan Marketplace
+                </button>
+            </li>
+            <li>
+                <button @click="uiState.pengaturanTab = 'modelproduk'" class="w-full text-left p-3 rounded-lg transition-colors" :class="{'bg-indigo-600 text-white': uiState.pengaturanTab === 'modelproduk', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'modelproduk'}">
+                    Model Produk
+                </button>
+            </li>
+            <li v-if="isAdmin">
+    <button @click="uiState.pengaturanTab = 'admin'" class="w-full text-left p-3 rounded-lg transition-colors" :class="{'bg-indigo-600 text-white': uiState.pengaturanTab === 'admin', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'admin'}">
+        Admin
+    </button>
+</li>
+        </ul>
         
-        <div class="lg:col-span-2 space-y-8">
-            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-    <h3 class="text-lg font-semibold text-slate-800 mb-4">Pengaturan Umum</h3>
-    <div class="space-y-4">
-        <div>
-            <label class="flex items-center text-sm font-medium text-slate-700 mb-1">
-                <svg class="w-4 h-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-                Nama Brand Anda
-            </label>
-            <input type="text" v-model="state.settings.brandName" class="w-full p-2 border border-slate-300 rounded-md">
-        </div>
-        <div>
-            <label class="flex items-center text-sm font-medium text-slate-700 mb-1">
-               <svg class="w-4 h-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Batas Stok Minimum Peringatan
-            </label>
-            <input type="number" v-model.number="state.settings.minStok" class="w-full p-2 border border-slate-300 rounded-md">
-        </div>
-
-        <div class="border-t pt-4 mt-4">
-            <button @click="saveGeneralSettings" :disabled="isSavingSettings" class="w-full bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed">
-                <span v-if="isSavingSettings">Menyimpan...</span>
-                <span v-else>Simpan Perubahan</span>
-            </button>
-        </div>
     </div>
-</div>
 
-            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-slate-800">Model Baju Default (Produksi)</h3>
-                    <button @click="addModelBaju" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">+ Tambah Model</button>
-                </div>
-                <div class="mb-4">
-                    <input type="text" v-model="uiState.pengaturanModelBajuSearch" placeholder="Cari nama model..." class="w-full p-2 border border-slate-300 rounded-md">
-                </div>
-                <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-        <thead class="text-left text-slate-500">
-            <tr>
-                <th class="p-2 font-medium">NAMA MODEL</th>
-                <th class="p-2 font-medium">YARD/BAJU</th>
-                <th class="p-2 font-medium">HARGA MAKLUN</th>
-                <th class="p-2 font-medium">HARGA JAHIT</th>
-                <th class="p-2 font-medium text-right">AKSI</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-200">
-            <tr v-if="filteredModelBaju.length === 0">
-                <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada model yang cocok.</td>
-            </tr>
-            <tr v-for="model in filteredModelBaju" :key="model.id">
-                <td class="p-3 font-semibold text-slate-700">{{ model.namaModel }}</td>
-                <td class="p-3">{{ model.yardPerBaju || 0 }} m</td>
-                <td class="p-3">{{ formatCurrency(model.hargaMaklun || 0) }}</td>
-                <td class="p-3">{{ formatCurrency(model.hargaJahit || 0) }}</td>
-                <td class="p-3 text-right space-x-4">
-                    <button @click="showModal('editModelBaju', JSON.parse(JSON.stringify(model)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                    <button @click="removeModelBaju(model.id)" class="text-red-500 hover:text-red-700">
-                        <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+    <div class="col-span-3 space-y-6">
 
+        <div v-if="uiState.pengaturanTab === 'umum'" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Informasi Dasar & Keamanan</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nama Brand Anda</label>
+                    <input type="text" v-model="state.settings.brandName" class="w-full p-2 border border-slate-300 rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Batas Stok Minimum Peringatan</label>
+                    <input type="number" v-model.number="state.settings.minStok" class="w-full p-2 border border-slate-300 rounded-md">
+                </div>
             </div>
-        </div> 
+            
+            <div class="border-t pt-4 mt-4">
+                <h4 class="font-semibold text-slate-700 mb-2">
+                    <span v-if="state.settings.dashboardPin">Ubah PIN Dasbor</span>
+                    <span v-else>Buat PIN Dasbor Baru</span>
+                </h4>
+                <div class="space-y-2">
+                    <div v-if="state.settings.dashboardPin">
+                        <label class="block text-sm font-medium text-slate-700">PIN Lama</label>
+                        <input type="password" v-model="uiState.oldPin" placeholder="Masukkan PIN lama" class="w-full p-2 border border-slate-300 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">PIN Baru</label>
+                        <input type="password" v-model="uiState.newPin" placeholder="Masukkan PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Konfirmasi PIN Baru</label>
+                        <input type="password" v-model="uiState.confirmNewPin" placeholder="Ketik ulang PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
+                    </div>
+                    <p v-if="uiState.pinError" class="text-sm text-red-500">{{ uiState.pinError }}</p>
+                </div>
+            </div>
 
-        <div class="lg:col-span-1">
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm">
-         <div class="p-4 border-b">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-lg font-semibold text-slate-800">Pengaturan Marketplace</h3>
+            <div class="flex justify-end pt-4 border-t mt-6">
+                <button @click="saveGeneralSettings" :disabled="isSavingSettings" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">
+                    <span v-if="isSavingSettings">Menyimpan...</span>
+                    <span v-else>Simpan Perubahan</span>
+                </button>
+            </div>
+        </div>
+
+        <div v-if="uiState.pengaturanTab === 'marketplace'" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-slate-800">Daftar Marketplace</h3>
                 <button @click="addMarketplace" class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm">Tambah</button>
             </div>
-            <input type="text" v-model="uiState.pengaturanMarketplaceSearch" placeholder="Cari nama marketplace..." class="w-full p-2 border border-slate-300 rounded-md">
-        </div>
-        <div class="space-y-4 p-4 max-h-[65vh] overflow-y-auto">
-            <p v-if="filteredMarketplaces.length === 0" class="text-center text-slate-500 py-4">Tidak ada marketplace yang cocok.</p>
-            
-            <div v-for="mp in filteredMarketplaces" :key="mp.id" class="p-4 border rounded-lg bg-white shadow-sm">
-                <div class="flex justify-between items-start mb-3">
-                    <h4 class="font-bold text-slate-800 text-base">{{ mp.name }}</h4>
-                    <div class="flex items-center gap-4">
-                        <button @click="showModal('editMarketplace', JSON.parse(JSON.stringify(mp)))" class="text-xs font-semibold text-blue-500 hover:underline">Edit</button>
-                        <button @click="removeMarketplace(mp.id)" class="text-red-500 hover:text-red-700">
-                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-                    <span class="text-slate-500">Adm:</span><span class="text-right font-semibold">{{ mp.adm }}%</span>
-                    <span class="text-slate-500">Program:</span><span class="text-right font-semibold">{{ mp.program }}%</span>
-                    <span class="text-slate-500">Layanan:</span><span class="text-right font-semibold">{{ mp.layanan }}%</span>
-                    <span class="text-slate-500">Komisi:</span><span class="text-right font-semibold">{{ mp.komisi }}%</span>
-                    <span class="text-slate-500">Voucher:</span><span class="text-right font-semibold">{{ mp.voucher }}%</span>
-                    <span class="text-slate-500">Per Pesanan:</span><span class="text-right font-semibold">{{ formatCurrency(mp.perPesanan) }}</span>
-                </div>
+            <div class="mb-4">
+                <input type="text" v-model="uiState.pengaturanMarketplaceSearch" placeholder="Cari nama marketplace..." class="w-full p-2 border border-slate-300 rounded-md">
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="text-left text-slate-500">
+                        <tr>
+                            <th class="p-2 font-medium">NAMA</th>
+                            <th class="p-2 font-medium">ADMIN</th>
+                            <th class="p-2 font-medium">KOMISI</th>
+                            <th class="p-2 font-medium">LAYANAN</th>
+                            <th class="p-2 font-medium">PER PESANAN</th>
+                            <th class="p-2 font-medium text-right">AKSI</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        <tr v-if="filteredMarketplaces.length === 0">
+                            <td colspan="6" class="p-4 text-center text-slate-500">Tidak ada marketplace yang cocok.</td>
+                        </tr>
+                        <tr v-for="mp in filteredMarketplaces" :key="mp.id">
+                            <td class="p-3 font-semibold text-slate-700">{{ mp.name }}</td>
+                            <td class="p-3">{{ mp.adm }}%</td>
+                            <td class="p-3">{{ mp.komisi }}%</td>
+                            <td class="p-3">{{ mp.layanan }}%</td>
+                            <td class="p-3">{{ formatCurrency(mp.perPesanan) }}</td>
+                            <td class="p-3 text-right space-x-4">
+                                <button @click="showModal('editMarketplace', JSON.parse(JSON.stringify(mp)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+                                <button @click="removeMarketplace(mp.id)" class="text-red-500 hover:text-red-700">
+                                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex justify-end pt-4 border-t mt-6">
+                <button @click="saveData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
+                    <span v-if="isSaving">Menyimpan...</span>
+                    <span v-else>Simpan Perubahan</span>
+                </button>
             </div>
         </div>
+<div v-if="uiState.pengaturanTab === 'admin' && isAdmin" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+    <h3 class="text-lg font-semibold text-slate-800 mb-4">Export Data Pelanggan</h3>
+    <p class="text-sm text-slate-500 mb-4">Pilih pelanggan untuk mengunduh semua data mereka (produk, transaksi, keuangan, dll.) ke dalam satu file Excel.</p>
+
+    <div class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700">Pilih Pelanggan</label>
+            <select v-model="uiState.selectedUserForExport" class="mt-1 w-full p-2 border rounded-md">
+                <option :value="null" disabled>-- Daftar Pelanggan --</option>
+                <option v-for="user in uiState.allUsers" :key="user.uid" :value="user">
+                    {{ user.email }}
+                </option>
+            </select>
+        </div>
+        <button 
+            @click="exportAllDataForUser(uiState.selectedUserForExport.uid, uiState.selectedUserForExport.email)" 
+            :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" 
+            class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
+            <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
+            <span v-else>Export Semua Data Pelanggan</span>
+        </button>
     </div>
 </div>
+        <div v-if="uiState.pengaturanTab === 'modelproduk'" class="space-y-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-slate-800">Daftar Model Produk</h3>
+                <button @click="addModelProduk" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">+ Tambah Model</button>
+            </div>
+            <div class="mb-4">
+                <input type="text" v-model="uiState.pengaturanModelProdukSearch" placeholder="Cari nama model..." class="w-full p-2 border border-slate-300 rounded-md">
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="text-left text-slate-500">
+                        <tr>
+                            <th class="p-2 font-medium">NAMA MODEL</th>
+                            <th class="p-2 font-medium">YARD/MODEL</th>
+                            <th class="p-2 font-medium">HARGA MAKLUN</th>
+                            <th class="p-2 font-medium">HARGA JAHIT</th>
+                            <th class="p-2 font-medium text-right">AKSI</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        <tr v-if="filteredModelProduk.length === 0">
+                            <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada model yang cocok.</td>
+                        </tr>
+                        <tr v-for="model in filteredModelProduk" :key="model.id">
+                            <td class="p-3 font-semibold text-slate-700">{{ model.namaModel }}</td>
+                            <td class="p-3">{{ model.yardPerModel || 0 }} m</td>
+                            <td class="p-3">{{ formatCurrency(model.hargaMaklun || 0) }}</td>
+                            <td class="p-3">{{ formatCurrency(model.hargaJahit || 0) }}</td>
+                            <td class="p-3 text-right space-x-4">
+                                <button @click="showModal('editModelProduk', JSON.parse(JSON.stringify(model)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+                                <button @click="removeModelProduk(model.id)" class="text-red-500 hover:text-red-700">
+                                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex justify-end pt-4 border-t mt-6">
+                <button @click="saveData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
+                    <span v-if="isSaving">Menyimpan...</span>
+                    <span v-else>Simpan Perubahan</span>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 <div v-if="activePage === 'panduan'">
@@ -4335,15 +5052,63 @@ watch(activePage, (newPage) => {
         <div class="space-y-8 text-slate-700 leading-relaxed">
             
             <section>
-                <h3 class="text-xl font-semibold text-slate-800 mb-2">Kebijakan Privasi dan Keamanan Data</h3>
-                <p>Kami menempatkan keamanan dan privasi data Anda sebagai prioritas tertinggi. Aplikasi Fashion OS ini dirancang sebagai sistem yang berjalan sepenuhnya di sisi klien (client-side) dengan koneksi langsung ke layanan Google Firebase milik Anda. </p>
-                <ul class="list-disc list-inside mt-4 space-y-2">
-                    <li><strong>Tidak Ada Server Perantara:</strong> Kami tidak memiliki server perantara yang menampung atau memproses data Anda. Semua informasi yang Anda masukkan—mulai dari data produk, transaksi, hingga keuangan—dikirim secara langsung dan aman dari browser Anda ke proyek Firebase pribadi Anda.</li>
-                    <li><strong>Kepemilikan Data Penuh:</strong> Anda memiliki kontrol dan kepemilikan penuh atas data Anda. Data bisnis Anda tersimpan secara eksklusif di dalam infrastruktur Google Firebase yang Anda kelola sendiri. Kami, sebagai pengembang aplikasi, tidak memiliki akses sama sekali ke informasi sensitif tersebut.</li>
-                    <li><strong>Enkripsi Standar Industri:</strong> Komunikasi antara aplikasi dan server Firebase dienkripsi menggunakan protokol HTTPS/TLS standar industri, memastikan data Anda terlindungi selama transit.</li>
-                </ul>
-                <p class="mt-4 text-sm text-slate-500 italic">Kami berkomitmen untuk menjaga kerahasiaan dan integritas data operasional bisnis Anda, memberikan Anda ketenangan pikiran untuk fokus pada pengembangan usaha Anda.</p>
-            </section>
+    <h3 class="text-xl font-semibold text-slate-800 mb-2">Kebijakan Privasi dan Keamanan Data</h3>
+    <p class="mb-4">
+        Data Anda 100% Milik Anda. Kami merancang aplikasi ini dengan privasi sebagai prioritas utama. Berikut adalah cara kami memastikan data bisnis Anda tetap aman dan sepenuhnya di bawah kendali Anda:
+    </p>
+    
+    <ul class="space-y-4">
+        <li class="p-4 bg-slate-50 rounded-lg">
+            <h4 class="font-bold text-slate-800">1. Arsitektur Tanpa Perantara</h4>
+            <p class="mt-1 text-sm">
+                Aplikasi ini tidak memiliki server perantara milik kami. Saat Anda memasukkan data (produk, penjualan, keuangan), informasi tersebut dikirim <strong>langsung dari browser Anda ke akun Google Firebase pribadi Anda sendiri.</strong> Kami, sebagai pengembang aplikasi, tidak pernah melihat, menyimpan, atau memiliki akses ke data operasional Anda.
+            </p>
+        </li>
+        <li class="p-4 bg-slate-50 rounded-lg">
+            <h4 class="font-bold text-slate-800">2. Anda adalah Pemilik Tunggal Data Anda</h4>
+            <p class="mt-1 text-sm">
+                Semua informasi bisnis Anda tersimpan secara eksklusif di dalam proyek Firebase yang Anda kontrol sepenuhnya. Anggap saja ini seperti Anda menyimpan data di **brankas pribadi Anda di dalam layanan Google**—hanya Anda yang memegang kuncinya.
+            </p>
+        </li>
+        <li class="p-4 bg-slate-50 rounded-lg">
+            <h4 class="font-bold text-slate-800">3. Keamanan Standar Perbankan</h4>
+            <p class="mt-1 text-sm">
+                Setiap data yang dikirim antara aplikasi dan database Anda dilindungi oleh enkripsi HTTPS/TLS, yaitu **standar keamanan yang sama yang digunakan oleh bank** dan layanan online terkemuka di seluruh dunia untuk melindungi transaksi.
+            </p>
+        </li>
+    </ul>
+
+    <p class="mt-6 text-sm text-slate-500 italic">
+        Komitmen kami adalah menyediakan alat yang kuat untuk bisnis Anda dengan privasi dan keamanan sebagai fondasi utamanya. Fokuslah pada pengembangan brand Anda dengan tenang, karena kami telah memastikan data Anda tetap menjadi milik Anda seutuhnya.
+    </p>
+</section>
+<section class="mt-8">
+    <h3 class="text-xl font-semibold text-slate-800 mb-2">Bagaimana "Kontrol Penuh" Bekerja?</h3>
+    <p class="mb-4 text-sm text-slate-600">
+        Kami menggunakan analogi sederhana: **Tanah dan Kunci Rumah.**
+    </p>
+    
+    <ul class="space-y-3">
+        <li class="flex items-start gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-xl">🏡</div>
+            <div>
+                <h4 class="font-bold text-slate-800">Akun Google Anda adalah Tanahnya</h4>
+                <p class="mt-1 text-sm">
+                    Seluruh database (Firebase) dibuat di bawah kepemilikan Akun Google Anda. Sama seperti sertifikat tanah, ini membuktikan bahwa Anda adalah satu-satunya pemilik sah dari "lahan digital" tempat data Anda disimpan.
+                </p>
+            </div>
+        </li>
+        <li class="flex items-start gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-xl">🔑</div>
+            <div>
+                <h4 class="font-bold text-slate-800">Password Anda adalah Kuncinya</h4>
+                <p class="mt-1 text-sm">
+                    Aplikasi Fashion OS ini hanyalah "alat" atau "rumah" yang beroperasi di atas tanah Anda. Kunci untuk masuk ke tanah tersebut adalah password Akun Google Anda. Tanpa password Anda, tidak ada seorang pun—termasuk kami sebagai pengembang—yang bisa mengakses data Anda. Keamanan data Anda setara dengan keamanan akun Google Anda.
+                </p>
+            </div>
+        </li>
+    </ul>
+</section>
 
             <section>
                 <h3 class="text-xl font-semibold text-slate-800 mb-2">Informasi Aplikasi</h3>
@@ -4373,6 +5138,7 @@ watch(activePage, (newPage) => {
 </div>
 <div v-if="activePage === 'langganan'">
     <div v-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()" class="max-w-4xl mx-auto text-center py-12 px-4">
+        <!-- Tampilan untuk langganan aktif -->
         <div class="bg-white p-8 sm:p-12 rounded-xl shadow-lg border border-green-300 flex flex-col items-center">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -4381,7 +5147,7 @@ watch(activePage, (newPage) => {
             </div>
             <h2 class="text-3xl font-bold text-slate-800 mb-2">Langganan Anda Aktif! 🎉</h2>
             <p class="text-slate-600 mb-6 max-w-xl">
-                Selamat, Anda memiliki akses penuh ke semua fitur premium kami. Terus kembangkan bisnis Anda bersama Fashion OS.
+                Selamat, Anda memiliki akses penuh ke semua fitur premium kami.
             </p>
             <div class="bg-green-50 text-green-800 px-6 py-4 rounded-lg w-full text-center">
                 <p class="text-lg font-semibold">Status Langganan: Aktif</p>
@@ -4392,7 +5158,8 @@ watch(activePage, (newPage) => {
         </div>
     </div>
     
-    <div v-else-if="currentUser?.userData?.subscriptionStatus === 'trial' && new Date(currentUser.userData.trialEndDate?.seconds * 1000) > Date.now()" class="max-w-4xl mx-auto text-center py-12 px-4">
+    <div v-else-if="currentUser?.userData?.subscriptionStatus === 'trial'" class="max-w-4xl mx-auto text-center py-12 px-4">
+        <!-- Tampilan untuk masa uji coba -->
         <div class="bg-white p-8 sm:p-12 rounded-xl shadow-lg border border-indigo-300 flex flex-col items-center">
             <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -4409,9 +5176,22 @@ watch(activePage, (newPage) => {
                     Berakhir pada: {{ new Date(currentUser.userData.trialEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
                 </p>
             </div>
+            
+            <!-- Tambahkan form aktivasi di sini -->
+            <div class="w-full mt-8 pt-6 border-t border-slate-200">
+                <h3 class="text-xl font-bold text-slate-800 mb-4">Aktivasi Langganan</h3>
+                <form @submit.prevent="activateSubscriptionWithCode">
+                    <label for="activation-code" class="block text-sm font-medium text-slate-700">Masukkan Kode Aktivasi Anda</label>
+                    <input type="text" v-model="authForm.activationCode" id="activation-code-page" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                    <button type="submit" class="w-full py-3 mt-4 rounded-xl shadow-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                        Aktifkan Sekarang
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
+    <!-- Tampilan untuk pengguna yang trialnya sudah habis -->
     <div v-else class="max-w-4xl mx-auto text-center py-12 px-4">
         <h2 class="text-3xl font-bold text-slate-800">Masa Percobaan Anda Telah Berakhir</h2>
         <p class="text-slate-600 mt-4 mb-8 max-w-xl mx-auto">
@@ -4423,7 +5203,7 @@ watch(activePage, (newPage) => {
                  :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'bulanan', 'border-transparent': selectedPlan !== 'bulanan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Bulanan</h3>
-                    <p class="text-4xl font-bold my-4">{{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal"></span></p>
+                    <p class="text-4xl font-bold my-4">{{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal">/bulan</span></p>
                     <ul class="text-left space-y-2 text-slate-600">
                         <li>✔️ Akses semua fitur</li>
                         <li>✔️ Dukungan prioritas</li>
@@ -4443,7 +5223,7 @@ watch(activePage, (newPage) => {
                  :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'tahunan', 'border-transparent': selectedPlan !== 'tahunan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Tahunan</h3>
-                    <p class="text-4xl font-bold my-4">{{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal"></span></p>
+                    <p class="text-4xl font-bold my-4">{{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal">/tahun</span></p>
                     <ul class="text-left space-y-2 text-slate-600">
                         <li>✔️ Akses semua fitur</li>
                         <li>✔️ Dukungan prioritas</li>
@@ -4461,6 +5241,7 @@ watch(activePage, (newPage) => {
         </div>
     </div>
 </div>
+
 </div>
 </main>
     </div>
@@ -4471,13 +5252,13 @@ watch(activePage, (newPage) => {
         
         <div v-if="uiState.modalType === 'kpiHelp'" class="bg-white rounded-lg shadow-xl p-6 max-w-xl w-full">
     <div class="flex justify-between items-center pb-4 border-b mb-4">
-        <h3 class="text-xl font-bold text-slate-800">{{ uiState.modalData.title }}</h3>
+        <h3 class="text-xl font-bold text-slate-800">{{ uiState.modalData?.title || 'Informasi' }}</h3>
     </div>
     <div class="space-y-4 text-slate-700">
-        <div>
+        <div v-if="uiState.modalData?.description">
             <p class="text-sm italic">{{ uiState.modalData.description }}</p>
         </div>
-        <div>
+        <div v-if="uiState.modalData?.formula">
             <p class="text-xs font-medium text-slate-700">Rumus:</p>
             <p class="font-mono text-sm mt-1 bg-slate-200 p-2 rounded-md">{{ uiState.modalData.formula }}</p>
         </div>
@@ -4514,13 +5295,24 @@ watch(activePage, (newPage) => {
             <label for="product-sku" class="block text-sm font-medium text-slate-700">SKU (Stock Keeping Unit)</label>
             <input type="text" v-model="uiState.modalData.sku" id="product-sku" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: TSH-BL-M001" required>
         </div>
+        
+        <!-- KODE PERBAIKAN DI SINI -->
         <div>
-            <label for="product-model" class="block text-sm font-medium text-slate-700">Model Baju</label>
-            <select v-model="uiState.modalData.modelId" id="product-model" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" required>
+            <label for="product-model" class="block text-sm font-medium text-slate-700">Model Produk</label>
+            <div v-if="state.settings.modelProduk.length === 0" class="mt-1 p-3 bg-red-100 text-red-800 border-l-4 border-red-500 rounded-lg shadow-sm">
+                <p class="font-semibold mb-1">Peringatan:</p>
+                <p class="text-sm">Anda belum memiliki data model Produk. Silakan tambahkan di halaman **Pengaturan** terlebih dahulu.</p>
+                <a href="#" @click.prevent="changePage('pengaturan'); hideModal();" class="mt-2 inline-block text-red-700 font-bold hover:underline">
+                    Buka Halaman Pengaturan &raquo;
+                </a>
+            </div>
+            <select v-else v-model="uiState.modalData.modelId" id="product-model" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" required>
                 <option value="">-- Pilih Model --</option>
-                <option v-for="model in state.settings.modelBaju" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
+                <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
             </select>
         </div>
+        <!-- AKHIR KODE PERBAIKAN -->
+        
         <div>
             <label for="product-name" class="block text-sm font-medium text-slate-700">Nama Produk</label>
             <input type="text" v-model="uiState.modalData.nama" id="product-name" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: Kaos Polos" required>
@@ -4547,6 +5339,7 @@ watch(activePage, (newPage) => {
         </div>
     </form>
 </div>
+
 
 <div v-if="uiState.modalType === 'addStockIn'" class="bg-white rounded-lg shadow-xl p-5 max-w-3xl w-full h-full md:max-h-[50vh] flex flex-col">
     <div class="flex items-center gap-4 mb-4">
@@ -4643,71 +5436,101 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'transactionDetail' && transactionDetails" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[75vh] flex flex-col">
-    <div class="flex justify-between items-start mb-4">
+<div v-if="uiState.modalType === 'transactionDetail' && transactionDetails" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[85vh] flex flex-col">
+    <div class="flex justify-between items-start pb-4 border-b">
         <div>
             <h3 class="text-2xl font-bold text-slate-800">Detail Transaksi</h3>
             <p class="text-sm text-slate-500 font-mono">{{ transactionDetails.id }}</p>
         </div>
         <div class="text-right">
             <p class="text-sm font-semibold text-slate-700">{{ new Date(transactionDetails.tanggal).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }}</p>
-            <p class="text-sm text-slate-500">{{ transactionDetails.channel }}</p>
+            <p class="text-base font-bold text-indigo-600">{{ transactionDetails.channel }}</p>
         </div>
     </div>
 
-    <div class="max-h-[65vh] overflow-y-auto -mx-6 px-6 py-4 border-t border-b">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+    <div class="flex-1 overflow-y-auto pt-6 -mx-6 px-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             <div class="space-y-4">
-                <div>
-                    <h4 class="font-semibold text-slate-700 mb-2">Produk Terjual:</h4>
-                    <ul class="space-y-2 text-sm text-slate-600">
-                        <li v-for="item in transactionDetails.items" :key="item.sku" class="flex justify-between p-2 bg-slate-50 rounded-md">
-                            <span>{{ item.qty }}x {{ getProductBySku(item.sku)?.nama || item.sku }}</span>
-                            <span class="font-semibold">{{ formatCurrency(item.hargaJual * item.qty) }}</span>
+                <div class="bg-slate-50 p-4 rounded-xl border">
+                    <h4 class="font-semibold text-slate-700 mb-2 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-500" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13h6v2H4v-2z" clip-rule="evenodd" /></svg>
+                        Produk Terjual
+                    </h4>
+                    <ul class="divide-y divide-slate-200">
+                        <li v-for="item in transactionDetails.items" :key="item.sku" class="py-3 flex justify-between items-center text-sm">
+                            <div class="font-medium text-slate-800">
+                                {{ item.qty }}x {{ getProductBySku(item.sku)?.nama || item.sku }}
+                            </div>
+                            <span class="font-semibold text-right">{{ formatCurrency(item.hargaJual * item.qty) }}</span>
                         </li>
                     </ul>
                 </div>
-                <div class="p-4 rounded-lg bg-indigo-50 border border-indigo-200 text-center">
-                    <p class="text-sm font-semibold text-indigo-800">Estimasi Laba Bersih Transaksi Ini:</p>
-                    <p class="text-3xl font-bold text-indigo-700 my-1">{{ formatCurrency(transactionDetails.labaBersih) }}</p>
-                    <p class="text-xs text-indigo-600">(Total Belanja - Total HPP - Total Biaya Marketplace)</p>
+                
+                <div class="p-6 rounded-xl border-2 border-indigo-400 bg-indigo-50 text-center shadow-md">
+                    <p class="text-sm font-medium text-indigo-800">Estimasi Laba Bersih Transaksi Ini:</p>
+                    <p class="text-3xl font-extrabold text-indigo-700 my-1">{{ formatCurrency(transactionDetails.labaBersih) }}</p>
+                    <p class="text-xs text-indigo-600 font-medium">(Omset Bersih - HPP Terjual - Total Biaya Marketplace)</p>
                 </div>
             </div>
+
             <div class="space-y-4">
-                <div>
-                    <h4 class="font-semibold text-slate-700 mb-2">Ringkasan Pembayaran:</h4>
-                    <div class="bg-slate-50 p-3 rounded-lg space-y-1 text-sm">
-                        <div class="flex justify-between"><span>Subtotal</span><span>{{ formatCurrency(transactionDetails.subtotal) }}</span></div>
-                        <div v-if="transactionDetails.diskon.totalDiscount > 0" class="flex justify-between text-green-600">
-                            <span>Diskon ({{ transactionDetails.diskon.description }})</span>
-                            <span>-{{ formatCurrency(transactionDetails.diskon.totalDiscount) }}</span>
-                        </div>
-                        <div class="flex justify-between font-bold text-base border-t pt-2 mt-2"><span>Total Belanja</span><span>{{ formatCurrency(transactionDetails.total) }}</span></div>
-                    </div>
+                <div class="bg-slate-50 p-4 rounded-xl border">
+                    <h4 class="font-semibold text-slate-700 mb-2 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" /></svg>
+                        Ringkasan Laba Rugi
+                    </h4>
+                    <ul class="space-y-1 text-sm">
+                        <li class="flex justify-between">
+                            <span class="text-slate-600">Omset Kotor</span>
+                            <span class="font-semibold">{{ formatCurrency(transactionDetails.subtotal) }}</span>
+                        </li>
+                        <li v-if="transactionDetails.diskon.totalDiscount > 0" class="flex justify-between text-green-600">
+                            <span class="text-sm">Diskon ({{ transactionDetails.diskon.description || 'N/A' }})</span>
+                            <span class="font-semibold">-{{ formatCurrency(transactionDetails.diskon.totalDiscount) }}</span>
+                        </li>
+                        <li class="flex justify-between font-bold border-t pt-2 mt-2">
+                            <span>Omset Bersih</span>
+                            <span>{{ formatCurrency(transactionDetails.total) }}</span>
+                        </li>
+                        <li class="flex justify-between pt-2">
+                            <span class="text-slate-600">HPP Terjual</span>
+                            <span class="text-red-600 font-semibold">-{{ formatCurrency(transactionDetails.totalHPP) }}</span>
+                        </li>
+                        <li class="flex justify-between font-bold border-t pt-2 mt-2">
+                            <span>Laba Kotor</span>
+                            <span>{{ formatCurrency(transactionDetails.total - transactionDetails.totalHPP) }}</span>
+                        </li>
+                    </ul>
                 </div>
-                <div>
-                    <h4 class="font-semibold text-slate-700 mb-2">Rincian Biaya Marketplace:</h4>
-                     <div class="bg-slate-50 p-3 rounded-lg space-y-1 text-sm">
-                        <div class="flex justify-between"><span>Biaya Administrasi</span><span>{{ formatCurrency(transactionDetails.biaya.adm) }}</span></div>
-                        <div class="flex justify-between"><span>Biaya Program</span><span>{{ formatCurrency(transactionDetails.biaya.program) }}</span></div>
-                        <div class="flex justify-between"><span>Biaya Komisi</span><span>{{ formatCurrency(transactionDetails.biaya.komisi) }}</span></div>
-                        <div class="flex justify-between"><span>Biaya Voucher</span><span>{{ formatCurrency(transactionDetails.biaya.voucher) }}</span></div>
-                        <div class="flex justify-between"><span>Biaya per Pesanan</span><span>{{ formatCurrency(transactionDetails.biaya.perPesanan) }}</span></div>
-                        <div class="flex justify-between font-bold text-base border-t pt-2 mt-2 text-red-600"><span>Total Biaya</span><span>-{{ formatCurrency(transactionDetails.totalBiayaMarketplace) }}</span></div>
-                    </div>
+
+                <div class="bg-slate-50 p-4 rounded-xl border">
+                    <h4 class="font-semibold text-slate-700 mb-2 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-red-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                        Biaya Marketplace
+                    </h4>
+                    <ul v-if="transactionDetails.biaya && transactionDetails.biaya.rincian" class="space-y-1 text-sm">
+                        <li class="flex justify-between font-bold text-red-600">
+                            <span>Total Biaya</span>
+                            <span>-{{ formatCurrency(transactionDetails.biaya.total) }}</span>
+                        </li>
+                        <template v-for="(item, index) in transactionDetails.biaya.rincian" :key="index">
+                            <li class="flex justify-between text-xs text-slate-600">
+                                <span>- {{ item.name }}</span>
+                                <span>{{ formatCurrency(item.value) }}</span>
+                            </li>
+                        </template>
+                    </ul>
+                    <p v-else class="text-xs text-slate-500 italic text-center py-4">Tidak ada rincian biaya marketplace.</p>
                 </div>
             </div>
         </div>
     </div>
-    
-    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-20 border-t">
-    <button @click="exportLaporanSemuaToExcel" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">
-        📄 Export ke Excel
-    </button>
-    <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">
-        Tutup
-    </button>
-</div>
+
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-6 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">
+            Tutup
+        </button>
+    </div>
 </div>
 <div v-if="uiState.modalType === 'addKain' || uiState.modalType === 'editKain'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[50vh] flex flex-col">
     <h3 class="text-xl font-bold mb-4">{{ uiState.modalType === 'addKain' ? 'Tambah Stok Kain Baru' : 'Edit Data Kain' }}</h3>
@@ -4898,13 +5721,13 @@ watch(activePage, (newPage) => {
             <div v-for="(kb, index) in uiState.modalData.kainBahan" :key="index" class="mb-3 p-4 bg-slate-50 rounded-lg border">
                 <p class="font-bold text-base text-slate-800">{{ kb.namaKain }}</p>
                 <ul class="list-disc list-inside ml-4 text-slate-600 space-y-1 mt-2">
-                    <li><strong>Model Baju:</strong> {{ state.settings.modelBaju.find(m => m.id === kb.modelBajuId)?.namaModel || 'N/A' }}</li>
+                    <li><strong>Model Produk:</strong> {{ state.settings.modelProduk.find(m => m.id === kb.modelProdukId)?.namaModel || 'N/A' }}</li>
                     <li><strong>Warna Kain:</strong> {{ kb.warnaKain || '-' }}</li>
                     <li><strong>Ukuran:</strong> {{ kb.ukuran || '-' }}</li>
                     <li><strong>Toko Kain:</strong> {{ kb.tokoKain || '-' }}</li>
                     <li><strong>Total Yard:</strong> {{ kb.totalYard || 0 }} yard @ {{ formatCurrency(kb.hargaKainPerYard || 0) }}/yard</li>
-                    <li><strong>Yard/Baju:</strong> {{ kb.yardPerBaju || 0 }} yard/baju</li>
-                    <li><strong>Target Qty:</strong> {{ Math.floor((kb.totalYard || 0) / (kb.yardPerBaju || 1)) }} pcs</li>
+                    <li><strong>Yard/Model:</strong> {{ kb.yardPerModel || 0 }} yard/Model</li>
+                    <li><strong>Target Qty:</strong> {{ Math.floor((kb.totalYard || 0) / (kb.yardPerModel || 1)) }} pcs</li>
                     <li class="font-semibold text-slate-800"><strong>Aktual Jadi:</strong> {{ kb.aktualJadi || 0 }} pcs, Harga Maklun/Pcs: {{ formatCurrency(kb.hargaMaklunPerPcs || 0) }}</li>
                     <li v-if="kb.aktualJadiKombinasi > 0"><strong>Aktual Jadi Kombinasi:</strong> {{ kb.aktualJadiKombinasi }} pcs</li>
                 </ul>
@@ -5069,10 +5892,10 @@ watch(activePage, (newPage) => {
                 <option value="Ditunda">Ditunda</option>
             </select>
         </div>
-        <!-- Filter jenis pekerja baru -->
+        <!-- Filter jenis Status baru -->
         <div>
-            <label for="ringkasan-pekerja-filter" class="block text-sm font-medium text-slate-700 mb-1">Pilih Jenis Status</label>
-            <select v-model="uiState.produksiFilterType" id="ringkasan-pekerja-filter" class="mt-1 block w-full p-2 border rounded-md bg-white shadow-sm">
+            <label for="ringkasan-Status-filter" class="block text-sm font-medium text-slate-700 mb-1">Pilih Jenis Status</label>
+            <select v-model="uiState.produksiFilterType" id="ringkasan-Status-filter" class="mt-1 block w-full p-2 border rounded-md bg-white shadow-sm">
                 <option value="all">Semua Jenis Status</option>
                 <option value="pemaklun">Pemaklun</option>
                 <option value="penjahit">Penjahit</option>
@@ -5084,7 +5907,7 @@ watch(activePage, (newPage) => {
             <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                 <tr>
                     <th class="px-6 py-3">Tanggal</th>
-                    <th class="px-6 py-3">Model Baju</th>
+                    <th class="px-6 py-3">Model Produk</th>
                     <th class="px-6 py-3">Nama Kain</th>
                     <th class="px-6 py-3">Warna</th>
                     <th class="px-6 py-3">Ukuran</th>
@@ -5224,16 +6047,16 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'editModelBaju'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[55vh] flex flex-col">
-    <h3 class="text-xl font-bold mb-4">Edit Model Baju</h3>
-    <form @submit.prevent="saveModelBajuEdit" class="space-y-4">
+<div v-if="uiState.modalType === 'editModelProduk'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[55vh] flex flex-col">
+    <h3 class="text-xl font-bold mb-4">Edit Model Produk</h3>
+    <form @submit.prevent="saveModelProdukEdit" class="space-y-4">
         <div>
             <label class="block text-sm font-medium text-slate-700">Nama Model</label>
             <input type="text" v-model="uiState.modalData.namaModel" class="mt-1 w-full p-2 border rounded-md">
         </div>
         <div>
-            <label class="block text-sm font-medium text-slate-700">Kebutuhan Kain (Yard/Baju)</label>
-            <input type="number" step="0.1" v-model.number="uiState.modalData.yardPerBaju" class="mt-1 w-full p-2 border rounded-md">
+            <label class="block text-sm font-medium text-slate-700">Kebutuhan Kain (Yard/Model)</label>
+            <input type="number" step="0.1" v-model.number="uiState.modalData.yardPerModel" class="mt-1 w-full p-2 border rounded-md">
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700">Harga Jasa Maklun (Rp)</label>
@@ -5252,24 +6075,44 @@ watch(activePage, (newPage) => {
 
 
 <div v-if="uiState.modalType === 'editMarketplace'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col">
-    <h3 class="text-xl font-bold mb-4">Edit Marketplace</h3>
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-slate-800">Edit Marketplace</h3>
+        <button @click="uiState.isProgramInfoModalVisible = true" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+            Informasi
+        </button>
+    </div>
     <form @submit.prevent="saveMarketplaceEdit" class="space-y-4 overflow-y-auto pr-2">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
                 <label class="block text-sm font-medium text-slate-700">Nama Marketplace</label>
                 <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md">
             </div>
-            <div><label class="block text-sm font-medium">Administrasi (%)</label><input type="number" v-model.number="uiState.modalData.adm" class="w-full p-2 border rounded-md"></div>
-            <div><label class="block text-sm font-medium">Layanan Gratis Ongkir Xtra (%)</label><input type="number" v-model.number="uiState.modalData.layanan" class="w-full p-2 border rounded-md"></div>
-            <div><label class="block text-sm font-medium">Komisi (%)</label><input type="number" v-model.number="uiState.modalData.komisi" class="w-full p-2 border rounded-md"></div>
-            <div><label class="block text-sm font-medium">Per Pesanan (Rp)</label><input type="number" v-model.number="uiState.modalData.perPesanan" class="w-full p-2 border rounded-md"></div>
+            <div>
+                <label class="block text-sm font-medium">Administrasi (%)</label>
+                <input type="text" v-model="admComputed" class="w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Layanan Gratis Ongkir Xtra (%)</label>
+                <input type="text" v-model="layananComputed" class="w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Komisi (%)</label>
+                <input type="text" v-model="komisiComputed" class="w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Per Pesanan (Rp)</label>
+                <input type="number" v-model.number="uiState.modalData.perPesanan" class="w-full p-2 border rounded-md">
+            </div>
         </div>
 
         <div class="space-y-2 mt-6">
             <h4 class="font-semibold text-slate-700 mb-2">Program Marketplace</h4>
             <div v-for="(program, index) in uiState.modalData.programs" :key="program.id || index" class="flex items-center gap-2 mb-2">
                 <input type="text" v-model="program.name" placeholder="Nama Program" class="w-full p-2 border rounded-md text-sm">
-                <input type="number" v-model.number="program.rate" placeholder="Rate (%)" class="w-24 p-2 border rounded-md text-sm text-right">
+                
+                <input type="text" :value="programRateComputed(program).value" @input="programRateComputed(program).setValue($event.target.value)" placeholder="Rate (%)" class="w-24 p-2 border rounded-md text-sm text-right">
+                
                 <button type="button" @click="removeProgram(program.id)" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
             </div>
             <button type="button" @click="addProgram()" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Program</button>
@@ -5278,6 +6121,41 @@ watch(activePage, (newPage) => {
     <div class="flex-shrink-0 flex justify-end gap-3 pt-4 border-t mt-4">
         <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
         <button type="submit" @click="saveMarketplaceEdit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Simpan Perubahan</button>
+    </div>
+</div>
+
+<div v-if="uiState.isProgramInfoModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full">
+        <div class="flex justify-between items-start pb-4 border-b">
+            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                Informasi Biaya Program
+            </h3>
+        </div>
+        <div class="space-y-4 text-slate-700 py-4">
+            <p class="text-sm text-slate-600">
+                **Biaya Program** adalah biaya tambahan yang dikenakan oleh platform e-commerce (seperti Shopee, Tokopedia, TikTok Shop) ketika Anda berpartisipasi dalam program promosi khusus.
+            </p>
+            <p class="text-sm text-slate-600">
+                Memasukkan biaya ini dengan benar dan **sangat penting** untuk memastikan kalkulasi laba bersih Anda akurat. Biaya ini berbeda dengan biaya administrasi atau komisi standar.
+            </p>
+            <div class="space-y-2 mt-4">
+                <div class="p-4 bg-slate-50 rounded-lg">
+                    <p class="font-semibold text-slate-700">Contoh Biaya Program:</p>
+                    <ul class="list-disc list-inside ml-4 mt-1 text-sm text-slate-600">
+                        <li>**Live Xtra:** Biaya khusus untuk program Live.</li>
+                        <li>**Cashback Xtra:** Biaya untuk program cashback.</li>
+                        <li>**Program Lainya:** Biaya untuk acara promosi Lainya.</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="mt-4 text-sm text-slate-600 font-semibold">
+                Anda dapat menemukan rincian biaya ini di laporan keuangan atau detail penjualan di setiap platform e-commerce.
+            </p>
+        </div>
+        <div class="flex justify-end gap-3 pt-4 border-t">
+            <button @click="uiState.isProgramInfoModalVisible = false" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+        </div>
     </div>
 </div>
 
@@ -5305,9 +6183,9 @@ watch(activePage, (newPage) => {
             </div>
         </div>
         <div>
-            <label class="block text-sm font-medium text-slate-700">{{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Nama Penjahit' : 'Nama Pemaklun' }}</label>
-            <input type="text" v-model="uiState.newProduksiBatch.namaPekerja" class="mt-1 block w-full p-2 border rounded-md" :placeholder="uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Contoh: Ibu Ranti' : 'Contoh: Jahit Cepat Abadi'" required>
-        </div>
+    <label class="block text-sm font-medium text-slate-700">{{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Nama Penjahit' : 'Nama Pemaklun' }}</label>
+    <input type="text" v-model="uiState.newProduksiBatch.namaStatus" class="mt-1 block w-full p-2 border rounded-md" :placeholder="uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Contoh: Ibu Ranti' : 'Contoh: Jahit Cepat Abadi'" required>
+</div>
         
         <div class="border-t pt-4">
             <h4 class="text-lg font-semibold mb-2">Detail Kain & Bahan</h4>
@@ -5317,21 +6195,21 @@ watch(activePage, (newPage) => {
                         <div class="space-y-3">
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label class="block text-xs font-medium">Model Baju</label>
-                                    <select v-model="item.modelBajuId" @change="handleModelBajuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white">
+                                    <label class="block text-xs font-medium">Model Produk</label>
+                                    <select v-model="item.modelProdukId" @change="handleModelProdukChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white">
                                         <option value="">Pilih Model</option>
-                                        <option v-for="model in state.settings.modelBaju" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
+                                        <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
                                     </select>
                                 </div>
 
-                                <div v-if="item.modelBajuId">
+                                <div v-if="item.modelProdukId">
                                     <label class="block text-xs font-medium">SKU Produk</label>
-                                    <select v-if="state.produk.filter(p => p.model_id === item.modelBajuId).length > 0" 
+                                    <select v-if="state.produk.filter(p => p.model_id === item.modelProdukId).length > 0" 
                                             v-model="item.sku" 
                                             @change="handleProductSkuChange(item)" 
                                             class="mt-1 w-full p-2 text-sm border rounded-md bg-white" required>
                                         <option value="">Pilih SKU</option>
-                                        <option v-for="product in state.produk.filter(p => p.model_id === item.modelBajuId)" :key="product.sku" :value="product.sku">
+                                        <option v-for="product in state.produk.filter(p => p.model_id === item.modelProdukId)" :key="product.sku" :value="product.sku">
                                             {{ product.sku }} - {{ product.warna }} - {{ product.varian }}
                                         </option>
                                     </select>
@@ -5449,7 +6327,7 @@ watch(activePage, (newPage) => {
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700">{{ uiState.editProduksiBatch.produksiType === 'penjahit' ? 'Nama Penjahit' : 'Nama Pemaklun' }}</label>
-            <input type="text" v-model="uiState.editProduksiBatch.namaPekerja" class="mt-1 block w-full p-2 border rounded-md" required>
+            <input type="text" v-model="uiState.editProduksiBatch.namaStatus" class="mt-1 block w-full p-2 border rounded-md" required>
         </div>
         
         <div class="border-t pt-4">
@@ -5460,17 +6338,17 @@ watch(activePage, (newPage) => {
                         <div class="space-y-3">
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label class="block text-xs font-medium">Model Baju</label>
-                                    <select v-model="item.modelBajuId" @change="handleModelBajuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white">
+                                    <label class="block text-xs font-medium">Model Produk</label>
+                                    <select v-model="item.modelProdukId" @change="handleModelProdukChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white">
                                         <option value="">Pilih Model</option>
-                                        <option v-for="model in state.settings.modelBaju" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
+                                        <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
                                     </select>
                                 </div>
-                                <div v-if="item.modelBajuId">
+                                <div v-if="item.modelProdukId">
                                     <label class="block text-xs font-medium">SKU Produk</label>
                                     <select v-model="item.sku" @change="handleProductSkuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white" required>
                                         <option value="">Pilih SKU</option>
-                                        <option v-for="product in state.produk.filter(p => p.model_id === item.modelBajuId)" :key="product.sku" :value="product.sku">
+                                        <option v-for="product in state.produk.filter(p => p.model_id === item.modelProdukId)" :key="product.sku" :value="product.sku">
                                             {{ product.sku }} - {{ product.warna }} - {{ product.varian }}
                                         </option>
                                     </select>
@@ -5577,7 +6455,7 @@ watch(activePage, (newPage) => {
             <div class="space-y-6 text-slate-700 leading-relaxed">
                 <div>
                     <h4 class="text-xl font-semibold">1. Aktual Jadi</h4>
-                    <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi"</strong> ketika satu produk (contoh: 1 baju) dibuat sepenuhnya dari satu jenis bahan kain utama.</p>
+                    <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi"</strong> ketika satu produk (contoh: 1 ModelProduk) dibuat sepenuhnya dari satu jenis bahan kain utama.</p>
                     <p>Kolom ini berfungsi sebagai sumber data utama untuk perhitungan final. Semua biaya krusial dan jumlah total produk jadi akan dihitung berdasarkan input di sini.</p>
                     <ul class="list-disc list-inside space-y-1 mt-2">
                         <li><strong>Kapan digunakan:</strong> Produksi standar, seperti kaos yang seluruh bagiannya terbuat dari bahan yang sama dan warna yang sama.</li>
@@ -5590,7 +6468,7 @@ watch(activePage, (newPage) => {
                     <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi Kombinasi"</strong> untuk mencatat penggunaan bahan kain sekunder atau tambahan dalam pembuatan satu produk yang sama.</p>
                     <p><strong>Aturan Penggunaan:</strong></p>
                     <ul class="list-disc list-inside space-y-1 mt-2">
-                        <li><strong>Bahan Utama/Dominan:</strong> Data untuk bahan yang paling banyak digunakan (misalnya, kain untuk bagian badan baju) harus dimasukkan ke dalam kolom "Aktual Jadi".</li>
+                        <li><strong>Bahan Utama/Dominan:</strong> Data untuk bahan yang paling banyak digunakan (misalnya, kain untuk bagian badan ModelProduk) harus dimasukkan ke dalam kolom "Aktual Jadi".</li>
                         <li><strong>Bahan Sekunder:</strong> Data untuk bahan campuran / bahan yang sama tapi berbeda warna (misalnya, kain untuk bagian lengan) dimasukkan ke dalam kolom "Aktual Jadi Kombinasi".</li>
                     </ul>
                     <ul class="list-disc list-inside space-y-1 mt-2">
@@ -5649,11 +6527,11 @@ watch(activePage, (newPage) => {
                     </select>
                 </div>
                 <div v-if="uiState.analisisModelFilter === 'model'">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Model Baju</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Model Produk</label>
                     <select v-model="uiState.analisisModelSelectedModel" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                        <option value="" disabled>-- Pilih Model Baju --</option>
-                        <option v-for="model in state.settings.modelBaju" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
-                    </select>
+    <option value="" disabled>-- Pilih Model Produk --</option>
+    <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
+</select>
                 </div>
                 <div v-if="uiState.analisisModelFilter === 'model' && uiState.analisisModelSelectedModel">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Tipe Aktual Jadi</label>
@@ -5671,7 +6549,7 @@ watch(activePage, (newPage) => {
                 </div>
             </div>
         </div>
-    
+        
         <div class="bg-white rounded-lg border shadow-sm flex-1 overflow-y-auto">
             <table class="w-full text-sm text-left text-slate-500">
                 <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
@@ -5698,7 +6576,7 @@ watch(activePage, (newPage) => {
                             <p class="font-semibold text-slate-800">{{ item.modelNama }}</p>
                             <p class="text-xs">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
                             <p class="text-xs text-indigo-600">
-                                {{ item.produksiType === 'penjahit' ? 'Penjahit' : 'Pemaklun' }}: {{ item.namaPekerja }}
+                                {{ item.produksiType === 'penjahit' ? 'Penjahit' : 'Pemaklun' }}: {{ item.namaStatus }}
                             </p>
                         </td>
                         <td class="px-4 py-3">{{ item.tokoKain }}</td>
@@ -5751,8 +6629,8 @@ watch(activePage, (newPage) => {
     
     <div class="flex-1 overflow-y-auto py-4 pr-2">
         <div class="mb-4">
-            <label for="laporan-pekerja-filter" class="block text-sm font-medium text-slate-700 mb-1">Pilih Jenis Status</label>
-            <select v-model="uiState.produksiFilterType" id="laporan-pekerja-filter" class="w-full p-2 border rounded-md bg-white shadow-sm">
+            <label for="laporan-Status-filter" class="block text-sm font-medium text-slate-700 mb-1">Pilih Jenis Status</label>
+            <select v-model="uiState.produksiFilterType" id="laporan-Status-filter" class="w-full p-2 border rounded-md bg-white shadow-sm">
                 <option value="all">Semua Jenis Status</option>
                 <option value="pemaklun">Pemaklun</option>
                 <option value="penjahit">Penjahit</option>
@@ -5770,7 +6648,7 @@ watch(activePage, (newPage) => {
             <div v-for="batch in uiState.laporanData.laporanPerStatus.filter(b => uiState.produksiFilterType === 'all' || b.produksiType === uiState.produksiFilterType)" :key="batch.id" class="p-4 border rounded-lg bg-white shadow-sm">
                 <div class="flex justify-between items-start">
                     <div>
-                        <p class="font-bold text-indigo-700">ID Batch: {{ batch.id }} ({{ batch.produksiType === 'penjahit' ? 'Penjahit' : 'Pemaklun' }}: {{ batch.namaPekerja }})</p>
+                        <p class="font-bold text-indigo-700">ID Batch: {{ batch.id }} ({{ batch.produksiType === 'penjahit' ? 'Penjahit' : 'Pemaklun' }}: {{ batch.namaStatus }})</p>
                         <span class="text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
                                 :class="{
                                     'bg-green-100 text-green-800': batch.statusProses === 'Selesai',
@@ -5796,7 +6674,7 @@ watch(activePage, (newPage) => {
                             <div>
                                 <p class="font-semibold">{{ kb.namaKain }}</p>
                                 <ul class="list-disc list-inside ml-4 text-slate-600 space-y-1 mt-1">
-                                    <li>Model Baju: {{ state.settings.modelBaju.find(m => m.id === kb.modelBajuId)?.namaModel || 'N/A' }}</li>
+                                    <li>Model Produk: {{ state.settings.modelProduk.find(m => m.id === kb.modelProdukId)?.namaModel || 'N/A' }}</li>
                                     <li>Warna Kain: {{ kb.warnaKain || '-' }}</li>
                                     <li>Ukuran: {{ kb.ukuran || '-' }}</li>
                                     <li>Qty Jadi: {{ kb.aktualJadi || 0 }} pcs</li>
@@ -5842,7 +6720,7 @@ watch(activePage, (newPage) => {
             <div class="space-y-6 text-slate-700 leading-relaxed">
                 <div>
                     <h4 class="text-xl font-semibold">1. Aktual Jadi</h4>
-                    <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi"</strong> ketika satu produk (contoh: 1 baju) dibuat sepenuhnya dari satu jenis bahan kain utama.</p>
+                    <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi"</strong> ketika satu produk (contoh: 1 ModelProduk) dibuat sepenuhnya dari satu jenis bahan kain utama.</p>
                     <p>Kolom ini berfungsi sebagai sumber data utama untuk perhitungan final. Semua biaya krusial dan jumlah total produk jadi akan dihitung berdasarkan input di sini.</p>
                     <ul class="list-disc list-inside space-y-1 mt-2">
                         <li><strong>Kapan digunakan:</strong> Produksi standar, seperti kaos yang seluruh bagiannya terbuat dari bahan yang sama dan warna yang sama.</li>
@@ -5855,7 +6733,7 @@ watch(activePage, (newPage) => {
                     <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi Kombinasi"</strong> untuk mencatat penggunaan bahan kain sekunder atau tambahan dalam pembuatan satu produk yang sama.</p>
                     <p><strong>Aturan Penggunaan:</strong></p>
                     <ul class="list-disc list-inside space-y-1 mt-2">
-                        <li><strong>Bahan Utama/Dominan:</strong> Data untuk bahan yang paling banyak digunakan (misalnya, kain untuk bagian badan baju) harus dimasukkan ke dalam kolom "Aktual Jadi".</li>
+                        <li><strong>Bahan Utama/Dominan:</strong> Data untuk bahan yang paling banyak digunakan (misalnya, kain untuk bagian badan Model Produk) harus dimasukkan ke dalam kolom "Aktual Jadi".</li>
                         <li><strong>Bahan Sekunder:</strong> Data untuk bahan campuran / bahan yang sama tapi berbeda warna (misalnya, kain untuk bagian lengan) dimasukkan ke dalam kolom "Aktual Jadi Kombinasi".</li>
                     </ul>
                     <ul class="list-disc list-inside space-y-1 mt-2">
@@ -5987,6 +6865,107 @@ watch(activePage, (newPage) => {
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
 </div>
+
+<div v-if="uiState.modalType === 'priceCalculator'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[85vh] flex flex-col">
+    <h3 class="text-2xl font-bold text-slate-800 mb-4 border-b pb-4">Kalkulator Harga Jual</h3>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1 overflow-hidden">
+        
+        <div class="flex flex-col space-y-4">
+            <h4 class="text-lg font-semibold text-slate-700">1. Masukkan Data</h4>
+            <form @submit.prevent="calculateSellingPrice" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium">Harga Pokok Penjualan (HPP)</label>
+                    <input type="number" v-model.number="uiState.priceCalculator.hpp" class="mt-1 w-full p-2 border rounded-md" required placeholder="Contoh: 50000">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Pilih Marketplace</label>
+                    <select v-model="uiState.priceCalculator.selectedMarketplace" class="w-full p-2 border rounded-md" required>
+                        <option value="" disabled>-- Pilih Marketplace --</option>
+                        <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Pilih Model Produk (untuk diskon)</label>
+                    <select v-model="uiState.priceCalculator.selectedModelName" class="w-full p-2 border rounded-md" required>
+                        <option value="" disabled>-- Pilih Model --</option>
+                        <option v-for="modelName in promosiProductModels" :key="modelName" :value="modelName">{{ modelName }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Target Keuntungan (%)</label>
+                    <input type="text" v-model="targetMarginComputed" class="mt-1 w-full p-2 border rounded-md" placeholder="Contoh: 30%">
+                </div>
+                
+                <div class="pt-4">
+                    <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors shadow-md">
+                        Hitung Harga
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="flex flex-col overflow-y-auto pr-2">
+            <h4 class="text-lg font-semibold text-slate-700">2. Hasil Perhitungan</h4>
+            <div v-if="!uiState.priceCalculator.result" class="flex-1 flex items-center justify-center bg-slate-50 rounded-lg mt-4">
+                <p class="text-slate-500">Hasil akan muncul di sini...</p>
+            </div>
+            <div v-else class="mt-4 space-y-6">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                        <p class="text-slate-600">Harga Jual Ideal</p>
+                        <p class="text-2xl font-bold text-green-700">{{ formatCurrency(uiState.priceCalculator.result.calculatedPrice) }}</p>
+                    </div>
+                    <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <p class="text-slate-600">Estimasi Laba Bersih</p>
+                        <p class="text-2xl font-bold text-blue-700">{{ formatCurrency(uiState.priceCalculator.result.netProfit) }}</p>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="p-4 bg-slate-50 rounded-lg">
+                        <p class="font-semibold text-slate-700">Pendapatan & Modal</p>
+                        <ul class="mt-2 text-sm text-slate-600 space-y-1">
+                            <li class="flex justify-between"><span>Harga Jual</span><span class="font-medium text-green-600">{{ formatCurrency(uiState.priceCalculator.result.calculatedPrice) }}</span></li>
+                             <li class="flex justify-between">
+                                <span>Diskon Otomatis ({{ uiState.priceCalculator.result.bestDiscountRatePercentage }}%)</span>
+                                <span class="text-red-600">-{{ formatCurrency(uiState.priceCalculator.result.bestDiscount) }}</span>
+                            </li>
+                            <li class="flex justify-between"><span>HPP (Modal)</span><span class="text-red-600">-{{ formatCurrency(uiState.priceCalculator.result.breakdown.hpp) }}</span></li>
+                            <li class="flex justify-between font-bold border-t pt-1 mt-1"><span>Laba Kotor</span><span>{{ formatCurrency(uiState.priceCalculator.result.labaKotor) }}</span></li>
+                        </ul>
+                    </div>
+
+                    <div class="p-4 bg-slate-50 rounded-lg">
+                        <p class="font-semibold text-slate-700">Rincian Biaya Marketplace</p>
+                        <ul class="mt-2 text-sm text-slate-600 space-y-1">
+                            <li class="flex justify-between"><span>Biaya Admin ({{ uiState.priceCalculator.result.breakdown.admRate }}%)</span><span>-{{ formatCurrency(uiState.priceCalculator.result.breakdown.adminFee) }}</span></li>
+                            <li class="flex justify-between"><span>Biaya Komisi ({{ uiState.priceCalculator.result.breakdown.komisiRate }}%)</span><span>-{{ formatCurrency(uiState.priceCalculator.result.breakdown.commission) }}</span></li>
+                            <li class="flex justify-between"><span>Biaya Layanan ({{ uiState.priceCalculator.result.breakdown.layananRate }}%)</span><span>-{{ formatCurrency(uiState.priceCalculator.result.breakdown.serviceFee) }}</span></li>
+                             <li v-for="program in uiState.priceCalculator.result.breakdown.programFee" :key="program.name" class="flex justify-between">
+                                <span>- {{ program.name }} ({{ program.rate }}%)</span>
+                                <span>-{{ formatCurrency(program.fee) }}</span>
+                            </li>
+                            <li class="flex justify-between"><span>Biaya Per Pesanan</span><span>-{{ formatCurrency(uiState.priceCalculator.result.breakdown.perOrderFee) }}</span></li>
+                            <li class="flex justify-between font-bold text-red-600 border-t pt-1 mt-1">
+                                <span>Total Biaya Marketplace</span>
+                                <span>-{{ formatCurrency(uiState.priceCalculator.result.totalFees) }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                     <div class="p-3 bg-blue-100 rounded-lg text-center">
+                         <p class="text-xs text-blue-700">Estimasi Laba Bersih = Laba Kotor - Total Biaya Marketplace</p>
+                         <p class="text-lg font-bold text-blue-800">{{formatCurrency(uiState.priceCalculator.result.labaKotor)}} - {{formatCurrency(uiState.priceCalculator.result.totalFees)}} = {{formatCurrency(uiState.priceCalculator.result.netProfit)}}</p>
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+    </div>
+</div>
+
 <div v-if="uiState.modalType === 'laporanSemuanya'" class="bg-white rounded-lg shadow-xl p-6 max-w-7xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Laporan Produksi Menyeluruh</h3>
@@ -6052,7 +7031,7 @@ watch(activePage, (newPage) => {
         </div>
         
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <div class="p-4 bg-white rounded-lg border"><h4 class="text-sm font-medium text-slate-500">Total Baju Selesai</h4><p class="text-2xl font-bold mt-1 text-indigo-600">{{ formatNumber(laporanSemuaKpis.totalBajuSelesai) }} pcs</p></div>
+            <div class="p-4 bg-white rounded-lg border"><h4 class="text-sm font-medium text-slate-500">Total Produk Selesai</h4><p class="text-2xl font-bold mt-1 text-indigo-600">{{ formatNumber(laporanSemuaKpis.totalProdukSelesai) }} pcs</p></div>
             <div class="p-4 bg-white rounded-lg border"><h4 class="text-sm font-medium text-slate-500">Total Biaya Produksi</h4><p class="text-2xl font-bold mt-1 text-red-600">{{ formatCurrency(laporanSemuaKpis.totalBiaya) }}</p></div>
             <div class="p-4 bg-white rounded-lg border"><h4 class="text-sm font-medium text-slate-500">Rata-rata HPP/Pcs</h4><p class="text-2xl font-bold mt-1 text-emerald-600">{{ formatCurrency(laporanSemuaKpis.avgHpp) }}</p></div>
             <div class="p-4 bg-white rounded-lg border"><h4 class="text-sm font-medium text-slate-500">Total Batch Produksi</h4><p class="text-2xl font-bold mt-1 text-sky-600">{{ formatNumber(laporanSemuaKpis.totalBatch) }}</p></div>
@@ -6120,21 +7099,70 @@ watch(activePage, (newPage) => {
 </template>
 
 <style scoped>
-body { font-family: 'Inter', sans-serif; }
-.chart-container { position: relative; width: 100%; height: 320px; }
-.sidebar-link { transition: all 0.2s; }
-.sidebar-link.active { background-color: #4338ca; color: #f9fafb; }
-.sidebar-link:not(.active):hover { background-color: #4f46e5; }
-.kpi-card { transition: transform 0.2s, box-shadow 0.2s; border-color: #e2e8f0; }
-.kpi-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
-.kpi-value { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.help-btn { background-color: #e2e8f0; color: #475569; border-radius: 9999px; width: 1.25rem; height: 1.25rem; font-size: 0.75rem; font-weight: bold; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; }
-.help-btn:hover { background-color: #cbd5e1; }
-.qty-btn { width: 1.75rem; height: 1.75rem; border-radius: 9999px; background-color: #e2e8f0; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s; }
-.inventory-group-header { transition: background-color 0.2s ease-in-out; }
-.inventory-group-header:hover { background-color: #f8fafc; }
-.inventory-variant-details { max-height: 0; overflow: hidden; transition: max-height 0.5s ease-in-out; }
-.inventory-group-card.active .inventory-variant-details { max-height: 1000px; }
-.inventory-group-header .arrow-icon { transition: transform 0.3s ease-in-out; }
-.inventory-group-card.active .arrow-icon { transform: rotate(180deg); }
+
+
+.help-icon-button {
+  position: absolute;
+  top: 0.5rem; /* 8px */
+  right: 0.5rem; /* 8px */
+  width: 1.25rem; /* 20px */
+  height: 1.25rem; /* 20px */
+  border-radius: 9999px; /* rounded-full */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f1f5f9; /* slate-100 */
+  color: #64748b; /* slate-500 */
+  font-weight: bold;
+  font-size: 0.875rem; /* text-sm */
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.help-icon-button:hover {
+  background-color: #6366f1; /* indigo-500 */
+  color: white;
+  transform: scale(1.1);
+}
+
+
+/* Gaya Sidebar Baru yang Profesional */
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    color: #9ca3af; /* gray-400 */
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+.sidebar-link:hover {
+    background-color: #374151; /* gray-700 */
+    color: #ffffff;
+}
+
+.sidebar-link-active {
+    background-image: linear-gradient(to right, #4f46e5, #6d28d9); /* gradasi indigo -> violet */
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Style dasar untuk komponen lain */
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: 320px;
+}
+
+.kpi-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-color: #e2e8f0;
+}
+
+.kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
 </style>
