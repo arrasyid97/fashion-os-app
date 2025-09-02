@@ -2186,19 +2186,19 @@ const analisisModelData = computed(() => {
 });
 
 const kpiExplanations = {
-    'saldo-kas': { title: 'Saldo Kas Saat Ini', formula: 'Omset Bersih - Biaya Operasional - Ambilan Pribadi + Modal Masuk', description: 'Estimasi uang tunai yang tersedia saat ini.' },
-    'omset': { title: 'Omset Bersih', formula: 'Total Penjualan dari Semua Transaksi', description: 'Total pendapatan dari penjualan setelah dikurangi diskon dan voucher.' },
-    'laba-kotor': { title: 'Laba Kotor', formula: 'Omset Bersih - Total HPP Barang Terjual', description: 'Keuntungan kotor dari penjualan sebelum dikurangi biaya operasional dan biaya transaksi marketplace.' },
-    'laba-bersih': { title: 'Laba Bersih (Est.)', formula: 'Laba Kotor - Biaya Operasional - Biaya Transaksi', description: 'Estimasi keuntungan bersih setelah dikurangi semua biaya.' },
-    'biaya-operasional': { title: 'Biaya Operasional', formula: 'Jumlah semua item di Riwayat Pengeluaran', description: 'Total semua biaya operasional yang tidak terkait langsung dengan transaksi.' },
-    'biaya-transaksi': { title: 'Biaya Transaksi Marketplace', formula: 'Penjumlahan semua biaya di marketplace', description: 'Total biaya yang dikeluarkan untuk setiap transaksi di marketplace, seperti biaya admin, komisi, dan program.' },
-    'total-stok': { title: 'Total Unit Stok', formula: 'Jumlah Stok Akhir dari Semua Produk', description: 'Jumlah total unit produk di inventaris gudang.' },
-    'nilai-stok': { title: 'Total Nilai Stok (HPP)', formula: 'Jumlah (Stok Akhir Produk x HPP Produk)', description: 'Total nilai moneter dari semua stok yang tersisa di gudang.' },
-    'nilai-retur': { title: 'Total Nilai Retur', formula: 'Jumlah (Qty Retur x Harga Jual Produk)', description: 'Total nilai dari produk yang dikembalikan oleh pelanggan.' },
-    'omset-kotor': { title: 'Omset Kotor', formula: 'Total Harga Jual Tanpa Diskon', description: 'Total pendapatan kotor dari penjualan sebelum dikurangi diskon, biaya, dan HPP.' },
-    'diskon': { title: 'Diskon', formula: 'Total Diskon dan Voucher', description: 'Total nilai diskon dan voucher yang diberikan kepada pelanggan dalam transaksi.' },
-    'hpp-terjual': { title: 'Total HPP Terjual', formula: 'Jumlah (HPP Produk x Qty Terjual)', description: 'Total biaya modal dari semua produk yang berhasil terjual.' },
-    'laba-bersih-operasional': { title: 'Laba Bersih Operasional', formula: 'Laba Kotor - Biaya Operasional - Biaya Transaksi', description: 'Estimasi keuntungan bersih setelah dikurangi semua biaya operasional dan transaksi.' },
+    'saldo-kas': { title: 'Saldo Kas Saat Ini', description: 'Estimasi total uang tunai yang tersedia dari hasil seluruh operasi bisnis, setelah dikurangi pengeluaran dan penarikan pribadi, dan ditambah modal masuk.' },
+    'omset-kotor': { title: 'Omset Kotor', description: 'Total pendapatan dari penjualan produk sebelum dikurangi diskon, biaya transaksi, atau retur. Ini adalah total harga jual semua produk yang laku.' },
+    'omset-bersih': { title: 'Omset Bersih', description: 'Total pendapatan dari penjualan setelah dikurangi diskon, voucher, dan nilai produk yang diretur. Ini adalah nilai bersih uang yang masuk dari penjualan.' },
+    'diskon': { title: 'Diskon', description: 'Total nilai semua diskon dan voucher yang diberikan kepada pelanggan pada periode ini. Angka ini mengurangi omset kotor.' },
+    'laba-kotor': { title: 'Laba Kotor', description: 'Keuntungan yang didapatkan dari penjualan setelah dikurangi harga pokok produksi (HPP) produk yang terjual. Angka ini belum termasuk biaya operasional.' },
+    'hpp-terjual': { title: 'Total HPP Terjual', description: 'Total biaya modal dari semua produk yang berhasil terjual. Nilai ini menjadi komponen utama untuk menghitung Laba Kotor.' },
+    'biaya-transaksi': { title: 'Biaya Transaksi Marketplace', description: 'Total biaya yang dikenakan oleh platform e-commerce untuk setiap transaksi, seperti biaya admin, komisi, dan biaya program promosi. Nilai ini juga disesuaikan dengan retur.' },
+    'biaya-operasional': { title: 'Biaya Operasional', description: 'Total semua biaya rutin bisnis yang tidak terkait langsung dengan transaksi, seperti gaji, sewa, listrik, dan biaya pemasaran. Data diambil dari pencatatan di halaman Manajemen Keuangan.' },
+    'laba-bersih-operasional': { title: 'Laba Bersih', description: 'Angka ini adalah indikator keuntungan final. Dihitung dari Laba Kotor dikurangi semua Biaya Operasional dan Biaya Transaksi Marketplace.' },
+    'total-unit-stok': { title: 'Total Unit Stok', description: 'Jumlah total fisik semua produk yang tersedia di gudang Anda.' },
+    'nilai-stok': { title: 'Total Nilai Stok (HPP)', description: 'Total nilai moneter dari semua stok yang tersisa di gudang, dihitung berdasarkan Harga Pokok Produksi (HPP) per unit.' },
+    // BARIS BARU DITAMBAHKAN
+    'nilai-retur': { title: 'Total Nilai Retur', description: 'Jumlah total moneter dari semua produk yang dikembalikan oleh pelanggan. Nilai ini mengurangi Omset Kotor dan secara otomatis disesuaikan dari laporan keuangan.' },
 };
 
 
@@ -5140,7 +5140,13 @@ watch(activePage, (newPage) => {
     
     <div v-else>
         <div class="flex flex-wrap justify-between items-center mb-8 gap-4">
-            <h2 class="text-3xl font-bold text-slate-800">Dashboard Analitik</h2>
+            <div class="flex items-center gap-4">
+                <h2 class="text-3xl font-bold text-slate-800">Dashboard Analitik</h2>
+                <button @click="showModal('dashboardKpiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                    Informasi
+                </button>
+            </div>
             <div class="flex flex-wrap items-center gap-2 p-3 bg-white rounded-lg border shadow-sm">
                 <select v-model="uiState.dashboardDateFilter" class="w-full sm:w-auto bg-white border-slate-300 text-sm rounded-lg p-2.5 capitalize">
                     <option value="today">hari ini</option>
@@ -5173,157 +5179,157 @@ watch(activePage, (newPage) => {
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Saldo Kas Saat Ini</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="help-icon-button">?</button>
             </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Saldo Kas Saat Ini</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Omset Bersih</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-green-600">{{ formatCurrency(dashboardKpis.omsetBersih) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['omset-bersih'])" class="help-icon-button">?</button>
+            </div>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-emerald-100 text-emerald-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Laba Kotor</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-emerald-600">{{ formatCurrency(dashboardKpis.labaKotor) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['laba-kotor'])" class="help-icon-button">?</button>
+            </div>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Laba Bersih</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(dashboardKpis.labaBersihOperasional) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['laba-bersih-operasional'])" class="help-icon-button">?</button>
             </div>
         </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="help-icon-button">?</button>
-    </div>
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Omset Bersih</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-green-600">{{ formatCurrency(dashboardKpis.omsetBersih) }}</p>
-            </div>
-        </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['omset'])" class="help-icon-button">?</button>
-    </div>
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-emerald-100 text-emerald-600 p-3 rounded-lg flex-shrink-0">
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Laba Kotor</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-emerald-600">{{ formatCurrency(dashboardKpis.labaKotor) }}</p>
-            </div>
-        </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['laba-kotor'])" class="help-icon-button">?</button>
-    </div>
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Laba Bersih Operasional</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(dashboardKpis.labaBersihOperasional) }}</p>
-            </div>
-        </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['laba-bersih-operasional'])" class="help-icon-button">?</button>
-    </div>
-</div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Omset Kotor</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.totalOmsetKotor) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['omset-kotor'])" class="help-icon-button">?</button>
             </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Omset Kotor</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.totalOmsetKotor) }}</p>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Diskon</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-red-600">{{ formatCurrency(dashboardKpis.totalDiskon) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['diskon'])" class="help-icon-button">?</button>
+            </div>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12H5m0 0l4-4m-4 4l4 4m6-10h4m0 0l-4-4m4 4l-4 4" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Total HPP Terjual</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">{{ formatCurrency(dashboardKpis.totalHppTerjual) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['hpp-terjual'])" class="help-icon-button">?</button>
+            </div>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-purple-100 text-purple-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi Marketplace</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-purple-600">{{ formatCurrency(dashboardKpis.totalBiayaTransaksi) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['biaya-transaksi'])" class="help-icon-button">?</button>
             </div>
         </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['omset-kotor'])" class="help-icon-button">?</button>
-    </div>
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Diskon</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-red-600">{{ formatCurrency(dashboardKpis.totalDiskon) }}</p>
-            </div>
-        </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['diskon'])" class="help-icon-button">?</button>
-    </div>
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12H5m0 0l4-4m-4 4l4 4m6-10h4m0 0l-4-4m4 4l-4 4" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Total HPP Terjual</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">{{ formatCurrency(dashboardKpis.totalHppTerjual) }}</p>
-            </div>
-        </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['hpp-terjual'])" class="help-icon-button">?</button>
-    </div>
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-purple-100 text-purple-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi Marketplace</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-purple-600">{{ formatCurrency(dashboardKpis.totalBiayaTransaksi) }}</p>
-            </div>
-        </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['biaya-transaksi'])" class="help-icon-button">?</button>
-    </div>
-</div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-orange-100 text-orange-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-orange-100 text-orange-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Biaya Operasional</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-orange-600">{{ formatCurrency(dashboardKpis.totalBiayaOperasional) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['biaya-operasional'])" class="help-icon-button">?</button>
             </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Biaya Operasional</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-orange-600">{{ formatCurrency(dashboardKpis.totalBiayaOperasional) }}</p>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-cyan-100 text-cyan-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Total Unit Stok</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-cyan-600">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['total-unit-stok'])" class="help-icon-button">?</button>
+            </div>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-amber-100 text-amber-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Total Nilai Stok (HPP)</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-amber-600">{{ formatCurrency(dashboardKpis.totalNilaiStokHPP) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['nilai-stok'])" class="help-icon-button">?</button>
+            </div>
+            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
+                <div class="flex items-start gap-4">
+                    <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2" /></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-medium text-slate-500">Total Nilai Retur</h3>
+                        <p class="kpi-value text-2xl font-bold mt-1 text-red-600">{{ formatCurrency(dashboardKpis.totalNilaiRetur) }}</p>
+                    </div>
+                </div>
+                <button @click="showModal('kpiHelp', kpiExplanations['nilai-retur'])" class="help-icon-button">?</button>
             </div>
         </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['biaya-operasional'])" class="help-icon-button">?</button>
-    </div>
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-cyan-100 text-cyan-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Total Unit Stok</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-cyan-600">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p>
-            </div>
-        </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['total-stok'])" class="help-icon-button">?</button>
-    </div>
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-amber-100 text-amber-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Total Nilai Stok (HPP)</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-amber-600">{{ formatCurrency(dashboardKpis.totalNilaiStokHPP) }}</p>
-            </div>
-        </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['nilai-stok'])" class="help-icon-button">?</button>
-    </div>
-    <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-        <div class="flex items-start gap-4">
-            <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2" /></svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Total Nilai Retur</h3>
-                <p class="kpi-value text-2xl font-bold mt-1 text-red-600">{{ formatCurrency(dashboardKpis.totalNilaiRetur) }}</p>
-            </div>
-        </div>
-        <button @click="showModal('kpiHelp', kpiExplanations['nilai-retur'])" class="help-icon-button">?</button>
-    </div>
-</div>
         
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <div class="lg:col-span-3 bg-white p-6 rounded-xl border">
@@ -6180,7 +6186,7 @@ watch(activePage, (newPage) => {
                     </div>
                     <div class="p-4 bg-slate-50 rounded-lg">
                         <p class="font-semibold text-slate-700">Kategori Pengeluaran</p>
-                        <p class="text-sm text-slate-500 mt-1">Semua data di sini akan diklasifikasikan sebagai **Biaya Operasional**, yang digunakan untuk menghitung **Laba Bersih Operasional** di dasbor.</p>
+                        <p class="text-sm text-slate-500 mt-1">Semua data di sini akan diklasifikasikan sebagai **Biaya Operasional**, yang digunakan untuk menghitung **Laba Bersih** di dasbor.</p>
                     </div>
                 </div>
             </div>
@@ -7038,13 +7044,15 @@ watch(activePage, (newPage) => {
                         <p>Arrasyid</p>
                     </div>
                     <div class="bg-slate-50 p-4 rounded-lg">
-                        <p class="font-semibold text-slate-600">Contact Information</p>
-                        <p>Email: <a href="mailto:ilhamars97@gmail.com" class="text-blue-600 hover:underline">ilhamars97@gmail.com</a></p>
-                        <p>Telepon: <a href="https://wa.me/6285691803476" class="text-blue-600 hover:underline">085691803476</a></p>
+                        <p class="font-semibold text-slate-600">Informasi Kontak</p>
+                        <p>Email: <a href="mailto:support@arrasyd.id" class="text-blue-600 hover:underline">support@arrasyd.id</a></p>
+                        <p>Telepon: <a href="https://wa.me/6281210842060" class="text-blue-600 hover:underline">0812-1084-2060</a></p>
                     </div>
                     <div class="bg-slate-50 p-4 rounded-lg">
                         <p class="font-semibold text-slate-600">Versi Aplikasi</p>
                         <p>1.0.0 (Build 20250806)</p>
+                        <p class="font-semibold text-slate-600 mt-2">Tanggal Rilis</p>
+                        <p>06 Agustus 2025</p>
                     </div>
                 </div>
             </section>
@@ -7171,71 +7179,41 @@ watch(activePage, (newPage) => {
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
        
-        <div v-if="uiState.modalType === 'panduanPromosi'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] flex flex-col">
+        <div v-if="uiState.modalType === 'dashboardKpiInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
-        <h3 class="text-2xl font-bold text-slate-800">Panduan Fitur Promosi & Voucher</h3>
-        <p class="text-slate-500">Memahami Hirarki dan Logika Diskon Otomatis.</p>
+        <h3 class="text-2xl font-bold text-slate-800">Memahami Dampak Retur pada Laporan Keuangan</h3>
+        <p class="text-slate-500 mt-1">Penjelasan singkat tentang bagaimana setiap data retur memengaruhi metrik di dashboard.</p>
     </div>
-    
-    <div class="flex-1 overflow-y-auto py-4 pr-2">
-        <div class="space-y-6 text-slate-700 leading-relaxed prose">
-            
-            <div class="p-4 bg-slate-50 rounded-lg">
-                <h4 class="text-lg font-semibold text-indigo-700">Tujuan Fitur Ini</h4>
-                <p class="mt-1 text-sm">
-                    Halaman ini memungkinkan Anda untuk merancang strategi diskon yang kompleks dan berlapis. Sistem akan secara otomatis menghitung dan menerapkan <strong>diskon terbaik</strong> yang tersedia untuk setiap transaksi di halaman Kasir (POS) dan Proses Massal.
-                </p>
-            </div>
-
-            <div class="p-4 bg-slate-50 rounded-lg">
-                <h4 class="text-lg font-semibold text-indigo-700">Jenis-Jenis Promosi</h4>
-                <p class="mt-1 text-sm">Ada dua level promosi yang bisa Anda atur:</p>
-                <ul class="list-disc list-inside space-y-2 mt-2 text-sm">
-                    <li>
-                        <strong>Promosi per Akun Penjualan:</strong>
-                        <ul class="list-circle list-inside ml-4">
-                            <li><strong>Voucher Ikuti Toko (%):</strong> Diskon persentase yang berlaku untuk seluruh keranjang belanja.</li>
-                            <li><strong>Voucher Semua Produk (Rp):</strong> Diskon nominal (rupiah) yang berlaku untuk seluruh keranjang belanja.</li>
-                        </ul>
-                    </li>
-                    <li>
-                        <strong>Promosi Spesifik per Model Produk:</strong>
-                         <ul class="list-circle list-inside ml-4">
-                            <li><strong>Voucher Produk Tertentu (%):</strong> Diskon persentase yang hanya berlaku untuk produk dari model yang dipilih.</li>
-                            <li><strong>Diskon Bertingkat:</strong> Atur diskon berdasarkan minimal belanja. Contoh: "Belanja Rp 100.000 diskon 5%, belanja Rp 200.000 diskon 10%".</li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-
-            <div class="mt-4 p-4 bg-slate-50 rounded-lg">
-                <h4 class="text-lg font-semibold text-indigo-700">Aturan Emas: Sistem Memilih Diskon Terbaik</h4>
-                <p class="mt-2 text-sm">
-                    Penting untuk dipahami: <strong>sistem tidak menumpuk diskon</strong>. Saat transaksi terjadi, aplikasi akan menghitung semua potensi diskon yang berlaku (dari voucher toko, voucher produk, dan diskon bertingkat), lalu secara otomatis hanya akan menerapkan <strong>SATU diskon yang memberikan potongan harga terbesar</strong> bagi pelanggan.
-                </p>
-            </div>
-            
-            <!-- [PERINGATAN BARU YANG DITAMBAHKAN] -->
-            <div class="mt-4 p-4 bg-red-50 text-red-900 border-l-4 border-red-500">
-                <h4 class="font-bold text-lg text-red-800">PERINGATAN KRUSIAL: Voucher Ikuti Toko</h4>
-                <p class="mt-2 text-sm">
-                    Harap berhati-hati saat mengisi kolom <strong>"Voucher Ikuti Toko (%)"</strong>. Di platform e-commerce, voucher ini umumnya hanya dapat digunakan <strong>satu kali oleh setiap pembeli baru</strong>.
-                </p>
-                <p class="mt-2 text-sm">
-                    <strong>Risiko Ketidakakuratan Data:</strong> Jika Anda menetapkan persentase voucher ini lebih tinggi dari promosi lain, aplikasi ini akan selalu menerapkannya untuk setiap transaksi (termasuk dari pembeli lama), karena sistem kami dirancang untuk memilih diskon tertinggi. Akibatnya, laba yang tercatat di aplikasi ini bisa jadi <strong>lebih rendah dari laba riil</strong> yang Anda terima dari marketplace, menyebabkan data menjadi tidak akurat.
-                </p>
-                <p class="mt-4 font-semibold text-sm">Rekomendasi Profesional:</p>
-                <ul class="list-disc list-inside space-y-1 mt-2 text-sm">
-                    <li><strong>Opsi Paling Aman:</strong> Kosongkan kolom "Voucher Ikuti Toko" di aplikasi ini dan nonaktifkan voucher tersebut di platform e-commerce Anda untuk menjamin 100% akurasi data.</li>
-                    <li><strong>Opsi Alternatif:</strong> Jika Anda tetap ingin menggunakannya, atur nilai persentase "Voucher Ikuti Toko" menjadi yang <strong>paling rendah</strong> di antara semua promosi Anda, sehingga voucher ini hanya berfungsi sebagai diskon dasar jika tidak ada promo lain yang lebih baik.</li>
-                </ul>
-            </div>
-
+    <div class="flex-1 overflow-y-auto py-4 pr-2 space-y-6 text-slate-700 leading-relaxed">
+        <p>
+            Ketika Anda menambahkan data retur di halaman **Manajemen Retur**, sistem secara otomatis menganggap pesanan tersebut sebagai **gagal** atau **dibatalkan**. Hal ini memicu penyesuaian otomatis pada semua metrik keuangan di dashboard analitik Anda untuk memastikan data yang ditampilkan selalu akurat.
+        </p>
+        
+        <div class="p-4 bg-slate-50 rounded-lg">
+            <h4 class="font-bold text-lg text-indigo-700">Dampak Langsung pada Metrik Utama</h4>
+            <ul class="list-disc list-inside ml-4 mt-2 space-y-2 text-sm">
+                <li>
+                    <strong>Omset Kotor & Omset Bersih:</strong> Nilai harga jual dari produk yang diretur akan **dikurangi** dari total omset Anda.
+                </li>
+                <li>
+                    <strong>Diskon:</strong> Jumlah diskon atau voucher yang sebelumnya teralokasi pada produk yang diretur juga akan **dibatalkan** dan dikurangi dari total diskon.
+                </li>
+                <li>
+                    <strong>Biaya Transaksi Marketplace:</strong> Biaya yang dibebankan oleh platform e-commerce (seperti biaya admin, komisi) untuk produk yang diretur akan **dihilangkan** dan dikurangi dari total biaya.
+                </li>
+                <li>
+                    <strong>Laba Kotor & Laba Bersih:</strong> Karena Omset Kotor dan Omset Bersih berkurang, maka nilai **Laba Kotor** dan **Laba Bersih** juga akan **terpengaruh dan ikut berkurang** secara proporsional.
+                </li>
+            </ul>
         </div>
-    </div>
+        
+        <p>
+            Dengan alur kerja ini, Anda tidak perlu lagi melakukan koreksi manual pada laporan keuangan. Cukup catat data retur, dan sistem akan mengurus sisanya, sehingga data di dashboard Anda selalu mencerminkan kondisi bisnis yang sebenarnya.
+        </p>
 
+    </div>
     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
 </div>
 
