@@ -2224,18 +2224,20 @@ async function saveData() {
         const userId = currentUser.value.uid;
         const batch = writeBatch(db);
 
-        // Bagian 1: Simpan semua pengaturan (ini sudah benar)
+        // Simpan semua pengaturan
         const settingsRef = doc(db, "settings", userId);
         const settingsData = {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
             marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
             modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
+            categories: JSON.parse(JSON.stringify(state.settings.categories)),
+            inflowCategories: JSON.parse(JSON.stringify(state.settings.inflowCategories)),
             userId: userId
         };
         batch.set(settingsRef, settingsData);
 
-        // Bagian 2: Simpan promosi (ini sudah benar)
+        // Simpan promosi
         const promotionsRef = doc(db, "promotions", userId);
         const promotionsData = {
             perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
@@ -2244,34 +2246,34 @@ async function saveData() {
         };
         batch.set(promotionsRef, promotionsData);
 
-        // ▼▼▼ BAGIAN 3: PERBAIKAN UTAMA ADA DI SINI ▼▼▼
-        // Simpan HPP & Harga Jual menggunakan docId
+        // Simpan HPP & Harga Jual
         for (const product of state.produk) {
-            // Gunakan ID unik 'docId' untuk referensi, bukan 'sku'
             const productRef = doc(db, "products", product.docId);
             batch.update(productRef, { hpp: product.hpp });
 
             for (const marketplaceId in product.hargaJual) {
-                // Buat ID dokumen harga yang unik menggunakan 'docId'
                 const priceDocId = `${product.docId}-${marketplaceId}`;
                 const priceRef = doc(db, "product_prices", priceDocId);
                 batch.set(priceRef, {
-                    product_id: product.docId, // <-- Simpan referensi ke ID unik
-                    product_sku: product.sku, // <-- Simpan SKU sebagai data
+                    product_id: product.docId,
+                    product_sku: product.sku,
                     marketplace_id: marketplaceId,
                     price: product.hargaJual[marketplaceId] || 0,
                     userId: userId
                 });
             }
         }
-
         await batch.commit();
+        
+        // Memuat ulang data dari database setelah berhasil disimpan
+        await loadAllDataFromFirebase();
+        
         console.log('Perubahan berhasil disimpan ke Database!');
         alert('Semua perubahan berhasil disimpan!');
 
     } catch (error) {
         console.error("Gagal menyimpan data ke Firebase:", error);
-        alert("Gagal menyimpan data.");
+        alert("Gagal menyimpan data. Cek console untuk detail.");
     } finally {
         isSaving.value = false;
     }
