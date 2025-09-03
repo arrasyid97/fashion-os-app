@@ -1459,13 +1459,10 @@ const targetMarginComputed = computed({
         return uiState.priceCalculator.targetMargin ? uiState.priceCalculator.targetMargin + '%' : '';
     },
     set(newValue) {
-        // Hapus simbol % dan pastikan nilai yang disimpan adalah angka
-        const parsedValue = parseInt(newValue.replace(/[^0-9]/g, '')) || 0;
-        uiState.priceCalculator.targetMargin = parsedValue;
+        // Gunakan fungsi helper untuk memproses nilai desimal
+        uiState.priceCalculator.targetMargin = parsePercentageInput(newValue);
     }
 });
-
-
 
 const formatNumber = (value) => (value === null || value === undefined) ? '' : new Intl.NumberFormat('id-ID').format(value);
 const getProductBySku = (sku) => {
