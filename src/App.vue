@@ -852,8 +852,8 @@ const voucherTokoComputed = (channel) => computed({
     set(newValue) { state.promotions.perChannel[channel.id].voucherToko = parseFloat(newValue.replace(/[^0-9.]/g, '')) || null; }
 });
 const voucherSemuaProdukComputed = (channel) => computed({
-    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk ? 'Rp ' + formatInputNumber(state.promotions.perChannel[channel.id].voucherSemuaProduk) : ''; },
-    set(newValue) { state.promotions.perChannel[channel.id].voucherSemuaProduk = parseInputNumber(newValue) || null; }
+    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk ? state.promotions.perChannel[channel.id].voucherSemuaProduk + '%' : ''; },
+    set(newValue) { state.promotions.perChannel[channel.id].voucherSemuaProduk = parseFloat(newValue.replace(/[^0-9.]/g, '')) || null; }
 });
 const voucherProdukComputed = (modelName, channelId) => computed({
     get() { return state.promotions.perModel[modelName]?.[channelId]?.voucherProduk ? state.promotions.perModel[modelName][channelId].voucherProduk + '%' : ''; },
@@ -2860,6 +2860,16 @@ function calculateBestDiscount(cart, channelId) {
             rate: channelPromos.voucherToko
         });
     }
+
+    // --- BARIS KODE BARU TELAH DITAMBAHKAN DI SINI ---
+    if (channelPromos.voucherSemuaProduk > 0) {
+        promotions.push({
+            totalDiscount: (channelPromos.voucherSemuaProduk / 100) * cartSubtotal,
+            description: `Voucher Semua Produk (${channelPromos.voucherSemuaProduk}%)`,
+            rate: channelPromos.voucherSemuaProduk
+        });
+    }
+    // --- AKHIR KODE BARU ---
 
     // 2. Kumpulkan semua promosi per-model produk
     const allModelPromos = state.promotions.perModel || {};
@@ -5787,15 +5797,15 @@ watch(activePage, (newPage) => {
                 <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border rounded-lg bg-slate-50">
                     <p class="font-semibold text-slate-700">{{ channel.name }}</p>
                     <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko (%)</label>
-                            <input type="text" placeholder="Contoh: 5%" v-model="voucherTokoComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (Rp)</label>
-                            <input type="text" placeholder="Contoh: Rp 10.000" v-model="voucherSemuaProdukComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
-                        </div>
-                    </div>
+    <div>
+        <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko (%)</label>
+        <input type="text" placeholder="Contoh: 5%" v-model="voucherTokoComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
+    </div>
+    <div>
+        <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (%)</label>
+        <input type="text" placeholder="Contoh: 10%" v-model="voucherSemuaProdukComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
+    </div>
+</div>
                 </div>
             </div>
         </div>
