@@ -7141,7 +7141,7 @@ watch(activePage, (newPage) => {
                  :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'bulanan', 'border-transparent': selectedPlan !== 'bulanan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Bulanan</h3>
-                    <p class="text-4xl font-bold my-4">{{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal">/bulan</span></p>
+                    <p class="text-4xl font-bold my-4">{{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal"></span></p>
                     <ul class="text-left space-y-2 text-slate-600">
                         <li>✔️ Akses semua fitur</li>
                         <li>✔️ Dukungan prioritas</li>
@@ -7161,7 +7161,7 @@ watch(activePage, (newPage) => {
                  :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'tahunan', 'border-transparent': selectedPlan !== 'tahunan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Tahunan</h3>
-                    <p class="text-4xl font-bold my-4">{{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal">/tahun</span></p>
+                    <p class="text-4xl font-bold my-4">{{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal"></span></p>
                     <ul class="text-left space-y-2 text-slate-600">
                         <li>✔️ Akses semua fitur</li>
                         <li>✔️ Dukungan prioritas</li>
