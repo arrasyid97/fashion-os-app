@@ -13,7 +13,7 @@ import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransacti
 let onSnapshotListener = null;
 
 let bulkSearchDebounceTimer = null;
-// Impor fungsi-fungsi BARU untuk Autentikasi
+// Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
     onAuthStateChanged, 
     signOut,
