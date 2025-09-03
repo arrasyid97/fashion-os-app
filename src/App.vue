@@ -855,15 +855,33 @@ async function handleSubscriptionMidtrans(plan) {
 
 const voucherTokoComputed = (channel) => computed({
     get() { return state.promotions.perChannel[channel.id]?.voucherToko ? state.promotions.perChannel[channel.id].voucherToko + '%' : ''; },
-    set(newValue) { state.promotions.perChannel[channel.id].voucherToko = parsePercentageInput(newValue); }
+    set(newValue) {
+        if (!state.promotions.perChannel[channel.id]) {
+            state.promotions.perChannel[channel.id] = {};
+        }
+        state.promotions.perChannel[channel.id].voucherToko = parsePercentageInput(newValue);
+    }
 });
 const voucherSemuaProdukComputed = (channel) => computed({
     get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk ? state.promotions.perChannel[channel.id].voucherSemuaProduk + '%' : ''; },
-    set(newValue) { state.promotions.perChannel[channel.id].voucherSemuaProduk = parsePercentageInput(newValue); }
+    set(newValue) {
+        if (!state.promotions.perChannel[channel.id]) {
+            state.promotions.perChannel[channel.id] = {};
+        }
+        state.promotions.perChannel[channel.id].voucherSemuaProduk = parsePercentageInput(newValue);
+    }
 });
 const voucherProdukComputed = (modelName, channelId) => computed({
     get() { return state.promotions.perModel[modelName]?.[channelId]?.voucherProduk ? state.promotions.perModel[modelName][channelId].voucherProduk + '%' : ''; },
-    set(newValue) { state.promotions.perModel[modelName][channelId].voucherProduk = parsePercentageInput(newValue); }
+    set(newValue) {
+        if (!state.promotions.perModel[modelName]) {
+            state.promotions.perModel[modelName] = {};
+        }
+        if (!state.promotions.perModel[modelName][channelId]) {
+            state.promotions.perModel[modelName][channelId] = {};
+        }
+        state.promotions.perModel[modelName][channelId].voucherProduk = parsePercentageInput(newValue);
+    }
 });
 const tieredMinComputed = (tier) => computed({
     get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
