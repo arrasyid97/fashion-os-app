@@ -7197,7 +7197,74 @@ watch(activePage, (newPage) => {
     <!-- Modal System -->
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
-       
+      
+        <div v-if="uiState.modalType === 'panduanPromosi'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] flex flex-col">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Panduan Fitur Promosi & Voucher</h3>
+        <p class="text-slate-500">Memahami Hirarki dan Logika Diskon Otomatis.</p>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto py-4 pr-2">
+        <div class="space-y-6 text-slate-700 leading-relaxed prose">
+            
+            <div class="p-4 bg-slate-50 rounded-lg">
+                <h4 class="text-lg font-semibold text-indigo-700">Tujuan Fitur Ini</h4>
+                <p class="mt-1 text-sm">
+                    Halaman ini memungkinkan Anda untuk merancang strategi diskon yang kompleks dan berlapis. Sistem akan secara otomatis menghitung dan menerapkan <strong>diskon terbaik</strong> yang tersedia untuk setiap transaksi di halaman Kasir (POS) dan Proses Massal.
+                </p>
+            </div>
+
+            <div class="p-4 bg-slate-50 rounded-lg">
+                <h4 class="text-lg font-semibold text-indigo-700">Jenis-Jenis Promosi</h4>
+                <p class="mt-1 text-sm">Ada dua level promosi yang bisa Anda atur:</p>
+                <ul class="list-disc list-inside space-y-2 mt-2 text-sm">
+                    <li>
+                        <strong>Promosi per Akun Penjualan:</strong>
+                        <ul class="list-circle list-inside ml-4">
+                            <li><strong>Voucher Ikuti Toko (%):</strong> Diskon persentase yang berlaku untuk seluruh keranjang belanja.</li>
+                            <li><strong>Voucher Semua Produk (%):</strong> Diskon persentase yang berlaku untuk seluruh keranjang belanja.</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>Promosi Spesifik per Model Produk:</strong>
+                          <ul class="list-circle list-inside ml-4">
+                            <li><strong>Voucher Produk Tertentu (%):</strong> Diskon persentase yang hanya berlaku untuk produk dari model yang dipilih.</li>
+                            <li><strong>Diskon Bertingkat:</strong> Atur diskon berdasarkan minimal belanja. Contoh: "Belanja Rp 100.000 diskon 5%, belanja Rp 200.000 diskon 10%".</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="mt-4 p-4 bg-slate-50 rounded-lg">
+                <h4 class="text-lg font-semibold text-indigo-700">Aturan Emas: Sistem Memilih Diskon Terbaik</h4>
+                <p class="mt-2 text-sm">
+                    Penting untuk dipahami: <strong>sistem tidak menumpuk diskon</strong>. Saat transaksi terjadi, aplikasi akan menghitung semua potensi diskon yang berlaku (dari voucher toko, voucher produk, dan diskon bertingkat), lalu secara otomatis hanya akan menerapkan <strong>SATU diskon yang memberikan potongan harga terbesar</strong> bagi pelanggan.
+                </p>
+            </div>
+            
+            <div class="mt-4 p-4 bg-red-50 text-red-900 border-l-4 border-red-500">
+                <h4 class="font-bold text-lg text-red-800">PERINGATAN KRUSIAL: Voucher Ikuti Toko</h4>
+                <p class="mt-2 text-sm">
+                    Harap berhati-hati saat mengisi kolom <strong>"Voucher Ikuti Toko (%)"</strong>. Di platform e-commerce, voucher ini umumnya hanya dapat digunakan <strong>satu kali oleh setiap pembeli baru</strong>.
+                </p>
+                <p class="mt-2 text-sm">
+                    <strong>Risiko Ketidakakuratan Data:</strong> Jika Anda menetapkan persentase voucher ini lebih tinggi dari promosi lain, aplikasi ini akan selalu menerapkannya untuk setiap transaksi (termasuk dari pembeli lama), karena sistem kami dirancang untuk memilih diskon tertinggi. Akibatnya, laba yang tercatat di aplikasi ini bisa jadi <strong>lebih rendah dari laba riil</strong> yang Anda terima dari marketplace, menyebabkan data menjadi tidak akurat.
+                </p>
+                <p class="mt-4 font-semibold text-sm">Rekomendasi Profesional:</p>
+                <ul class="list-disc list-inside space-y-1 mt-2 text-sm">
+                    <li><strong>Opsi Paling Aman:</strong> Kosongkan kolom "Voucher Ikuti Toko" di aplikasi ini dan nonaktifkan voucher tersebut di platform e-commerce Anda untuk menjamin 100% akurasi data.</li>
+                    <li><strong>Opsi Alternatif:</strong> Jika Anda tetap ingin menggunakannya, atur nilai persentase "Voucher Ikuti Toko" menjadi yang <strong>paling rendah</strong> di antara semua promosi Anda, sehingga voucher ini hanya berfungsi sebagai diskon dasar jika tidak ada promo lain yang lebih baik.</li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+    </div>
+</div>
+
         <div v-if="uiState.modalType === 'dashboardKpiInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Memahami Dampak Retur pada Laporan Keuangan</h3>
