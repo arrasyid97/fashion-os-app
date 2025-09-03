@@ -1399,6 +1399,7 @@ const uiState = reactive({
     pinConfirmInput: '',
     pinConfirmError: '',
     pinActionToConfirm: null,
+    posChannelFilter: 'all',
 
      laporanBagiHasil: {
         selectedInvestorId: null,
@@ -1727,7 +1728,7 @@ const hargaKainPerYardHistory = computed(() => {
     return Array.from(uniqueHargas).sort((a, b) => a - b);
 });
 const filteredTransaksi = computed(() => {
-    return filterDataByDate(
+    let filteredData = filterDataByDate(
         state.transaksi, 
         uiState.posDateFilter, 
         uiState.posStartDate, 
@@ -1736,7 +1737,14 @@ const filteredTransaksi = computed(() => {
         uiState.posStartYear,
         uiState.posEndMonth,
         uiState.posEndYear
-    ).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+    );
+    
+    // BARIS BARU: Menambahkan filter berdasarkan channel jika sudah dipilih
+    if (uiState.posChannelFilter && uiState.posChannelFilter !== 'all') {
+        filteredData = filteredData.filter(trx => trx.channelId === uiState.posChannelFilter);
+    }
+
+    return filteredData.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 });
 const activeCart = computed(() => state.carts[uiState.activeCartChannel] || []);
 const cartSummary = computed(() => {
@@ -5398,23 +5406,25 @@ watch(activePage, (newPage) => {
 
             <div>
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                    <h3 class="text-xl font-semibold">Riwayat Transaksi</h3>
-                    <div class="flex items-start gap-2">
-                        <div class="flex-grow">
-                            <select v-model="uiState.posDateFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                                <option value="today">hari ini</option>
-                                <option value="last_7_days">1 minggu terakhir</option>
-                                <option value="last_30_days">1 bulan terakhir</option>
-                                <option value="this_year">1 tahun terakhir</option>
-                                <option value="by_date_range">rentang tanggal</option>
-                                <option value="by_month_range">rentang bulan</option>
-                                <option value="by_year_range">rentang tahun</option>
-                                <option value="all_time">semua</option>
-                            </select>
-                        </div>
-                        <button @click="exportTransactionsToExcel" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px]">Export</button>
-                    </div>
-                </div>
+    <h3 class="text-xl font-semibold">Riwayat Transaksi</h3>
+    <div class="flex items-start gap-2">
+        <select v-model="uiState.posDateFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+            <option value="today">hari ini</option>
+            <option value="last_7_days">1 minggu terakhir</option>
+            <option value="last_30_days">1 bulan terakhir</option>
+            <option value="this_year">1 tahun terakhir</option>
+            <option value="by_date_range">rentang tanggal</option>
+            <option value="by_month_range">rentang bulan</option>
+            <option value="by_year_range">rentang tahun</option>
+            <option value="all_time">semua</option>
+        </select>
+        <select v-model="uiState.posChannelFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+            <option value="all">Semua Channel</option>
+            <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
+        </select>
+        <button @click="exportTransactionsToExcel" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px]">Export</button>
+    </div>
+</div>
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-h-96">
                     <table class="w-full text-sm text-left text-slate-500">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
