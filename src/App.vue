@@ -849,15 +849,15 @@ async function handleSubscriptionMidtrans(plan) {
 
 const voucherTokoComputed = (channel) => computed({
     get() { return state.promotions.perChannel[channel.id]?.voucherToko ? state.promotions.perChannel[channel.id].voucherToko + '%' : ''; },
-    set(newValue) { state.promotions.perChannel[channel.id].voucherToko = parseFloat(newValue.replace(/[^0-9.]/g, '')) || null; }
+    set(newValue) { state.promotions.perChannel[channel.id].voucherToko = parsePercentageInput(newValue); }
 });
 const voucherSemuaProdukComputed = (channel) => computed({
     get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk ? state.promotions.perChannel[channel.id].voucherSemuaProduk + '%' : ''; },
-    set(newValue) { state.promotions.perChannel[channel.id].voucherSemuaProduk = parseFloat(newValue.replace(/[^0-9.]/g, '')) || null; }
+    set(newValue) { state.promotions.perChannel[channel.id].voucherSemuaProduk = parsePercentageInput(newValue); }
 });
 const voucherProdukComputed = (modelName, channelId) => computed({
     get() { return state.promotions.perModel[modelName]?.[channelId]?.voucherProduk ? state.promotions.perModel[modelName][channelId].voucherProduk + '%' : ''; },
-    set(newValue) { state.promotions.perModel[modelName][channelId].voucherProduk = parseFloat(newValue.replace(/[^0-9.]/g, '')) || null; }
+    set(newValue) { state.promotions.perModel[modelName][channelId].voucherProduk = parsePercentageInput(newValue); }
 });
 const tieredMinComputed = (tier) => computed({
     get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
@@ -865,7 +865,28 @@ const tieredMinComputed = (tier) => computed({
 });
 const tieredDiskonComputed = (tier) => computed({
     get() { return tier.diskon ? tier.diskon + '%' : ''; },
-    set(newValue) { tier.diskon = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0; }
+    set(newValue) { tier.diskon = parsePercentageInput(newValue); }
+});
+
+const admComputed = computed({
+    get() { return uiState.modalData.adm ? uiState.modalData.adm + '%' : ''; },
+    set(newValue) { uiState.modalData.adm = parsePercentageInput(newValue); }
+});
+const komisiComputed = computed({
+    get() { return uiState.modalData.komisi ? uiState.modalData.komisi + '%' : ''; },
+    set(newValue) { uiState.modalData.komisi = parsePercentageInput(newValue); }
+});
+const layananComputed = computed({
+    get() { return uiState.modalData.layanan ? uiState.modalData.layanan + '%' : ''; },
+    set(newValue) { uiState.modalData.layanan = parsePercentageInput(newValue); }
+});
+const programRateComputed = (program) => ({
+    get value() {
+        return program.rate ? program.rate + '%' : '';
+    },
+    setValue(newValue) {
+        program.rate = parsePercentageInput(newValue);
+    }
 });
 
 async function activateSubscriptionWithCode() {
@@ -1426,6 +1447,12 @@ const formatCurrency = (value) => {
     }).format(value || 0);
 };
 
+const parsePercentageInput = (value) => {
+    if (typeof value !== 'string') return value;
+    const cleaned = value.replace(',', '.').replace(/[^0-9.]/g, '');
+    return parseFloat(cleaned) || 0;
+};
+
 const targetMarginComputed = computed({
     get() {
         // Tampilkan nilai dengan simbol % di input
@@ -1438,26 +1465,7 @@ const targetMarginComputed = computed({
     }
 });
 
-const admComputed = computed({
-    get() { return uiState.modalData.adm ? uiState.modalData.adm + '%' : ''; },
-    set(newValue) { uiState.modalData.adm = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0; }
-});
-const komisiComputed = computed({
-    get() { return uiState.modalData.komisi ? uiState.modalData.komisi + '%' : ''; },
-    set(newValue) { uiState.modalData.komisi = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0; }
-});
-const layananComputed = computed({
-    get() { return uiState.modalData.layanan ? uiState.modalData.layanan + '%' : ''; },
-    set(newValue) { uiState.modalData.layanan = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0; }
-});
-const programRateComputed = (program) => ({
-    get value() {
-        return program.rate ? program.rate + '%' : '';
-    },
-    setValue(newValue) {
-        program.rate = parseFloat(newValue.replace(/[^0-9.]/g, '')) || 0;
-    }
-});
+
 
 const formatNumber = (value) => (value === null || value === undefined) ? '' : new Intl.NumberFormat('id-ID').format(value);
 const getProductBySku = (sku) => {
