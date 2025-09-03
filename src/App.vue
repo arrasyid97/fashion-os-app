@@ -7179,7 +7179,7 @@ watch(activePage, (newPage) => {
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
        
-        <div v-if="uiState.modalType === 'dashboardKpiInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[100vh] flex flex-col">
+        <div v-if="uiState.modalType === 'dashboardKpiInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[100vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Memahami Dampak Retur pada Laporan Keuangan</h3>
         <p class="text-slate-500 mt-1">Penjelasan singkat tentang bagaimana setiap data retur memengaruhi metrik di dashboard.</p>
