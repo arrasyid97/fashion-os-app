@@ -2237,14 +2237,15 @@ async function saveData() {
         };
         batch.set(settingsRef, settingsData);
 
-        // Simpan promosi
+        // --- AWAL PERBAIKAN: Memastikan data promosi tidak kosong sebelum disimpan ---
         const promotionsRef = doc(db, "promotions", userId);
         const promotionsData = {
-            perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
-            perModel: JSON.parse(JSON.stringify(state.promotions.perModel)),
+            perChannel: state.promotions.perChannel || {},
+            perModel: state.promotions.perModel || {},
             userId: userId
         };
-        batch.set(promotionsRef, promotionsData);
+        batch.set(promotionsRef, JSON.parse(JSON.stringify(promotionsData)));
+        // --- AKHIR PERBAIKAN ---
 
         // Simpan HPP & Harga Jual
         for (const product of state.produk) {
