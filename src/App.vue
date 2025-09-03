@@ -5785,7 +5785,6 @@ watch(activePage, (newPage) => {
     
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         
-        <!-- Promosi per Akun Penjualan -->
         <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h4 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-3">Promosi per Akun Penjualan</h4>
             <p class="text-sm text-slate-500 mb-4">Voucher ini berlaku untuk semua produk yang dijual di akun yang bersangkutan.</p>
@@ -5798,21 +5797,27 @@ watch(activePage, (newPage) => {
                             <input type="text" placeholder="Contoh: 5%" v-model="voucherTokoComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (Rp)</label>
-                            <input type="text" placeholder="Contoh: Rp 10.000" v-model="voucherSemuaProdukComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
+                            <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (%)</label>
+                            <input type="text" placeholder="Contoh: 10%" v-model="voucherSemuaProdukComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
                         </div>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Promosi Spesifik per Model Produk -->
         <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h4 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-3">Promosi Spesifik per Model Produk</h4>
             <p class="text-sm text-slate-500 mb-4">Atur diskon dan voucher yang hanya berlaku untuk model produk tertentu di setiap akun.</p>
             <div class="mb-4">
                 <label for="promo-model-filter" class="block text-sm font-medium text-slate-700">Pilih Model Produk</label>
-                <select v-model="uiState.promosiSelectedModel" id="promo-model-filter" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                <div v-if="promosiProductModels.length === 0" class="mt-1 p-3 bg-red-100 text-red-800 border-l-4 border-red-500 rounded-lg shadow-sm">
+                    <p class="font-semibold mb-1">Peringatan:</p>
+                    <p class="text-sm">Anda belum memiliki produk di Inventaris. Silakan tambahkan di halaman **Manajemen Inventaris** terlebih dahulu.</p>
+                    <a href="#" @click.prevent="changePage('inventaris')" class="mt-2 inline-block text-red-700 font-bold hover:underline">
+                        Buka Halaman Inventaris &raquo;
+                    </a>
+                </div>
+                <select v-else v-model="uiState.promosiSelectedModel" id="promo-model-filter" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm">
                     <option value="">-- Pilih Model untuk Diatur --</option>
                     <option v-for="modelName in promosiProductModels" :key="modelName" :value="modelName">{{ modelName }}</option>
                 </select>
