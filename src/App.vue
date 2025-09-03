@@ -7127,12 +7127,12 @@ watch(activePage, (newPage) => {
             
             <!-- Tambahkan form aktivasi di sini -->
             <div class="w-full mt-8 pt-6 border-t border-slate-200">
-                <h3 class="text-xl font-bold text-slate-800 mb-4">Aktivasi Langganan</h3>
+                <h3 class="text-xl font-bold text-slate-800 mb-4">Aktivasi</h3>
                 <form @submit.prevent="activateSubscriptionWithCode">
-                    <label for="activation-code" class="block text-sm font-medium text-slate-700">Masukkan Kode Aktivasi Anda</label>
+                    <label for="activation-code" class="block text-sm font-medium text-slate-700">Masukkan Kode Aktivasi</label>
                     <input type="text" v-model="authForm.activationCode" id="activation-code-page" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
                     <button type="submit" class="w-full py-3 mt-4 rounded-xl shadow-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
-                        Aktifkan Sekarang
+                        Konfirmasi
                     </button>
                 </form>
             </div>
