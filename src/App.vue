@@ -7079,25 +7079,24 @@ watch(activePage, (newPage) => {
             </section>
 
             <section>
-                <h3 class="text-xl font-semibold text-slate-800 mb-2">Informasi Aplikasi</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                    <div class="bg-slate-50 p-4 rounded-lg">
-                        <p class="font-semibold text-slate-600">Dikembangkan oleh</p>
-                        <p>Arrasyid</p>
-                    </div>
-                    <div class="bg-slate-50 p-4 rounded-lg">
-                        <p class="font-semibold text-slate-600">Informasi Kontak</p>
-                        <p>Email: <a href="mailto:support@arrasyd.id" class="text-blue-600 hover:underline">support@arrasyd.id</a></p>
-                        <p>Telepon: <a href="https://wa.me/6281210842060" class="text-blue-600 hover:underline">0812-1084-2060</a></p>
-                    </div>
-                    <div class="bg-slate-50 p-4 rounded-lg">
-                        <p class="font-semibold text-slate-600">Versi Aplikasi</p>
-                        <p>1.0.0 (Build 20250806)</p>
-                        <p class="font-semibold text-slate-600 mt-2">Tanggal Rilis</p>
-                        <p>06 Agustus 2025</p>
-                    </div>
-                </div>
-            </section>
+    <h3 class="text-xl font-semibold text-slate-800 mb-2">Informasi Aplikasi</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+        <div class="bg-slate-50 p-4 rounded-lg">
+            <p class="font-semibold text-slate-600">Dikembangkan oleh</p>
+            <p>Arrasyid</p>
+        </div>
+        <div class="bg-slate-50 p-4 rounded-lg">
+            <p class="font-semibold text-slate-600">Informasi Kontak</p>
+            <p>Email: <a href="mailto:fashion234oss@gmail.com" class="text-blue-600 hover:underline">fashion234oss@gmail.com</a></p>
+        </div>
+        <div class="bg-slate-50 p-4 rounded-lg">
+            <p class="font-semibold text-slate-600">Versi Aplikasi</p>
+            <p>1.0.0 (Build 20250903)</p>
+            <p class="font-semibold text-slate-600 mt-2">Tanggal Rilis</p>
+            <p>03 September 2025</p>
+        </div>
+    </div>
+</section>
 
             <section>
                 <h3 class="text-xl font-semibold text-slate-800 mb-2">Hak Cipta</h3>
