@@ -4930,7 +4930,7 @@ onMounted(async () => {
         uid: ADMIN_UID,
         email: "verifikasi@fashionos.app"
     };
-    await loadAllDataFromFirebase();
+    // await loadAllDataFromFirebase(); // Diberi komentar atau dihapus
     changePage('dashboard');
     isLoading.value = false;
 });
