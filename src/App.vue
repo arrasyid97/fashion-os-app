@@ -1,5 +1,4 @@
 <script setup>
-/* eslint-disable no-unused-vars */ // <-- TAMBAHKAN BARIS INI
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
@@ -4924,10 +4923,25 @@ async function loadAllDataFromFirebase() {
 }
 
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
+onMounted(async () => {
+    isLoading.value = true;
+    currentUser.value = {
+        uid: ADMIN_UID,
+        email: "verifikasi@fashionos.app"
+    };
+    await loadAllDataFromFirebase();
+    changePage('dashboard');
+    isLoading.value = false;
+});
+// Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
+watch(activePage, (newPage) => {
+    localStorage.setItem('lastActivePage', newPage);
+});
 
 </script>
 
 <template>
+    
         
   <div v-if="currentUser && !isLoading">
     <div class="flex h-screen bg-slate-100">
