@@ -742,6 +742,8 @@ async function handleSubscriptionXendit(plan) {
         const response = await fetch('/api/create-xendit-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            // --- PERBAIKAN UTAMA ADA DI SINI ---
+            // Mengirim nama parameter yang persis sama dengan yang diharapkan oleh API
             body: JSON.stringify({
                 amount: priceToPay,
                 external_id: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
