@@ -41,7 +41,7 @@ const dashboardPinInput = ref('');
 const dashboardPinError = ref('');
 const ADMIN_UID = '6m4bgRlZMDhL8niVyD4lZmGuarF3'; 
 
-// Properti ini akan otomatis bernilai 'true' jika yang login adalah Anda (Admin)
+// Propertii ini akan otomatis bernilai 'true' jika yang login adalah Anda (Admin)
 const isAdmin = computed(() => {
   return currentUser.value && currentUser.value.uid === ADMIN_UID;
 });
