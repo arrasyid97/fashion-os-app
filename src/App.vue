@@ -742,8 +742,6 @@ async function handleSubscriptionXendit(plan) {
         const response = await fetch('/api/create-xendit-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // --- PERBAIKAN UTAMA ADA DI SINI ---
-            // Menggunakan external_id dan payer_email (huruf kecil & garis bawah)
             body: JSON.stringify({
                 amount: priceToPay,
                 external_id: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
