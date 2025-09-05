@@ -722,7 +722,7 @@ async function findTransactionForReturn() {
     }
 }
 
-async function handleSubscriptionMidtrans(plan) {
+async function handleSubscriptionXendit(plan) {
     if (!currentUser.value) {
         alert("Silakan login terlebih dahulu.");
         return;
@@ -741,35 +741,22 @@ async function handleSubscriptionMidtrans(plan) {
     }
     
     isSubscribingPlan.value = true;
-
-    // --- PERBAIKAN DI SINI ---
-    // Gunakan variabel harga yang sudah kita deklarasikan
+    
+    // Mengambil harga dari variabel yang sudah ada
     const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
 
-    const transactionDetails = {
-        order_id: `${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
-        gross_amount: priceToPay, // <-- Gunakan variabel di sini
-    };
-    const customerDetails = {
-        first_name: currentUser.value.displayName || 'Pelanggan',
-        email: currentUser.value.email,
-    };
-    const itemDetails = [{
-        id: `plan-${plan}`,
-        price: priceToPay, // <-- Gunakan variabel di sini
-        quantity: 1,
-        name: `Langganan ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
-    }];
-    // --- AKHIR PERBAIKAN ---
-
     try {
-        const response = await fetch('/api/create-midtrans-snap', {
+        // Panggil API Vercel untuk membuat invoice Xendit
+        const response = await fetch('/api/create-xendit-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                transaction_details: transactionDetails,
-                customer_details: customerDetails,
-                item_details: itemDetails,
+                amount: priceToPay,
+                externalId: `${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
+                payerEmail: currentUser.value.email,
+                description: `Langganan ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'} untuk ${currentUser.value.email}`,
+                plan: plan,
+                userId: currentUser.value.uid,
             }),
         });
 
@@ -780,73 +767,14 @@ async function handleSubscriptionMidtrans(plan) {
 
         const data = await response.json();
 
-        if (data.snapToken) {
-            window.snap.pay(data.snapToken, {
-                onSuccess: async function(result) {
-                    console.log('Payment success:', result);
-                    alert("Pembayaran Berhasil! Langganan Anda akan segera aktif.");
-
-                    const now = new Date();
-                    const endDate = plan === 'bulanan'
-                        ? new Date(now.setMonth(now.getMonth() + 1))
-                        : new Date(now.setFullYear(now.getFullYear() + 1));
-                    
-                    currentUser.value.userData = {
-                        ...currentUser.value.userData,
-                        subscriptionStatus: 'active',
-                        subscriptionEndDate: endDate,
-                    };
-
-                    try {
-                        const updateResponse = await fetch('/api/update-subscription', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: currentUser.value.uid,
-                                plan: plan,
-                                paymentStatus: 'active',
-                            }),
-                        });
-                        if (updateResponse.ok) {
-                            console.log('Status langganan berhasil diperbarui di database.');
-                            await loadAllDataFromFirebase();
-                            activePage.value = 'dashboard';
-                        } else {
-                            const errorData = await updateResponse.json();
-                            console.error('Gagal memperbarui status langganan:', errorData);
-                            alert('Pembayaran berhasil, tetapi gagal memperbarui status di database. Silakan hubungi admin.');
-                        }
-                    } catch (error) {
-                        console.error('Error saat memanggil API update-subscription:', error);
-                        alert('Terjadi kesalahan. Silakan hubungi admin.');
-                    } finally {
-                        if (plan === 'bulanan') isSubscribingMonthly.value = false;
-                        else isSubscribingYearly.value = false;
-                    }
-                },
-                onPending: function(result) {
-                    console.log('Payment pending:', result);
-                    alert("Pembayaran Anda menunggu konfirmasi. Silakan selesaikan pembayaran.");
-                    if (plan === 'bulanan') isSubscribingMonthly.value = false;
-                    else isSubscribingYearly.value = false;
-                },
-                onError: function(result) {
-                    console.log('Payment error:', result);
-                    alert("Pembayaran gagal. Silakan coba lagi.");
-                    if (plan === 'bulanan') isSubscribingMonthly.value = false;
-                    else isSubscribingYearly.value = false;
-                },
-                onClose: function() {
-                    console.log('Pop-up pembayaran ditutup.');
-                    if (plan === 'bulanan') isSubscribingMonthly.value = false;
-                    else isSubscribingYearly.value = false;
-                }
-            });
+        // Xendit mengembalikan URL invoice untuk redirect
+        if (data.invoice_url) {
+            window.location.href = data.invoice_url;
         } else {
-            throw new Error(data.message || 'Gagal mendapatkan snapToken.');
+            throw new Error(data.message || 'Gagal mendapatkan invoice URL.');
         }
     } catch (error) {
-        console.error("Gagal memproses langganan Midtrans:", error);
+        console.error("Gagal memproses langganan Xendit:", error);
         alert(`Gagal memproses langganan. Silakan coba lagi. Error: ${error.message}`);
     } finally {
         if (plan === 'bulanan') isSubscribingMonthly.value = false;
@@ -7064,7 +6992,7 @@ watch(activePage, (newPage) => {
                         <li>✔️ Update berkala</li>
                     </ul>
                 </div>
-                <button @click="handleSubscriptionMidtrans('bulanan')"
+                <button @click="handleSubscriptionXendit('bulanan')"
                         :disabled="isSubscribingMonthly"
                         class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed">
                     <span v-if="isSubscribingMonthly">Memproses...</span>
@@ -7085,7 +7013,7 @@ watch(activePage, (newPage) => {
                         <li>💰 <span class="font-semibold">Diskon 2 bulan!</span></li>
                     </ul>
                 </div>
-                <button @click="handleSubscriptionMidtrans('tahunan')"
+                <button @click="handleSubscriptionXendit('tahunan')"
                         :disabled="isSubscribingYearly"
                         class="mt-8 w-full bg-slate-800 text-white font-bold py-3 px-8 rounded-lg hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed">
                     <span v-if="isSubscribingYearly">Memproses...</span>
