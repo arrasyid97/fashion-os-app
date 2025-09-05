@@ -26,7 +26,7 @@ export default async function handler(req, res) {
                         .digest('hex')
     };
 
-    const response = await fetch('https://tripay.co.id/api/transaction/create', {
+    const response = await fetch('https://tripay.co.id/api-sandbox/transaction/create', {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + process.env.TRIPAY_API_KEY,
