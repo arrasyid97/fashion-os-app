@@ -1,45 +1,38 @@
-const { Xendit } = require('xendit-node');
+const { Xendit } = require('xendit-node'); // <-- PERBAIKAN DI SINI
 
-// Inisialisasi Xendit dengan Secret Key dari Vercel Environment Variables
-const xenditClient = new Xendit({
-  secretKey: process.env.XENDIT_SECRET_KEY,
+const xendit = new Xendit({
+    secretKey: process.env.XENDIT_SECRET_KEY,
 });
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method Not Allowed' });
-  }
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method Not Allowed' });
+    }
 
-  try {
-    const { amount, externalId, payerEmail, description, businessId } = req.body;
+    try {
+        const { amount, externalId, payerEmail, description, plan, userId } = req.body;
 
-    // Membuat invoice dengan memanggil instance dari Invoice API
-    const { Invoice } = xenditClient;
-    const invoiceSpecificOptions = {}; // Biarkan kosong jika tidak yakin
+        if (!amount || !externalId || !payerEmail || !description) {
+            return res.status(400).json({ message: 'Missing required parameters' });
+        }
+        
+        console.log('API Key berhasil dibaca. Melanjutkan ke Xendit...'); // <-- UNTUK DEBUGGING
 
-    const invoice = await Invoice.createInvoice({
-      data: { // <-- INI ADALAH PERBAIKAN UTAMA
-        externalID: externalId,
-        amount: amount,
-        payerEmail: payerEmail,
-        description: description,
-        successRedirectURL: `${req.headers.origin}/langganan?status=success`,
-        failureRedirectURL: `${req.headers.origin}/langganan?status=failure`,
-        currency: 'IDR',
-      },
-      // Header 'for-user-id' untuk akun platform
-      forUserId: businessId, 
-    }, invoiceSpecificOptions);
+        const invoice = await xendit.Invoice.createInvoice({
+            externalID: externalId,
+            amount: amount,
+            payerEmail: payerEmail,
+            description: description,
+            successRedirectURL: `${req.headers.origin}/langganan`,
+            failureRedirectURL: `${req.headers.origin}/langganan`,
+            invoiceDuration: 86400, // 24 jam
+            currency: 'IDR',
+        });
+        
+        return res.status(200).json({ invoice_url: invoice.invoice_url });
 
-    return res.status(200).json({ invoice_url: invoice.invoiceUrl });
-
-  } catch (error) {
-    // Kirim kembali error yang lebih detail dari Xendit untuk debugging
-    console.error('Error creating Xendit invoice:', error);
-    return res.status(500).json({ 
-      message: error.message, 
-      error_code: error.errorCode,
-      errors: error.errors
-    });
-  }
+    } catch (error) {
+        console.error('Error creating Xendit invoice:', error);
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
 }
