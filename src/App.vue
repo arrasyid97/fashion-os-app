@@ -3956,7 +3956,7 @@ function handleReturPageSearch() {
     const lowerQuery = query.toLowerCase();
     const recommendations = new Set();
     
-    // Cari berdasarkan SKU, Nama, Alasan dari data retur yang sudah ada
+    // Carii berdasarkan SKU, Nama, Alasan dari data retur yang sudah ada
     // Perbaikann untuk memastikan tidak error saat ada data kosong
     state.retur.forEach(item => {
         // Karena data retur sekarang bisa memiliki banyak item di dalam array 'items'
