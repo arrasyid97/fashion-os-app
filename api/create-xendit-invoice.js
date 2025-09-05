@@ -1,8 +1,7 @@
 const { Xendit } = require('xendit-node');
 
 export default async function handler(req, res) {
-  // PERINGATAN: Kunci API dimasukkan langsung untuk debugging.
-  // Ganti 'xnd_development_...' dengan Secret Key Anda yang sebenarnya.
+  // PERINGATAN: Ganti '...' dengan Secret Key Anda.
   // Ini SANGAT TIDAK AMAN untuk produksi jangka panjang.
   const xenditClient = new Xendit({
     secretKey: 'xnd_development_SmEvUZxXD0xHLfziqDaSbHGyu4E5v1l3afoB1grG569Bnkb7q3smLQkLPjF0Tns',
@@ -17,7 +16,7 @@ export default async function handler(req, res) {
     
     const { Invoice } = xenditClient;
 
-    // Membuat invoice dengan struktur data yang benar
+    // Membuat invoice dengan struktur data yang benar tanpa parameter tambahan
     const invoice = await Invoice.createInvoice({
       data: {
         externalID: externalId,
