@@ -1,22 +1,11 @@
 const { Xendit } = require('xendit-node');
 
 export default async function handler(req, res) {
-  // LANGKAH 1: LOGGING EKSPLISIT UNTUK DEBUGGING
-  // Kita akan langsung mencatat apa yang Vercel lihat.
-  console.log("Mencoba membaca XENDIT_SECRET_KEY:", process.env.XENDIT_SECRET_KEY);
-
-  // LANGKAH 2: PENGECEKAN DINI
-  // Jika key tidak ada, kita kirim error yang lebih jelas.
-  if (!process.env.XENDIT_SECRET_KEY) {
-    console.error("FATAL ERROR: XENDIT_SECRET_KEY tidak ditemukan di environment variables Vercel.");
-    return res.status(500).json({ 
-      message: "Konfigurasi sisi server error: Secret Key tidak ditemukan.",
-      error_code: "SERVER_CONFIG_ERROR"
-    });
-  }
-
+  // PERINGATAN: Kunci API dimasukkan langsung untuk debugging.
+  // Ganti 'xnd_development_...' dengan Secret Key Anda yang sebenarnya.
+  // Ini SANGAT TIDAK AMAN untuk produksi jangka panjang.
   const xenditClient = new Xendit({
-    secretKey: process.env.XENDIT_SECRET_KEY,
+    secretKey: 'xnd_development_SmEvUZxXD0xHLfziqDaSbHGyu4E5v1l3afoB1grG569Bnkb7q3smLQkLPjF0Tns',
   });
 
   if (req.method !== 'POST') {
@@ -24,10 +13,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { amount, externalId, payerEmail, description, businessId } = req.body;
+    const { amount, externalId, payerEmail, description } = req.body;
     
     const { Invoice } = xenditClient;
 
+    // Membuat invoice dengan struktur data yang benar
     const invoice = await Invoice.createInvoice({
       data: {
         externalID: externalId,
@@ -37,13 +27,13 @@ export default async function handler(req, res) {
         successRedirectURL: `${req.headers.origin}/langganan?status=success`,
         failureRedirectURL: `${req.headers.origin}/langganan?status=failure`,
         currency: 'IDR',
-      },
-      forUserId: businessId
+      }
     });
 
     return res.status(200).json({ invoice_url: invoice.invoiceUrl });
 
   } catch (error) {
+    // Mencatat error detail dari Xendit di log Vercel
     console.error('Error detail dari Xendit:', error);
     return res.status(500).json({ 
       message: error.message || 'Terjadi kesalahan internal', 
@@ -52,3 +42,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
