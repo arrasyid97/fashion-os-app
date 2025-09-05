@@ -3,7 +3,7 @@ const { Xendit } = require('xendit-node');
 const xendit = new Xendit({
     secretKey: process.env.XENDIT_SECRET_KEY,
 });
-
+console.log('Xendit Secret Key:', process.env.XENDIT_SECRET_KEY ? '*****' : 'Tidak terbaca!');
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
