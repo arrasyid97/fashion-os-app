@@ -13,14 +13,16 @@ export default async function handler(req, res) {
         const { amount, externalId, payerEmail, description } = req.body;
 
         const invoice = await xendit.Invoice.createInvoice({
-            externalID: externalId,
-            amount: amount,
-            payerEmail: payerEmail,
-            description: description,
-            successRedirectURL: `${req.headers.origin}/langganan`,
-            failureRedirectURL: `${req.headers.origin}/langganan`,
-            invoiceDuration: 86400, // 24 jam
-            currency: 'IDR',
+            data: {
+                externalID: externalId,
+                amount: amount,
+                payerEmail: payerEmail,
+                description: description,
+                successRedirectURL: `${req.headers.origin}/langganan`,
+                failureRedirectURL: `${req.headers.origin}/langganan`,
+                invoiceDuration: 86400,
+                currency: 'IDR',
+            }
         });
         
         return res.status(200).json({ invoice_url: invoice.invoice_url });
