@@ -3957,7 +3957,7 @@ function handleReturPageSearch() {
     const recommendations = new Set();
     
     // Cari berdasarkan SKU, Nama, Alasan dari data retur yang sudah ada
-    // Perbaikan untuk memastikan tidak error saat ada data kosong
+    // Perbaikann untuk memastikan tidak error saat ada data kosong
     state.retur.forEach(item => {
         // Karena data retur sekarang bisa memiliki banyak item di dalam array 'items'
         // Kita perlu meloop di dalamnya juga
