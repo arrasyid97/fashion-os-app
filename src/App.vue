@@ -113,7 +113,7 @@ function showInvestorPaymentDetail(p) {
     showModal('laporanBagiHasilDetail', reportResult);
 }
 
-// FUNGSI BARU UNTUK MENGHAPUS RIWAYAT PEMBAYARAN
+// FUNGSII BARU UNTUK MENGHAPUS RIWAYAT PEMBAYARAN
 async function deleteInvestorPayment(paymentId) {
     if (!confirm("Anda yakin ingin menghapus riwayat pembayaran ini? Aksi ini tidak dapat dibatalkan.")) {
         return;
