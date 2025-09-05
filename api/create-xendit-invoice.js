@@ -2,7 +2,7 @@ import { Xendit } from 'xendit-node';
 
 // PENTING: Kunci API Xendit harus disimpan sebagai Environment Variable di Vercel
 const xendit = new Xendit({
-    secretKey: process.env.VITE_XENDIT_SECRET_KEY,
+    secretKey: process.env.XENDIT_SECRET_KEY,
 });
 
 export default async function handler(req, res) {
