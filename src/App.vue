@@ -210,7 +210,7 @@ async function toggleInvestorStatus(investor) {
     }
 }
 
-// Fungsi untuk mengekspor semua data milik satu pengguna
+// Fungsii untuk mengekspor semua data milik satu pengguna
 async function exportAllDataForUser(userId, userEmail, filterType, startDateStr, endDateStr, startMonth, endMonth, startYear, endYear) {
     if (!isAdmin.value) return;
     if (!userId) {
