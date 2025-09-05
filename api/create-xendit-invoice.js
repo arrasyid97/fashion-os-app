@@ -16,7 +16,9 @@ export default async function handler(req, res) {
 
     const invoice = await Invoice.createInvoice({
       data: {
-        externalID: externalId,
+        // --- PERBAIKAN ADA DI BARIS INI ---
+        external_id: externalId, // Diubah dari externalID menjadi external_id
+        // ------------------------------------
         amount: amount,
         payerEmail: payerEmail,
         description: description,
@@ -29,10 +31,8 @@ export default async function handler(req, res) {
     return res.status(200).json({ invoice_url: invoice.invoiceUrl });
 
   } catch (error) {
-    // --- INI ADALAH BAGIAN YANG DIPERBARUI ---
-    // Kita akan mencatat seluruh objek error secara detail
     console.error('--- DETAIL ERROR DARI XENDIT ---');
-    console.error(JSON.stringify(error, null, 2)); // Ini akan membuka isi dari [ [Object] ]
+    console.error(JSON.stringify(error, null, 2));
     
     return res.status(500).json({ 
       message: error.message || 'Terjadi kesalahan internal', 
