@@ -52,7 +52,7 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
-// Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
+// Fungsii untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
     if (!isAdmin.value) return; // Hanya jalankan jika admin
     try {
