@@ -13,7 +13,7 @@ export default async function handler(req, res) {
         const { amount, externalId, payerEmail, description, plan, userId } = req.body;
 
         const invoice = await xendit.Invoice.createInvoice({
-            data: { // <-- PERBAIKAN DI SINI
+            data: {
                 externalID: externalId,
                 amount: amount,
                 payerEmail: payerEmail,
@@ -29,6 +29,8 @@ export default async function handler(req, res) {
 
     } catch (error) {
         console.error('Error creating Xendit invoice:', error);
-        return res.status(500).json({ message: 'Internal Server Error' });
+        // PERBAIKAN DI SINI: Memastikan respons error selalu valid
+        const errorMessage = error.response?.message || 'Terjadi kesalahan tidak terduga.';
+        return res.status(500).json({ message: 'Internal Server Error', error: errorMessage });
     }
 }
