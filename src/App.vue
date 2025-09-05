@@ -742,7 +742,6 @@ async function handleSubscriptionXendit(plan) {
         const response = await fetch('/api/create-xendit-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // --- PERBAIKAN UTAMA ADA DI SINI ---
             // Mengirim nama parameter yang persis sama dengan yang diharapkan oleh API
             body: JSON.stringify({
                 amount: priceToPay,
@@ -775,7 +774,6 @@ async function handleSubscriptionXendit(plan) {
         isSubscribingPlan.value = false;
     }
 }
-
 
 const voucherTokoComputed = (channel) => computed({
     get() { return state.promotions.perChannel[channel.id]?.voucherToko ? state.promotions.perChannel[channel.id].voucherToko + '%' : ''; },
