@@ -13,6 +13,7 @@ export default async function handler(req, res) {
         const { amount, externalId, payerEmail, description } = req.body;
 
         const invoice = await xendit.Invoice.createInvoice({
+            forUser: '689f5756ae4401d27a0c8d54',
             externalID: externalId,
             amount: amount,
             payerEmail: payerEmail,
