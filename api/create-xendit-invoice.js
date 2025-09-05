@@ -1,5 +1,6 @@
 const { Xendit } = require('xendit-node');
 
+// Inisialisasi Xendit akan membaca dari process.env, ini sudah benar.
 const xenditClient = new Xendit({
   secretKey: process.env.XENDIT_SECRET_KEY,
 });
@@ -10,17 +11,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { amount, externalId, payerEmail, description } = req.body;
+    // --- PERBAIKAN UTAMA ADA DI BARIS INI ---
+    // Mengambil data dengan nama yang benar (huruf kecil & garis bawah)
+    // agar cocok dengan yang dikirim dari app.vue
+    const { amount, external_id, payer_email, description } = req.body;
     
     const { Invoice } = xenditClient;
 
     const invoice = await Invoice.createInvoice({
       data: {
-        // --- PERBAIKAN ADA DI BARIS INI ---
-        external_id: externalId, // Diubah dari externalID menjadi external_id
-        // ------------------------------------
+        // Menggunakan variabel yang sudah benar di sini
+        external_id: external_id,
         amount: amount,
-        payerEmail: payerEmail,
+        payer_email: payer_email,
         description: description,
         successRedirectURL: `${req.headers.origin}/langganan?status=success`,
         failureRedirectURL: `${req.headers.origin}/langganan?status=failure`,
@@ -31,6 +34,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ invoice_url: invoice.invoiceUrl });
 
   } catch (error) {
+    // Mencatat error detail dari Xendit di log Vercel
     console.error('--- DETAIL ERROR DARI XENDIT ---');
     console.error(JSON.stringify(error, null, 2));
     

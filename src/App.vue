@@ -742,11 +742,12 @@ async function handleSubscriptionXendit(plan) {
         const response = await fetch('/api/create-xendit-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // HANYA MENGIRIM DATA YANG DIBUTUHKAN OLEH API
+            // --- BAGIAN INI TELAH DIPERBAIKI ---
+            // Menggunakan external_id dan payer_email (huruf kecil)
             body: JSON.stringify({
                 amount: priceToPay,
-                externalId: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
-                payerEmail: currentUser.value.email,
+                external_id: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
+                payer_email: currentUser.value.email,
                 description: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`
             }),
         });
@@ -754,7 +755,6 @@ async function handleSubscriptionXendit(plan) {
         const data = await response.json();
 
         if (!response.ok) {
-            // Menampilkan error yang lebih detail dari server
             let errorMessage = data.message || `Server Error: ${response.status}`;
             if(data.error_code) {
                 errorMessage += ` (Code: ${data.error_code})`;
@@ -775,6 +775,7 @@ async function handleSubscriptionXendit(plan) {
         isSubscribingPlan.value = false;
     }
 }
+
 
 const voucherTokoComputed = (channel) => computed({
     get() { return state.promotions.perChannel[channel.id]?.voucherToko ? state.promotions.perChannel[channel.id].voucherToko + '%' : ''; },
