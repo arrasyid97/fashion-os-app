@@ -722,7 +722,7 @@ async function findTransactionForReturn() {
     }
 }
 
-async function handleSubscriptionXendit(plan) {
+async function handleSubscriptionTripay(plan) {
     if (!currentUser.value) {
         alert("Silakan login terlebih dahulu.");
         return;
@@ -739,14 +739,13 @@ async function handleSubscriptionXendit(plan) {
     const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
 
     try {
-        const response = await fetch('/api/create-xendit-invoice', {
+        const response = await fetch('/api/create-tripay-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // Mengirim nama parameter yang persis sama dengan yang diharapkan oleh API
             body: JSON.stringify({
                 amount: priceToPay,
-                external_id: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
-                payer_email: currentUser.value.email,
+                externalId: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
+                payerEmail: currentUser.value.email,
                 description: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`
             }),
         });
@@ -754,21 +753,17 @@ async function handleSubscriptionXendit(plan) {
         const data = await response.json();
 
         if (!response.ok) {
-            let errorMessage = data.message || `Server Error: ${response.status}`;
-            if(data.error_code) {
-                errorMessage += ` (Code: ${data.error_code})`;
-            }
-            throw new Error(errorMessage);
+            throw new Error(data.message || `Server Error: ${response.status}`);
         }
 
-        if (data.invoice_url) {
-            window.location.href = data.invoice_url;
+        if (data.payment_url) {
+            window.location.href = data.payment_url;
         } else {
-            throw new Error('Gagal mendapatkan URL invoice dari server.');
+            throw new Error('Gagal mendapatkan URL pembayaran dari server.');
         }
 
     } catch (error) {
-        console.error("Gagal memproses langganan Xendit:", error);
+        console.error("Gagal memproses langganan Tripay:", error);
         alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
     } finally {
         isSubscribingPlan.value = false;
