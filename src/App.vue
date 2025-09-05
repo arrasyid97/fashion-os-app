@@ -723,65 +723,57 @@ async function findTransactionForReturn() {
 }
 
 async function handleSubscriptionXendit(plan) {
-    if (!currentUser.value) {
-        alert("Silakan login terlebih dahulu.");
-        return;
-    }
+    if (!currentUser.value) {
+        alert("Silakan login terlebih dahulu.");
+        return;
+    }
 
-    let isSubscribingPlan;
-    if (plan === 'bulanan') {
-        isSubscribingPlan = isSubscribingMonthly;
-    } else {
-        isSubscribingPlan = isSubscribingYearly;
-    }
+    let isSubscribingPlan = plan === 'bulanan' ? isSubscribingMonthly : isSubscribingYearly;
 
-    if (isSubscribingPlan.value) {
-        console.log("Pembayaran sedang diproses, mohon tunggu.");
-        return;
-    }
-    
-    isSubscribingPlan.value = true;
-    
-    const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
+    if (isSubscribingPlan.value) {
+        return;
+    }
+    
+    isSubscribingPlan.value = true;
+    
+    const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
 
-    try {
-        const response = await fetch('/api/create-xendit-invoice', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            // --- BAGIAN INI TELAH DIPERBAIKI ---
-            // Kita hanya mengirim data yang dibutuhkan oleh API
-            body: JSON.stringify({
-                amount: priceToPay,
-                externalId: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
-                payerEmail: currentUser.value.email,
-                description: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`
-            }),
-        });
+    try {
+        const response = await fetch('/api/create-xendit-invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // HANYA MENGIRIM DATA YANG DIBUTUHKAN OLEH API
+            body: JSON.stringify({
+                amount: priceToPay,
+                externalId: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
+                payerEmail: currentUser.value.email,
+                description: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`
+            }),
+        });
 
-        const data = await response.json();
+        const data = await response.json();
 
-        if (!response.ok) {
-            // --- PENANGANAN ERROR INI JUGA DIPERBAIKI ---
-            // Sekarang akan menampilkan pesan error yang lebih detail dari Xendit
-            let errorMessage = data.message || 'Terjadi kesalahan tidak diketahui';
-            if (data.errors && data.errors[0]) {
-                errorMessage += ` | Detail: ${data.errors[0].message}`;
-            }
-            throw new Error(errorMessage);
-        }
+        if (!response.ok) {
+            // Menampilkan error yang lebih detail dari server
+            let errorMessage = data.message || `Server Error: ${response.status}`;
+            if(data.error_code) {
+                errorMessage += ` (Code: ${data.error_code})`;
+            }
+            throw new Error(errorMessage);
+        }
 
-        if (data.invoice_url) {
-            window.location.href = data.invoice_url;
-        } else {
-            throw new Error('Gagal mendapatkan invoice URL dari server.');
-        }
+        if (data.invoice_url) {
+            window.location.href = data.invoice_url;
+        } else {
+            throw new Error('Gagal mendapatkan URL invoice dari server.');
+        }
 
-    } catch (error) {
-        console.error("Gagal memproses langganan Xendit:", error);
-        alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
-    } finally {
-        isSubscribingPlan.value = false;
-    }
+    } catch (error) {
+        console.error("Gagal memproses langganan Xendit:", error);
+        alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
+    } finally {
+        isSubscribingPlan.value = false;
+    }
 }
 
 const voucherTokoComputed = (channel) => computed({
