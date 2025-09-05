@@ -723,63 +723,65 @@ async function findTransactionForReturn() {
 }
 
 async function handleSubscriptionXendit(plan) {
-    if (!currentUser.value) {
-        alert("Silakan login terlebih dahulu.");
-        return;
-    }
+    if (!currentUser.value) {
+        alert("Silakan login terlebih dahulu.");
+        return;
+    }
 
-    let isSubscribingPlan;
-    if (plan === 'bulanan') {
-        isSubscribingPlan = isSubscribingMonthly;
-    } else {
-        isSubscribingPlan = isSubscribingYearly;
-    }
+    let isSubscribingPlan;
+    if (plan === 'bulanan') {
+        isSubscribingPlan = isSubscribingMonthly;
+    } else {
+        isSubscribingPlan = isSubscribingYearly;
+    }
 
-    if (isSubscribingPlan.value) {
-        console.log("Pembayaran sedang diproses, mohon tunggu.");
-        return;
-    }
-    
-    isSubscribingPlan.value = true;
-    
-    // Mengambil harga dari variabel yang sudah ada
-    const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
+    if (isSubscribingPlan.value) {
+        console.log("Pembayaran sedang diproses, mohon tunggu.");
+        return;
+    }
+    
+    isSubscribingPlan.value = true;
+    
+    const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
 
-    try {
-        // Panggil API Vercel untuk membuat invoice Xendit
-        const response = await fetch('/api/create-xendit-invoice', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                amount: priceToPay,
-                externalId: `${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
-                payerEmail: currentUser.value.email,
-                description: `Langganan ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'} untuk ${currentUser.value.email}`,
-                plan: plan,
-                userId: currentUser.value.uid,
-            }),
-        });
+    try {
+        const response = await fetch('/api/create-xendit-invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // --- BAGIAN INI TELAH DIPERBAIKI ---
+            // Kita hanya mengirim data yang dibutuhkan oleh API
+            body: JSON.stringify({
+                amount: priceToPay,
+                externalId: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
+                payerEmail: currentUser.value.email,
+                description: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`
+            }),
+        });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server responded with status ${response.status}: ${errorText}`);
-        }
+        const data = await response.json();
 
-        const data = await response.json();
+        if (!response.ok) {
+            // --- PENANGANAN ERROR INI JUGA DIPERBAIKI ---
+            // Sekarang akan menampilkan pesan error yang lebih detail dari Xendit
+            let errorMessage = data.message || 'Terjadi kesalahan tidak diketahui';
+            if (data.errors && data.errors[0]) {
+                errorMessage += ` | Detail: ${data.errors[0].message}`;
+            }
+            throw new Error(errorMessage);
+        }
 
-        // Xendit mengembalikan URL invoice untuk redirect
-        if (data.invoice_url) {
-            window.location.href = data.invoice_url;
-        } else {
-            throw new Error(data.message || 'Gagal mendapatkan invoice URL.');
-        }
-    } catch (error) {
-        console.error("Gagal memproses langganan Xendit:", error);
-        alert(`Gagal memproses langganan. Silakan coba lagi. Error: ${error.message}`);
-    } finally {
-        if (plan === 'bulanan') isSubscribingMonthly.value = false;
-        else isSubscribingYearly.value = false;
-    }
+        if (data.invoice_url) {
+            window.location.href = data.invoice_url;
+        } else {
+            throw new Error('Gagal mendapatkan invoice URL dari server.');
+        }
+
+    } catch (error) {
+        console.error("Gagal memproses langganan Xendit:", error);
+        alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
+    } finally {
+        isSubscribingPlan.value = false;
+    }
 }
 
 const voucherTokoComputed = (channel) => computed({
