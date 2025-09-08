@@ -20,7 +20,7 @@ export default async function handler(req, res) {
         name: description,
       }],
       return_url: `${req.headers.origin}/langganan?status=success`,
-      expired_time: Date.now() + (24 * 60 * 60 * 1000),
+      expired_time: Math.round((Date.now() / 1000) + (24 * 60 * 60)), // <-- PERBAIKAN DI SINI, waktu dalam detik
       signature: crypto.createHmac('sha256', process.env.TRIPAY_PRIVATE_KEY)
                         .update(process.env.TRIPAY_MERCHANT_CODE + externalId + String(amount))
                         .digest('hex')
