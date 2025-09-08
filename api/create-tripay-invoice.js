@@ -22,11 +22,11 @@ export default async function handler(req, res) {
       return_url: `${req.headers.origin}/langganan?status=success`,
       expired_time: Date.now() + (24 * 60 * 60 * 1000),
       signature: crypto.createHmac('sha256', process.env.TRIPAY_PRIVATE_KEY)
-                        .update(process.env.TRIPAY_MERCHANT_CODE + externalId + amount)
+                        .update(process.env.TRIPAY_MERCHANT_CODE + externalId + String(amount))
                         .digest('hex')
     };
 
-    const response = await fetch('https://tripay.co.id/api-sandbox/transaction/create', {
+    const response = await fetch('https://tripay.co.id/api-sandbox/transaction/create', { // <-- PERBAIKAN DI SINI
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + process.env.TRIPAY_API_KEY,
