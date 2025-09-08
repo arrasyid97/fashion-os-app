@@ -1,5 +1,4 @@
 <script setup>
-/* eslint-disable */ // <-- GUNAKAN BARIS INI
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
@@ -29,7 +28,7 @@ import { 
 // --- STATE MANAGEMENT ---
 const activePage = ref('dashboard');
 const isLoading = ref(true);
-const isSaving = ref(false); // Untuk tombol simpan umumm
+const isSaving = ref(false); // Untuk tombol simpan umum
 const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengaturan
 // Hapus baris 'const isSubscribing = ref(false);' yang lama
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
@@ -41,7 +40,7 @@ const dashboardPinInput = ref('');
 const dashboardPinError = ref('');
 const ADMIN_UID = '6m4bgRlZMDhL8niVyD4lZmGuarF3'; 
 
-// Propertii ini akan otomatis bernilai 'true' jika yang login adalah Anda (Admin)
+// Properti ini akan otomatis bernilai 'true' jika yang login adalah Anda (Admin)
 const isAdmin = computed(() => {
   return currentUser.value && currentUser.value.uid === ADMIN_UID;
 });
@@ -52,7 +51,7 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
-// Fungsii untuk mengambil daftar semua pengguna (hanya untuk Admin)
+// Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
     if (!isAdmin.value) return; // Hanya jalankan jika admin
     try {
@@ -113,7 +112,7 @@ function showInvestorPaymentDetail(p) {
     showModal('laporanBagiHasilDetail', reportResult);
 }
 
-// FUNGSII BARU UNTUK MENGHAPUS RIWAYAT PEMBAYARAN
+// FUNGSI BARU UNTUK MENGHAPUS RIWAYAT PEMBAYARAN
 async function deleteInvestorPayment(paymentId) {
     if (!confirm("Anda yakin ingin menghapus riwayat pembayaran ini? Aksi ini tidak dapat dibatalkan.")) {
         return;
@@ -210,7 +209,7 @@ async function toggleInvestorStatus(investor) {
     }
 }
 
-// Fungsii untuk mengekspor semua data milik satu pengguna
+// Fungsi untuk mengekspor semua data milik satu pengguna
 async function exportAllDataForUser(userId, userEmail, filterType, startDateStr, endDateStr, startMonth, endMonth, startYear, endYear) {
     if (!isAdmin.value) return;
     if (!userId) {
@@ -722,51 +721,135 @@ async function findTransactionForReturn() {
     }
 }
 
-async function handleSubscriptionTripay(plan) {
+async function handleSubscriptionMidtrans(plan) {
     if (!currentUser.value) {
         alert("Silakan login terlebih dahulu.");
         return;
     }
 
-    let isSubscribingPlan = plan === 'bulanan' ? isSubscribingMonthly : isSubscribingYearly;
+    let isSubscribingPlan;
+    if (plan === 'bulanan') {
+        isSubscribingPlan = isSubscribingMonthly;
+    } else {
+        isSubscribingPlan = isSubscribingYearly;
+    }
 
     if (isSubscribingPlan.value) {
+        console.log("Pembayaran sedang diproses, mohon tunggu.");
         return;
     }
     
     isSubscribingPlan.value = true;
-    
+
+    // --- PERBAIKAN DI SINI ---
+    // Gunakan variabel harga yang sudah kita deklarasikan
     const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
 
+    const transactionDetails = {
+        order_id: `${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
+        gross_amount: priceToPay, // <-- Gunakan variabel di sini
+    };
+    const customerDetails = {
+        first_name: currentUser.value.displayName || 'Pelanggan',
+        email: currentUser.value.email,
+    };
+    const itemDetails = [{
+        id: `plan-${plan}`,
+        price: priceToPay, // <-- Gunakan variabel di sini
+        quantity: 1,
+        name: `Langganan ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
+    }];
+    // --- AKHIR PERBAIKAN ---
+
     try {
-        const response = await fetch('/api/create-tripay-invoice', {
+        const response = await fetch('/api/create-midtrans-snap', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                amount: priceToPay,
-                externalId: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
-                payerEmail: currentUser.value.email,
-                description: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`
+                transaction_details: transactionDetails,
+                customer_details: customerDetails,
+                item_details: itemDetails,
             }),
         });
 
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+        }
+
         const data = await response.json();
 
-        if (!response.ok) {
-            throw new Error(data.message || `Server Error: ${response.status}`);
-        }
+        if (data.snapToken) {
+            window.snap.pay(data.snapToken, {
+                onSuccess: async function(result) {
+                    console.log('Payment success:', result);
+                    alert("Pembayaran Berhasil! Langganan Anda akan segera aktif.");
 
-        if (data.payment_url) {
-            window.location.href = data.payment_url;
+                    const now = new Date();
+                    const endDate = plan === 'bulanan'
+                        ? new Date(now.setMonth(now.getMonth() + 1))
+                        : new Date(now.setFullYear(now.getFullYear() + 1));
+                    
+                    currentUser.value.userData = {
+                        ...currentUser.value.userData,
+                        subscriptionStatus: 'active',
+                        subscriptionEndDate: endDate,
+                    };
+
+                    try {
+                        const updateResponse = await fetch('/api/update-subscription', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: currentUser.value.uid,
+                                plan: plan,
+                                paymentStatus: 'active',
+                            }),
+                        });
+                        if (updateResponse.ok) {
+                            console.log('Status langganan berhasil diperbarui di database.');
+                            await loadAllDataFromFirebase();
+                            activePage.value = 'dashboard';
+                        } else {
+                            const errorData = await updateResponse.json();
+                            console.error('Gagal memperbarui status langganan:', errorData);
+                            alert('Pembayaran berhasil, tetapi gagal memperbarui status di database. Silakan hubungi admin.');
+                        }
+                    } catch (error) {
+                        console.error('Error saat memanggil API update-subscription:', error);
+                        alert('Terjadi kesalahan. Silakan hubungi admin.');
+                    } finally {
+                        if (plan === 'bulanan') isSubscribingMonthly.value = false;
+                        else isSubscribingYearly.value = false;
+                    }
+                },
+                onPending: function(result) {
+                    console.log('Payment pending:', result);
+                    alert("Pembayaran Anda menunggu konfirmasi. Silakan selesaikan pembayaran.");
+                    if (plan === 'bulanan') isSubscribingMonthly.value = false;
+                    else isSubscribingYearly.value = false;
+                },
+                onError: function(result) {
+                    console.log('Payment error:', result);
+                    alert("Pembayaran gagal. Silakan coba lagi.");
+                    if (plan === 'bulanan') isSubscribingMonthly.value = false;
+                    else isSubscribingYearly.value = false;
+                },
+                onClose: function() {
+                    console.log('Pop-up pembayaran ditutup.');
+                    if (plan === 'bulanan') isSubscribingMonthly.value = false;
+                    else isSubscribingYearly.value = false;
+                }
+            });
         } else {
-            throw new Error('Gagal mendapatkan URL pembayaran dari server.');
+            throw new Error(data.message || 'Gagal mendapatkan snapToken.');
         }
-
     } catch (error) {
-        console.error("Gagal memproses langganan Tripay:", error);
-        alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
+        console.error("Gagal memproses langganan Midtrans:", error);
+        alert(`Gagal memproses langganan. Silakan coba lagi. Error: ${error.message}`);
     } finally {
-        isSubscribingPlan.value = false;
+        if (plan === 'bulanan') isSubscribingMonthly.value = false;
+        else isSubscribingYearly.value = false;
     }
 }
 
@@ -3944,8 +4027,8 @@ function handleReturPageSearch() {
     const lowerQuery = query.toLowerCase();
     const recommendations = new Set();
     
-    // Carii berdasarkan SKU, Nama, Alasan dari data retur yang sudah ada
-    // Perbaikann untuk memastikan tidak error saat ada data kosong
+    // Cari berdasarkan SKU, Nama, Alasan dari data retur yang sudah ada
+    // Perbaikan untuk memastikan tidak error saat ada data kosong
     state.retur.forEach(item => {
         // Karena data retur sekarang bisa memiliki banyak item di dalam array 'items'
         // Kita perlu meloop di dalamnya juga
@@ -4840,15 +4923,74 @@ async function loadAllDataFromFirebase() {
 }
 
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
-onMounted(async () => {
-    isLoading.value = true;
-    currentUser.value = {
-        uid: ADMIN_UID,
-        email: "verifikasi@fashionos.app"
-    };
-    // await loadAllDataFromFirebase(); // Diberi komentar atau dihapus
-    changePage('dashboard');
-    isLoading.value = false;
+onMounted(() => {
+    // Panggil listener onAuthStateChanged saat komponen dimuat
+    onAuthStateChanged(auth, async (user) => {
+        isLoading.value = true;
+
+        if (user) {
+            // Jika pengguna login, muat data pengguna dan listener real-time
+            currentUser.value = user;
+
+            try {
+                const userDocRef = doc(db, "users", user.uid);
+
+                // Hentikan listener sebelumnya jika ada, untuk menghindari duplikasi
+                if (onSnapshotListener) {
+                    onSnapshotListener();
+                }
+
+                // BUAT LISTENER REAL-TIME untuk dokumen pengguna
+                onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
+                    if (userDocSnap.exists()) {
+                        const userData = userDocSnap.data();
+                        currentUser.value.userData = userData;
+                        state.settings.dashboardPin = userData.dashboardPin || '';
+
+                        const now = new Date();
+                        const endDate = userData.subscriptionEndDate?.toDate();
+                        const trialDate = userData.trialEndDate?.toDate();
+
+                        const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+                                                    (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+
+                        if (isSubscriptionValid) {
+                            // PENTING: Muat semua data lain setelah memastikan langganan valid
+                            await loadAllDataFromFirebase();
+                            const storedPage = localStorage.getItem('lastActivePage');
+                            
+                            // [PERBAIKAN KUNCI ADA DI SINI]
+                            // Kita tidak lagi mengatur activePage.value secara langsung.
+                            // Kita memanggil changePage() agar semua logika kunci ikut berjalan.
+                            const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                            changePage(pageToLoad);
+
+                        } else {
+                            activePage.value = 'langganan';
+                        }
+                    } else {
+                        console.error("Data user tidak ditemukan di Firestore. Mengarahkan ke logout.");
+                        handleLogout();
+                    }
+                    isLoading.value = false;
+                });
+            } catch (error) {
+                console.error("Gagal memuat data user:", error);
+                alert("Gagal memuat data user. Silakan coba lagi.");
+                isLoading.value = false;
+                handleLogout();
+            }
+        } else {
+            // Logika logout
+            if (onSnapshotListener) {
+                onSnapshotListener();
+                onSnapshotListener = null;
+            }
+            currentUser.value = null;
+            activePage.value = 'login';
+            isLoading.value = false;
+        }
+    });
 });
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
@@ -4858,9 +5000,67 @@ watch(activePage, (newPage) => {
 </script>
 
 <template>
-    
+    <div v-if="!currentUser && !isLoading" class="flex items-center justify-center h-screen bg-slate-100 p-4">
+    <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8 sm:p-12 space-y-8 animate-fade-in">
+        <div class="text-center">
+            <h2 class="text-4xl font-extrabold text-slate-800">Selamat Datang di</h2>
+            <p class="mt-2 text-2xl font-bold text-indigo-600">{{ state.settings.brandName }}</p>
+        </div>
+
+        <div class="space-y-4">
+            <button type="button" @click="signInWithGoogle" class="w-full flex items-center justify-center py-3.5 px-4 rounded-xl shadow-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
+                <img src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="Google" class="w-6 h-6 mr-3">
+                Login dengan Google
+            </button>
+        </div>
+
+        <div class="relative py-4">
+            <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-slate-300"></div>
+            </div>
+            <div class="relative flex justify-center text-sm text-slate-500">
+                <span class="bg-white px-2">Atau</span>
+            </div>
+        </div>
+
+        <form @submit.prevent="activePage === 'login' ? handleLogin() : handleRegister()" class="space-y-6">
+            <div>
+                <label for="email" class="block text-sm font-medium text-slate-700">Alamat Email</label>
+                <input type="email" v-model="authForm.email" id="email" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-slate-700 mt-4">Password</label>
+                <input type="password" v-model="authForm.password" id="password" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+            </div>
+            
+            <div v-if="activePage === 'register'">
+                <label for="activation-code" class="block text-sm font-medium text-slate-700 mt-4">Kode Aktivasi (Opsional)</label>
+                <input type="text" v-model="authForm.activationCode" id="activation-code" class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                <p class="mt-2 text-xs text-slate-500">Masukkan kode aktivasi untuk mendapatkan langganan premium.</p>
+            </div>
+
+            <div v-if="authForm.error" class="p-3 mt-4 text-sm text-red-700 bg-red-100 rounded-md border border-red-300">
+                {{ authForm.error }}
+            </div>
+            <div id="recaptcha-container"></div>
+            
+            <div class="mt-6 space-y-3">
+                <button type="submit" class="w-full py-3.5 rounded-xl shadow-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 transition-colors">
+                    <span v-if="activePage === 'login'">Login</span>
+                    <span v-else>Daftar Akun Baru</span>
+                </button>
+                <p class="text-center text-sm text-slate-600">
+                    <button type="button" @click="changePage(activePage === 'login' ? 'register' : 'login')" class="text-indigo-600 hover:underline transition-colors">
+                        <span v-if="activePage === 'login'">Belum Punya Akun? Daftar</span>
+                        <span v-else>Sudah Punya Akun? Login</span>
+                    </button>
+                </p>
+            </div>
+        </form>
+    </div>
+</div>
         
-  <div v-if="currentUser && !isLoading">
+  <div v-if="currentUser">
     <div class="flex h-screen bg-slate-100">
       <!-- Sidebar -->
       <aside class="w-64 bg-gray-900 text-gray-300 flex-shrink-0 hidden md:flex md:flex-col">
@@ -6980,7 +7180,7 @@ watch(activePage, (newPage) => {
                         <li>✔️ Update berkala</li>
                     </ul>
                 </div>
-                <button @click="handleSubscriptionTripay('bulanan')"
+                <button @click="handleSubscriptionMidtrans('bulanan')"
                         :disabled="isSubscribingMonthly"
                         class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed">
                     <span v-if="isSubscribingMonthly">Memproses...</span>
@@ -7001,7 +7201,7 @@ watch(activePage, (newPage) => {
                         <li>💰 <span class="font-semibold">Diskon 2 bulan!</span></li>
                     </ul>
                 </div>
-                <button @click="handleSubscriptionTripay('tahunan')"
+                <button @click="handleSubscriptionMidtrans('tahunan')"
                         :disabled="isSubscribingYearly"
                         class="mt-8 w-full bg-slate-800 text-white font-bold py-3 px-8 rounded-lg hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed">
                     <span v-if="isSubscribingYearly">Memproses...</span>
