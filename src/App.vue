@@ -721,135 +721,51 @@ async function findTransactionForReturn() {
     }
 }
 
-async function handleSubscriptionMidtrans(plan) {
+async function handleSubscriptionTripay(plan) {
     if (!currentUser.value) {
         alert("Silakan login terlebih dahulu.");
         return;
     }
 
-    let isSubscribingPlan;
-    if (plan === 'bulanan') {
-        isSubscribingPlan = isSubscribingMonthly;
-    } else {
-        isSubscribingPlan = isSubscribingYearly;
-    }
+    let isSubscribingPlan = plan === 'bulanan' ? isSubscribingMonthly : isSubscribingYearly;
 
     if (isSubscribingPlan.value) {
-        console.log("Pembayaran sedang diproses, mohon tunggu.");
         return;
     }
     
     isSubscribingPlan.value = true;
-
-    // --- PERBAIKAN DI SINI ---
-    // Gunakan variabel harga yang sudah kita deklarasikan
+    
     const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
 
-    const transactionDetails = {
-        order_id: `${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
-        gross_amount: priceToPay, // <-- Gunakan variabel di sini
-    };
-    const customerDetails = {
-        first_name: currentUser.value.displayName || 'Pelanggan',
-        email: currentUser.value.email,
-    };
-    const itemDetails = [{
-        id: `plan-${plan}`,
-        price: priceToPay, // <-- Gunakan variabel di sini
-        quantity: 1,
-        name: `Langganan ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
-    }];
-    // --- AKHIR PERBAIKAN ---
-
     try {
-        const response = await fetch('/api/create-midtrans-snap', {
+        const response = await fetch('/api/create-tripay-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                transaction_details: transactionDetails,
-                customer_details: customerDetails,
-                item_details: itemDetails,
+                amount: priceToPay,
+                externalId: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
+                payerEmail: currentUser.value.email,
+                description: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`
             }),
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server responded with status ${response.status}: ${errorText}`);
-        }
-
         const data = await response.json();
 
-        if (data.snapToken) {
-            window.snap.pay(data.snapToken, {
-                onSuccess: async function(result) {
-                    console.log('Payment success:', result);
-                    alert("Pembayaran Berhasil! Langganan Anda akan segera aktif.");
-
-                    const now = new Date();
-                    const endDate = plan === 'bulanan'
-                        ? new Date(now.setMonth(now.getMonth() + 1))
-                        : new Date(now.setFullYear(now.getFullYear() + 1));
-                    
-                    currentUser.value.userData = {
-                        ...currentUser.value.userData,
-                        subscriptionStatus: 'active',
-                        subscriptionEndDate: endDate,
-                    };
-
-                    try {
-                        const updateResponse = await fetch('/api/update-subscription', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: currentUser.value.uid,
-                                plan: plan,
-                                paymentStatus: 'active',
-                            }),
-                        });
-                        if (updateResponse.ok) {
-                            console.log('Status langganan berhasil diperbarui di database.');
-                            await loadAllDataFromFirebase();
-                            activePage.value = 'dashboard';
-                        } else {
-                            const errorData = await updateResponse.json();
-                            console.error('Gagal memperbarui status langganan:', errorData);
-                            alert('Pembayaran berhasil, tetapi gagal memperbarui status di database. Silakan hubungi admin.');
-                        }
-                    } catch (error) {
-                        console.error('Error saat memanggil API update-subscription:', error);
-                        alert('Terjadi kesalahan. Silakan hubungi admin.');
-                    } finally {
-                        if (plan === 'bulanan') isSubscribingMonthly.value = false;
-                        else isSubscribingYearly.value = false;
-                    }
-                },
-                onPending: function(result) {
-                    console.log('Payment pending:', result);
-                    alert("Pembayaran Anda menunggu konfirmasi. Silakan selesaikan pembayaran.");
-                    if (plan === 'bulanan') isSubscribingMonthly.value = false;
-                    else isSubscribingYearly.value = false;
-                },
-                onError: function(result) {
-                    console.log('Payment error:', result);
-                    alert("Pembayaran gagal. Silakan coba lagi.");
-                    if (plan === 'bulanan') isSubscribingMonthly.value = false;
-                    else isSubscribingYearly.value = false;
-                },
-                onClose: function() {
-                    console.log('Pop-up pembayaran ditutup.');
-                    if (plan === 'bulanan') isSubscribingMonthly.value = false;
-                    else isSubscribingYearly.value = false;
-                }
-            });
-        } else {
-            throw new Error(data.message || 'Gagal mendapatkan snapToken.');
+        if (!response.ok) {
+            throw new Error(data.message || `Server Error: ${response.status}`);
         }
+
+        if (data.payment_url) {
+            window.location.href = data.payment_url;
+        } else {
+            throw new Error('Gagal mendapatkan URL pembayaran dari server.');
+        }
+
     } catch (error) {
-        console.error("Gagal memproses langganan Midtrans:", error);
-        alert(`Gagal memproses langganan. Silakan coba lagi. Error: ${error.message}`);
+        console.error("Gagal memproses langganan Tripay:", error);
+        alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
     } finally {
-        if (plan === 'bulanan') isSubscribingMonthly.value = false;
-        else isSubscribingYearly.value = false;
+        isSubscribingPlan.value = false;
     }
 }
 
