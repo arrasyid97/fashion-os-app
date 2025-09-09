@@ -1007,7 +1007,7 @@ async function handleLogin() {
         alert('Selamat datang kembali!');
         
         // Panggil fungsi pemuatan dan navigasi utama di sini
-        await handleAuth(user);
+        
 
     } catch (error) {
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
