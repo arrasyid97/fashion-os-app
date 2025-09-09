@@ -878,43 +878,6 @@ const commissionModelComputed = (modelName, channelId) => computed({
     }
 });
 
-async function handleAuth(user) {
-    currentUser.value = user;
-
-    try {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            currentUser.value.userData = userData;
-            state.settings.dashboardPin = userData.dashboardPin || '';
-
-            const now = new Date();
-            const endDate = userData.subscriptionEndDate?.toDate();
-            const trialDate = userData.trialEndDate?.toDate();
-
-            const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                         (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-
-            if (isSubscriptionValid) {
-                await loadAllDataFromFirebase();
-                const storedPage = localStorage.getItem('lastActivePage');
-                activePage.value = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-            } else {
-                activePage.value = 'langganan';
-            }
-        } else {
-            console.error("Data user tidak ditemukan di Firestore. Mengarahkan ke logout.");
-            handleLogout();
-        }
-    } catch (error) {
-        console.error("Gagal memuat data user:", error);
-        alert("Gagal memuat data user. Silakan coba lagi.");
-        handleLogout();
-    }
-}
-
 
 async function addCategory() {
     if (!currentUser.value) return alert("Anda harus login.");
@@ -4919,68 +4882,59 @@ async function loadAllDataFromFirebase() {
 
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
-    // Panggil listener onAuthStateChanged saat komponen dimuat
-    onAuthStateChanged(auth, async (user) => {
+    // Listener ini akan memantau status login/logout pengguna
+    onAuthStateChanged(auth, (user) => {
         isLoading.value = true;
 
+        // Hentikan listener data real-time sebelumnya jika ada (misalnya saat logout)
+        if (onSnapshotListener) {
+            onSnapshotListener();
+            onSnapshotListener = null;
+        }
+
         if (user) {
-            // Jika pengguna login, muat data pengguna dan listener real-time
+            // Jika PENGGUNA LOGIN
             currentUser.value = user;
+            const userDocRef = doc(db, "users", user.uid);
 
-            try {
-                const userDocRef = doc(db, "users", user.uid);
+            // Buat listener real-time BARU untuk data pengguna ini
+            onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
+                if (userDocSnap.exists()) {
+                    const userData = userDocSnap.data();
+                    currentUser.value.userData = userData;
+                    state.settings.dashboardPin = userData.dashboardPin || '';
 
-                // Hentikan listener sebelumnya jika ada, untuk menghindari duplikasi
-                if (onSnapshotListener) {
-                    onSnapshotListener();
-                }
+                    const now = new Date();
+                    const endDate = userData.subscriptionEndDate?.toDate();
+                    const trialDate = userData.trialEndDate?.toDate();
 
-                // BUAT LISTENER REAL-TIME untuk dokumen pengguna
-                onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
-                    if (userDocSnap.exists()) {
-                        const userData = userDocSnap.data();
-                        currentUser.value.userData = userData;
-                        state.settings.dashboardPin = userData.dashboardPin || '';
+                    const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                        const now = new Date();
-                        const endDate = userData.subscriptionEndDate?.toDate();
-                        const trialDate = userData.trialEndDate?.toDate();
-
-                        const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                                    (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-
-                        if (isSubscriptionValid) {
-                            // PENTING: Muat semua data lain setelah memastikan langganan valid
-                            await loadAllDataFromFirebase();
-                            const storedPage = localStorage.getItem('lastActivePage');
-                            
-                            // [PERBAIKAN KUNCI ADA DI SINI]
-                            // Kita tidak lagi mengatur activePage.value secara langsung.
-                            // Kita memanggil changePage() agar semua logika kunci ikut berjalan.
-                            const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                            changePage(pageToLoad);
-
-                        } else {
-                            activePage.value = 'langganan';
-                        }
+                    if (isSubscriptionValid) {
+                        // Jika langganan valid, muat semua data bisnis
+                        await loadAllDataFromFirebase();
+                        const storedPage = localStorage.getItem('lastActivePage');
+                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                        changePage(pageToLoad);
                     } else {
-                        console.error("Data user tidak ditemukan di Firestore. Mengarahkan ke logout.");
-                        handleLogout();
+                        // Jika langganan tidak valid, paksa ke halaman langganan
+                        activePage.value = 'langganan';
                     }
-                    isLoading.value = false;
-                });
-            } catch (error) {
-                console.error("Gagal memuat data user:", error);
-                alert("Gagal memuat data user. Silakan coba lagi.");
+                } else {
+                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
+                    handleLogout();
+                }
+                isLoading.value = false;
+            }, (error) => {
+                console.error("Gagal mendengarkan data pengguna:", error);
+                alert("Gagal memuat data pengguna. Silakan coba lagi.");
                 isLoading.value = false;
                 handleLogout();
-            }
+            });
+
         } else {
-            // Logika logout
-            if (onSnapshotListener) {
-                onSnapshotListener();
-                onSnapshotListener = null;
-            }
+            // Jika PENGGUNA LOGOUT
             currentUser.value = null;
             activePage.value = 'login';
             isLoading.value = false;
