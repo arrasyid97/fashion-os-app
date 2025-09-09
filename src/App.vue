@@ -1391,22 +1391,29 @@ let salesChannelChart = null;
 
 // --- UTILITY FUNCTIONS ---
 const formatCurrency = (value) => {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0, // <-- DIUBAH MENJADI 1
-        maximumFractionDigits: 1, // <-- DIUBAH MENJADI 1
-    }).format(value || 0);
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0, // Tidak ada angka di belakang koma
+        maximumFractionDigits: 0, // Angka akan dibulatkan
+    }).format(value || 0);
 };
 
 const targetMarginComputed = computed({
     get() {
-        // Tampilkan nilai dengan simbol % di input
-        return uiState.priceCalculator.targetMargin ? uiState.priceCalculator.targetMargin + '%' : '';
+        if (uiState.priceCalculator.targetMargin) {
+            // Menampilkan kembali dengan koma jika ada
+            return uiState.priceCalculator.targetMargin.toString().replace('.', ',') + '%';
+        }
+        return '';
     },
     set(newValue) {
-        // Hapus simbol % dan pastikan nilai yang disimpan adalah angka
-        const parsedValue = parseInt(newValue.replace(/[^0-9]/g, '')) || 0;
+        // Mengizinkan koma sebagai input desimal dan mengubahnya menjadi titik
+        const jsNumberString = newValue.toString().replace(/,/g, '.');
+        // Membersihkan karakter selain angka dan titik
+        const cleanedValue = jsNumberString.replace(/[^0-9.]/g, '');
+        // Menggunakan parseFloat untuk membaca angka desimal
+        const parsedValue = parseFloat(cleanedValue) || 0;
         uiState.priceCalculator.targetMargin = parsedValue;
     }
 });
