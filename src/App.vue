@@ -2555,7 +2555,7 @@ function showModal(type, data = {}) {
              uiState.modalData = JSON.parse(JSON.stringify(data));
         }
 
-        // Logika khusus untuk modal tertentu
+        // Logika khususs untuk modal tertentu
         if (type === 'editMarketplace' && data) {
             if (!uiState.modalData.programs) {
                 uiState.modalData.programs = [];
