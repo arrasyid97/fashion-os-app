@@ -764,7 +764,10 @@ async function handleSubscriptionTripay(plan) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 amount: priceToPay,
-                externalId: `FASHIONOS-${currentUser.value.uid.substring(0, 8)}-${Date.now()}`,
+                // --- [PERBAIKAN KUNCI DI SINI] ---
+                // Hapus .substring(0, 8) untuk mengirim ID pengguna yang lengkap
+                externalId: `FASHIONOS-${currentUser.value.uid}-${Date.now()}`,
+                // ---------------------------------
                 payerEmail: currentUser.value.email,
                 description: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`
             }),
