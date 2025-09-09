@@ -563,30 +563,24 @@ function handleBulkManualSearch() {
 
 // FUNGSI INTI UNTUK MENAMBAHKAN PRODUK KE ANTRIAN SEMENTARA
 function addProductToBulkQueue(product) {
-    if (!uiState.activeCartChannel) return alert("Pilih Channel Penjualan dulu.");
-    
-    // Cari pesanan yang sedang aktif di antrian (yang belum punya ID Resi)
-    let currentOrder = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
-    if (!currentOrder) {
-        currentOrder = {
-            id: `TEMP-${Date.now()}`,
-            marketplaceOrderId: 'MENUNGGU RESI...',
-            items: [],
-            status: 'Sedang Diisi'
-        };
-        uiState.bulk_order_queue.unshift(currentOrder);
-    }
+    if (!uiState.activeCartChannel) return alert("Pilih Channel Penjualan dulu.");
+    
+// ... existing code ...
+    const specialPrice = state.specialPrices[uiState.activeCartChannel]?.[product.sku];
+    const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? 0;
+    const finalPrice = specialPrice !== undefined ? specialPrice : regularPrice;
 
-    const specialPrice = state.specialPrices[uiState.activeCartChannel]?.[product.sku];
-    const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? 0;
-    const finalPrice = specialPrice !== undefined ? specialPrice : regularPrice;
+    // --- LOGIKA KOMISI BARU ---
+    const commissionRate = product.commissions?.[uiState.activeCartChannel] || 0;
 
-    const existingItem = currentOrder.items.find(item => item.sku === product.sku);
-    if (existingItem) {
-        existingItem.qty++;
-    } else {
-        currentOrder.items.push({ ...product, qty: 1, hargaJualAktual: finalPrice });
-    }
+    const existingItem = currentOrder.items.find(item => item.sku === product.sku);
+    if (existingItem) {
+        existingItem.qty++;
+        existingItem.commissionRate = commissionRate; // Pastikan komisi juga di-update
+    } else {
+        // Tambahkan commissionRate ke objek item antrian
+        currentOrder.items.push({ ...product, qty: 1, hargaJualAktual: finalPrice, commissionRate: commissionRate });
+    }
 }
 
 // FUNGSI SAAT MENG-KLIK REKOMENDASI MANUAL
@@ -625,65 +619,82 @@ function deleteQueuedOrder(index) {
 
 // FUNGSI FINAL UNTUK MEMPROSES SEMUA PESANAN DI ANTRIAN
 async function processBatchOrders() {
-    const ordersToProcess = uiState.bulk_order_queue;
-    if (ordersToProcess.length === 0) {
-        return alert("Tidak ada pesanan di antrian untuk diproses.");
-    }
-    if (!confirm(`Anda akan memproses ${ordersToProcess.length} pesanan... Lanjutkan?`)) return;
+    const ordersToProcess = uiState.bulk_order_queue;
+    if (ordersToProcess.length === 0) {
+        return alert("Tidak ada pesanan di antrian untuk diproses.");
+    }
+    if (!confirm(`Anda akan memproses ${ordersToProcess.length} pesanan... Lanjutkan?`)) return;
 
-    uiState.is_processing_scan = true;
-    const marketplace = getMarketplaceById(uiState.activeCartChannel);
-    let successCount = 0;
+    uiState.is_processing_scan = true;
+    const marketplace = getMarketplaceById(uiState.activeCartChannel);
+    let successCount = 0;
 
-    const batch = writeBatch(db);
-    try {
-        for (const order of ordersToProcess) {
-            const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
-            const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
-            const finalTotal = subtotal - discount.totalDiscount;
+    const batch = writeBatch(db);
+    try {
+        for (const order of ordersToProcess) {
+            const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
+            const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
+            const finalTotal = subtotal - discount.totalDiscount;
 
-            let totalBiaya = 0;
-            const biayaList = [];
-            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
-            if (marketplace.komisi > 0) { const val = (marketplace.komisi / 100) * finalTotal; biayaList.push({ name: 'Komisi', value: val }); totalBiaya += val; }
-            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
-            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
-            if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
-
-            const newTransactionData = {
-                marketplaceOrderId: order.marketplaceOrderId,
-                tanggal: new Date(),
-                items: order.items.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
-                subtotal, discount, total: finalTotal, channel: marketplace.name, channelId: uiState.activeCartChannel,
-                biaya: { rincian: biayaList, total: totalBiaya },
-                userId: currentUser.value.uid
-            };
-
-            const transactionRef = doc(collection(db, "transactions"));
-            batch.set(transactionRef, newTransactionData);
+            let totalBiaya = 0;
+            const biayaList = [];
             
+            // --- AWAL PERUBAHAN ---
+            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
+            // Baris marketplace.komisi yang lama sudah dihapus
+
+            // Menghitung total komisi dari setiap item di dalam pesanan antrian
+            let totalKomisi = 0;
             for (const item of order.items) {
-                // ▼▼▼ PERBAIKAN DI SINI: Gunakan item.docId, bukan item.sku ▼▼▼
-                const productRef = doc(db, "products", item.docId);
-                const productInState = state.produk.find(p => p.docId === item.docId);
-                const newStock = (productInState.stokFisik || 0) - item.qty;
-                if (newStock < 0) throw new Error(`Stok untuk ${item.sku} tidak cukup!`);
-                batch.update(productRef, { physical_stock: newStock });
+                if (item.commissionRate && item.commissionRate > 0) {
+                    // Komisi dihitung dari harga jual aktual item dikali kuantitasnya
+                    totalKomisi += (item.commissionRate / 100) * (item.hargaJualAktual * item.qty);
+                }
             }
-            successCount++;
-        }
-        
-        await batch.commit();
+            // Jika ada total komisi, tambahkan ke daftar biaya
+            if (totalKomisi > 0) {
+                biayaList.push({ name: 'Komisi Produk', value: totalKomisi });
+                totalBiaya += totalKomisi;
+            }
 
-        await loadAllDataFromFirebase();
-        alert(`Proses Selesai! ${successCount} pesanan berhasil diproses.`);
-        uiState.bulk_order_queue = [];
+            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
+            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
+            if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
+            // --- AKHIR PERUBAHAN ---
 
-    } catch (error) {
-        alert(`Terjadi kesalahan: ${error.message}. Tidak ada pesanan yang diproses.`);
-    } finally {
-        uiState.is_processing_scan = false;
-    }
+            const newTransactionData = {
+                marketplaceOrderId: order.marketplaceOrderId,
+                tanggal: new Date(),
+                items: order.items.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
+                subtotal, discount, total: finalTotal, channel: marketplace.name, channelId: uiState.activeCartChannel,
+                biaya: { rincian: biayaList, total: totalBiaya },
+                userId: currentUser.value.uid
+            };
+
+            const transactionRef = doc(collection(db, "transactions"));
+            batch.set(transactionRef, newTransactionData);
+            
+            for (const item of order.items) {
+                const productRef = doc(db, "products", item.docId);
+                const productInState = state.produk.find(p => p.docId === item.docId);
+                const newStock = (productInState.stokFisik || 0) - item.qty;
+                if (newStock < 0) throw new Error(`Stok untuk ${item.sku} tidak cukup!`);
+                batch.update(productRef, { physical_stock: newStock });
+            }
+            successCount++;
+        }
+        
+        await batch.commit();
+
+        await loadAllDataFromFirebase();
+        alert(`Proses Selesai! ${successCount} pesanan berhasil diproses.`);
+        uiState.bulk_order_queue = [];
+
+    } catch (error) {
+        alert(`Terjadi kesalahan: ${error.message}. Tidak ada pesanan yang diproses.`);
+    } finally {
+        uiState.is_processing_scan = false;
+    }
 }
 
 function generateUniqueCode() {
@@ -1382,10 +1393,7 @@ const admComputed = computed({
     get() { return uiState.modalData.adm ? uiState.modalData.adm + '%' : ''; },
     set(newValue) { uiState.modalData.adm = parsePercentageInput(newValue); }
 });
-const komisiComputed = computed({
-    get() { return uiState.modalData.komisi ? uiState.modalData.komisi + '%' : ''; },
-    set(newValue) { uiState.modalData.komisi = parsePercentageInput(newValue); }
-});
+
 const layananComputed = computed({
     get() { return uiState.modalData.layanan ? uiState.modalData.layanan + '%' : ''; },
     set(newValue) { uiState.modalData.layanan = parsePercentageInput(newValue); }
@@ -2194,6 +2202,7 @@ async function saveData() {
                     product_sku: product.sku,
                     marketplace_id: marketplaceId,
                     price: product.hargaJual[marketplaceId] || 0,
+                    commission: product.commissions ? (product.commissions[marketplaceId] || 0) : 0,
                     userId: userId
                 });
             }
@@ -2680,11 +2689,13 @@ function addProductToCart(product, qty = 1) {
     const specialPrice = state.specialPrices[uiState.activeCartChannel]?.[product.sku];
     const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? Object.values(product.hargaJual)[0] ?? 0;
     const finalPrice = specialPrice !== undefined ? specialPrice : regularPrice;
+    const commissionRate = product.commissions?.[uiState.activeCartChannel] || 0;
     if (existingItem) {
         existingItem.qty += qty;
         existingItem.hargaJualAktual = finalPrice;
+        existingItem.commissionRate = commissionRate;
     } else {
-        cart.push({ ...product, qty, hargaJualAktual: finalPrice });
+        cart.push({ ...product, qty, hargaJualAktual: finalPrice, commissionRate: commissionRate });
     }
 }
 function updateCartItemQty(sku, delta) {
@@ -2714,80 +2725,99 @@ function confirmCompleteTransaction() {
     });
 }
 async function executeCompleteTransaction() {
-    if (!currentUser.value) {
-        return alert("Anda harus login untuk menyelesaikan transaksi.");
-    }
-    const marketplace = getMarketplaceById(uiState.activeCartChannel);
-    const summary = cartSummary.value;
-    if (!marketplace || activeCart.value.length === 0) {
-        alert("Keranjang kosong atau channel penjualan tidak valid.");
-        return;
-    }
-    if (!uiState.pos_order_id) {
-        hideModal();
-        alert("Gagal: ID Pesanan Marketplace belum di-scan. Silakan scan resi terlebih dahulu.");
-        return;
-    }
+    if (!currentUser.value) {
+        return alert("Anda harus login untuk menyelesaikan transaksi.");
+    }
+    const marketplace = getMarketplaceById(uiState.activeCartChannel);
+    const summary = cartSummary.value;
+    if (!marketplace || activeCart.value.length === 0) {
+        alert("Keranjang kosong atau channel penjualan tidak valid.");
+        return;
+    }
+    if (!uiState.pos_order_id) {
+        hideModal();
+        alert("Gagal: ID Pesanan Marketplace belum di-scan. Silakan scan resi terlebih dahulu.");
+        return;
+    }
 
-    const biayaList = [];
-    let totalBiaya = 0;
-    if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
-    if (marketplace.komisi > 0) { const val = (marketplace.komisi / 100) * summary.finalTotal; biayaList.push({ name: 'Komisi', value: val }); totalBiaya += val; }
-    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
-    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
-    if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
-    
-    const newTransactionData = {
-        marketplaceOrderId: uiState.pos_order_id,
-        tanggal: new Date(),
-        items: activeCart.value.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
-        subtotal: summary.subtotal,
-        diskon: summary.discount,
-        total: summary.finalTotal,
-        channel: marketplace.name,
-        channelId: marketplace.id,
-        biaya: { rincian: biayaList, total: totalBiaya },
-        userId: currentUser.value.uid
-    };
+    const biayaList = [];
+    let totalBiaya = 0;
 
-    try {
-        const batch = writeBatch(db);
-        const transactionRef = doc(collection(db, "transactions"));
-        batch.set(transactionRef, newTransactionData);
+    // --- AWAL PERUBAHAN ---
+    // Menghitung biaya tetap dan persentase dari marketplace
+    if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
+    // Baris 'marketplace.komisi' dihapus dari sini
 
-        for (const item of activeCart.value) {
-            // ▼▼▼ PERBAIKAN DI SINI: Gunakan item.docId, bukan item.sku ▼▼▼
-            const productRef = doc(db, "products", item.docId);
-            const newStock = (item.stokFisik || 0) - item.qty;
-            
-            if (newStock < 0) {
-                throw new Error(`Stok untuk produk ${item.nama} (${item.sku}) tidak mencukupi!`);
-            }
-            batch.update(productRef, { physical_stock: newStock });
+    // Menghitung total komisi dari setiap item di keranjang
+    let totalKomisi = 0;
+    for (const item of activeCart.value) {
+        if (item.commissionRate && item.commissionRate > 0) {
+            // Komisi dihitung dari harga jual aktual item dikali kuantitasnya
+            totalKomisi += (item.commissionRate / 100) * (item.hargaJualAktual * item.qty);
         }
-
-        await batch.commit();
-
-        const finalTransactionForUI = { ...newTransactionData, id: transactionRef.id, tanggal: newTransactionData.tanggal.toISOString().split('T')[0] };
-        state.transaksi.unshift(finalTransactionForUI);
-        
-        activeCart.value.forEach(item => {
-            const productInState = state.produk.find(p => p.docId === item.docId); // Cari berdasarkan docId
-            if (productInState) {
-                productInState.stokFisik -= item.qty;
-            }
-        });
-        
-        state.carts[uiState.activeCartChannel] = [];
-        uiState.pos_order_id = '';
-        hideModal();
-        alert("Transaksi berhasil disimpan ke Database!");
-
-    } catch (error) {
-        console.error("Error saat menyimpan transaksi:", error);
-        alert(`Gagal menyimpan transaksi: ${error.message}`);
     }
+    // Jika ada total komisi, tambahkan ke daftar biaya
+    if (totalKomisi > 0) {
+        biayaList.push({ name: 'Komisi Produk', value: totalKomisi });
+        totalBiaya += totalKomisi;
+    }
+
+    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
+    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
+    if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
+    // --- AKHIR PERUBAHAN ---
+
+    const newTransactionData = {
+        marketplaceOrderId: uiState.pos_order_id,
+        tanggal: new Date(),
+        items: activeCart.value.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
+        subtotal: summary.subtotal,
+        diskon: summary.discount,
+        total: summary.finalTotal,
+        channel: marketplace.name,
+        channelId: marketplace.id,
+        biaya: { rincian: biayaList, total: totalBiaya },
+        userId: currentUser.value.uid
+    };
+
+    try {
+        const batch = writeBatch(db);
+        const transactionRef = doc(collection(db, "transactions"));
+        batch.set(transactionRef, newTransactionData);
+
+        for (const item of activeCart.value) {
+            const productRef = doc(db, "products", item.docId);
+            const newStock = (item.stokFisik || 0) - item.qty;
+            
+            if (newStock < 0) {
+                throw new Error(`Stok untuk produk ${item.nama} (${item.sku}) tidak mencukupi!`);
+            }
+            batch.update(productRef, { physical_stock: newStock });
+        }
+
+        await batch.commit();
+
+        const finalTransactionForUI = { ...newTransactionData, id: transactionRef.id, tanggal: newTransactionData.tanggal.toISOString().split('T')[0] };
+        state.transaksi.unshift(finalTransactionForUI);
+        
+        activeCart.value.forEach(item => {
+            const productInState = state.produk.find(p => p.docId === item.docId); // Cari berdasarkan docId
+            if (productInState) {
+                productInState.stokFisik -= item.qty;
+            }
+        });
+        
+        state.carts[uiState.activeCartChannel] = [];
+        uiState.pos_order_id = '';
+        hideModal();
+        alert("Transaksi berhasil disimpan ke Database!");
+
+    } catch (error) {
+        console.error("Error saat menyimpan transaksi:", error);
+        alert(`Gagal menyimpan transaksi: ${error.message}`);
+    }
 }
+
 function calculateBestDiscount(cart, channelId) {
     if (!cart || cart.length === 0) return { totalDiscount: 0, description: '', rate: 0 };
 
@@ -2852,75 +2882,88 @@ function calculateBestDiscount(cart, channelId) {
 }
 
 function calculateSellingPrice() {
-    const { hpp, targetMargin, selectedMarketplace, selectedModelName } = uiState.priceCalculator;
+    const { hpp, targetMargin, selectedMarketplace, selectedModelName } = uiState.priceCalculator;
 
-    if (!hpp || !selectedMarketplace || !selectedModelName) {
-        uiState.priceCalculator.result = null;
-        return;
-    }
+    if (!hpp || !selectedMarketplace || !selectedModelName) {
+        uiState.priceCalculator.result = null;
+        return;
+    }
 
-    const mp = state.settings.marketplaces.find(m => m.id === selectedMarketplace);
-    if (!mp) {
-        uiState.priceCalculator.result = null;
-        return;
-    }
+    const mp = state.settings.marketplaces.find(m => m.id === selectedMarketplace);
+    if (!mp) {
+        uiState.priceCalculator.result = null;
+        return;
+    }
 
-    const dummyProduct = {
-        sku: 'calc-dummy',
-        nama: selectedModelName,
-        hargaJualAktual: hpp * 2,
-        qty: 1
-    };
-    const discountInfo = calculateBestDiscount([dummyProduct], selectedMarketplace);
-    const bestDiscountRate = (discountInfo.rate || 0) / 100;
+    const dummyProduct = {
+        sku: 'calc-dummy',
+        nama: selectedModelName,
+        hargaJualAktual: hpp * 2,
+        qty: 1
+    };
+    const discountInfo = calculateBestDiscount([dummyProduct], selectedMarketplace);
+    const bestDiscountRate = (discountInfo.rate || 0) / 100;
 
-    const totalMarketplacePercentageFees = (mp.adm || 0) + (mp.komisi || 0) + (mp.layanan || 0);
-    const perOrderFee = mp.perPesanan || 0;
-    const targetProfitPercentage = targetMargin / 100;
+    // --- AWAL PERUBAHAN ---
+    // Menghapus mp.komisi dari perhitungan
+    const totalMarketplacePercentageFees = (mp.adm || 0) + (mp.layanan || 0);
+    // --- AKHIR PERUBAHAN ---
 
-    const itemizedProgramFeesBase = (mp.programs || []).map(p => (parseFloat(p.rate) || 0) / 100);
-    const totalProgramPercentage = itemizedProgramFeesBase.reduce((sum, rate) => sum + rate, 0);
+    const perOrderFee = mp.perPesanan || 0;
+    const targetProfitPercentage = targetMargin / 100;
 
-    const allPercentageFees = (totalMarketplacePercentageFees / 100) + targetProfitPercentage + bestDiscountRate + totalProgramPercentage;
-    
-    const calculatedPrice = (hpp + perOrderFee) / (1 - allPercentageFees);
+    const itemizedProgramFeesBase = (mp.programs || []).map(p => (parseFloat(p.rate) || 0) / 100);
+    const totalProgramPercentage = itemizedProgramFeesBase.reduce((sum, rate) => sum + rate, 0);
 
-    const adminFee = calculatedPrice * (mp.adm || 0) / 100;
-    const commission = calculatedPrice * (mp.komisi || 0) / 100;
-    const serviceFee = calculatedPrice * (mp.layanan || 0) / 100;
-    const bestDiscount = calculatedPrice * bestDiscountRate;
+    const allPercentageFees = (totalMarketplacePercentageFees / 100) + targetProfitPercentage + bestDiscountRate + totalProgramPercentage;
+    
+    const calculatedPrice = (hpp + perOrderFee) / (1 - allPercentageFees);
 
-    const itemizedProgramFees = (mp.programs || []).map(program => {
-        const rate = parseFloat(program.rate) || 0;
-        return { name: program.name, rate: rate, fee: calculatedPrice * (rate / 100) };
-    });
-    const totalProgramFeeValue = itemizedProgramFees.reduce((sum, item) => sum + item.fee, 0);
+    const adminFee = calculatedPrice * (mp.adm || 0) / 100;
+    // --- AWAL PERUBAHAN ---
+    // Menghapus variabel 'commission'
+    // const commission = calculatedPrice * (mp.komisi || 0) / 100;
+    // --- AKHIR PERUBAHAN ---
+    const serviceFee = calculatedPrice * (mp.layanan || 0) / 100;
+    const bestDiscount = calculatedPrice * bestDiscountRate;
 
-    const totalFees = adminFee + commission + serviceFee + totalProgramFeeValue + perOrderFee;
-    const netProfit = calculatedPrice - hpp - bestDiscount - totalFees;
-    const totalSemuaBiaya = hpp + bestDiscount + totalFees;
-    const labaKotor = calculatedPrice - bestDiscount - hpp;
+    const itemizedProgramFees = (mp.programs || []).map(program => {
+        const rate = parseFloat(program.rate) || 0;
+        return { name: program.name, rate: rate, fee: calculatedPrice * (rate / 100) };
+    });
+    const totalProgramFeeValue = itemizedProgramFees.reduce((sum, item) => sum + item.fee, 0);
 
-    uiState.priceCalculator.result = {
-        calculatedPrice,
-        totalFees,
-        netProfit,
-        bestDiscount,
-        totalSemuaBiaya,
-        labaKotor,
-        bestDiscountRatePercentage: discountInfo.rate || 0, // <-- TAMBAHAN BARU
-        breakdown: {
-            hpp,
-            adminFee,
-            admRate: mp.adm || 0, // <-- TAMBAHAN BARU
-            commission,
-            komisiRate: mp.komisi || 0, // <-- TAMBAHAN BARU
-            serviceFee,
-            layananRate: mp.layanan || 0, // <-- TAMBAHAN BARU
-            programFee: itemizedProgramFees,
-            perOrderFee
-        }
-    };
+    // --- AWAL PERUBAHAN ---
+    // Menghapus 'commission' dari total biaya
+    const totalFees = adminFee + serviceFee + totalProgramFeeValue + perOrderFee;
+    // --- AKHIR PERUBAHAN ---
+    const netProfit = calculatedPrice - hpp - bestDiscount - totalFees;
+    const totalSemuaBiaya = hpp + bestDiscount + totalFees;
+    const labaKotor = calculatedPrice - bestDiscount - hpp;
+
+    uiState.priceCalculator.result = {
+        calculatedPrice,
+        totalFees,
+        netProfit,
+        bestDiscount,
+        totalSemuaBiaya,
+        labaKotor,
+        bestDiscountRatePercentage: discountInfo.rate || 0,
+        breakdown: {
+            hpp,
+            adminFee,
+            admRate: mp.adm || 0,
+            // --- AWAL PERUBAHAN ---
+            // Menghapus 'commission' dan 'komisiRate' dari breakdown
+            // commission,
+            // komisiRate: mp.komisi || 0,
+            // --- AKHIR PERUBAHAN ---
+            serviceFee,
+            layananRate: mp.layanan || 0,
+            programFee: itemizedProgramFees,
+            perOrderFee
+        }
+    };
 }
 
 async function recordBagiHasilPayment() {
@@ -4063,7 +4106,7 @@ async function addMarketplace() {
     const newMarketplace = {
         id: `marketplace-${Date.now()}`,
         name: 'Marketplace Baru',
-        adm: 0, program: 0, layanan: 0, perPesanan: 0, komisi: 0, voucher: 0,
+        adm: 0, program: 0, layanan: 0, perPesanan: 0, voucher: 0,
     };
 
     state.settings.marketplaces.push(newMarketplace);
@@ -4796,12 +4839,14 @@ async function loadAllDataFromFirebase() {
     const p = { id: docSnap.id, ...docSnap.data() };
     const hargaJual = {};
     const stokAlokasi = {};
+    const commissions = {};
     // Perbaikan: Cari alokasi berdasarkan ID dokumen
     const productAllocation = allocationsData.find(alloc => alloc.sku === p.id); 
     (state.settings.marketplaces || []).forEach(mp => {
         // Perbaikan: Cari harga berdasarkan ID produk
         const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id); 
         hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+        commissions[mp.id] = priceInfo ? (priceInfo.commission || 0) : 0;
         stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
     });
     return {
@@ -4815,6 +4860,7 @@ async function loadAllDataFromFirebase() {
         hpp: p.hpp, 
         hargaJual, 
         stokAlokasi,
+        commissions,
         userId: p.userId
     };
 });
@@ -5650,8 +5696,8 @@ watch(activePage, (newPage) => {
     <div v-if="activePage === 'harga-hpp'">
     <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
         <div>
-            <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga Jual & HPP</h2>
-            <p class="text-slate-600 mt-1">Atur modal (HPP) dan harga jual untuk setiap varian di semua channel.</p>
+            <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga Jual, HPP & Komisi</h2>
+            <p class="text-slate-600 mt-1">Atur modal (HPP) dan harga jual serta komisi untuk setiap varian di semua channel.</p>
         </div>
         <div class="flex gap-2">
             <button @click="showModal('priceCalculator')" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 transition-colors shadow">Kalkulator Harga</button>
@@ -5687,21 +5733,40 @@ watch(activePage, (newPage) => {
                     </div>
                 </div>
 
-                <div class="md:col-span-2 space-y-3">
-                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
-                        <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
-                        <div class="flex items-center gap-2">
+                <div class="md:col-span-2 space-y-4">
+                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="border-b pb-3 last:border-b-0">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-sm font-semibold text-slate-700">{{ marketplace.name }}</label>
                             <span class="text-xs font-bold px-2 py-0.5 rounded-full" 
-                                    :class="{
-                                     'bg-green-100 text-green-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 40, 
-                                     'bg-yellow-100 text-yellow-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 20 && ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 40, 
-                                     'bg-red-100 text-red-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 20
-                                    }">
-                                {{ (varian.hargaJual[marketplace.id] && varian.hpp ? (((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}%
+                                  :class="{
+                                   'bg-green-100 text-green-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 40, 
+                                   'bg-yellow-100 text-yellow-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 20 && ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 40, 
+                                   'bg-red-100 text-red-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 20
+                                  }">
+                                {{ (varian.hargaJual[marketplace.id] && varian.hpp && varian.hargaJual[marketplace.id] > 0 ? (((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
                             </span>
-                            <div class="relative w-36">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                <input type="text" :value="formatInputNumber(varian.hargaJual[marketplace.id])" @input="varian.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500">Harga Jual</label>
+                                <div class="relative mt-1">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">Rp</span>
+                                    <input type="text" 
+                                           :value="formatInputNumber(varian.hargaJual[marketplace.id])" 
+                                           @input="varian.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" 
+                                           class="w-full p-2 pl-7 pr-3 border border-slate-300 rounded-md text-right font-medium text-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500">Komisi (%)</label>
+                                <div class="relative mt-1">
+                                    <input type="text" 
+                                           :value="varian.commissions ? varian.commissions[marketplace.id] : ''" 
+                                           @input="varian.commissions[marketplace.id] = parsePercentageInput($event.target.value)" 
+                                           class="w-full p-2 pr-6 border border-slate-300 rounded-md text-right text-sm" placeholder="0">
+                                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -8480,10 +8545,7 @@ watch(activePage, (newPage) => {
                 <input type="text" v-model="layananComputed" class="w-full p-2 border rounded-md">
             </div>
             <div>
-                <label class="block text-sm font-medium">Komisi (%)</label>
-                <input type="text" v-model="komisiComputed" class="w-full p-2 border rounded-md">
-            </div>
-            <div>
+                
                 <label class="block text-sm font-medium">Per Pesanan (Rp)</label>
                 <input type="number" v-model.number="uiState.modalData.perPesanan" class="w-full p-2 border rounded-md">
             </div>
