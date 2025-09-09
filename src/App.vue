@@ -2914,88 +2914,83 @@ function calculateBestDiscount(cart, channelId) {
 }
 
 function calculateSellingPrice() {
-    const { hpp, targetMargin, selectedMarketplace, selectedModelName } = uiState.priceCalculator;
+    const { hpp, targetMargin, selectedMarketplace, selectedModelName } = uiState.priceCalculator;
 
-    if (!hpp || !selectedMarketplace || !selectedModelName) {
-        uiState.priceCalculator.result = null;
-        return;
-    }
+    if (!hpp || !selectedMarketplace || !selectedModelName) {
+        uiState.priceCalculator.result = null;
+        return;
+    }
 
-    const mp = state.settings.marketplaces.find(m => m.id === selectedMarketplace);
-    if (!mp) {
-        uiState.priceCalculator.result = null;
-        return;
-    }
+    const mp = state.settings.marketplaces.find(m => m.id === selectedMarketplace);
+    if (!mp) {
+        uiState.priceCalculator.result = null;
+        return;
+    }
 
-    const dummyProduct = {
-        sku: 'calc-dummy',
-        nama: selectedModelName,
-        hargaJualAktual: hpp * 2,
-        qty: 1
-    };
-    const discountInfo = calculateBestDiscount([dummyProduct], selectedMarketplace);
-    const bestDiscountRate = (discountInfo.rate || 0) / 100;
+    // --- [PERUBAIAN 1: Mengambil Data Komisi yang Benar] ---
+    // Mengambil komisi berdasarkan Model Produk dan Marketplace yang dipilih
+    const commissionRate = (state.commissions.perModel[selectedModelName]?.[selectedMarketplace] || 0) / 100;
 
-    // --- AWAL PERUBAHAN ---
-    // Menghapus mp.komisi dari perhitungan
-    const totalMarketplacePercentageFees = (mp.adm || 0) + (mp.layanan || 0);
-    // --- AKHIR PERUBAHAN ---
+    const dummyProduct = {
+        sku: 'calc-dummy',
+        nama: selectedModelName,
+        hargaJualAktual: hpp * 2, // Harga dummy untuk kalkulasi diskon
+        qty: 1
+    };
+    const discountInfo = calculateBestDiscount([dummyProduct], selectedMarketplace);
+    const bestDiscountRate = (discountInfo.rate || 0) / 100;
 
-    const perOrderFee = mp.perPesanan || 0;
-    const targetProfitPercentage = targetMargin / 100;
+    // --- [PERUBAIAN 2: Menghapus Komisi Lama dari Kalkulasi] ---
+    // 'mp.komisi' sudah tidak digunakan di sini
+    const totalMarketplacePercentageFees = (mp.adm || 0) + (mp.layanan || 0);
+    const perOrderFee = mp.perPesanan || 0;
+    const targetProfitPercentage = (targetMargin || 0) / 100;
 
-    const itemizedProgramFeesBase = (mp.programs || []).map(p => (parseFloat(p.rate) || 0) / 100);
-    const totalProgramPercentage = itemizedProgramFeesBase.reduce((sum, rate) => sum + rate, 0);
+    const itemizedProgramFeesBase = (mp.programs || []).map(p => (parseFloat(p.rate) || 0) / 100);
+    const totalProgramPercentage = itemizedProgramFeesBase.reduce((sum, rate) => sum + rate, 0);
 
-    const allPercentageFees = (totalMarketplacePercentageFees / 100) + targetProfitPercentage + bestDiscountRate + totalProgramPercentage;
-    
-    const calculatedPrice = (hpp + perOrderFee) / (1 - allPercentageFees);
+    // --- [PERUBAIAN 3: Menambahkan Komisi Baru ke Total Biaya Persentase] ---
+    const allPercentageFees = (totalMarketplacePercentageFees / 100) + targetProfitPercentage + bestDiscountRate + totalProgramPercentage + commissionRate;
+    
+    const calculatedPrice = (hpp + perOrderFee) / (1 - allPercentageFees);
 
-    const adminFee = calculatedPrice * (mp.adm || 0) / 100;
-    // --- AWAL PERUBAHAN ---
-    // Menghapus variabel 'commission'
-    // const commission = calculatedPrice * (mp.komisi || 0) / 100;
-    // --- AKHIR PERUBAHAN ---
-    const serviceFee = calculatedPrice * (mp.layanan || 0) / 100;
-    const bestDiscount = calculatedPrice * bestDiscountRate;
+    // --- [PERUBAIAN 4: Menghitung & Menampilkan Rincian Komisi Baru] ---
+    const adminFee = calculatedPrice * (mp.adm || 0) / 100;
+    const commission = calculatedPrice * commissionRate; // Menghitung nilai komisi dalam Rupiah
+    const serviceFee = calculatedPrice * (mp.layanan || 0) / 100;
+    const bestDiscount = calculatedPrice * bestDiscountRate;
 
-    const itemizedProgramFees = (mp.programs || []).map(program => {
-        const rate = parseFloat(program.rate) || 0;
-        return { name: program.name, rate: rate, fee: calculatedPrice * (rate / 100) };
-    });
-    const totalProgramFeeValue = itemizedProgramFees.reduce((sum, item) => sum + item.fee, 0);
+    const itemizedProgramFees = (mp.programs || []).map(program => {
+        const rate = parseFloat(program.rate) || 0;
+        return { name: program.name, rate: rate, fee: calculatedPrice * (rate / 100) };
+    });
+    const totalProgramFeeValue = itemizedProgramFees.reduce((sum, item) => sum + item.fee, 0);
 
-    // --- AWAL PERUBAHAN ---
-    // Menghapus 'commission' dari total biaya
-    const totalFees = adminFee + serviceFee + totalProgramFeeValue + perOrderFee;
-    // --- AKHIR PERUBAHAN ---
-    const netProfit = calculatedPrice - hpp - bestDiscount - totalFees;
-    const totalSemuaBiaya = hpp + bestDiscount + totalFees;
-    const labaKotor = calculatedPrice - bestDiscount - hpp;
+    const totalFees = adminFee + commission + serviceFee + totalProgramFeeValue + perOrderFee; // Menambahkan 'commission' ke total biaya
+    const netProfit = calculatedPrice - hpp - bestDiscount - totalFees;
+    const totalSemuaBiaya = hpp + bestDiscount + totalFees;
+    const labaKotor = calculatedPrice - bestDiscount - hpp;
 
-    uiState.priceCalculator.result = {
-        calculatedPrice,
-        totalFees,
-        netProfit,
-        bestDiscount,
-        totalSemuaBiaya,
-        labaKotor,
-        bestDiscountRatePercentage: discountInfo.rate || 0,
-        breakdown: {
-            hpp,
-            adminFee,
-            admRate: mp.adm || 0,
-            // --- AWAL PERUBAHAN ---
-            // Menghapus 'commission' dan 'komisiRate' dari breakdown
-            // commission,
-            // komisiRate: mp.komisi || 0,
-            // --- AKHIR PERUBAHANn ---
-            serviceFee,
-            layananRate: mp.layanan || 0,
-            programFee: itemizedProgramFees,
-            perOrderFee
-        }
-    };
+    uiState.priceCalculator.result = {
+        calculatedPrice,
+        totalFees,
+        netProfit,
+        bestDiscount,
+        totalSemuaBiaya,
+        labaKotor,
+        bestDiscountRatePercentage: discountInfo.rate || 0,
+        breakdown: {
+            hpp,
+            adminFee,
+            admRate: mp.adm || 0,
+            commission, // Menampilkan nilai komisi baru
+            komisiRate: commissionRate * 100, // Menampilkan persentase komisi baru
+            serviceFee,
+            layananRate: mp.layanan || 0,
+            programFee: itemizedProgramFees,
+            perOrderFee
+        }
+    };
 }
 
 async function recordBagiHasilPayment() {
