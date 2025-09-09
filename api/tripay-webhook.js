@@ -8,13 +8,9 @@ export const config = {
     },
 };
 
-// --- [PERBAIKAN KUNCI: Validasi Environment Variable] ---
-// Memastikan variabel ada sebelum digunakan untuk mencegah error JSON.parse
 if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    // Memberikan pesan error yang jelas jika variabel tidak ditemukan
     throw new Error("Kredensial Firebase Admin (FIREBASE_SERVICE_ACCOUNT_JSON) tidak ditemukan di Environment Variables Vercel.");
 }
-// -----------------------------------------------------------
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 
@@ -68,11 +64,15 @@ export default async function handler(req, res) {
             const now = new Date();
             const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + 1));
 
-            await userRef.update({
+            // --- [PERBAIKAN KUNCI: Menggunakan setDoc bukan update] ---
+            // setDoc dengan { merge: true } akan MEMBUAT dokumen jika belum ada,
+            // atau MEMPERBARUI jika sudah ada. Ini jauh lebih aman daripada update().
+            await userRef.set({
                 subscriptionStatus: 'active',
                 subscriptionEndDate: subscriptionEndDate,
                 trialEndDate: null
-            });
+            }, { merge: true });
+            // --- [AKHIR PERBAIKAN] ---
         }
 
         return res.status(200).json({ success: true });
@@ -82,3 +82,4 @@ export default async function handler(req, res) {
         return res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
 }
+
