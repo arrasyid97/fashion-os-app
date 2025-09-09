@@ -1000,14 +1000,15 @@ async function handleRegister() {
 }
 async function handleLogin() {
     try {
-        const userCredential = await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
-        const user = userCredential.user;
+        // [PERBAIKAN DI SINI]
+        // Kita tidak perlu lagi menyimpan 'userCredential' karena
+        // onAuthStateChanged akan menanganinya secara otomatis.
+        await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
+        
+        // Baris `const user = userCredential.user;` sudah dihapus.
+        
         authForm.error = '';
-
         alert('Selamat datang kembali!');
-        
-        // Panggil fungsi pemuatan dan navigasi utama di sini
-        
 
     } catch (error) {
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
