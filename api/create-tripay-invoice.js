@@ -1,3 +1,4 @@
+// --- [KODE BARU 1: Impor library untuk proxy] ---
 import { HttpsProxyAgent } from 'https-proxy-agent';
 const crypto = require('crypto');
 
