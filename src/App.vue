@@ -565,20 +565,32 @@ function handleBulkManualSearch() {
 function addProductToBulkQueue(product) {
     if (!uiState.activeCartChannel) return alert("Pilih Channel Penjualan dulu.");
     
-// ... existing code ...
+    // Bagian ini penting untuk mendefinisikan 'currentOrder'
+    let currentOrder = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
+    if (!currentOrder) {
+        currentOrder = {
+            id: `TEMP-${Date.now()}`,
+            marketplaceOrderId: 'MENUNGGU RESI...',
+            items: [],
+            status: 'Sedang Diisi'
+        };
+        uiState.bulk_order_queue.unshift(currentOrder);
+    }
+
     const specialPrice = state.specialPrices[uiState.activeCartChannel]?.[product.sku];
     const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? 0;
     const finalPrice = specialPrice !== undefined ? specialPrice : regularPrice;
-
-    // --- LOGIKA KOMISI BARU ---
+    
+    // Logika komisi baru yang sudah kita tambahkan sebelumnya
     const commissionRate = product.commissions?.[uiState.activeCartChannel] || 0;
 
     const existingItem = currentOrder.items.find(item => item.sku === product.sku);
     if (existingItem) {
         existingItem.qty++;
-        existingItem.commissionRate = commissionRate; // Pastikan komisi juga di-update
+        // Pastikan komisi juga di-update jika produk yang sama di-scan lagi
+        existingItem.commissionRate = commissionRate;
     } else {
-        // Tambahkan commissionRate ke objek item antrian
+        // Menambahkan item baru lengkap dengan harga dan komisinya
         currentOrder.items.push({ ...product, qty: 1, hargaJualAktual: finalPrice, commissionRate: commissionRate });
     }
 }
