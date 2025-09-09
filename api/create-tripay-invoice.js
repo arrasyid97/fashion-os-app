@@ -1,8 +1,6 @@
-// --- [KODE BARU 1: Impor library untuk proxy] ---
 import { HttpsProxyAgent } from 'https-proxy-agent';
 const crypto = require('crypto');
 
-// --- [KODE BARU 2: Mengambil URL proxy dari Vercel] ---
 const PROXY_URL = process.env.PROXYLITE_URL; 
 
 export default async function handler(req, res) {
@@ -14,7 +12,7 @@ export default async function handler(req, res) {
 
     try {
         const data = {
-            method: 'BRIVA', // Contoh: Pembayaran via BRIVA
+            method: 'BRIVA',
             merchant_ref: externalId,
             amount: amount,
             customer_name: 'Pelanggan',
@@ -31,15 +29,16 @@ export default async function handler(req, res) {
                             .digest('hex')
         };
 
-        const response = await fetch('https://tripay.co.id/api-sandbox/transaction/create', {
+        // --- [PERBAIKAN KUNCI DI SINI] ---
+        // URL diubah dari 'api-sandbox' menjadi 'api' untuk mode produksi
+        const response = await fetch('https://tripay.co.id/api/transaction/create', {
+        // ---------------------------------
             method: 'POST',
             headers: {
                 'Authorization': 'Bearer ' + process.env.TRIPAY_API_KEY,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(data),
-            // --- [KODE BARUu 3: Menyisipkan konfigurasi proxy] ---
-            // Ini akan membuat `fetch` berjalan melalui IP statis Anda
             ...(PROXY_URL && { agent: new HttpsProxyAgent(PROXY_URL) })
         });
 
