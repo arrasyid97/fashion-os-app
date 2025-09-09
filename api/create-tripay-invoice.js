@@ -1,10 +1,9 @@
+import axios from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 const crypto = require('crypto');
 
-// --- [PERBAIKAN KUNCI DI SINI] ---
-// Mengambil URL proxy dari NAMA VARIABEL YANG BARU
-const PROXY_URL = process.env.STATIC_IP_PROXY_URL; 
-// ---------------------------------
+// Mengambil URL proxy dari Environment Variable yang sudah kita atur
+const PROXY_URL = process.env.STATIC_IP_PROXY_URL;
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -32,17 +31,21 @@ export default async function handler(req, res) {
                             .digest('hex')
         };
 
-        const response = await fetch('https://tripay.co.id/api/transaction/create', {
-            method: 'POST',
+        // Membuat agen proxy HANYA jika PROXY_URL ada
+        const httpsAgent = PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined;
+
+        // Konfigurasi untuk permintaan Axios
+        const config = {
             headers: {
                 'Authorization': 'Bearer ' + process.env.TRIPAY_API_KEY,
-                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(data),
-            ...(PROXY_URL && { agent: new HttpsProxyAgent(PROXY_URL) })
-        });
+            // Memberitahu Axios untuk menggunakan agen proxy kita
+            httpsAgent: httpsAgent
+        };
 
-        const result = await response.json();
+        // Mengirim permintaan menggunakan Axios
+        const response = await axios.post('[https://tripay.co.id/api/transaction/create](https://tripay.co.id/api/transaction/create)', data, config);
+        const result = response.data; // Di Axios, data respons ada di dalam `response.data`
 
         if (result.success) {
             return res.status(200).json({ payment_url: result.data.checkout_url });
@@ -52,7 +55,14 @@ export default async function handler(req, res) {
         }
 
     } catch (error) {
-        console.error('Error in Tripay API:', error);
-        return res.status(500).json({ message: 'Internal Server Error' });
+        if (error.response) {
+            // Menangkap error spesifik dari API Tripay
+            console.error('Axios error response:', error.response.data);
+            return res.status(500).json({ message: 'Tripay Error', error: error.response.data.message });
+        } else {
+            // Menangkap error jaringan atau lainnya
+            console.error('Error in Tripay API call:', error.message);
+            return res.status(500).json({ message: 'Internal Server Error' });
+        }
     }
 }
