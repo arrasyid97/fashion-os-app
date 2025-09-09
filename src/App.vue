@@ -410,6 +410,7 @@ const state = reactive({
 ],
     carts: {},
     promotions: { perChannel: {}, perModel: {} },
+    commissions: { perModel: {} },
     specialPrices: {},
     produksi: [],    // --- START: KODE BARU UNTUK STOK KAIN ---
     gudangKain: [],
@@ -631,82 +632,79 @@ function deleteQueuedOrder(index) {
 
 // FUNGSI FINAL UNTUK MEMPROSES SEMUA PESANAN DI ANTRIAN
 async function processBatchOrders() {
-    const ordersToProcess = uiState.bulk_order_queue;
-    if (ordersToProcess.length === 0) {
-        return alert("Tidak ada pesanan di antrian untuk diproses.");
-    }
-    if (!confirm(`Anda akan memproses ${ordersToProcess.length} pesanan... Lanjutkan?`)) return;
+    const ordersToProcess = uiState.bulk_order_queue;
+    if (ordersToProcess.length === 0) {
+        return alert("Tidak ada pesanan di antrian untuk diproses.");
+    }
+    if (!confirm(`Anda akan memproses ${ordersToProcess.length} pesanan... Lanjutkan?`)) return;
 
-    uiState.is_processing_scan = true;
-    const marketplace = getMarketplaceById(uiState.activeCartChannel);
-    let successCount = 0;
+    uiState.is_processing_scan = true;
+    const marketplace = getMarketplaceById(uiState.activeCartChannel);
+    let successCount = 0;
 
-    const batch = writeBatch(db);
-    try {
-        for (const order of ordersToProcess) {
-            const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
-            const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
-            const finalTotal = subtotal - discount.totalDiscount;
+    const batch = writeBatch(db);
+    try {
+        for (const order of ordersToProcess) {
+            const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
+            const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
+            const finalTotal = subtotal - discount.totalDiscount;
 
-            let totalBiaya = 0;
-            const biayaList = [];
-            
-            // --- AWAL PERUBAHAN ---
-            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
-            // Baris marketplace.komisi yang lama sudah dihapus
+            let totalBiaya = 0;
+            const biayaList = [];
 
-            // Menghitung total komisi dari setiap item di dalam pesanan antrian
+            // --- [PERUBAIAN 2: Kalkulasi Biaya Komisi Baru] ---
+            // Menghitung total komisi dari setiap item di dalam antrian pesanan
             let totalKomisi = 0;
             for (const item of order.items) {
-                if (item.commissionRate && item.commissionRate > 0) {
-                    // Komisi dihitung dari harga jual aktual item dikali kuantitasnya
+                if (item.commissionRate > 0) {
                     totalKomisi += (item.commissionRate / 100) * (item.hargaJualAktual * item.qty);
                 }
             }
-            // Jika ada total komisi, tambahkan ke daftar biaya
             if (totalKomisi > 0) {
                 biayaList.push({ name: 'Komisi Produk', value: totalKomisi });
                 totalBiaya += totalKomisi;
             }
+            // --- [AKHIR PERUBAIAN 2] ---
 
-            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
-            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
-            if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
-            // --- AKHIR PERUBAHAN ---
+            // Biaya Marketplace lainnya (baris 'marketplace.komisi' sudah dihapus)
+            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
+            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
+            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
+            if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
 
-            const newTransactionData = {
-                marketplaceOrderId: order.marketplaceOrderId,
-                tanggal: new Date(),
-                items: order.items.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
-                subtotal, discount, total: finalTotal, channel: marketplace.name, channelId: uiState.activeCartChannel,
-                biaya: { rincian: biayaList, total: totalBiaya },
-                userId: currentUser.value.uid
-            };
+            const newTransactionData = {
+                marketplaceOrderId: order.marketplaceOrderId,
+                tanggal: new Date(),
+                items: order.items.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
+                subtotal, discount, total: finalTotal, channel: marketplace.name, channelId: uiState.activeCartChannel,
+                biaya: { rincian: biayaList, total: totalBiaya },
+                userId: currentUser.value.uid
+            };
 
-            const transactionRef = doc(collection(db, "transactions"));
-            batch.set(transactionRef, newTransactionData);
-            
-            for (const item of order.items) {
-                const productRef = doc(db, "products", item.docId);
-                const productInState = state.produk.find(p => p.docId === item.docId);
-                const newStock = (productInState.stokFisik || 0) - item.qty;
-                if (newStock < 0) throw new Error(`Stok untuk ${item.sku} tidak cukup!`);
-                batch.update(productRef, { physical_stock: newStock });
-            }
-            successCount++;
-        }
-        
-        await batch.commit();
+            const transactionRef = doc(collection(db, "transactions"));
+            batch.set(transactionRef, newTransactionData);
+            
+            for (const item of order.items) {
+                const productRef = doc(db, "products", item.docId);
+                const productInState = state.produk.find(p => p.docId === item.docId);
+                const newStock = (productInState.stokFisik || 0) - item.qty;
+                if (newStock < 0) throw new Error(`Stok untuk ${item.sku} tidak cukup!`);
+                batch.update(productRef, { physical_stock: newStock });
+            }
+            successCount++;
+        }
+        
+        await batch.commit();
 
-        await loadAllDataFromFirebase();
-        alert(`Proses Selesai! ${successCount} pesanan berhasil diproses.`);
-        uiState.bulk_order_queue = [];
+        await loadAllDataFromFirebase();
+        alert(`Proses Selesai! ${successCount} pesanan berhasil diproses.`);
+        uiState.bulk_order_queue = [];
 
-    } catch (error) {
-        alert(`Terjadi kesalahan: ${error.message}. Tidak ada pesanan yang diproses.`);
-    } finally {
-        uiState.is_processing_scan = false;
-    }
+    } catch (error) {
+        alert(`Terjadi kesalahan: ${error.message}. Tidak ada pesanan yang diproses.`);
+    } finally {
+        uiState.is_processing_scan = false;
+    }
 }
 
 function generateUniqueCode() {
@@ -867,6 +865,18 @@ async function activateSubscriptionWithCode() {
         alert(`Terjadi kesalahan: ${error.message}`);
     }
 }
+
+const commissionModelComputed = (modelName, channelId) => computed({
+    get() {
+        return state.commissions.perModel[modelName]?.[channelId] ? state.commissions.perModel[modelName][channelId] + '%' : '';
+    },
+    set(newValue) {
+        if (!state.commissions.perModel[modelName]) {
+            state.commissions.perModel[modelName] = {};
+        }
+        state.commissions.perModel[modelName][channelId] = parsePercentageInput(newValue);
+    }
+});
 
 async function handleAuth(user) {
     currentUser.value = user;
@@ -2191,7 +2201,6 @@ async function saveData() {
         };
         batch.set(settingsRef, settingsData);
 
-        // --- AWAL PERBAIKAN: Memastikan data promosi tidak kosong sebelum disimpan ---
         const promotionsRef = doc(db, "promotions", userId);
         const promotionsData = {
             perChannel: state.promotions.perChannel || {},
@@ -2199,7 +2208,16 @@ async function saveData() {
             userId: userId
         };
         batch.set(promotionsRef, JSON.parse(JSON.stringify(promotionsData)));
-        // --- AKHIR PERBAIKAN ---
+
+        // --- [KODE BARU DITAMBAHKAN] ---
+        // Menyimpan data komisi per model
+        const commissionsRef = doc(db, "commissions", userId);
+        const commissionsData = {
+            perModel: state.commissions.perModel || {},
+            userId: userId
+        };
+        batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)));
+        // --- [AKHIR KODE BARU] ---
 
         // Simpan HPP & Harga Jual
         for (const product of state.produk) {
@@ -2214,14 +2232,12 @@ async function saveData() {
                     product_sku: product.sku,
                     marketplace_id: marketplaceId,
                     price: product.hargaJual[marketplaceId] || 0,
-                    commission: product.commissions ? (product.commissions[marketplaceId] || 0) : 0,
                     userId: userId
-                });
+                }, { merge: true });
             }
         }
         await batch.commit();
         
-        // Memuat ulang data dari database setelah berhasil disimpan
         await loadAllDataFromFirebase();
         
         console.log('Perubahan berhasil disimpan ke Database!');
@@ -2698,18 +2714,25 @@ function addProductToCart(product, qty = 1) {
     if (!uiState.activeCartChannel) { alert("Pilih channel penjualan."); return; }
     const cart = state.carts[uiState.activeCartChannel];
     const existingItem = cart.find(item => item.sku === product.sku);
+
     const specialPrice = state.specialPrices[uiState.activeCartChannel]?.[product.sku];
     const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? Object.values(product.hargaJual)[0] ?? 0;
     const finalPrice = specialPrice !== undefined ? specialPrice : regularPrice;
-    const commissionRate = product.commissions?.[uiState.activeCartChannel] || 0;
+
+    // --- [PERBAIKAN KUNCI DI SINI] ---
+    // Mengambil komisi berdasarkan NAMA MODEL produk dari state global, bukan dari produk itu sendiri.
+    const commissionRate = state.commissions.perModel[product.nama]?.[uiState.activeCartChannel] || 0;
+
     if (existingItem) {
         existingItem.qty += qty;
         existingItem.hargaJualAktual = finalPrice;
-        existingItem.commissionRate = commissionRate;
+        existingItem.commissionRate = commissionRate; // Update komisi juga
     } else {
+        // Saat menambahkan produk baru, sertakan commissionRate yang benar
         cart.push({ ...product, qty, hargaJualAktual: finalPrice, commissionRate: commissionRate });
     }
 }
+
 function updateCartItemQty(sku, delta) {
     const item = activeCart.value.find(i => i.sku === sku);
     if (item) {
@@ -2737,97 +2760,94 @@ function confirmCompleteTransaction() {
     });
 }
 async function executeCompleteTransaction() {
-    if (!currentUser.value) {
-        return alert("Anda harus login untuk menyelesaikan transaksi.");
-    }
-    const marketplace = getMarketplaceById(uiState.activeCartChannel);
-    const summary = cartSummary.value;
-    if (!marketplace || activeCart.value.length === 0) {
-        alert("Keranjang kosong atau channel penjualan tidak valid.");
-        return;
-    }
-    if (!uiState.pos_order_id) {
-        hideModal();
-        alert("Gagal: ID Pesanan Marketplace belum di-scan. Silakan scan resi terlebih dahulu.");
-        return;
-    }
+    if (!currentUser.value) {
+        return alert("Anda harus login untuk menyelesaikan transaksi.");
+    }
+    const marketplace = getMarketplaceById(uiState.activeCartChannel);
+    const summary = cartSummary.value;
+    if (!marketplace || activeCart.value.length === 0) {
+        alert("Keranjang kosong atau channel penjualan tidak valid.");
+        return;
+    }
+    if (!uiState.pos_order_id) {
+        hideModal();
+        alert("Gagal: ID Pesanan Marketplace belum di-scan. Silakan scan resi terlebih dahulu.");
+        return;
+    }
 
-    const biayaList = [];
-    let totalBiaya = 0;
+    const biayaList = [];
+    let totalBiaya = 0;
 
-    // --- AWAL PERUBAHAN ---
-    // Menghitung biaya tetap dan persentase dari marketplace
-    if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
-    // Baris 'marketplace.komisi' dihapus dari sini
-
+    // --- [PERUBAIAN: Kalkulasi Biaya Komisi Baru] ---
     // Menghitung total komisi dari setiap item di keranjang
     let totalKomisi = 0;
     for (const item of activeCart.value) {
-        if (item.commissionRate && item.commissionRate > 0) {
+        if (item.commissionRate > 0) {
             // Komisi dihitung dari harga jual aktual item dikali kuantitasnya
             totalKomisi += (item.commissionRate / 100) * (item.hargaJualAktual * item.qty);
         }
     }
-    // Jika ada total komisi, tambahkan ke daftar biaya
     if (totalKomisi > 0) {
         biayaList.push({ name: 'Komisi Produk', value: totalKomisi });
         totalBiaya += totalKomisi;
     }
+    // --- [AKHIR PERUBAIAN] ---
 
-    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
-    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
-    if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
-    // --- AKHIR PERUBAHAN ---
+    // Biaya Marketplace lainnya (baris 'marketplace.komisi' sudah dihapus)
+    if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
+    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
+    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
+    if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
+    
+    const newTransactionData = {
+        marketplaceOrderId: uiState.pos_order_id,
+        tanggal: new Date(),
+        items: activeCart.value.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
+        subtotal: summary.subtotal,
+        diskon: summary.discount,
+        total: summary.finalTotal,
+        channel: marketplace.name,
+        channelId: marketplace.id,
+        biaya: { rincian: biayaList, total: totalBiaya },
+        userId: currentUser.value.uid
+    };
 
-    const newTransactionData = {
-        marketplaceOrderId: uiState.pos_order_id,
-        tanggal: new Date(),
-        items: activeCart.value.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
-        subtotal: summary.subtotal,
-        diskon: summary.discount,
-        total: summary.finalTotal,
-        channel: marketplace.name,
-        channelId: marketplace.id,
-        biaya: { rincian: biayaList, total: totalBiaya },
-        userId: currentUser.value.uid
-    };
+    try {
+        const batch = writeBatch(db);
+        const transactionRef = doc(collection(db, "transactions"));
+        batch.set(transactionRef, newTransactionData);
 
-    try {
-        const batch = writeBatch(db);
-        const transactionRef = doc(collection(db, "transactions"));
-        batch.set(transactionRef, newTransactionData);
+        for (const item of activeCart.value) {
+            const productRef = doc(db, "products", item.docId);
+            const newStock = (item.stokFisik || 0) - item.qty;
+            
+            if (newStock < 0) {
+                throw new Error(`Stok untuk produk ${item.nama} (${item.sku}) tidak mencukupi!`);
+            }
+            batch.update(productRef, { physical_stock: newStock });
+        }
 
-        for (const item of activeCart.value) {
-            const productRef = doc(db, "products", item.docId);
-            const newStock = (item.stokFisik || 0) - item.qty;
-            
-            if (newStock < 0) {
-                throw new Error(`Stok untuk produk ${item.nama} (${item.sku}) tidak mencukupi!`);
-            }
-            batch.update(productRef, { physical_stock: newStock });
-        }
+        await batch.commit();
 
-        await batch.commit();
+        const finalTransactionForUI = { ...newTransactionData, id: transactionRef.id, tanggal: newTransactionData.tanggal.toISOString().split('T')[0] };
+        state.transaksi.unshift(finalTransactionForUI);
+        
+        activeCart.value.forEach(item => {
+            const productInState = state.produk.find(p => p.docId === item.docId);
+            if (productInState) {
+                productInState.stokFisik -= item.qty;
+            }
+        });
+        
+        state.carts[uiState.activeCartChannel] = [];
+        uiState.pos_order_id = '';
+        hideModal();
+        alert("Transaksi berhasil disimpan ke Database!");
 
-        const finalTransactionForUI = { ...newTransactionData, id: transactionRef.id, tanggal: newTransactionData.tanggal.toISOString().split('T')[0] };
-        state.transaksi.unshift(finalTransactionForUI);
-        
-        activeCart.value.forEach(item => {
-            const productInState = state.produk.find(p => p.docId === item.docId); // Cari berdasarkan docId
-            if (productInState) {
-                productInState.stokFisik -= item.qty;
-            }
-        });
-        
-        state.carts[uiState.activeCartChannel] = [];
-        uiState.pos_order_id = '';
-        hideModal();
-        alert("Transaksi berhasil disimpan ke Database!");
-
-    } catch (error) {
-        console.error("Error saat menyimpan transaksi:", error);
-        alert(`Gagal menyimpan transaksi: ${error.message}`);
-    }
+    } catch (error) {
+        console.error("Error saat menyimpan transaksi:", error);
+        alert(`Gagal menyimpan transaksi: ${error.message}`);
+    }
 }
 
 function calculateBestDiscount(cart, channelId) {
@@ -4789,9 +4809,11 @@ async function loadAllDataFromFirebase() {
         return;
     }
     try {
+        // --- [PERUBAHAN 1: Menambahkan 'commissions' untuk diambil] ---
         const collectionsToFetch = [
             getDoc(doc(db, "settings", userId)),
             getDoc(doc(db, "promotions", userId)),
+            getDoc(doc(db, "commissions", userId)), // <-- BARIS BARU DITAMBAHKAN
             getDocs(query(collection(db, "products"), where("userId", "==", userId))),
             getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
             getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
@@ -4802,38 +4824,32 @@ async function loadAllDataFromFirebase() {
             getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
             getDocs(query(collection(db, "categories"), where("userId", "==", userId))),
             getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))), // <-- Tambahan baru
-            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))) // <-- Tambahan baru
+            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId)))
         ];
 
         const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
 
+        // --- [PERUBAHAN 2: Menambahkan variabel 'commissionsSnap'] ---
         const [
-            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
+            settingsSnap, promotionsSnap, commissionsSnap, productsSnap, pricesSnap, allocationsSnap,
             transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
             categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap
         ] = results;
 
-        // Cek jika ada error fundamental (misal: aturan keamanan)
         const firstError = results.find(res => res instanceof Error);
         if (firstError) {
             console.error("Salah satu query gagal:", firstError);
             throw new Error("Gagal mengambil data. Periksa aturan keamanan Firestore Anda.");
         }
         
-        // Proses data seperti biasa...
         if (settingsSnap.exists()) {
             Object.assign(state.settings, settingsSnap.data());
             if (!state.settings.pinProtection) {
-                state.settings.pinProtection = {
-                    dashboard: true,
-                    incomeHistory: true,
-                    investmentPage: true,
-                };
+                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true, };
             }
         }
         
-        // TAMBAHKAN INI UNTUK MEMASTIKAN KATEGORI PEMASUKAN JUGA DIUPDATE
         const userDocRef = doc(db, "users", userId);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
@@ -4844,38 +4860,41 @@ async function loadAllDataFromFirebase() {
             Object.assign(state.promotions, promotionsSnap.data());
         }
 
+        // --- [PERUBAHAN 3: Memproses data komisi yang baru diambil] ---
+        if (commissionsSnap && commissionsSnap.exists()) {
+            Object.assign(state.commissions, commissionsSnap.data());
+        }
+        // --- [AKHIR PERUBAHAN 3] ---
+
         const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
         
+        // --- [PERUBAHAN 4: Menghapus logika komisi lama dari data produk] ---
         state.produk = productsSnap.docs.map(docSnap => {
-    const p = { id: docSnap.id, ...docSnap.data() };
-    const hargaJual = {};
-    const stokAlokasi = {};
-    const commissions = {};
-    // Perbaikan: Cari alokasi berdasarkan ID dokumen
-    const productAllocation = allocationsData.find(alloc => alloc.sku === p.id); 
-    (state.settings.marketplaces || []).forEach(mp => {
-        // Perbaikan: Cari harga berdasarkan ID produk
-        const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id); 
-        hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-        commissions[mp.id] = priceInfo ? (priceInfo.commission || 0) : 0;
-        stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-    });
-    return {
-        docId: p.id,                // <-- BARU: Simpan ID asli dokumen
-        sku: p.sku,                 // <-- DIPERBAIKI: Ambil SKU dari field data
-        nama: p.product_name, 
-        model_id: p.model_id, 
-        warna: p.color, 
-        varian: p.variant,
-        stokFisik: p.physical_stock, 
-        hpp: p.hpp, 
-        hargaJual, 
-        stokAlokasi,
-        commissions,
-        userId: p.userId
-    };
-});
+            const p = { id: docSnap.id, ...docSnap.data() };
+            const hargaJual = {};
+            const stokAlokasi = {};
+            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id); 
+            (state.settings.marketplaces || []).forEach(mp => {
+                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id); 
+                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+            });
+            return {
+                docId: p.id,
+                sku: p.sku,
+                nama: p.product_name, 
+                model_id: p.model_id, 
+                warna: p.color, 
+                varian: p.variant,
+                stokFisik: p.physical_stock, 
+                hpp: p.hpp, 
+                hargaJual, 
+                stokAlokasi,
+                // Properti 'commissions' dihapus dari sini karena sekarang dikelola secara global
+                userId: p.userId
+            };
+        });
         
         state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
@@ -5708,8 +5727,8 @@ watch(activePage, (newPage) => {
     <div v-if="activePage === 'harga-hpp'">
     <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
         <div>
-            <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga Jual, HPP & Komisi</h2>
-            <p class="text-slate-600 mt-1">Atur modal (HPP) dan harga jual serta komisi untuk setiap varian di semua channel.</p>
+            <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga, HPP & Komisi</h2>
+            <p class="text-slate-600 mt-1">Atur komisi per-model, lalu atur HPP dan harga jual per-varian.</p>
         </div>
         <div class="flex gap-2">
             <button @click="showModal('priceCalculator')" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 transition-colors shadow">Kalkulator Harga</button>
@@ -5722,12 +5741,31 @@ watch(activePage, (newPage) => {
 
     <div class="bg-white p-6 rounded-xl border">
         <div class="mb-6 max-w-lg">
-            <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Produk</label>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Model Produk</label>
             <select v-model="uiState.hargaHppSelectedProduct" class="w-full p-3 border border-slate-300 rounded-md">
                 <option value="">-- Pilih --</option>
                 <option v-for="namaProduk in hargaHppProductNames" :key="namaProduk" :value="namaProduk">{{ namaProduk }}</option>
             </select>
         </div>
+
+        <!-- [BAGIAN BARU] Pengaturan Komisi per Model -->
+        <div v-if="uiState.hargaHppSelectedProduct" class="mb-6 p-4 border-2 border-dashed border-indigo-300 bg-indigo-50 rounded-lg">
+            <h4 class="text-lg font-semibold text-indigo-800">Pengaturan Komisi untuk Model: {{ uiState.hargaHppSelectedProduct }}</h4>
+            <p class="text-sm text-slate-600 mt-1 mb-4">Komisi yang Anda atur di sini akan berlaku untuk SEMUA varian dari model ini.</p>
+            <div class="space-y-3">
+                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
+                    <label class="text-sm font-medium text-slate-700">{{ marketplace.name }}</label>
+                    <div class="relative w-36">
+                        <input type="text" 
+                               v-model="commissionModelComputed(uiState.hargaHppSelectedProduct, marketplace.id).value"
+                               class="w-full p-2 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
+                               placeholder="0">
+                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- [AKHIR BAGIAN BARU] -->
 
         <div class="space-y-4">
             <p v-if="!uiState.hargaHppSelectedProduct" class="text-center py-16 text-slate-500">Pilih produk di atas untuk mulai.</p>
@@ -5745,10 +5783,10 @@ watch(activePage, (newPage) => {
                     </div>
                 </div>
 
-                <div class="md:col-span-2 space-y-4">
-                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="border-b pb-3 last:border-b-0">
-                        <div class="flex justify-between items-center mb-2">
-                            <label class="text-sm font-semibold text-slate-700">{{ marketplace.name }}</label>
+                <div class="md:col-span-2 space-y-3">
+                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
+                        <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
+                        <div class="flex items-center gap-2">
                             <span class="text-xs font-bold px-2 py-0.5 rounded-full" 
                                   :class="{
                                    'bg-green-100 text-green-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 40, 
@@ -5757,28 +5795,9 @@ watch(activePage, (newPage) => {
                                   }">
                                 {{ (varian.hargaJual[marketplace.id] && varian.hpp && varian.hargaJual[marketplace.id] > 0 ? (((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
                             </span>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-medium text-slate-500">Harga Jual</label>
-                                <div class="relative mt-1">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">Rp</span>
-                                    <input type="text" 
-                                           :value="formatInputNumber(varian.hargaJual[marketplace.id])" 
-                                           @input="varian.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" 
-                                           class="w-full p-2 pl-7 pr-3 border border-slate-300 rounded-md text-right font-medium text-sm">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-500">Komisi (%)</label>
-                                <div class="relative mt-1">
-                                    <input type="text" 
-                                           :value="varian.commissions ? varian.commissions[marketplace.id] : ''" 
-                                           @input="varian.commissions[marketplace.id] = parsePercentageInput($event.target.value)" 
-                                           class="w-full p-2 pr-6 border border-slate-300 rounded-md text-right text-sm" placeholder="0">
-                                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
-                                </div>
+                            <div class="relative w-36">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                <input type="text" :value="formatInputNumber(varian.hargaJual[marketplace.id])" @input="varian.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold">
                             </div>
                         </div>
                     </div>
