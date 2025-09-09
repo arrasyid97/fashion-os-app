@@ -1,7 +1,10 @@
 import { HttpsProxyAgent } from 'https-proxy-agent';
 const crypto = require('crypto');
 
-const PROXY_URL = process.env.PROXYLITE_URL; 
+// --- [PERBAIKAN KUNCI DI SINI] ---
+// Mengambil URL proxy dari NAMA VARIABEL YANG BARU
+const PROXY_URL = process.env.STATIC_IP_PROXY_URL; 
+// ---------------------------------
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -29,10 +32,7 @@ export default async function handler(req, res) {
                             .digest('hex')
         };
 
-        // --- [PERBAIKAN KUNCI DI SINI] ---
-        // URL diubah dari 'api-sandbox' menjadi 'api' untuk mode produksi
         const response = await fetch('https://tripay.co.id/api/transaction/create', {
-        // ---------------------------------
             method: 'POST',
             headers: {
                 'Authorization': 'Bearer ' + process.env.TRIPAY_API_KEY,
