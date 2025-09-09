@@ -1,67 +1,89 @@
-// Impor library yang diperlukan
-const crypto = require('crypto');
-const { db } = require('../firebase.js'); // Pastikan path ke firebase.js benar
-const { doc, updateDoc } = require('firebase/firestore');
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import crypto from 'crypto';
 
-// Ambil kunci rahasia dari environment variables
-const TRIPAY_PRIVATE_KEY = process.env.TRIPAY_PRIVATE_KEY;
+// Konfigurasi untuk menonaktifkan body parser default Vercel
+// Ini PENTING agar kita bisa memverifikasi signature dari Tripay
+export const config = {
+    api: {
+        bodyParser: false,
+    },
+};
+
+// Inisialisasi Firebase Admin SDK
+// Mengambil kredensial dari Vercel Environment Variable
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+// Cek apakah aplikasi sudah diinisialisasi untuk menghindari error duplikat
+if (!getApps().length) {
+    initializeApp({
+        credential: cert(serviceAccount)
+    });
+}
+
+const db = getFirestore();
+
+// Fungsi untuk membaca raw body dari request
+async function getRawBody(req) {
+    const chunks = [];
+    for await (const chunk of req) {
+        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    }
+    return Buffer.concat(chunks);
+}
 
 export default async function handler(req, res) {
-  // 1. Hanya izinkan metode POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method Not Allowed' });
-  }
+    if (req.method !== 'POST') {
+        return res.status(405).json({ success: false, message: 'Method Not Allowed' });
+    }
 
-  // --- Verifikasi Signature Webhook ---
-  const signature = req.headers['x-callback-signature'];
-  const json_data = JSON.stringify(req.body);
+    try {
+        const privateKey = process.env.TRIPAY_PRIVATE_KEY;
+        const callbackSignature = req.headers['x-callback-signature'];
+        
+        // 1. Baca dan Verifikasi Signature
+        const rawBody = await getRawBody(req);
+        const signature = crypto.createHmac('sha256', privateKey)
+                                .update(rawBody)
+                                .digest('hex');
 
-  // Buat signature pembanding menggunakan private key Anda
-  const hash = crypto.createHmac('sha256', TRIPAY_PRIVATE_KEY)
-                     .update(json_data)
-                     .digest('hex');
+        if (signature !== callbackSignature) {
+            return res.status(401).json({ success: false, message: 'Invalid Signature' });
+        }
 
-  if (signature !== hash) {
-    console.warn('Signature verification failed. Incoming signature:', signature, 'Generated hash:', hash);
-    return res.status(401).json({ success: false, message: 'Unauthorized. Invalid signature.' });
-  }
+        // 2. Proses Notifikasi jika Signature Valid
+        const data = JSON.parse(rawBody.toString());
 
-  // --- Proses Data Webhook ---
-  const { merchant_ref, status } = req.body;
+        if (data.status === 'PAID') {
+            const externalId = data.merchant_ref; // 'FASHIONOS-UIDLENGKAP-TIMESTAMP'
+            const parts = externalId.split('-');
+            
+            if (parts.length < 2 || parts[0] !== 'FASHIONOS') {
+                throw new Error('Format merchant_ref tidak valid');
+            }
 
-  // Pastikan status pembayaran adalah 'PAID' (atau 'SETTLEMENT' tergantung konfigurasi Tripay Anda)
-  if (status !== 'PAID') {
-    return res.status(200).json({ success: true, message: `Skipping processing for status: ${status}` });
-  }
+            const userId = parts[1]; // Mengambil UID lengkap dari merchant_ref
+            const userRef = db.collection('users').doc(userId);
 
-  // AMBIL ID USER DARI merchant_ref
-  // Asumsi format merchant_ref adalah 'FASHIONOS-USERID-TIMESTAMP'
-  const userId = merchant_ref ? merchant_ref.split('-')[1] : null;
+            // Tentukan tanggal berakhirnya langganan (30 hari dari sekarang)
+            const now = new Date();
+            const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + 1));
 
-  if (!userId) {
-    console.error('Failed to extract userId from merchant_ref:', merchant_ref);
-    return res.status(400).json({ success: false, message: 'Invalid merchant reference format.' });
-  }
+            // 3. Update Database Firestore
+            await userRef.update({
+                subscriptionStatus: 'active',
+                subscriptionEndDate: subscriptionEndDate,
+                trialEndDate: null // Hapus tanggal trial jika ada
+            });
+        }
 
-  try {
-    // --- Update Database Firestore ---
-    const userRef = doc(db, 'users', userId);
-    
-    // Hitung tanggal kedaluwarsa (30 hari dari sekarang)
-    const subscriptionEndDate = new Date(Date.now() + (30 * 24 * 60 * 60 * 1000));
+        // 4. Kirim Respons Sukses ke Tripay
+        return res.status(200).json({ success: true });
 
-    // **PERBAIKAN UTAMA:** Menghapus 'userData.' agar path data sesuai dengan app.vue
-    await updateDoc(userRef, {
-      subscriptionStatus: 'active',
-      subscriptionEndDate: subscriptionEndDate
-    });
-    
-    console.log(`Successfully updated subscription for user: ${userId}`);
-    return res.status(200).json({ success: true, message: 'Webhook received and processed successfully.' });
-
-  } catch (error) {
-    console.error(`Error processing webhook for user: ${userId}`, error);
-    // Jika terjadi error, kirim status 500 agar Tripay mencoba mengirim ulang webhook nanti.
-    return res.status(500).json({ success: false, message: 'Internal Server Error during database update.' });
-  }
+    } catch (error) {
+        console.error('Webhook Error:', error.message);
+        return res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
 }
+    
+
