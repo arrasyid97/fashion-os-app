@@ -1006,6 +1006,7 @@ async function handleLogin() {
         await signInWithEmailAndPassword(auth, authForm.email, authForm.password);
         
         // Baris `const user = userCredential.user;` sudah dihapus.
+        // Baris `await handleAuth(user);` sudah dihapus.
         
         authForm.error = '';
         alert('Selamat datang kembali!');
