@@ -2957,7 +2957,7 @@ function calculateSellingPrice() {
             // Menghapus 'commission' dan 'komisiRate' dari breakdown
             // commission,
             // komisiRate: mp.komisi || 0,
-            // --- AKHIR PERUBAHAN ---
+            // --- AKHIR PERUBAHANn ---
             serviceFee,
             layananRate: mp.layanan || 0,
             programFee: itemizedProgramFees,
