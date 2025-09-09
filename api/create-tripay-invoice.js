@@ -38,7 +38,7 @@ export default async function handler(req, res) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(data),
-            // --- [KODE BARU 3: Menyisipkan konfigurasi proxy] ---
+            // --- [KODE BARUu 3: Menyisipkan konfigurasi proxy] ---
             // Ini akan membuat `fetch` berjalan melalui IP statis Anda
             ...(PROXY_URL && { agent: new HttpsProxyAgent(PROXY_URL) })
         });
