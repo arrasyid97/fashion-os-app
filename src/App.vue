@@ -2562,7 +2562,7 @@ function showModal(type, data = {}) {
             }
         } else if (type === 'addProduksi') {
             if (!state.settings.modelProduk || state.settings.modelProduk.length === 0) {
-                alert("Data 'Model Produk' belum selesai dimuat. silahkan kehalaman pengaturan untuk menambahkan model produk.");
+                alert("Data 'Model Produk' belum dibuat. silahkan kehalaman pengaturan untuk menambahkan model produk.");
                 hideModal();
                 return;
             }
