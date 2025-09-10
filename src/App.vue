@@ -5,7 +5,7 @@ import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 
 // Impor dari file konfigurasi Firebase Anda
-// Final sync check
+
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
