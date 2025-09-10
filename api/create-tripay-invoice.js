@@ -38,12 +38,19 @@ export default async function handler(req, res) {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(data),
-            // Menggunakan agen proxy jika URL-nya ada
-            ...(process.env.STATIC_IP_PROXY_URL && { agent: new HttpsProxyAgent(process.env.STATIC_IP_PROXY_URL) })
+            body: JSON.stringify(data)
         };
-        
-        // Menggunakan fetch alih-alih axios
+
+        // Tambahkan logika proksi secara eksplisit
+        let proxyAgent;
+        if (process.env.STATIC_IP_PROXY_URL) {
+            proxyAgent = new HttpsProxyAgent(process.env.STATIC_IP_PROXY_URL);
+            fetchConfig.agent = proxyAgent;
+            console.log('Using static IP proxy:', process.env.STATIC_IP_PROXY_URL);
+        } else {
+            console.log('No static IP proxy configured.');
+        }
+
         const response = await fetch('https://tripay.co.id/api/transaction/create', fetchConfig);
         const result = await response.json();
 
