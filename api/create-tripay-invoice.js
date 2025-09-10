@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { request, ProxyAgent } from 'undici';
+import axios from 'axios';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -32,33 +33,32 @@ export default async function handler(req, res) {
             signature: signature
         };
 
-        let dispatcher;
-        if (process.env.STATIC_IP_PROXY_URL) {
-            dispatcher = new ProxyAgent(process.env.STATIC_IP_PROXY_URL);
-            console.log('Menggunakan proxy statis:', process.env.STATIC_IP_PROXY_URL);
-        }
-
-        const response = await request('https://tripay.co.id/api/transaction/create', {
-            method: 'POST',
+        const config = {
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data),
-            dispatcher: dispatcher // Mengatur dispatcher secara eksplisit di sini
-        });
+            }
+        };
 
-        const result = await response.body.json();
+        // Menggunakan SocksProxyAgent untuk axios jika proksi tersedia
+        if (process.env.STATIC_IP_PROXY_URL) {
+            const proxyAgent = new SocksProxyAgent(process.env.STATIC_IP_PROXY_URL);
+            config.httpAgent = proxyAgent;
+            config.httpsAgent = proxyAgent;
+            console.log('Menggunakan proxy statis:', process.env.STATIC_IP_PROXY_URL);
+        }
 
-        if (response.statusCode >= 200 && response.statusCode < 300 && result.success) {
-            return res.status(200).json({ payment_url: result.data.checkout_url });
+        const response = await axios.post('https://tripay.co.id/api/transaction/create', data, config);
+
+        if (response.status === 200 && response.data.success) {
+            return res.status(200).json({ payment_url: response.data.data.checkout_url });
         } else {
-            console.error('Gagal membuat invoice Tripay:', result.message);
-            return res.status(response.statusCode).json({ message: 'Tripay Error', error: result.message });
+            console.error('Gagal membuat invoice Tripay:', response.data.message);
+            return res.status(response.status).json({ message: 'Tripay Error', error: response.data.message });
         }
 
     } catch (error) {
-        console.error('Kesalahan dalam API Tripay:', error.message);
+        console.error('Kesalahan dalam API Tripay:', error.response ? error.response.data : error.message);
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 }
