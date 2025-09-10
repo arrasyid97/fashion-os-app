@@ -1,6 +1,5 @@
+import https from 'https';
 import crypto from 'crypto';
-import fetch from 'node-fetch';
-import { SocksProxyAgent } from 'socks-proxy-agent';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -17,7 +16,7 @@ export default async function handler(req, res) {
             .update(merchantCode + externalId + String(amount))
             .digest('hex');
 
-        const data = {
+        const postData = JSON.stringify({
             method: 'BRIVA',
             merchant_ref: externalId,
             amount: amount,
@@ -31,34 +30,50 @@ export default async function handler(req, res) {
             return_url: `${req.headers.origin}/langganan?status=success`,
             expired_time: Math.round((Date.now() / 1000) + (24 * 60 * 60)),
             signature: signature
-        };
+        });
 
-        const config = {
+        const options = {
+            hostname: 'tripay.co.id',
+            path: '/api/transaction/create',
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data),
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
         };
 
-        // Menggunakan SocksProxyAgent untuk node-fetch jika proksi tersedia
-        if (process.env.STATIC_IP_PROXY_URL) {
-            config.agent = new SocksProxyAgent(process.env.STATIC_IP_PROXY_URL);
-            console.log('Menggunakan proxy statis:', process.env.STATIC_IP_PROXY_URL);
-        }
+        const apiRequest = https.request(options, (apiResponse) => {
+            let data = '';
+            apiResponse.on('data', (chunk) => {
+                data += chunk;
+            });
+            apiResponse.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    if (apiResponse.statusCode === 200 && result.success) {
+                        return res.status(200).json({ payment_url: result.data.checkout_url });
+                    } else {
+                        console.error('Gagal membuat invoice Tripay:', result.message);
+                        return res.status(apiResponse.statusCode).json({ message: 'Tripay Error', error: result.message });
+                    }
+                } catch (e) {
+                    console.error('Kesalahan dalam respons Tripay:', e.message);
+                    return res.status(500).json({ message: 'Internal Server Error', error: e.message });
+                }
+            });
+        });
 
-        const response = await fetch('https://tripay.co.id/api/transaction/create', config);
-        const result = await response.json();
+        apiRequest.on('error', (error) => {
+            console.error('Kesalahan dalam permintaan API:', error.message);
+            return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+        });
 
-        if (response.ok && result.success) {
-            return res.status(200).json({ payment_url: result.data.checkout_url });
-        } else {
-            console.error('Gagal membuat invoice Tripay:', result.message);
-            return res.status(response.status).json({ message: 'Tripay Error', error: result.message });
-        }
+        apiRequest.write(postData);
+        apiRequest.end();
+
     } catch (error) {
-        console.error('Kesalahan dalam API Tripay:', error.message);
+        console.error('Kesalahan umum:', error.message);
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 }
