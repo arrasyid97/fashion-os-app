@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { request } from 'undici';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -32,33 +33,27 @@ export default async function handler(req, res) {
             signature: signature
         };
 
-        const fetchConfig = {
+        const proxyAgent = process.env.STATIC_IP_PROXY_URL ? new HttpsProxyAgent(process.env.STATIC_IP_PROXY_URL) : undefined;
+
+        // Menggunakan undici.request sebagai pengganti fetch
+        const { body, statusCode } = await request('https://tripay.co.id/api/transaction/create', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(data)
-        };
+            body: JSON.stringify(data),
+            // undici menggunakan 'dispatcher' untuk agent
+            dispatcher: proxyAgent,
+        });
 
-        // Tambahkan logika proksi secara eksplisit
-        let proxyAgent;
-        if (process.env.STATIC_IP_PROXY_URL) {
-            proxyAgent = new HttpsProxyAgent(process.env.STATIC_IP_PROXY_URL);
-            fetchConfig.agent = proxyAgent;
-            console.log('Using static IP proxy:', process.env.STATIC_IP_PROXY_URL);
-        } else {
-            console.log('No static IP proxy configured.');
-        }
+        const result = await body.json();
 
-        const response = await fetch('https://tripay.co.id/api/transaction/create', fetchConfig);
-        const result = await response.json();
-
-        if (response.ok && result.success) {
+        if (statusCode >= 200 && statusCode < 300 && result.success) {
             return res.status(200).json({ payment_url: result.data.checkout_url });
         } else {
             console.error('Error creating Tripay invoice:', result.message);
-            return res.status(response.status).json({ message: 'Tripay Error', error: result.message });
+            return res.status(statusCode).json({ message: 'Tripay Error', error: result.message });
         }
 
     } catch (error) {
