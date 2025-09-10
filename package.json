@@ -11,10 +11,12 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.53.0",
     "axios": "^1.7.2",
+    "body-parser": "^2.2.0",
     "chart.js": "^4.4.3",
     "chartjs-adapter-date-fns": "^3.0.0",
     "core-js": "^3.8.3",
     "date-fns": "^3.6.0",
+    "express": "^5.1.0",
     "firebase": "^10.12.2",
     "firebase-admin": "^13.5.0",
     "socks-proxy-agent": "^8.0.5",
