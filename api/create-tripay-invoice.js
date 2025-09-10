@@ -1,8 +1,7 @@
 import axios from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
-const crypto = require('crypto');
+import crypto from 'crypto';
 
-// Mengambil URL proxy dari Environment Variable yang sudah kita atur
 const PROXY_URL = process.env.STATIC_IP_PROXY_URL;
 
 export default async function handler(req, res) {
@@ -11,8 +10,15 @@ export default async function handler(req, res) {
     }
 
     const { amount, externalId, payerEmail, description } = req.body;
+    const apiKey = process.env.TRIPAY_API_KEY;
+    const privateKey = process.env.TRIPAY_PRIVATE_KEY;
+    const merchantCode = process.env.TRIPAY_MERCHANT_CODE;
 
     try {
+        const signature = crypto.createHmac('sha256', privateKey)
+                                .update(merchantCode + externalId + String(amount))
+                                .digest('hex');
+
         const data = {
             method: 'BRIVA',
             merchant_ref: externalId,
@@ -26,26 +32,24 @@ export default async function handler(req, res) {
             }],
             return_url: `${req.headers.origin}/langganan?status=success`,
             expired_time: Math.round((Date.now() / 1000) + (24 * 60 * 60)),
-            signature: crypto.createHmac('sha256', process.env.TRIPAY_PRIVATE_KEY)
-                            .update(process.env.TRIPAY_MERCHANT_CODE + externalId + String(amount))
-                            .digest('hex')
+            signature: signature
         };
 
-        // Membuat agen proxy HANYA jika PROXY_URL ada
-        const httpsAgent = PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined;
-
-        // Konfigurasi untuk permintaan Axios
-        const config = {
+        // --- [PERBAIKAN KUNCI DI SINI] ---
+        // Konfigurasi untuk axios
+        const axiosConfig = {
             headers: {
-                'Authorization': 'Bearer ' + process.env.TRIPAY_API_KEY,
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
             },
-            // Memberitahu Axios untuk menggunakan agen proxy kita
-            httpsAgent: httpsAgent
+            // Memberitahu axios untuk menggunakan agen proxy jika URL-nya ada
+            ...(PROXY_URL && { httpsAgent: new HttpsProxyAgent(PROXY_URL) })
         };
 
-        // Mengirim permintaan menggunakan Axios
-        const response = await axios.post('[https://tripay.co.id/api/transaction/create](https://tripay.co.id/api/transaction/create)', data, config);
-        const result = response.data; // Di Axios, data respons ada di dalam `response.data`
+        // Menggunakan axios.post bukan fetch
+        const response = await axios.post('[https://tripay.co.id/api/transaction/create](https://tripay.co.id/api/transaction/create)', data, axiosConfig);
+        const result = response.data;
+        // --- [AKHIR PERBAIKAN] ---
 
         if (result.success) {
             return res.status(200).json({ payment_url: result.data.checkout_url });
@@ -55,14 +59,8 @@ export default async function handler(req, res) {
         }
 
     } catch (error) {
-        if (error.response) {
-            // Menangkap error spesifik dari API Tripay
-            console.error('Axios error response:', error.response.data);
-            return res.status(500).json({ message: 'Tripay Error', error: error.response.data.message });
-        } else {
-            // Menangkap error jaringan atau lainnya
-            console.error('Error in Tripay API call:', error.message);
-            return res.status(500).json({ message: 'Internal Server Error' });
-        }
+        // Axios memberikan detail error yang lebih baik
+        console.error('Error in Tripay API:', error.response ? error.response.data : error.message);
+        return res.status(500).json({ message: 'Internal Server Error' });
     }
 }
