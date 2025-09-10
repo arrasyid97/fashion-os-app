@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-import { request } from 'undici';
-import { ProxyAgent } from 'proxy-agent';
+import { request, ProxyAgent } from 'undici';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -33,23 +32,22 @@ export default async function handler(req, res) {
             signature: signature
         };
 
-        const fetchConfig = {
+        let dispatcher;
+        if (process.env.STATIC_IP_PROXY_URL) {
+            dispatcher = new ProxyAgent(process.env.STATIC_IP_PROXY_URL);
+            console.log('Menggunakan proxy statis:', process.env.STATIC_IP_PROXY_URL);
+        }
+
+        const response = await request('https://tripay.co.id/api/transaction/create', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(data),
-        };
+            dispatcher: dispatcher // Mengatur dispatcher secara eksplisit di sini
+        });
 
-        // Menggunakan ProxyAgent dari library 'proxy-agent'
-        if (process.env.STATIC_IP_PROXY_URL) {
-            const proxyAgent = new ProxyAgent(process.env.STATIC_IP_PROXY_URL);
-            fetchConfig.dispatcher = proxyAgent;
-            console.log('Menggunakan proxy statis:', process.env.STATIC_IP_PROXY_URL);
-        }
-
-        const response = await request('https://tripay.co.id/api/transaction/create', fetchConfig);
         const result = await response.body.json();
 
         if (response.statusCode >= 200 && response.statusCode < 300 && result.success) {
