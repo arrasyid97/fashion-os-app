@@ -1,7 +1,7 @@
-import https from 'https';
-import crypto from 'crypto';
+const https = require('https');
+const crypto = require('crypto');
 
-export default async function handler(req, res) {
+function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
@@ -77,3 +77,7 @@ export default async function handler(req, res) {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 }
+
+module.exports = {
+  default: handler,
+};

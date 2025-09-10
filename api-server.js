@@ -1,20 +1,25 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
-const handler = require('./api/create-tripay-invoice');
+
+// [PERBAIKAN KUNCI 1]: Impor file rute Anda dengan benar
+const tripayRoutes = require('./api_vps/routes/tripay');
+const webhookRoutes = require('./api_vps/routes/webhook');
+
+// Inisialisasi aplikasi Express
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 
-const corsOptions = {
-  origin: 'https://appfashion.id', // Domain frontend Anda di Vercel
-  optionsSuccessStatus: 200 // Untuk kompatibilitas browser
-};
+// Mengaktifkan CORS agar aplikasi Vercel Anda bisa berkomunikasi
+app.use(cors({
+  origin: 'https://appfashion.id'
+}));
 
-app.use(cors(corsOptions));
-app.use(bodyParser.json());
+// [PERBAIKAN KUNCI 2]: Gunakan app.use() untuk memasang (mount) seluruh router.
+// Ini adalah cara yang benar untuk memberitahu Express agar menggunakan "buku menu" yang sudah kita siapkan.
+app.use('/api/v1/tripay', tripayRoutes);
+app.use('/api/v1/webhook', webhookRoutes);
 
-app.post('/api/create-tripay-invoice', handler.default);
-
+// Menjalankan server
 app.listen(port, () => {
-    console.log(`Server API berjalan di http://localhost:${port}`);
+  console.log(`Server API Fashion OS berjalan di http://localhost:${port}`);
 });
