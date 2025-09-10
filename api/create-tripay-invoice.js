@@ -1,12 +1,7 @@
-import axios from 'axios';
-// --- [PERBAIKAN KUNCI 1: Mengimpor alat yang benar] ---
-import { SocksProxyAgent } from 'socks-proxy-agent';
-import crypto from 'crypto';
+const https = require('https');
+const crypto = require('crypto');
 
-// Mengambil URL proxy dari Vercel Environment Variable
-const PROXY_URL = process.env.STATIC_IP_PROXY_URL;
-
-export default async function handler(req, res) {
+function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
@@ -16,17 +11,12 @@ export default async function handler(req, res) {
     const privateKey = process.env.TRIPAY_PRIVATE_KEY;
     const merchantCode = process.env.TRIPAY_MERCHANT_CODE;
 
-    if (!apiKey || !privateKey || !merchantCode || !PROXY_URL) {
-        console.error("Salah satu environment variable penting tidak ditemukan.");
-        return res.status(500).json({ message: "Konfigurasi server tidak lengkap." });
-    }
-
     try {
         const signature = crypto.createHmac('sha256', privateKey)
-                                .update(merchantCode + externalId + String(amount))
-                                .digest('hex');
+            .update(merchantCode + externalId + String(amount))
+            .digest('hex');
 
-        const data = {
+        const postData = JSON.stringify({
             method: 'BRIVA',
             merchant_ref: externalId,
             amount: amount,
@@ -37,29 +27,57 @@ export default async function handler(req, res) {
                 quantity: 1,
                 name: description,
             }],
-            return_url: `https://appfashion.id/langganan?status=success`,
+            return_url: `${req.headers.origin}/langganan?status=success`,
             expired_time: Math.round((Date.now() / 1000) + (24 * 60 * 60)),
             signature: signature
+        });
+
+        const options = {
+            hostname: 'tripay.co.id',
+            path: '/api/transaction/create',
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            }
         };
 
-        const axiosConfig = {
-            headers: { 'Authorization': `Bearer ${apiKey}` },
-            // --- [PERBAIKAN KUNCI 2: Menggunakan alat yang benar] ---
-            httpsAgent: new SocksProxyAgent(PROXY_URL)
-        };
+        const apiRequest = https.request(options, (apiResponse) => {
+            let data = '';
+            apiResponse.on('data', (chunk) => {
+                data += chunk;
+            });
+            apiResponse.on('end', () => {
+                try {
+                    const result = JSON.parse(data);
+                    if (apiResponse.statusCode === 200 && result.success) {
+                        return res.status(200).json({ payment_url: result.data.checkout_url });
+                    } else {
+                        console.error('Gagal membuat invoice Tripay:', result.message);
+                        return res.status(apiResponse.statusCode).json({ message: 'Tripay Error', error: result.message });
+                    }
+                } catch (e) {
+                    console.error('Kesalahan dalam respons Tripay:', e.message);
+                    return res.status(500).json({ message: 'Internal Server Error', error: e.message });
+                }
+            });
+        });
 
-        const response = await axios.post('[https://tripay.co.id/api/transaction/create](https://tripay.co.id/api/transaction/create)', data, axiosConfig);
-        const result = response.data;
+        apiRequest.on('error', (error) => {
+            console.error('Kesalahan dalam permintaan API:', error.message);
+            return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+        });
 
-        if (result.success) {
-            return res.status(200).json({ payment_url: result.data.checkout_url });
-        } else {
-            console.error('Error dari Tripay:', result.message);
-            return res.status(500).json({ message: 'Tripay Error', error: result.message });
-        }
+        apiRequest.write(postData);
+        apiRequest.end();
 
     } catch (error) {
-        console.error('Error di dalam API:', error.response ? error.response.data : error.message);
-        return res.status(500).json({ message: 'Internal Server Error' });
+        console.error('Kesalahan umum:', error.message);
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 }
+
+module.exports = {
+  default: handler,
+};

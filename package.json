@@ -11,13 +11,22 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.53.0",
     "axios": "^1.7.2",
+<<<<<<< HEAD
+=======
+    "body-parser": "^2.2.0",
+>>>>>>> 9a43ecd34cf55f2fa8a18752c3d0cf28bca099bc
     "chart.js": "^4.4.3",
     "chartjs-adapter-date-fns": "^3.0.0",
     "core-js": "^3.8.3",
     "cors": "^2.8.5",
+<<<<<<< HEAD
     "crypto": "^1.0.1",
     "date-fns": "^3.6.0",
     "express": "^4.19.2",
+=======
+    "date-fns": "^3.6.0",
+    "express": "^5.1.0",
+>>>>>>> 9a43ecd34cf55f2fa8a18752c3d0cf28bca099bc
     "firebase": "^10.12.2",
     "firebase-admin": "^12.1.1",
     "https-proxy-agent": "^7.0.5",
