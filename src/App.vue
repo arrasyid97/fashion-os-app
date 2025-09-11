@@ -7161,7 +7161,7 @@ watch(activePage, (newPage) => {
                         <li>✔️ Update berkala</li>
                     </ul>
                 </div>
-                <button @click="handleSubscriptionTripay('bulanan')"
+                <button @click="handleSubscriptionMayar('bulanan')"
                         :disabled="isSubscribingMonthly"
                         class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed">
                     <span v-if="isSubscribingMonthly">Memproses...</span>
@@ -7182,7 +7182,7 @@ watch(activePage, (newPage) => {
                         <li>💰 <span class="font-semibold">Diskon 2 bulan!</span></li>
                     </ul>
                 </div>
-                <button @click="handleSubscriptionTripay('tahunan')"
+                <button @click="handleSubscriptionMayar('tahunan')"
                         :disabled="isSubscribingYearly"
                         class="mt-8 w-full bg-slate-800 text-white font-bold py-3 px-8 rounded-lg hover:bg-slate-700 disabled:bg-slate-400 disabled:cursor-not-allowed">
                     <span v-if="isSubscribingYearly">Memproses...</span>
