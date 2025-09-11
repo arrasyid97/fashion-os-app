@@ -1,4 +1,4 @@
-// File: /api/create-mayar-payment.js (VERSI DEBUGGING)
+// File: /api/create-mayar-payment.js (VERSI FINAL YANG BENAR)
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -13,11 +13,17 @@ export default async function handler(req, res) {
     const mayarRequestBody = {
       customer_name: "Pelanggan Fashion OS",
       customer_email: email,
-      items: [{ name: `Langganan Fashion OS - ${plan}`, quantity: 1, price: amount }],
+      items: [{
+        name: `Langganan Fashion OS - ${plan}`,
+        quantity: 1,
+        price: amount,
+      }],
       callback_url: "https://appfashion.id/dashboard?payment=success",
     };
 
-    const response = await fetch("https://api.mayar.id/v1/links", {
+    // --- INI ADALAH PERBAIKAN KUNCI ---
+    // Menggunakan endpoint yang benar: /v1/payment-links
+    const response = await fetch("https://api.mayar.id/v1/payment-links", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -26,24 +32,16 @@ export default async function handler(req, res) {
       body: JSON.stringify(mayarRequestBody),
     });
 
-    // --- PERUBAHAN UTAMA DIMULAI DI SINI ---
-
-    // Jika respons TIDAK OK (bukan 200), kita akan membaca balasan sebagai TEKS biasa
-    if (!response.ok) {
-      // Baca respons mentah sebagai teks
-      const errorText = await response.text();
-      // Tampilkan respons mentah ini di log Vercel!
-      console.error("RESPONS MENTAH DARI MAYAR:", errorText);
-      // Kirim pesan error yang lebih informatif ke frontend
-      throw new Error(`Mayar merespons dengan status ${response.status}. Lihat log Vercel untuk detail.`);
-    }
-
-    // Jika respons OK, baru kita coba baca sebagai JSON
     const data = await response.json();
-    
-    // --- AKHIR PERUBAHAN ---
 
-    res.status(200).json({ payment_url: data.data[0].link });
+    if (!response.ok) {
+      console.error("Mayar API Error:", data);
+      throw new Error(data.message || "Gagal membuat link pembayaran Mayar.");
+    }
+    
+    // Kirim kembali link pembayaran ke frontend
+    // Struktur respons Mayar berbeda, kita sesuaikan
+    res.status(200).json({ payment_url: data.data.redirect_url });
 
   } catch (error) {
     console.error("Internal Server Error:", error.message);
