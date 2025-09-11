@@ -13,7 +13,7 @@ export default async function (req, res) {
         }
 
         const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
-        const mayarApiUrl = 'https://api.mayar.id/hl/v1/invoice/create';
+        const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
 
         // --- Perubahan Kunci di sini: Sesuaikan payload dengan format Mayar ---
         const mayarPayload = {
