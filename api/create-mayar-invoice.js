@@ -22,7 +22,7 @@ export default async function (req, res) {
         const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
 
         // Endpoint API Mayar untuk membuat tagihan.
-        const mayarApiUrl = 'https://my.mayar.cloud/api/resource/invoice';
+        const mayarApiUrl = 'https://web.mayar.club/api/resource/invoice';
         
         // Data yang akan dikirim ke API Mayar.
         const mayarPayload = {
