@@ -743,58 +743,58 @@ async function findTransactionForReturn() {
 }
 
 async function handleSubscriptionMayar(plan) {
-  if (!currentUser.value) {
-    alert("Silakan login terlebih dahulu.");
-    return;
-  }
-
-  // Tentukan harga dan nama paket
-  const isMonthly = plan === 'bulanan';
-  const amount = isMonthly ? monthlyPrice.value : yearlyPrice.value;
-  const planName = isMonthly ? 'Bulanan' : 'Tahunan';
-
-  // Tampilkan loading spinner yang sesuai
-  if (isMonthly) {
-    isSubscribingMonthly.value = true;
-  } else {
-    isSubscribingYearly.value = true;
-  }
-
-  try {
-    // Panggil backend Vercel kita
-    const response = await fetch('/api/create-mayar-payment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: amount,
-        plan: planName,
-        email: currentUser.value.email,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-  // Sekarang 'data.message' akan berisi pesan mentah dari Mayar
-  throw new Error(data.message || 'Gagal memproses. Cek log Vercel.');
-}
-
-    if (data.payment_url) {
-      // Arahkan pengguna ke halaman pembayaran Mayar
-      window.location.href = data.payment_url;
-    } else {
-      throw new Error('Gagal mendapatkan URL pembayaran dari server.');
+    if (!currentUser.value) {
+        alert("Silakan login terlebih dahulu.");
+        return;
     }
 
-  } catch (error) {
-    console.error("Gagal memproses langganan Mayar:", error);
-    alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
-  } finally {
-    // Sembunyikan loading spinner
-    isSubscribingMonthly.value = false;
-    isSubscribingYearly.value = false;
-  }
+    let isSubscribingPlan = plan === 'bulanan' ? isSubscribingMonthly : isSubscribingYearly;
+    if (isSubscribingPlan.value) {
+        return;
+    }
+    
+    isSubscribingPlan.value = true;
+    
+    const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
+    const itemName = `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`;
+
+    try {
+        const response = await fetch('https://api.mayar.id/api/v1/invoices', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer {"version":1,"type":"window","query":"query{\n  getPaymentLinkPageDev{\n    page\n    offset\n    total\n    items{\n      name\n      invoiceUrl\n      status\n      amount\n      type\n    }\n  }\n}","apiUrl":"https://api.mayar.id/headless/","variables":"","subscriptionUrl":"","headers":[{"key":"Authorization","value":"Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhYjI3ZDVhMC04ZDhjLTRhYzktODdjYy1hYmYwYjFkNGRmMmEiLCJhY2NvdW50SWQiOiIzN2Q4MDRjYS02YzhjLTRjMTctOTJiNS04YWEyM2JhODhjY2IiLCJjcmVhdGVkQXQiOiIxNzU3NTc1OTI0NDQzIiwicm9sZSI6ImRldmVsb3BlciIsInN1YiI6ImlsaGFtYXJzOTdAZ21haWwuY29tIiwibmFtZSI6IklMSEFNIEFSUk9TWUlEIiwibGluayI6ImRpZ2l0YWwtNzg4NzQiLCJpc1NlbGZEb21haW4iOm51bGwsImlhdCI6MTc1NzU3NTkyNH0.E4pX7fajKrQHd8kZNdOad33NJLQalsJy-QGCPqu2kPlE7EfoUwEoUkjXG4yOIPhYrY2yjLTBqu3qgy4EIN3n7e2PEX_7GrzedHtNVr6DlLj2TYrHRcSFSLQGVbeaABLqQ5ly-l5M0c6YrmHUGr5E75uv4IWRdjR5b6oBsg8Hk8IdWmd0SNT05poH7Uh9QpiolO9ubUK-G2z60NgSOU-gITFKnjFwMo-1NNpDr3KaNMDdQygu6LlX_tSjlvcyy6LBbUmC7moMM7D6c8TQjTZ7LnnqZeyyfSNggJ8RhVzgL3NvR17kvceR2dkQqIZiYmfHvsN2Jo9F0lpuw3OCGeAbKA","enabled":true}],"windowName":"Default","preRequestScript":"","preRequestScriptEnabled":false}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                amount: priceToPay,
+                item_name: itemName,
+                customer_email: currentUser.value.email,
+                callback_url: 'https://appfashion.id/api/mayar-webhook',
+                redirect_url: `https://appfashion.id/langganan?status=success`,
+                merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || `Mayar API Error: ${response.status}`);
+        }
+
+        if (data.invoice_url) {
+            window.location.href = data.invoice_url;
+        } else {
+            throw new Error('Gagal mendapatkan URL pembayaran dari Mayar.');
+        }
+
+    } catch (error) {
+        console.error("Gagal memproses langganan Mayar:", error);
+        alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
+    } finally {
+        isSubscribingPlan.value = false;
+    }
 }
+
 
 const voucherTokoComputed = (channel) => computed({
     get() { return state.promotions.perChannel[channel.id]?.voucherToko ? state.promotions.perChannel[channel.id].voucherToko + '%' : ''; },
