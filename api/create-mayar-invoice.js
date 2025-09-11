@@ -1,5 +1,5 @@
 // Mengimpor library yang dibutuhkan, seperti axios untuk HTTP request.
-import axios from 'axios';
+import axios from 'axios/dist/node/axios.cjs';
 
 // Ini adalah fungsi utama yang akan dieksekusi oleh Vercel.
 export default async function (req, res) {
