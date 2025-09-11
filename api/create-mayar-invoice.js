@@ -19,7 +19,7 @@ export default async function (req, res) {
         const mayarPayload = {
             name: 'Customer Name', // Nama pelanggan, Anda bisa ganti dengan nama dari data pengguna jika ada
             email: customer_email,
-            mobile: '', // Jika Anda punya data nomor HP, tambahkan di sini
+            mobile: '081234567890',
             redirectUrl: redirect_url,
             callbackUrl: callback_url,
             description: item_name,
