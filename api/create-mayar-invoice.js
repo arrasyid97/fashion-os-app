@@ -1,4 +1,4 @@
-// Mengimpor library yang dibutuhkan, seperti axios untuk HTTP request.
+// Mengimpor library yang dibutuhkan
 import axios from 'axios/dist/node/axios.cjs';
 
 // Ini adalah fungsi utama yang akan dieksekusi oleh Vercel.
@@ -26,16 +26,13 @@ export default async function (req, res) {
         
         // Data yang akan dikirim ke API Mayar.
         const mayarPayload = {
-            // ... salin dan tempel semua data yang relevan dari dokumentasi API Mayar ...
-            // Contohnya seperti:
             amount,
             item_name,
             customer_email,
             callback_url,
             redirect_url,
             merchant_ref,
-            // Anda mungkin perlu menambahkan field lain sesuai kebutuhan Mayar, seperti
-            // 'currency': 'IDR'
+            // Tambahkan field lain yang mungkin dibutuhkan, seperti 'currency': 'IDR'
         };
 
         // Mengirim request ke API Mayar.
@@ -50,6 +47,12 @@ export default async function (req, res) {
         return res.status(200).json({ invoice_url: mayarResponse.data.data.invoice_url });
 
     } catch (error) {
+        // Penanganan error yang lebih baik
+        if (error.code === 'ENOTFOUND') {
+            console.error('Error DNS: Tidak dapat menemukan domain my.mayar.cloud. Pastikan URL API Mayar sudah benar.');
+            return res.status(503).json({ message: 'Layanan Mayar tidak dapat dijangkau.', error: error.message });
+        }
+        
         console.error('Error creating Mayar invoice:', error.response?.data || error.message);
         return res.status(500).json({ message: 'Failed to create Mayar invoice', error: error.message });
     }
