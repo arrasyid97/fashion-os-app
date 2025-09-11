@@ -723,7 +723,7 @@ async function findTransactionForReturn() {
         return alert("Silakan scan resi atau masukkan ID Pesanan Marketplace.");
     }
     
-    // Cari transaksi berdasarkan marketplaceOrderId
+    // Cari transaksii berdasarkan marketplaceOrderId
     const foundTrx = state.transaksi.find(t => t.marketplaceOrderId && t.marketplaceOrderId.toLowerCase() === orderId.toLowerCase());
 
     if (foundTrx) {
@@ -759,7 +759,7 @@ async function handleSubscriptionTripay(plan) {
     const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
 
     try {
-        const response = await fetch('http://31.97.66.211:3000/api/v1/tripay/create-invoice', {
+        const response = await fetch('https://api.appfashion.id/api/v1/tripay/create-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
