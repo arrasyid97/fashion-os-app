@@ -759,7 +759,7 @@ async function handleSubscriptionTripay(plan) {
     const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
 
     try {
-        const response = await fetch('http://31.97.66.211:3000/api/create-tripay-invoice', {
+        const response = await fetch('http://31.97.66.211:3000/api/v1/tripay/create-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
