@@ -742,55 +742,57 @@ async function findTransactionForReturn() {
     }
 }
 
-async function handleSubscriptionTripay(plan) {
-    if (!currentUser.value) {
-        alert("Silakan login terlebih dahulu.");
-        return;
+async function handleSubscriptionMayar(plan) {
+  if (!currentUser.value) {
+    alert("Silakan login terlebih dahulu.");
+    return;
+  }
+
+  // Tentukan harga dan nama paket
+  const isMonthly = plan === 'bulanan';
+  const amount = isMonthly ? monthlyPrice.value : yearlyPrice.value;
+  const planName = isMonthly ? 'Bulanan' : 'Tahunan';
+
+  // Tampilkan loading spinner yang sesuai
+  if (isMonthly) {
+    isSubscribingMonthly.value = true;
+  } else {
+    isSubscribingYearly.value = true;
+  }
+
+  try {
+    // Panggil backend Vercel kita
+    const response = await fetch('/api/create-mayar-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: amount,
+        plan: planName,
+        email: currentUser.value.email,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Server Error');
     }
 
-    let isSubscribingPlan = plan === 'bulanan' ? isSubscribingMonthly : isSubscribingYearly;
-
-    if (isSubscribingPlan.value) {
-        return;
+    if (data.payment_url) {
+      // Arahkan pengguna ke halaman pembayaran Mayar
+      window.location.href = data.payment_url;
+    } else {
+      throw new Error('Gagal mendapatkan URL pembayaran dari server.');
     }
-    
-    isSubscribingPlan.value = true;
-    
-    const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
 
-    try {
-        const response = await fetch('https://api.appfashion.id/api/v1/tripay/create-invoice', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                amount: priceToPay,
-                // --- [PERBAIKAN KUNCI DI SINI] ---
-                // Menambahkan jenis 'plan' ke dalam externalId sebagai "memo"
-                externalId: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
-                // ---------------------------------
-                payerEmail: currentUser.value.email,
-                description: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`
-            }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.message || `Server Error: ${response.status}`);
-        }
-
-        if (data.payment_url) {
-            window.location.href = data.payment_url;
-        } else {
-            throw new Error('Gagal mendapatkan URL pembayaran dari server.');
-        }
-
-    } catch (error) {
-        console.error("Gagal memproses langganan Tripay:", error);
-        alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
-    } finally {
-        isSubscribingPlan.value = false;
-    }
+  } catch (error) {
+    console.error("Gagal memproses langganan Mayar:", error);
+    alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
+  } finally {
+    // Sembunyikan loading spinner
+    isSubscribingMonthly.value = false;
+    isSubscribingYearly.value = false;
+  }
 }
 
 const voucherTokoComputed = (channel) => computed({
