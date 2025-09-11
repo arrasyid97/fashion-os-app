@@ -1,4 +1,4 @@
-// File: /api/create-mayar-payment.js (VERSI FINAL YANG BENAR)
+// File: /api/create-mayar-payment.js (VERSI DEBUGGING BARU)
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -10,19 +10,17 @@ export default async function handler(req, res) {
     const { amount, plan, email } = req.body;
     const mayarSecretKey = process.env.MAYAR_SECRET_KEY;
 
+    if (!mayarSecretKey) {
+        throw new Error("MAYAR_SECRET_KEY tidak ditemukan di environment variables Vercel.");
+    }
+
     const mayarRequestBody = {
       customer_name: "Pelanggan Fashion OS",
       customer_email: email,
-      items: [{
-        name: `Langganan Fashion OS - ${plan}`,
-        quantity: 1,
-        price: amount,
-      }],
+      items: [{ name: `Langganan Fashion OS - ${plan}`, quantity: 1, price: amount }],
       callback_url: "https://appfashion.id/dashboard?payment=success",
     };
 
-    // --- INI ADALAH PERBAIKAN KUNCI ---
-    // Menggunakan endpoint yang benar: /v1/payment-links
     const response = await fetch("https://api.mayar.id/v1/payment-links", {
       method: "POST",
       headers: {
@@ -32,15 +30,21 @@ export default async function handler(req, res) {
       body: JSON.stringify(mayarRequestBody),
     });
 
-    const data = await response.json();
+    // --- PERUBAHAN UTAMA DIMULAI DI SINI ---
 
+    // Jika respons TIDAK OK, kita akan membaca balasan sebagai TEKS biasa
     if (!response.ok) {
-      console.error("Mayar API Error:", data);
-      throw new Error(data.message || "Gagal membuat link pembayaran Mayar.");
+      const errorText = await response.text();
+      console.error("RESPONS MENTAH DARI MAYAR:", errorText);
+      // Kirim pesan mentah ini ke frontend
+      return res.status(500).json({ message: `Error dari Mayar: ${errorText}` });
     }
+
+    // Jika respons OK, baru kita baca sebagai JSON
+    const data = await response.json();
     
-    // Kirim kembali link pembayaran ke frontend
-    // Struktur respons Mayar berbeda, kita sesuaikan
+    // --- AKHIR PERUBAHAN ---
+    
     res.status(200).json({ payment_url: data.data.redirect_url });
 
   } catch (error) {

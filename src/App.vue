@@ -775,8 +775,9 @@ async function handleSubscriptionMayar(plan) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'Server Error');
-    }
+  // Sekarang 'data.message' akan berisi pesan mentah dari Mayar
+  throw new Error(data.message || 'Gagal memproses. Cek log Vercel.');
+}
 
     if (data.payment_url) {
       // Arahkan pengguna ke halaman pembayaran Mayar
