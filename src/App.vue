@@ -759,12 +759,9 @@ async function handleSubscriptionMayar(plan) {
     const itemName = `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`;
 
     try {
-        const response = await fetch('https://api.mayar.id/api/v1/invoices', {
+        const response = await fetch('/api/create-mayar-invoice', { // <-- INI YANG PENTING
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer {"version":1,"type":"window","query":"query{\n  getPaymentLinkPageDev{\n    page\n    offset\n    total\n    items{\n      name\n      invoiceUrl\n      status\n      amount\n      type\n    }\n  }\n}","apiUrl":"https://api.mayar.id/headless/","variables":"","subscriptionUrl":"","headers":[{"key":"Authorization","value":"Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhYjI3ZDVhMC04ZDhjLTRhYzktODdjYy1hYmYwYjFkNGRmMmEiLCJhY2NvdW50SWQiOiIzN2Q4MDRjYS02YzhjLTRjMTctOTJiNS04YWEyM2JhODhjY2IiLCJjcmVhdGVkQXQiOiIxNzU3NTc1OTI0NDQzIiwicm9sZSI6ImRldmVsb3BlciIsInN1YiI6ImlsaGFtYXJzOTdAZ21haWwuY29tIiwibmFtZSI6IklMSEFNIEFSUk9TWUlEIiwibGluayI6ImRpZ2l0YWwtNzg4NzQiLCJpc1NlbGZEb21haW4iOm51bGwsImlhdCI6MTc1NzU3NTkyNH0.E4pX7fajKrQHd8kZNdOad33NJLQalsJy-QGCPqu2kPlE7EfoUwEoUkjXG4yOIPhYrY2yjLTBqu3qgy4EIN3n7e2PEX_7GrzedHtNVr6DlLj2TYrHRcSFSLQGVbeaABLqQ5ly-l5M0c6YrmHUGr5E75uv4IWRdjR5b6oBsg8Hk8IdWmd0SNT05poH7Uh9QpiolO9ubUK-G2z60NgSOU-gITFKnjFwMo-1NNpDr3KaNMDdQygu6LlX_tSjlvcyy6LBbUmC7moMM7D6c8TQjTZ7LnnqZeyyfSNggJ8RhVzgL3NvR17kvceR2dkQqIZiYmfHvsN2Jo9F0lpuw3OCGeAbKA","enabled":true}],"windowName":"Default","preRequestScript":"","preRequestScriptEnabled":false}`,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 amount: priceToPay,
                 item_name: itemName,
@@ -794,6 +791,7 @@ async function handleSubscriptionMayar(plan) {
         isSubscribingPlan.value = false;
     }
 }
+
 
 
 const voucherTokoComputed = (channel) => computed({
