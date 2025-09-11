@@ -1,41 +1,36 @@
-// Mengimpor library yang dibutuhkan
 import axios from 'axios/dist/node/axios.cjs';
 
-// Ini adalah fungsi utama yang akan dieksekusi oleh Vercel.
 export default async function (req, res) {
-    // Memastikan request yang masuk adalah metode POST.
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
     try {
-        // Mendapatkan data dari body request yang dikirim dari App.vue.
         const { amount, item_name, customer_email, callback_url, redirect_url, merchant_ref } = req.body;
         
-        // Memastikan semua data yang diperlukan sudah lengkap.
         if (!amount || !item_name || !customer_email || !callback_url || !redirect_url || !merchant_ref) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
-        // Mengambil MAYAR_API_KEY dari Environment Variables Vercel.
-        // Ini adalah cara yang aman untuk menggunakan kunci rahasia.
         const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
+        const mayarApiUrl = 'https://api.mayar.id/hl/v1/invoice/create';
 
-        // Endpoint API Mayar untuk membuat tagihan.
-        const mayarApiUrl = 'https://web.mayar.club/api/resource/invoice';
-        
-        // Data yang akan dikirim ke API Mayar.
+        // --- Perubahan Kunci di sini: Sesuaikan payload dengan format Mayar ---
         const mayarPayload = {
-            amount,
-            item_name,
-            customer_email,
-            callback_url,
-            redirect_url,
-            merchant_ref,
-            // Tambahkan field lain yang mungkin dibutuhkan, seperti 'currency': 'IDR'
+            name: 'Customer Name', // Nama pelanggan, Anda bisa ganti dengan nama dari data pengguna jika ada
+            email: customer_email,
+            mobile: '', // Jika Anda punya data nomor HP, tambahkan di sini
+            redirectUrl: redirect_url,
+            callbackUrl: callback_url,
+            description: item_name,
+            items: [{
+                quantity: 1, // Kita asumsikan 1 item per langganan
+                rate: amount,
+                description: item_name
+            }],
+            // Tambahkan expiredAt jika perlu, atau biarkan Mayar yang mengurusnya
         };
 
-        // Mengirim request ke API Mayar.
         const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
             headers: {
                 'Authorization': `Bearer ${MAYAR_API_KEY}`,
@@ -43,17 +38,20 @@ export default async function (req, res) {
             },
         });
 
-        // Mengirim kembali URL pembayaran dari Mayar ke aplikasi Anda.
-        return res.status(200).json({ invoice_url: mayarResponse.data.data.invoice_url });
+        // Mayar menggunakan `link` di responsnya untuk URL pembayaran
+        if (mayarResponse.data?.data?.link) {
+            return res.status(200).json({ invoice_url: mayarResponse.data.data.link });
+        } else {
+            throw new Error('Gagal mendapatkan URL pembayaran dari Mayar.');
+        }
 
     } catch (error) {
-        // Penanganan error yang lebih baik
         if (error.code === 'ENOTFOUND') {
-            console.error('Error DNS: Tidak dapat menemukan domain my.mayar.cloud. Pastikan URL API Mayar sudah benar.');
+            console.error('Error DNS: Tidak dapat menemukan domain API Mayar. Pastikan URL sudah benar.');
             return res.status(503).json({ message: 'Layanan Mayar tidak dapat dijangkau.', error: error.message });
         }
         
         console.error('Error creating Mayar invoice:', error.response?.data || error.message);
-        return res.status(500).json({ message: 'Failed to create Mayar invoice', error: error.message });
+        return res.status(500).json({ message: 'Failed to create Mayar invoice', error: error.response?.data || error.message });
     }
 }
