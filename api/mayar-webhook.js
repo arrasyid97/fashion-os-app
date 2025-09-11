@@ -1,37 +1,40 @@
-import { db } from './firebase.js';
-    import { doc, setDoc } from 'firebase/firestore';
+// Mengimpor library yang dibutuhkan
+// Import admin dari firebase.js yang sudah ada
+// import { db } from '../firebase'; 
 
-    export default async function handler(req, res) {
-      if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method Not Allowed' });
-      }
+export default async function (req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method Not Allowed' });
+  }
 
-      const { event, data, merchant_ref } = req.body;
+  // Ambil token dari header dan environment variables
+  const mayarTokenHeader = req.headers['mayar-webhook-token'];
+  const myWebhookToken = process.env.MAYAR_WEBHOOK_TOKEN;
 
-      if (event === 'invoice_paid') {
-        const parts = merchant_ref.split('-');
-        const userId = parts[1];
-        const planType = parts[3];
+  // Verifikasi token untuk memastikan request datang dari Mayar
+  if (mayarTokenHeader !== myWebhookToken) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
 
-        const now = new Date();
-        let subscriptionEndDate;
+  const event = req.body;
 
-        if (planType === 'tahunan') {
-            subscriptionEndDate = new Date(now.setFullYear(now.getFullYear() + 1));
-        } else {
-            subscriptionEndDate = new Date(now.setMonth(now.getMonth() + 1));
-        }
+  // Proses event dari Mayar
+  if (event.type === 'invoice.paid' && event.status === 'paid') {
+    const merchantRef = event.data.merchant_ref;
+    // merchantRef akan berisi `FASHIONOS-UID-TIMESTAMP-plan`
+    const [appName, uid, timestamp, plan] = merchantRef.split('-');
 
-        const userRef = doc(db, "users", userId);
-        await setDoc(userRef, {
-            subscriptionStatus: 'active',
-            subscriptionEndDate: subscriptionEndDate,
-            trialEndDate: null
-        }, { merge: true });
+    // Lakukan pembaruan status langganan di database Firebase Anda di sini
+    console.log(`Pembayaran berhasil untuk pengguna: ${uid}, paket: ${plan}`);
 
-        console.log(`Langganan untuk user ${userId} diaktifkan.`);
-        return res.status(200).json({ status: 'success' });
-      }
+    // TODO: Tambahkan kode untuk memperbarui status langganan di Firebase
+    // Contoh:
+    // const userRef = db.collection('users').doc(uid);
+    // await userRef.update({ 
+    //   subscriptionStatus: 'active',
+    //   subscriptionEndDate: ... // Hitung tanggal berakhir
+    // });
+  }
 
-      return res.status(200).json({ status: 'ignored' });
-    }
+  return res.status(200).json({ message: 'Webhook received' });
+}
