@@ -1128,7 +1128,7 @@ async function submitStockAdjustment() {
 
         await runTransaction(db, async (transaction) => {
             const productDoc = await transaction.get(productRef); // get() sekarang menggunakan referensi yang benar
-            // Kita tidak perlu memeriksa 'exists()' lagi karena sudah diperiksa di atas
+            // Kitaa tidak perlu memeriksa 'exists()' lagi karena sudah diperiksa di atas
             
             const currentStock = productDoc.data().physical_stock || 0;
             let newStock;
