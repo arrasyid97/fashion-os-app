@@ -1,56 +1,52 @@
-// File: /api/create-mayar-payment.js
+// File: /api/create-mayar-payment.js (VERSI DEBUGGING)
 
 export default async function handler(req, res) {
-  // Hanya izinkan metode POST
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
   try {
-    // Ambil data dari frontend
     const { amount, plan, email } = req.body;
     const mayarSecretKey = process.env.MAYAR_SECRET_KEY;
 
-    // Siapkan data yang akan dikirim ke Mayar
     const mayarRequestBody = {
-      customer_name: "Pelanggan Fashion OS", // Anda bisa membuat ini dinamis nanti
+      customer_name: "Pelanggan Fashion OS",
       customer_email: email,
-      items: [
-        {
-          name: `Langganan Fashion OS - ${plan}`,
-          quantity: 1,
-          price: amount,
-        },
-      ],
-      // URL kemana pelanggan akan diarahkan setelah pembayaran berhasil
+      items: [{ name: `Langganan Fashion OS - ${plan}`, quantity: 1, price: amount }],
       callback_url: "https://appfashion.id/dashboard?payment=success",
     };
 
-    // Panggil API Mayar untuk membuat link pembayaran
     const response = await fetch("https://api.mayar.id/v1/links", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // Gunakan Secret Key dari Vercel Environment Variables
         "Authorization": `Bearer ${mayarSecretKey}`,
       },
       body: JSON.stringify(mayarRequestBody),
     });
 
-    const data = await response.json();
+    // --- PERUBAHAN UTAMA DIMULAI DI SINI ---
 
+    // Jika respons TIDAK OK (bukan 200), kita akan membaca balasan sebagai TEKS biasa
     if (!response.ok) {
-      // Jika ada error dari Mayar, kirimkan sebagai respons
-      console.error("Mayar API Error:", data);
-      throw new Error(data.message || "Gagal membuat link pembayaran Mayar.");
+      // Baca respons mentah sebagai teks
+      const errorText = await response.text();
+      // Tampilkan respons mentah ini di log Vercel!
+      console.error("RESPONS MENTAH DARI MAYAR:", errorText);
+      // Kirim pesan error yang lebih informatif ke frontend
+      throw new Error(`Mayar merespons dengan status ${response.status}. Lihat log Vercel untuk detail.`);
     }
+
+    // Jika respons OK, baru kita coba baca sebagai JSON
+    const data = await response.json();
     
-    // Kirim kembali link pembayaran ke frontend
+    // --- AKHIR PERUBAHAN ---
+
     res.status(200).json({ payment_url: data.data[0].link });
 
   } catch (error) {
-    console.error("Internal Server Error:", error);
+    console.error("Internal Server Error:", error.message);
     res.status(500).json({ message: error.message });
   }
 }
