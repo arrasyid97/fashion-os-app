@@ -5023,70 +5023,64 @@ onMounted(() => {
 
     // Listener ini akan memantau status login/logout pengguna
     onAuthStateChanged(auth, (user) => {
-        isLoading.value = true;
-        
-        // Hentikan listener data real-time sebelumnya jika ada
-        if (onSnapshotListener) {
-            onSnapshotListener();
-            onSnapshotListener = null;
-        }
+    isLoading.value = true;
+    
+    if (onSnapshotListener) {
+        onSnapshotListener();
+        onSnapshotListener = null;
+    }
 
-        if (user) {
-            // Jika PENGGUNA LOGIN
-            currentUser.value = user;
-            const userDocRef = doc(db, "users", user.uid);
+    if (user) {
+        currentUser.value = user;
+        const userDocRef = doc(db, "users", user.uid);
 
-            // Buat listener real-time BARU untuk data pengguna ini
-            onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
-                console.log("--- Listener Firestore Aktif! ---");
-    console.log("Data user baru diterima dari database:");
-    console.log(userDocSnap.data());
-                if (userDocSnap.exists()) {
-                    const userData = userDocSnap.data();
-                    currentUser.value.userData = userData;
-                    state.settings.dashboardPin = userData.dashboardPin || '';
+        onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
+            console.log("--- Listener Firestore Aktif! ---");
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data();
+                currentUser.value.userData = userData;
+                state.settings.dashboardPin = userData.dashboardPin || '';
 
-                    // Tambahkan baris ini untuk menyimpan data mitra
-                    currentUser.value.isPartner = userData.isPartner || false;
-                    currentUser.value.referralCode = userData.referralCode || null;
+                currentUser.value.isPartner = userData.isPartner || false;
+                currentUser.value.referralCode = userData.referralCode || null;
 
-                    const now = new Date();
-                    const endDate = userData.subscriptionEndDate?.toDate();
-                    const trialDate = userData.trialEndDate?.toDate();
+                const now = new Date();
+                const endDate = userData.subscriptionEndDate?.toDate();
+                const trialDate = userData.trialEndDate?.toDate();
 
-                    const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-                    
-                    const wasPreviouslyOnSubscriptionPage = activePage.value === 'langganan';
+                // Logika utama yang diperbaiki
+                const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+                                            (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+                
+                const wasPreviouslyOnSubscriptionPage = activePage.value === 'langganan';
 
-                    if (isSubscriptionValid) {
-                        if (state.produk.length === 0 || wasPreviouslyOnSubscriptionPage) {
-                            await loadAllDataFromFirebase();
-                        }
-                        const storedPage = localStorage.getItem('lastActivePage');
-                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                        changePage(pageToLoad);
-                    } else {
-                        activePage.value = 'langganan';
+                if (isSubscriptionValid) {
+                    if (state.produk.length === 0 || wasPreviouslyOnSubscriptionPage) {
+                        await loadAllDataFromFirebase();
                     }
+                    const storedPage = localStorage.getItem('lastActivePage');
+                    const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                    changePage(pageToLoad);
                 } else {
-                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
-                    handleLogout();
+                    activePage.value = 'langganan';
                 }
-                isLoading.value = false;
-            }, (error) => {
-                console.error("Gagal mendengarkan data pengguna:", error);
-                alert("Gagal memuat data pengguna. Silakan coba lagi.");
-                isLoading.value = false;
+            } else {
+                console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                 handleLogout();
-            });
-        } else {
-            // Jika PENGGUNA LOGOUT
-            currentUser.value = null;
-            activePage.value = 'login';
+            }
             isLoading.value = false;
-        }
-    });
+        }, (error) => {
+            console.error("Gagal mendengarkan data pengguna:", error);
+            alert("Gagal memuat data pengguna. Silakan coba lagi.");
+            isLoading.value = false;
+            handleLogout();
+        });
+    } else {
+        currentUser.value = null;
+        activePage.value = 'login';
+        isLoading.value = false;
+    }
+});
 });
 
 onUnmounted(() => {
@@ -7302,7 +7296,8 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 <div v-if="activePage === 'langganan'">
-    <div v-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()" class="max-w-4xl mx-auto text-center py-12 px-4">
+    <div v-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()"
+        class="max-w-4xl mx-auto text-center py-12 px-4">
         <div class="bg-white p-8 sm:p-12 rounded-xl shadow-lg border border-green-300 flex flex-col items-center">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
