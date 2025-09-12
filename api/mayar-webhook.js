@@ -13,10 +13,9 @@ export default async function (req, res) {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
-    const mayarTokenHeader = req.headers['mayar-webhook-token'];
+    const mayarTokenHeader = req.headers['x-callback-token'];
     const myWebhookToken = process.env.MAYAR_WEBHOOK_TOKEN;
-console.log("TOKEN YANG DIKIRIM MAYAR:", mayarTokenHeader);
-console.log("TOKEN YANG ADA DI VERCEL:", myWebhookToken);
+
     if (mayarTokenHeader !== myWebhookToken) {
         console.error('Webhook Unauthorized: Invalid token');
         return res.status(401).json({ message: 'Unauthorized' });
