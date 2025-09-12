@@ -35,6 +35,8 @@ const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
 
+const commissions = ref([]);
+
 const isDashboardLocked = ref(true);
 const dashboardPinInput = ref('');
 const dashboardPinError = ref('');
@@ -523,6 +525,61 @@ async function submitAddProduct() {
     } catch (error) {
         console.error('Error menyimpan produk:', error);
         alert(`Gagal menyimpan produk: ${error.message}`);
+    }
+}
+
+const totalUnpaidCommission = computed(() => {
+    return commissions.value.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + c.amount, 0);
+});
+
+const totalPaidCommission = computed(() => {
+    return commissions.value.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
+});
+
+const unpaidCommissions = computed(() => {
+    return commissions.value.filter(c => c.status === 'unpaid').sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
+});
+
+function getCustomerEmail(userId) {
+    // Fungsi ini akan mencari email pelanggan berdasarkan UID
+    const user = uiState.allUsers.find(u => u.uid === userId);
+    return user ? user.email : 'Pelanggan tidak ditemukan';
+}
+
+async function cashoutCommission() {
+    if (!confirm(`Anda akan mencairkan komisi sebesar ${formatCurrency(totalUnpaidCommission.value)}. Lanjutkan?`)) return;
+
+    try {
+        isSaving.value = true;
+        const batch = writeBatch(db);
+        const now = new Date();
+
+        // Tandai semua komisi 'unpaid' menjadi 'paid'
+        commissions.value.filter(c => c.status === 'unpaid').forEach(c => {
+            const commissionRef = doc(db, "commissions", c.id);
+            batch.update(commissionRef, { status: 'paid', paidDate: now });
+        });
+
+        // Catat pengeluaran di koleksi 'keuangan'
+        const expenseData = {
+            kategori: 'Pembayaran Komisi Mitra',
+            jumlah: totalUnpaidCommission.value,
+            catatan: `Pembayaran komisi untuk mitra ${currentUser.value.referralCode}`,
+            jenis: 'pengeluaran',
+            userId: currentUser.value.uid,
+            tanggal: now
+        };
+        const keuanganRef = doc(collection(db, "keuangan"));
+        batch.set(keuanganRef, expenseData);
+
+        await batch.commit();
+        alert('Permintaan pencairan komisi berhasil dicatat!');
+        hideModal();
+    } catch (error) {
+        console.error('Error saat mencairkan komisi:', error);
+        alert('Gagal mencairkan komisi. Silakan coba lagi.');
+    } finally {
+        isSaving.value = false;
     }
 }
 
@@ -6713,12 +6770,65 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="activePage === 'mitra'">
-    <h2 class="text-3xl font-bold">Dashboard Mitra</h2>
-    <div class="p-6 bg-white rounded-xl shadow-sm mt-6">
-        <h4 class="text-lg font-semibold text-slate-800">Kode Rujukan Anda:</h4>
-        <p class="text-3xl font-mono font-bold text-indigo-600 mt-2">{{ currentUser.referralCode }}</p>
-        <p class="text-sm text-slate-500 mt-1">Bagikan kode ini ke teman-teman Anda untuk mendapatkan komisi.</p>
+<div v-if="activePage === 'mitra'" class="animate-fade-in">
+    <div v-if="!currentUser.isPartner" class="flex items-center justify-center h-full p-4">
+        <div class="bg-white rounded-xl shadow-lg p-8 max-w-sm w-full text-center">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">Daftar Menjadi Mitra</h3>
+            <p class="text-sm text-slate-600 mb-4">Dapatkan komisi 10% setiap bulan dari pelanggan yang Anda ajak. Jadilah bagian dari tim kami!</p>
+            <button @click="showModal('registerPartner')" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg">Daftar Sekarang</button>
+        </div>
+    </div>
+    <div v-else>
+        <h2 class="text-3xl font-bold">Dashboard Mitra</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 mb-8">
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <h4 class="text-sm font-medium text-slate-500">Kode Rujukan Anda</h4>
+                <p class="text-2xl font-mono font-bold text-indigo-600 mt-2">{{ currentUser.referralCode }}</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <h4 class="text-sm font-medium text-slate-500">Komisi Belum Dibayar</h4>
+                <p class="text-2xl font-bold text-green-600 mt-2">{{ formatCurrency(totalUnpaidCommission) }}</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <h4 class="text-sm font-medium text-slate-500">Total Komisi Terkumpul</h4>
+                <p class="text-2xl font-bold text-cyan-600 mt-2">{{ formatCurrency(totalPaidCommission + totalUnpaidCommission) }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-slate-800">Riwayat Komisi Belum Dibayar</h3>
+                <button @click="showModal('cashoutCommission')" :disabled="totalUnpaidCommission === 0" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:bg-green-400">
+                    Cairkan Komisi
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-500">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-3">Tanggal</th>
+                            <th class="px-6 py-3">Pelanggan Rujukan</th>
+                            <th class="px-6 py-3 text-right">Jumlah Komisi</th>
+                            <th class="px-6 py-3 text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <tr v-if="unpaidCommissions.length === 0">
+                            <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada komisi yang belum dibayar.</td>
+                        </tr>
+                        <tr v-for="com in unpaidCommissions" :key="com.id" class="hover:bg-slate-50">
+                            <td class="px-6 py-4">{{ new Date(com.paymentDate).toLocaleDateString('id-ID') }}</td>
+                            <td class="px-6 py-4">{{ getCustomerEmail(com.referredUserId) }}</td>
+                            <td class="px-6 py-4 text-right font-bold text-green-600">{{ formatCurrency(com.amount) }}</td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 capitalize">{{ com.status }}</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
