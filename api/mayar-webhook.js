@@ -34,17 +34,17 @@ export default async function (req, res) {
     try {
         if (event.event === 'payment.received' && event.data.status === 'SUCCESS') {
             console.log(`Event 'payment.received' dengan status 'SUCCESS' diterima.`);
-
+            
             // --- KODE PERBAIKAN DI SINI ---
-            // Mencari merchant_ref di berbagai kemungkinan lokasi
-            const merchantRef = event.data.merchant_ref || event.data.metadata?.merchant_ref || null;
-            const customerEmail = event.data.customer_email || event.data.metadata?.customer_email || null;
-            const amountPaid = event.data.amount || event.data.nettAmount || null;
+            // Menggunakan nama kunci yang benar dari log
+            const customerEmail = event.data?.customerEmail;
+            const amountPaid = event.data?.amount;
+            const productDescription = event.data?.productDescription;
 
-            console.log(`Debugging: Merchant Ref: ${merchantRef}, Customer Email: ${customerEmail}`);
+            console.log(`Debugging: Customer Email: ${customerEmail}, Amount: ${amountPaid}, Description: ${productDescription}`);
 
-            if (!customerEmail || !amountPaid) {
-                console.error('❌ ERROR: Data customerEmail atau amountPaid tidak ditemukan di body webhook.');
+            if (!customerEmail || !amountPaid || !productDescription) {
+                console.error('❌ ERROR: Data customerEmail, amount, atau productDescription tidak ditemukan di body webhook.');
                 return res.status(400).json({ message: 'Missing required data from webhook body' });
             }
 
@@ -58,8 +58,11 @@ export default async function (req, res) {
                 const userData = userDoc.data();
                 
                 console.log(`User ditemukan! User ID: ${userId}, Data:`, userData);
-                
-                const plan = merchantRef?.includes('bulanan') ? 'bulanan' : 'tahunan';
+
+                // Menentukan paket langganan dari productDescription
+                const plan = productDescription.includes('Paket Bulanan') ? 'bulanan' : 'tahunan';
+                console.log(`Paket langganan terdeteksi: ${plan}`);
+
                 const now = new Date();
                 const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + (plan === 'bulanan' ? 1 : 12)));
                 await firestoreAdmin.collection("users").doc(userId).set({
