@@ -554,7 +554,7 @@ async function cashoutCommission() {
         const batch = writeBatch(db);
         const now = new Date();
 
-        // Tandai semua komisi 'unpaid' menjadi 'paid'
+        // Tandaii semua komisi 'unpaid' menjadi 'paid'
         commissions.value.filter(c => c.status === 'unpaid').forEach(c => {
             const commissionRef = doc(db, "commissions", c.id);
             batch.update(commissionRef, { status: 'paid', paidDate: now });
