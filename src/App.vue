@@ -7228,10 +7228,19 @@ watch(activePage, (newPage) => {
                 </ul>
             </div>
 
-            <p class="mt-4 p-3 bg-slate-100 rounded-lg text-sm italic">
-                Sistem akan selalu memilih diskon yang paling menguntungkan bagi pelanggan (atau diskon dengan nilai terbesar) dari semua promosi yang berlaku. Ini memastikan harga jual yang terekam di sistem Anda sudah final dan akurat.
-            </p>
-        </div>
+            <h4 class="text-lg font-semibold mt-6 mb-2 text-red-700">Catatan Penting: Prioritas Voucher dan Batasan Penggunaan</h4>
+            <div class="p-4 bg-red-50 rounded-lg border border-red-200 text-sm">
+                <p>Sistem promosi di aplikasi ini dirancang untuk secara otomatis memilih dan menerapkan **voucher dengan nilai diskon terbaik** untuk setiap transaksi. Namun, untuk memastikan data Anda selalu sinkron dengan laporan dari marketplace (seperti Shopee atau TikTok), ada satu detail penting yang perlu Anda perhatikan:</p>
+                
+                <p class="mt-2">Beberapa jenis voucher, seperti **"Voucher Ikuti Toko"**, hanya dapat digunakan **satu kali per pelanggan** di platform marketplace.</p>
+                
+                <p class="mt-2">Untuk mencegah ketidakcocokan data, Anda memiliki dua opsi saat mengatur voucher ini:</p>
+                <ol class="list-decimal list-inside ml-4 mt-2 space-y-1">
+                    <li>**Berikan Nilai Diskon Paling Rendah**: Masukkan nilai diskon yang lebih kecil pada kolom **"Voucher Ikuti Toko"** dibandingkan dengan voucher lainnya. Dengan cara ini, aplikasi akan memprioritaskan voucher lain yang nilainya lebih besar.</li>
+                    <li>**Kosongkan Nilai Diskon**: Jika Anda tidak ingin menggunakan "Voucher Ikuti Toko" dalam kalkulasi otomatis sama sekali, Anda bisa mengosongkan nilai diskonnya.</li>
+                </ol>
+            </div>
+            </div>
     </div>
     
     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
