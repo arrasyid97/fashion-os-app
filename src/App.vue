@@ -996,7 +996,13 @@ async function handleRegister() {
             subscriptionStatus: 'trial',
             subscriptionEndDate: null,
             trialEndDate: null,
-            dashboardPin: authForm.dashboardPin || null // <-- Ambil PIN dari form register
+            dashboardPin: authForm.dashboardPin || null,
+            
+            // --- BARIS BARU UNTUK PROGRAM KEMITRAAN ---
+            isPartner: false, // Default: pengguna baru bukan mitra
+            referralCode: null,
+            referredBy: authForm.referredBy || null // <-- Ambil kode rujukan dari form jika ada
+            // --- AKHIR BARIS BARU ---
         };
         
         if (authForm.activationCode) {
@@ -1010,21 +1016,16 @@ async function handleRegister() {
                 alert('Registrasi berhasil! Langganan Anda aktif selama 30 hari.');
                 await updateDoc(codeRef, { status: 'used', usedBy: user.uid, usedAt: new Date() });
             } else {
-                // Perubahan di sini: dari 7 hari menjadi 3 hari
                 const threeDaysLater = new Date(now.setDate(now.getDate() + 3));
                 newUserData.trialEndDate = threeDaysLater;
-                // Perubahan teks notifikasi di sini
                 alert('Kode aktivasi tidak valid atau sudah digunakan. Anda mendapatkan free trial selama 3 hari.');
             }
         } else {
-            // Perubahan di sini: dari 7 hari menjadi 3 hari
             const threeDaysLater = new Date(now.setDate(now.getDate() + 3));
             newUserData.trialEndDate = threeDaysLater;
-            // Perubahan teks notifikasi di sini
             alert('Registrasi berhasil! Anda mendapatkan free trial selama 3 hari.');
         }
 
-        // SIMPAN PIN BARU BERSAMAAN DENGAN DATA PENGGUNA BARU
         await setDoc(userDocRef, newUserData, { merge: true });
         authForm.error = '';
     } catch (error) {
@@ -1039,6 +1040,7 @@ async function handleRegister() {
         }
     }
 }
+
 async function handleLogin() {
     try {
         // [PERBAIKAN DI SINI]
@@ -1106,7 +1108,8 @@ const authForm = reactive({
     password: '',
     error: '',
     dashboardPin: '',
-    activationCode: ''
+    activationCode: '',
+    referredBy: ''
 });
 
 function addProgram() {
