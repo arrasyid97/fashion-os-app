@@ -5056,7 +5056,7 @@ watch(activePage, (newPage) => {
     <div class="h-16 flex items-center justify-center px-4 border-b border-gray-700/50">
         <h1 class="text-xl font-bold text-white tracking-wider">{{ state.settings.brandName }}</h1>
     </div>
-    <div class="p-4 text-center text-gray-400 text-xs">
+    <div class="p-4 text-center text-cyan-400 font-bold text-sm">
     {{ currentTime }}
 </div>
     <div class="flex-1 flex flex-col overflow-y-auto">
