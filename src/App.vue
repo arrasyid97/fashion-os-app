@@ -48,11 +48,7 @@ const unpaidCommissions = computed(() => {
     return commissions.value.filter(c => c.status === 'unpaid').sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000));
 });
 
-function getCustomerEmail(userId) {
-    // Fungsi ini akan mencari email pelanggan berdasarkan UID
-    const user = uiState.allUsers.find(u => u.uid === userId);
-    return user ? user.email : 'Pelanggan tidak ditemukan';
-}
+
 
 const isDashboardLocked = ref(true);
 const dashboardPinInput = ref('');
