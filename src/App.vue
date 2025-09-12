@@ -7302,10 +7302,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 <div v-if="activePage === 'langganan'">
-    <!-- Tampilan ini akan muncul jika langganan aktif ATAU masa uji coba masih berjalan -->
-    <div v-if="currentUser?.userData?.subscriptionStatus === 'active' || (currentUser?.userData?.subscriptionStatus === 'trial' && new Date(currentUser.userData.trialEndDate?.seconds * 1000) > Date.now())"
-        class="max-w-4xl mx-auto text-center py-12 px-4">
-        <!-- Tampilan untuk langganan aktif -->
+    <div v-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()" class="max-w-4xl mx-auto text-center py-12 px-4">
         <div class="bg-white p-8 sm:p-12 rounded-xl shadow-lg border border-green-300 flex flex-col items-center">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -7324,8 +7321,38 @@ watch(activePage, (newPage) => {
             </div>
         </div>
     </div>
-    
-    <!-- Tampilan ini akan muncul jika langganan SAMA SEKALI belum aktif DAN masa uji coba sudah habis -->
+    
+    <div v-else-if="currentUser?.userData?.subscriptionStatus === 'trial' && new Date(currentUser.userData.trialEndDate?.seconds * 1000) > Date.now()" class="max-w-4xl mx-auto text-center py-12 px-4">
+        <div class="bg-white p-8 sm:p-12 rounded-xl shadow-lg border border-indigo-300 flex flex-col items-center">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-slate-800 mb-2">Anda dalam Masa Uji Coba Gratis</h2>
+            <p class="text-slate-600 mb-6 max-w-xl">
+                Masa uji coba gratis Anda akan segera berakhir. Tingkatkan paket Anda untuk terus menggunakan semua fitur premium.
+            </p>
+            <div class="bg-indigo-50 text-indigo-800 px-6 py-4 rounded-lg w-full text-center">
+                <p class="text-lg font-semibold">Status Langganan: Uji Coba</p>
+                <p v-if="currentUser?.userData?.trialEndDate" class="text-sm mt-1">
+                    Berakhir pada: {{ new Date(currentUser.userData.trialEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                </p>
+            </div>
+            
+            <div class="w-full mt-8 pt-6 border-t border-slate-200">
+                <h3 class="text-xl font-bold text-slate-800 mb-4">Aktivasi Langganan</h3>
+                <form @submit.prevent="activateSubscriptionWithCode">
+                    <label for="activation-code" class="block text-sm font-medium text-slate-700">Masukkan Kode Aktivasi Anda</label>
+                    <input type="text" v-model="authForm.activationCode" id="activation-code-page" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                    <button type="submit" class="w-full py-3 mt-4 rounded-xl shadow-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
+                        Aktifkan Sekarang
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div v-else class="max-w-4xl mx-auto text-center py-12 px-4">
         <h2 class="text-3xl font-bold text-slate-800">Masa Percobaan Anda Telah Berakhir</h2>
         <p class="text-slate-600 mt-4 mb-8 max-w-xl mx-auto">
