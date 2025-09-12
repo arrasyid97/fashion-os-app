@@ -5017,16 +5017,17 @@ async function loadAllDataFromFirebase() {
 
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
+    // Panggil fungsi waktu di luar onAuthStateChanged
+    updateTime(); 
+    intervalId = setInterval(updateTime, 1000);
+    
     // Listener ini akan memantau status login/logout pengguna
     onAuthStateChanged(auth, (user) => {
         isLoading.value = true;
-
-        // Hentikan listener data real-time sebelumnya jika ada (misalnya saat logout)
         if (onSnapshotListener) {
             onSnapshotListener();
             onSnapshotListener = null;
         }
-
         if (user) {
             // Jika PENGGUNA LOGIN
             currentUser.value = user;
@@ -5053,8 +5054,6 @@ onMounted(() => {
                     const wasPreviouslyOnSubscriptionPage = activePage.value === 'langganan';
 
                     if (isSubscriptionValid) {
-                        // Jika langganan valid, muat semua data bisnis
-                        // Hanya muat jika belum ada data atau jika baru saja menjadi valid
                         if (state.produk.length === 0 || wasPreviouslyOnSubscriptionPage) {
                             await loadAllDataFromFirebase();
                         }
@@ -5062,7 +5061,6 @@ onMounted(() => {
                         const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         changePage(pageToLoad);
                     } else {
-                        // Jika langganan tidak valid, paksa ke halaman langganan
                         activePage.value = 'langganan';
                     }
                 } else {
@@ -5076,7 +5074,6 @@ onMounted(() => {
                 isLoading.value = false;
                 handleLogout();
             });
-
         } else {
             // Jika PENGGUNA LOGOUT
             currentUser.value = null;
@@ -5084,10 +5081,10 @@ onMounted(() => {
             isLoading.value = false;
         }
     });
+});
 
-    // Tambahkan baris ini untuk update waktu realtime
-    updateTime(); 
-    intervalId = setInterval(updateTime, 1000);
+onUnmounted(() => {
+    clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
 });
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
