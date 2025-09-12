@@ -1,7 +1,5 @@
 import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../src/firebase';
-
-// Tambahkan inisialisasi Firebase Admin
 import admin from 'firebase-admin';
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -53,7 +51,6 @@ export default async function (req, res) {
                 const userId = parts[1];
                 const plan = parts[3];
                 
-                // Gunakan Firebase Admin untuk operasi penulisan
                 const userDocRef = firestoreAdmin.collection("users").doc(userId);
                 const userDoc = await userDocRef.get();
                 if (!userDoc.exists) {
@@ -63,10 +60,9 @@ export default async function (req, res) {
                 const now = new Date();
                 const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + (plan === 'bulanan' ? 1 : 12)));
 
-                // Perbarui status langganan
                 await userDocRef.set({
                     subscriptionStatus: 'active',
-                    subscriptionEndDate: Timestamp.fromDate(subscriptionEndDate) // <-- Perbaikan kunci di sini
+                    subscriptionEndDate: Timestamp.fromDate(subscriptionEndDate)
                 }, { merge: true });
                 console.log(`Status langganan untuk user ${userId} berhasil diperbarui.`);
 
@@ -84,7 +80,7 @@ export default async function (req, res) {
                         await firestoreAdmin.collection("commissions").add({
                             partnerId: partnerId,
                             referredUserId: userId,
-                            paymentDate: Timestamp.fromDate(now), // <-- Perbaikan kunci di sini
+                            paymentDate: Timestamp.fromDate(now),
                             amount: commissionAmount,
                             status: 'unpaid'
                         });
