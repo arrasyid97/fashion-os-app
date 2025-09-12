@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp, addD
 import { db } from '../src/firebase';
 import admin from 'firebase-admin';
 
+// Inisialisasi Firebase Admin SDK
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS))
@@ -33,16 +34,15 @@ export default async function (req, res) {
     try {
         if (event.event === 'payment.received' && event.data.status === 'SUCCESS') {
             console.log(`Event 'payment.received' dengan status 'SUCCESS' diterima.`);
-            
-            // --- PERBAIKAN DI SINI ---
-            // Pastikan event.data ada sebelum mengakses propertinya
-            const merchantRef = event.data?.merchant_ref;
-            const customerEmail = event.data?.customer_email;
-            const amountPaid = event.data?.amount;
+
+            // --- KODE PERBAIKAN DI SINI ---
+            // Mencari merchant_ref di berbagai kemungkinan lokasi
+            const merchantRef = event.data.merchant_ref || event.data.metadata?.merchant_ref || null;
+            const customerEmail = event.data.customer_email || event.data.metadata?.customer_email || null;
+            const amountPaid = event.data.amount || event.data.nettAmount || null;
 
             console.log(`Debugging: Merchant Ref: ${merchantRef}, Customer Email: ${customerEmail}`);
 
-            // Jika customerEmail atau amountPaid tidak terdefinisi, hentikan proses
             if (!customerEmail || !amountPaid) {
                 console.error('❌ ERROR: Data customerEmail atau amountPaid tidak ditemukan di body webhook.');
                 return res.status(400).json({ message: 'Missing required data from webhook body' });
