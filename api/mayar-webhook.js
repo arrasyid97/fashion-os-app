@@ -1,8 +1,16 @@
-import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../src/firebase';
 
+// Tambahkan inisialisasi Firebase Admin
+import admin from 'firebase-admin';
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS))
+    });
+}
+const firestoreAdmin = admin.firestore();
+
 export default async function (req, res) {
-    // Pastikan metode adalah POST
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
@@ -10,16 +18,14 @@ export default async function (req, res) {
     const mayarTokenHeader = req.headers['mayar-webhook-token'];
     const myWebhookToken = process.env.MAYAR_WEBHOOK_TOKEN;
 
-    // Verifikasi token webhook
     if (mayarTokenHeader !== myWebhookToken) {
         console.error('Webhook Unauthorized: Invalid token');
         return res.status(401).json({ message: 'Unauthorized' });
     }
 
     const event = req.body;
-    
+
     try {
-        // Hanya proses event 'invoice.paid' dengan status 'paid'
         if (event.type === 'invoice.paid' && event.status === 'paid') {
             const merchantRef = event.data.merchant_ref;
             const customerEmail = event.data.customer_email;
@@ -31,8 +37,8 @@ export default async function (req, res) {
                 const userId = merchantRef.split('-')[1];
                 const newReferralCode = 'PARTNER-' + userId.slice(0, 5).toUpperCase();
                 
-                const userDocRef = doc(db, "users", userId);
-                await setDoc(userDocRef, {
+                const userDocRef = firestoreAdmin.collection("users").doc(userId);
+                await userDocRef.set({
                     isPartner: true,
                     referralCode: newReferralCode
                 }, { merge: true });
@@ -47,53 +53,49 @@ export default async function (req, res) {
                 const userId = parts[1];
                 const plan = parts[3];
                 
-                // Transaksi untuk memastikan konsistensi data
-                await runTransaction(db, async (transaction) => {
-                    const userDocRef = doc(db, "users", userId);
-                    const userDoc = await transaction.get(userDocRef);
+                // Gunakan Firebase Admin untuk operasi penulisan
+                const userDocRef = firestoreAdmin.collection("users").doc(userId);
+                const userDoc = await userDocRef.get();
+                if (!userDoc.exists) {
+                    throw new Error("User document not found");
+                }
+                
+                const now = new Date();
+                const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + (plan === 'bulanan' ? 1 : 12)));
 
-                    if (!userDoc.exists()) {
-                        throw new Error("User document not found");
-                    }
-                    
-                    const now = new Date();
-                    const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + (plan === 'bulanan' ? 1 : 12)));
-
-                    // Perbarui status langganan
-                    transaction.set(userDocRef, {
-                        subscriptionStatus: 'active',
-                        subscriptionEndDate: subscriptionEndDate
-                    }, { merge: true });
-
-                    const userData = userDoc.data();
-                    if (userData && userData.referredBy) {
-                        const referralCode = userData.referredBy;
-                        console.log(`User ini diajak oleh mitra dengan kode: ${referralCode}`);
-
-                        const partnerQuery = query(collection(db, "users"), where("referralCode", "==", referralCode));
-                        const partnerDocs = await getDocs(partnerQuery);
-                        if (!partnerDocs.empty) {
-                            const partnerId = partnerDocs.docs[0].id;
-                            const commissionAmount = 25000;
-                            const commissionDocRef = doc(collection(db, "commissions"));
-                            
-                            transaction.set(commissionDocRef, {
-                                partnerId: partnerId,
-                                referredUserId: userId,
-                                paymentDate: new Date(),
-                                amount: commissionAmount,
-                                status: 'unpaid'
-                            });
-                            console.log(`Komisi sebesar ${commissionAmount} berhasil dicatat untuk mitra ${partnerId}.`);
-                        } else {
-                            console.warn(`Mitra dengan kode rujukan ${referralCode} tidak ditemukan.`);
-                        }
-                    }
-                });
-
+                // Perbarui status langganan
+                await userDocRef.set({
+                    subscriptionStatus: 'active',
+                    subscriptionEndDate: Timestamp.fromDate(subscriptionEndDate) // <-- Perbaikan kunci di sini
+                }, { merge: true });
                 console.log(`Status langganan untuk user ${userId} berhasil diperbarui.`);
-                return res.status(200).json({ message: 'Webhook processed successfully' });
+
+                const userData = userDoc.data();
+                if (userData && userData.referredBy) {
+                    const referralCode = userData.referredBy;
+                    console.log(`User ini diajak oleh mitra dengan kode: ${referralCode}`);
+
+                    const partnerQuery = firestoreAdmin.collection("users").where("referralCode", "==", referralCode).limit(1);
+                    const partnerDocs = await partnerQuery.get();
+
+                    if (!partnerDocs.empty) {
+                        const partnerId = partnerDocs.docs[0].id;
+                        const commissionAmount = 25000;
+                        await firestoreAdmin.collection("commissions").add({
+                            partnerId: partnerId,
+                            referredUserId: userId,
+                            paymentDate: Timestamp.fromDate(now), // <-- Perbaikan kunci di sini
+                            amount: commissionAmount,
+                            status: 'unpaid'
+                        });
+                        console.log(`Komisi sebesar ${commissionAmount} berhasil dicatat untuk mitra ${partnerId}.`);
+                    } else {
+                        console.warn(`Mitra dengan kode rujukan ${referralCode} tidak ditemukan.`);
+                    }
+                }
             }
+
+            return res.status(200).json({ message: 'Webhook processed successfully' });
         }
         
         return res.status(200).json({ message: 'Ignored webhook event' });
