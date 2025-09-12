@@ -7200,6 +7200,45 @@ watch(activePage, (newPage) => {
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
        
+<div v-if="uiState.modalType === 'panduanPromosi'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Panduan Manajemen Promosi & Voucher</h3>
+        <p class="text-slate-500 mt-1">Pahami struktur promosi berlapis untuk mengoptimalkan profitabilitas.</p>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto py-4 pr-2">
+        <div class="space-y-6 text-slate-700 leading-relaxed prose">
+            <p>Sistem promosi dirancang untuk memberikan fleksibilitas maksimum dalam strategi harga Anda. Ada dua tingkatan promosi utama yang bisa Anda atur, dan keduanya akan dibandingkan secara otomatis untuk menemukan diskon terbaik saat transaksi terjadi.</p>
+            
+            <h4 class="text-lg font-semibold mt-4 mb-2">1. Promosi Per Akun Penjualan (Berlaku Global)</h4>
+            <div class="p-4 bg-indigo-50 rounded-lg border border-indigo-200 text-sm">
+                <p>Ini adalah promosi yang berlaku untuk **semua produk** yang dijual di satu channel marketplace. Cocok untuk strategi diskon umum.</p>
+                <ul class="list-disc list-inside ml-4 mt-2 space-y-1">
+                    <li>**Voucher Ikuti Toko**: Diskon persentase yang diberikan kepada pelanggan baru yang mengikuti toko Anda.</li>
+                    <li>**Voucher Semua Produk**: Diskon persentase yang berlaku untuk semua item di keranjang belanja.</li>
+                </ul>
+            </div>
+            
+            <h4 class="text-lg font-semibold mt-4 mb-2">2. Promosi Spesifik Per Model Produk (Berlaku Terbatas)</h4>
+            <div class="p-4 bg-green-50 rounded-lg border border-green-200 text-sm">
+                <p>Ini adalah promosi yang hanya berlaku untuk **varian produk dari model tertentu**. Strategi ini sangat efektif untuk promosi produk unggulan atau produk baru.</p>
+                <ul class="list-disc list-inside ml-4 mt-2 space-y-1">
+                    <li>**Voucher Produk Tertentu**: Diskon persentase khusus untuk model produk yang Anda pilih.</li>
+                    <li>**Diskon Bertingkat**: Memberikan diskon yang berbeda berdasarkan jumlah minimal belanja.</li>
+                </ul>
+            </div>
+
+            <p class="mt-4 p-3 bg-slate-100 rounded-lg text-sm italic">
+                Sistem akan selalu memilih diskon yang paling menguntungkan bagi pelanggan (atau diskon dengan nilai terbesar) dari semua promosi yang berlaku. Ini memastikan harga jual yang terekam di sistem Anda sudah final dan akurat.
+            </p>
+        </div>
+    </div>
+    
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+    </div>
+</div>
+
         <div v-if="uiState.modalType === 'dashboardKpiInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Memahami Dampak Retur pada Laporan Keuangan</h3>
