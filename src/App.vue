@@ -4950,6 +4950,10 @@ onMounted(() => {
                     currentUser.value.userData = userData;
                     state.settings.dashboardPin = userData.dashboardPin || '';
 
+                    // Tambahkan baris ini untuk menyimpan data mitra
+                    currentUser.value.isPartner = userData.isPartner || false;
+                    currentUser.value.referralCode = userData.referralCode || null;
+
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
@@ -4991,6 +4995,10 @@ onMounted(() => {
             isLoading.value = false;
         }
     });
+
+    // Tambahkan baris ini untuk update waktu realtime
+    updateTime(); 
+    intervalId = setInterval(updateTime, 1000);
 });
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
