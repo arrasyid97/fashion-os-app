@@ -36,12 +36,12 @@ export default async function handler(request, response) {
   try {
     const userDocRef = db.collection('users').doc(userId);
 
-    await userDocRef.update({
-      subscriptionStatus: paymentStatus,
-      subscriptionEndDate: subscriptionEndDate,
-      plan: plan,
-      trialEndDate: admin.firestore.FieldValue.delete(),
-    });
+    await userDocRef.set({
+    subscriptionStatus: paymentStatus,
+    subscriptionEndDate: subscriptionEndDate,
+    plan: plan,
+    trialEndDate: admin.firestore.FieldValue.delete(),
+}, { merge: true });
 
     return response.status(200).json({ message: 'Subscription status updated successfully' });
   } catch (error) {
