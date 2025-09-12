@@ -57,16 +57,25 @@ let intervalId = null;
 
 const updateTime = () => {
     const now = new Date();
-    // Gunakan Intl.DateTimeFormat untuk format lokal Indonesia (Asia/Jakarta)
-    currentTime.value = new Intl.DateTimeFormat('id-ID', {
+    
+    // Pisahkan format tanggal
+    const datePart = new Intl.DateTimeFormat('id-ID', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
+        timeZone: 'Asia/Jakarta'
+    }).format(now);
+    
+    // Pisahkan format waktu (jam, menit, detik)
+    const timePart = new Intl.DateTimeFormat('id-ID', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
         timeZone: 'Asia/Jakarta'
     }).format(now);
+
+    // Gabungkan tanggal dan waktu tanpa kata "pukul"
+    currentTime.value = `${datePart} ${timePart}`;
 };
 
 onMounted(() => {
