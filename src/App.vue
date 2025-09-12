@@ -5038,6 +5038,9 @@ onMounted(() => {
 
             // Buat listener real-time BARU untuk data pengguna ini
             onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
+                console.log("--- Listener Firestore Aktif! ---");
+    console.log("Data user baru diterima dari database:");
+    console.log(userDocSnap.data());
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
