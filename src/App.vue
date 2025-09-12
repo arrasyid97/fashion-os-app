@@ -583,6 +583,38 @@ async function cashoutCommission() {
     }
 }
 
+async function proceedToPartnerPayment() {
+    if (!currentUser.value) return alert("Anda harus login.");
+
+    try {
+        const priceToPay = 50000; // Biaya pendaftaran mitra
+        const itemName = 'Biaya Pendaftaran Mitra Fashion OS';
+
+        const response = await fetch('/api/create-mayar-invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount: priceToPay,
+                item_name: itemName,
+                customer_email: currentUser.value.email,
+                callback_url: 'https://appfashion.id/api/mayar-webhook',
+                redirect_url: `https://appfashion.id/langganan?status=success`, // Arahkan kembali ke halaman langganan setelah pembayaran
+                merchant_ref: `PARTNERREG-${currentUser.value.uid}-${Date.now()}`,
+            }),
+        });
+
+        const data = await response.json();
+        if (data.invoice_url) {
+            window.location.href = data.invoice_url;
+        } else {
+            throw new Error('Gagal mendapatkan URL pembayaran dari Mayar.');
+        }
+    } catch (error) {
+        console.error("Gagal memproses pendaftaran mitra:", error);
+        alert(`Gagal memproses pendaftaran. Silakan coba lagi.\n\nError: ${error.message}`);
+    }
+}
+
 function handlePosSubmit() {
     if (uiState.pos_order_id) {
         alert("Selesaikan transaksi saat ini terlebih dahulu!");
@@ -7425,6 +7457,43 @@ watch(activePage, (newPage) => {
     
     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+    </div>
+</div>
+
+<div v-if="uiState.modalType === 'cashoutCommission'" class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
+    <h3 class="text-xl font-bold mb-4">Ajukan Pencairan Komisi</h3>
+    <p class="text-sm text-slate-600">Total komisi yang belum dibayar saat ini adalah: <span class="font-bold text-green-600">{{ formatCurrency(totalUnpaidCommission) }}</span></p>
+    <p class="text-sm text-slate-600">Pastikan rekening bank Anda sudah terdaftar di halaman Pengaturan.</p>
+
+    <form @submit.prevent="cashoutCommission">
+        <div class="mt-4">
+            <label class="block text-sm font-medium">Jumlah yang Ingin Dicairkan</label>
+            <input type="number" v-model.number="uiState.modalData.amount" :max="totalUnpaidCommission" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div class="flex justify-end gap-3 pt-6 border-t mt-4">
+            <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+            <button type="submit" :disabled="uiState.modalData.amount <= 0 || uiState.modalData.amount > totalUnpaidCommission" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg disabled:bg-indigo-400">
+                Ajukan Pencairan
+            </button>
+        </div>
+    </form>
+</div>
+
+<div v-if="uiState.modalType === 'registerPartner'" class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
+    <h3 class="text-xl font-bold mb-4">Daftar Menjadi Mitra</h3>
+    <div class="space-y-4">
+        <p class="text-sm text-slate-600">Untuk menjadi mitra, Anda akan dikenakan biaya pendaftaran satu kali sebesar Rp 50.000. Biaya ini akan kami gunakan untuk mendukung program dan operasional kami.</p>
+        <p class="text-sm font-semibold text-slate-800">Manfaat menjadi mitra:</p>
+        <ul class="list-disc list-inside ml-4 text-sm text-slate-600">
+            <li>Dapatkan komisi berkelanjutan dari setiap pelanggan yang Anda ajak.</li>
+            <li>Akses ke dashboard khusus untuk melacak komisi Anda secara real-time.</li>
+            <li>Mendukung pengembangan aplikasi yang lebih baik.</li>
+        </ul>
+        <p class="mt-4 text-xs font-semibold text-red-600">Setelah pembayaran, Anda akan menerima kode rujukan unik.</p>
+    </div>
+    <div class="flex justify-end gap-3 pt-6 border-t mt-4">
+        <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+        <button @click="proceedToPartnerPayment" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Lanjut ke Pembayaran</button>
     </div>
 </div>
 
