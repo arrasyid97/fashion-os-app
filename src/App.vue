@@ -93,14 +93,7 @@ const updateTime = () => {
     currentTime.value = `${datePart} ${timePart}`;
 };
 
-onMounted(() => {
-    updateTime(); // Perbarui waktu saat komponen dimuat
-    intervalId = setInterval(updateTime, 1000); // Perbarui setiap detik
-});
 
-onUnmounted(() => {
-    clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
-});
 
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
@@ -5019,13 +5012,11 @@ onMounted(() => {
 
     onAuthStateChanged(auth, (user) => {
         isLoading.value = true;
-        
+
         if (onSnapshotListener) {
             onSnapshotListener();
             onSnapshotListener = null;
         }
-
-        // --- HENTIKAN LISTENER KOMISI YANG LAMA ---
         if (commissionsListener) {
             commissionsListener();
             commissionsListener = null;
@@ -5036,7 +5027,6 @@ onMounted(() => {
             const userDocRef = doc(db, "users", user.uid);
 
             onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
-                console.log("--- Listener Firestore Aktif! ---");
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
@@ -5051,21 +5041,18 @@ onMounted(() => {
 
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-                    
+
                     if (isSubscriptionValid) {
                         if (state.produk.length === 0 || activePage.value === 'langganan') {
                             await loadAllDataFromFirebase();
                         }
 
-                        // --- KODE BARU UNTUK LISTENER KOMISI MITRA ---
                         if (currentUser.value.isPartner && currentUser.value.referralCode) {
                             const commissionsQuery = query(
                                 collection(db, 'commissions'),
                                 where('referredByUserId', '==', currentUser.value.referralCode)
                             );
-                            // Set listener baru untuk komisi
                             commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                console.log('Data komisi berubah, memperbarui tampilan.');
                                 const fetchedCommissions = [];
                                 snapshot.forEach(doc => {
                                     fetchedCommissions.push({ id: doc.id, ...doc.data() });
