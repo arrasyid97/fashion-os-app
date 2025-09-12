@@ -11,7 +11,7 @@ import { db, auth } from './firebase.js'; 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
 let onSnapshotListener = null;
-
+let commissionsListener = null;
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
@@ -36,6 +36,23 @@ const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
 
 const commissions = ref([]);
+const totalUnpaidCommission = computed(() => {
+    return commissions.value.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + c.amount, 0);
+});
+
+const totalPaidCommission = computed(() => {
+    return commissions.value.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
+});
+
+const unpaidCommissions = computed(() => {
+    return commissions.value.filter(c => c.status === 'unpaid').sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000));
+});
+
+function getCustomerEmail(userId) {
+    // Fungsi ini akan mencari email pelanggan berdasarkan UID
+    const user = uiState.allUsers.find(u => u.uid === userId);
+    return user ? user.email : 'Pelanggan tidak ditemukan';
+}
 
 const isDashboardLocked = ref(true);
 const dashboardPinInput = ref('');
@@ -528,23 +545,7 @@ async function submitAddProduct() {
     }
 }
 
-const totalUnpaidCommission = computed(() => {
-    return commissions.value.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + c.amount, 0);
-});
 
-const totalPaidCommission = computed(() => {
-    return commissions.value.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
-});
-
-const unpaidCommissions = computed(() => {
-    return commissions.value.filter(c => c.status === 'unpaid').sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
-});
-
-function getCustomerEmail(userId) {
-    // Fungsi ini akan mencari email pelanggan berdasarkan UID
-    const user = uiState.allUsers.find(u => u.uid === userId);
-    return user ? user.email : 'Pelanggan tidak ditemukan';
-}
 
 async function cashoutCommission() {
     if (!confirm(`Anda akan mencairkan komisi sebesar ${formatCurrency(totalUnpaidCommission.value)}. Lanjutkan?`)) return;
@@ -5017,74 +5018,89 @@ async function loadAllDataFromFirebase() {
 
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
-    // Panggil fungsi waktu di luar onAuthStateChanged
     updateTime();
     intervalId = setInterval(updateTime, 1000);
 
-    // Listener ini akan memantau status login/logout pengguna
     onAuthStateChanged(auth, (user) => {
-    isLoading.value = true;
-    
-    if (onSnapshotListener) {
-        onSnapshotListener();
-        onSnapshotListener = null;
-    }
+        isLoading.value = true;
+        
+        if (onSnapshotListener) {
+            onSnapshotListener();
+            onSnapshotListener = null;
+        }
 
-    if (user) {
-        currentUser.value = user;
-        const userDocRef = doc(db, "users", user.uid);
+        // --- HENTIKAN LISTENER KOMISI YANG LAMA ---
+        if (commissionsListener) {
+            commissionsListener();
+            commissionsListener = null;
+        }
 
-        onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
-            console.log("--- Listener Firestore Aktif! ---");
-            if (userDocSnap.exists()) {
-                const userData = userDocSnap.data();
-                currentUser.value.userData = userData;
-                state.settings.dashboardPin = userData.dashboardPin || '';
+        if (user) {
+            currentUser.value = user;
+            const userDocRef = doc(db, "users", user.uid);
 
-                currentUser.value.isPartner = userData.isPartner || false;
-                currentUser.value.referralCode = userData.referralCode || null;
+            onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
+                console.log("--- Listener Firestore Aktif! ---");
+                if (userDocSnap.exists()) {
+                    const userData = userDocSnap.data();
+                    currentUser.value.userData = userData;
+                    state.settings.dashboardPin = userData.dashboardPin || '';
 
-                const now = new Date();
-                const endDate = userData.subscriptionEndDate?.toDate();
-                const trialDate = userData.trialEndDate?.toDate();
+                    currentUser.value.isPartner = userData.isPartner || false;
+                    currentUser.value.referralCode = userData.referralCode || null;
 
-                // Logika utama yang diperbaiki
-                const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                            (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-                
-                const wasPreviouslyOnSubscriptionPage = activePage.value === 'langganan';
+                    const now = new Date();
+                    const endDate = userData.subscriptionEndDate?.toDate();
+                    const trialDate = userData.trialEndDate?.toDate();
 
-                if (isSubscriptionValid) {
-                    if (state.produk.length === 0 || wasPreviouslyOnSubscriptionPage) {
-                        await loadAllDataFromFirebase();
+                    const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+                    
+                    if (isSubscriptionValid) {
+                        if (state.produk.length === 0 || activePage.value === 'langganan') {
+                            await loadAllDataFromFirebase();
+                        }
+
+                        // --- KODE BARU UNTUK LISTENER KOMISI MITRA ---
+                        if (currentUser.value.isPartner && currentUser.value.referralCode) {
+                            const commissionsQuery = query(
+                                collection(db, 'commissions'),
+                                where('referredByUserId', '==', currentUser.value.referralCode)
+                            );
+                            // Set listener baru untuk komisi
+                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                console.log('Data komisi berubah, memperbarui tampilan.');
+                                const fetchedCommissions = [];
+                                snapshot.forEach(doc => {
+                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
+                                });
+                                commissions.value = fetchedCommissions;
+                            });
+                        }
+
+                        const storedPage = localStorage.getItem('lastActivePage');
+                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                        changePage(pageToLoad);
+                    } else {
+                        activePage.value = 'langganan';
                     }
-                    const storedPage = localStorage.getItem('lastActivePage');
-                    const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                    changePage(pageToLoad);
                 } else {
-                    activePage.value = 'langganan';
+                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
+                    handleLogout();
                 }
-            } else {
-                console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
+                isLoading.value = false;
+            }, (error) => {
+                console.error("Gagal mendengarkan data pengguna:", error);
+                alert("Gagal memuat data pengguna. Silakan coba lagi.");
+                isLoading.value = false;
                 handleLogout();
-            }
+            });
+        } else {
+            currentUser.value = null;
+            activePage.value = 'login';
             isLoading.value = false;
-        }, (error) => {
-            console.error("Gagal mendengarkan data pengguna:", error);
-            alert("Gagal memuat data pengguna. Silakan coba lagi.");
-            isLoading.value = false;
-            handleLogout();
-        });
-    } else {
-        currentUser.value = null;
-        activePage.value = 'login';
-        isLoading.value = false;
-    }
-});
-});
-
-onUnmounted(() => {
-    clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
+        }
+    });
 });
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
@@ -6847,8 +6863,8 @@ watch(activePage, (newPage) => {
                             <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada komisi yang belum dibayar.</td>
                         </tr>
                         <tr v-for="com in unpaidCommissions" :key="com.id" class="hover:bg-slate-50">
-                            <td class="px-6 py-4">{{ new Date(com.paymentDate).toLocaleDateString('id-ID') }}</td>
-                            <td class="px-6 py-4">{{ getCustomerEmail(com.referredUserId) }}</td>
+                            <td class="px-6 py-4">{{ new Date(com.createdAt.seconds * 1000).toLocaleDateString('id-ID') }}</td>
+                            <td class="px-6 py-4">{{ com.customerEmail }}</td>
                             <td class="px-6 py-4 text-right font-bold text-green-600">{{ formatCurrency(com.amount) }}</td>
                             <td class="px-6 py-4 text-center">
                                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 capitalize">{{ com.status }}</span>
