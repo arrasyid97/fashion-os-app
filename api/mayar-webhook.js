@@ -50,7 +50,9 @@ export default async function (req, res) {
             if (parts.length >= 3) {
                 const userId = parts[1];
                 const plan = parts[3];
-                
+            console.log("MEMPROSES PEMBAYARAN UNTUK:");
+            console.log("User ID:", userId);
+            console.log("Paket:", plan);
                 const userDocRef = firestoreAdmin.collection("users").doc(userId);
                 const userDoc = await userDocRef.get();
                 if (!userDoc.exists) {
@@ -59,12 +61,12 @@ export default async function (req, res) {
                 
                 const now = new Date();
                 const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + (plan === 'bulanan' ? 1 : 12)));
-
+console.log("Tanggal Kedaluwarsa BARU yang akan disimpan:", subscriptionEndDate.toISOString());
                 await userDocRef.set({
                     subscriptionStatus: 'active',
                     subscriptionEndDate: Timestamp.fromDate(subscriptionEndDate)
                 }, { merge: true });
-                console.log(`Status langganan untuk user ${userId} berhasil diperbarui.`);
+                console.log(`SUKSES: Firestore seharusnya sudah di-update untuk user ${userId}.`);
 
                 const userData = userDoc.data();
                 if (userData && userData.referredBy) {
