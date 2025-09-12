@@ -5135,10 +5135,10 @@ watch(activePage, (newPage) => {
             </div>
             
             <div v-if="activePage === 'register'">
-                <label for="activation-code" class="block text-sm font-medium text-slate-700 mt-4">Kode Aktivasi (Opsional)</label>
-                <input type="text" v-model="authForm.activationCode" id="activation-code" class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
-                <p class="mt-2 text-xs text-slate-500">Masukkan kode aktivasi untuk mendapatkan langganan premium.</p>
-            </div>
+    <label for="activation-code" class="block text-sm font-medium text-slate-700 mt-4">Kode Aktivasi (Opsional)</label>
+    <input type="text" v-model="authForm.activationCode" id="activation-code" class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+    <p class="mt-2 text-xs text-slate-500">Masukkan kode aktivasi untuk mendapatkan langganan premium.</p>
+</div>
 <div v-if="activePage === 'register'">
     <label for="referred-by" class="block text-sm font-medium text-slate-700 mt-4">Kode Rujukan (Opsional)</label>
     <input type="text" v-model="authForm.referredBy" id="referred-by" placeholder="Contoh: PARTNER-ABCDE" class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
