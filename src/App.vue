@@ -51,6 +51,34 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
+
+const currentTime = ref('');
+let intervalId = null;
+
+const updateTime = () => {
+    const now = new Date();
+    // Gunakan Intl.DateTimeFormat untuk format lokal Indonesia (Asia/Jakarta)
+    currentTime.value = new Intl.DateTimeFormat('id-ID', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: 'Asia/Jakarta'
+    }).format(now);
+};
+
+onMounted(() => {
+    updateTime(); // Perbarui waktu saat komponen dimuat
+    intervalId = setInterval(updateTime, 1000); // Perbarui setiap detik
+});
+
+onUnmounted(() => {
+    clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
+});
+
+
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
     if (!isAdmin.value) return; // Hanya jalankan jika admin
@@ -5028,6 +5056,9 @@ watch(activePage, (newPage) => {
     <div class="h-16 flex items-center justify-center px-4 border-b border-gray-700/50">
         <h1 class="text-xl font-bold text-white tracking-wider">{{ state.settings.brandName }}</h1>
     </div>
+    <div class="p-4 text-center text-gray-400 text-xs">
+    {{ currentTime }}
+</div>
     <div class="flex-1 flex flex-col overflow-y-auto">
         <nav class="flex-1 px-2 py-4 space-y-1">
             <a href="#" @click.prevent="changePage('dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'dashboard' }">
