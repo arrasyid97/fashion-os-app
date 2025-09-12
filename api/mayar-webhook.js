@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../src/firebase';
 import admin from 'firebase-admin';
 
@@ -35,8 +35,6 @@ export default async function (req, res) {
         if (event.event === 'payment.received' && event.data.status === 'SUCCESS') {
             console.log(`Event 'payment.received' dengan status 'SUCCESS' diterima.`);
             
-            // --- KODE PERBAIKAN DI SINI ---
-            // Menggunakan nama kunci yang benar dari log
             const customerEmail = event.data?.customerEmail;
             const amountPaid = event.data?.amount;
             const productDescription = event.data?.productDescription;
@@ -59,15 +57,16 @@ export default async function (req, res) {
                 
                 console.log(`User ditemukan! User ID: ${userId}, Data:`, userData);
 
-                // Menentukan paket langganan dari productDescription
                 const plan = productDescription.includes('Paket Bulanan') ? 'bulanan' : 'tahunan';
                 console.log(`Paket langganan terdeteksi: ${plan}`);
 
                 const now = new Date();
                 const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + (plan === 'bulanan' ? 1 : 12)));
+                
+                console.log('Mencoba memperbarui dokumen user menggunakan Timestamp dari firebase-admin...');
                 await firestoreAdmin.collection("users").doc(userId).set({
                     subscriptionStatus: 'active',
-                    subscriptionEndDate: Timestamp.fromDate(subscriptionEndDate)
+                    subscriptionEndDate: admin.firestore.Timestamp.fromDate(subscriptionEndDate)
                 }, { merge: true });
                 
                 console.log(`✅ SUKSES: Langganan untuk user ${userId} berhasil diaktifkan.`);
@@ -77,17 +76,15 @@ export default async function (req, res) {
                     const commissionRate = 0.10; 
                     const commissionAmount = Math.round(amountPaid * commissionRate);
                     
-                    const commissionData = {
+                    await firestoreAdmin.collection("commissions").add({
                         referredByUserId: userData.referredBy,
                         customerUserId: userId,
                         customerEmail: customerEmail,
                         amount: commissionAmount,
                         transactionAmount: amountPaid,
                         status: 'unpaid',
-                        createdAt: Timestamp.now(),
-                    };
-                    
-                    await firestoreAdmin.collection("commissions").add(commissionData);
+                        createdAt: admin.firestore.Timestamp.now(),
+                    });
                     
                     console.log(`Komisi sebesar Rp ${commissionAmount} berhasil dicatat untuk user mitra ${userData.referredBy}.`);
                 } else {
