@@ -34,11 +34,19 @@ export default async function (req, res) {
         if (event.event === 'payment.received' && event.data.status === 'SUCCESS') {
             console.log(`Event 'payment.received' dengan status 'SUCCESS' diterima.`);
             
-            const merchantRef = event.data.merchant_ref;
-            const customerEmail = event.data.customer_email;
-            const amountPaid = event.data.amount; // Jumlah pembayaran yang akan kita gunakan untuk komisi
+            // --- PERBAIKAN DI SINI ---
+            // Pastikan event.data ada sebelum mengakses propertinya
+            const merchantRef = event.data?.merchant_ref;
+            const customerEmail = event.data?.customer_email;
+            const amountPaid = event.data?.amount;
 
             console.log(`Debugging: Merchant Ref: ${merchantRef}, Customer Email: ${customerEmail}`);
+
+            // Jika customerEmail atau amountPaid tidak terdefinisi, hentikan proses
+            if (!customerEmail || !amountPaid) {
+                console.error('❌ ERROR: Data customerEmail atau amountPaid tidak ditemukan di body webhook.');
+                return res.status(400).json({ message: 'Missing required data from webhook body' });
+            }
 
             const usersCollection = firestoreAdmin.collection("users");
             const q = usersCollection.where("email", "==", customerEmail).limit(1);
@@ -51,8 +59,7 @@ export default async function (req, res) {
                 
                 console.log(`User ditemukan! User ID: ${userId}, Data:`, userData);
                 
-                // Logika langganan (sudah kita perbaiki sebelumnya)
-                const plan = merchantRef.includes('bulanan') ? 'bulanan' : 'tahunan';
+                const plan = merchantRef?.includes('bulanan') ? 'bulanan' : 'tahunan';
                 const now = new Date();
                 const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + (plan === 'bulanan' ? 1 : 12)));
                 await firestoreAdmin.collection("users").doc(userId).set({
@@ -62,26 +69,21 @@ export default async function (req, res) {
                 
                 console.log(`✅ SUKSES: Langganan untuk user ${userId} berhasil diaktifkan.`);
 
-                // --- LOGIKA BARU UNTUK KOMISI MITRA ---
                 if (userData.referredBy) {
                     console.log(`Pelanggan ini direferensikan oleh: ${userData.referredBy}`);
-                    
-                    // Anggap persentase komisi 10%
                     const commissionRate = 0.10; 
                     const commissionAmount = Math.round(amountPaid * commissionRate);
                     
-                    // Siapkan data komisi
                     const commissionData = {
                         referredByUserId: userData.referredBy,
                         customerUserId: userId,
                         customerEmail: customerEmail,
                         amount: commissionAmount,
                         transactionAmount: amountPaid,
-                        status: 'unpaid', // Komisi awal berstatus 'unpaid'
+                        status: 'unpaid',
                         createdAt: Timestamp.now(),
                     };
                     
-                    // Simpan data komisi ke Firestore
                     await firestoreAdmin.collection("commissions").add(commissionData);
                     
                     console.log(`Komisi sebesar Rp ${commissionAmount} berhasil dicatat untuk user mitra ${userData.referredBy}.`);
