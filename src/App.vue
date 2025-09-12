@@ -5018,16 +5018,19 @@ async function loadAllDataFromFirebase() {
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
     // Panggil fungsi waktu di luar onAuthStateChanged
-    updateTime(); 
+    updateTime();
     intervalId = setInterval(updateTime, 1000);
-    
+
     // Listener ini akan memantau status login/logout pengguna
     onAuthStateChanged(auth, (user) => {
         isLoading.value = true;
+        
+        // Hentikan listener data real-time sebelumnya jika ada
         if (onSnapshotListener) {
             onSnapshotListener();
             onSnapshotListener = null;
         }
+
         if (user) {
             // Jika PENGGUNA LOGIN
             currentUser.value = user;
