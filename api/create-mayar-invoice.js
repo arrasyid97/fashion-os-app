@@ -1,6 +1,10 @@
 import axios from 'axios/dist/node/axios.cjs';
 
 export default async function (req, res) {
+    // --- KODE LOG BARU: untuk melihat apa yang dikirim dari frontend ---
+    console.log('--- LOG: Menerima request dari frontend ---');
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
@@ -35,6 +39,11 @@ export default async function (req, res) {
                 referredByCode: referredByCode || null
             }
         };
+
+        // --- KODE LOG BARU: untuk melihat payload yang akan dikirim ke Mayar ---
+        console.log('--- LOG: Mengirim payload ke Mayar API ---');
+        console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
+
 
         const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
             headers: {
