@@ -964,27 +964,35 @@ const tieredDiskonComputed = (tier) => computed({
 });
 
 async function applyReferralCode() {
-    if (!uiState.referralCode) {
-        uiState.referralCodeError = "Kode tidak boleh kosong.";
+    if (!uiState.referralCodeInput) {
+        uiState.referralCodeMessage = "Kode rujukan tidak boleh kosong.";
         uiState.referralCodeApplied = false;
         return;
     }
 
     try {
-        const codeRef = doc(db, "users", uiState.referralCode);
-        const codeDoc = await getDoc(codeRef);
+        // --- KODE PERBAIKAN: Gunakan query untuk mencari field referralCode ---
+        const usersCollection = collection(db, "users");
+        const q = query(usersCollection, where("referralCode", "==", uiState.referralCodeInput));
+        const querySnapshot = await getDocs(q);
 
-        if (codeDoc.exists() && codeDoc.data().isPartner) {
-            uiState.referralCodeApplied = true;
-            uiState.referralCodeError = "";
-            alert("Kode rujukan berhasil diterapkan!");
+        if (!querySnapshot.empty) {
+            // Kode ditemukan! Ambil datanya
+            const partnerDoc = querySnapshot.docs[0];
+            if (partnerDoc.data().isPartner) {
+                uiState.referralCodeApplied = true;
+                uiState.referralCodeMessage = "Kode rujukan berhasil diterapkan! Harga paket akan disesuaikan.";
+            } else {
+                uiState.referralCodeMessage = "Kode rujukan tidak valid atau bukan milik mitra.";
+                uiState.referralCodeApplied = false;
+            }
         } else {
-            uiState.referralCodeError = "Kode rujukan tidak valid atau bukan milik mitra.";
+            uiState.referralCodeMessage = "Kode rujukan tidak valid atau tidak ditemukan.";
             uiState.referralCodeApplied = false;
         }
     } catch (error) {
         console.error("Error applying referral code:", error);
-        uiState.referralCodeError = "Terjadi kesalahan saat memvalidasi kode.";
+        uiState.referralCodeMessage = "Terjadi kesalahan saat memvalidasi kode.";
         uiState.referralCodeApplied = false;
     }
 }
