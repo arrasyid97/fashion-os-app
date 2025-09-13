@@ -934,18 +934,27 @@ async function handleSubscriptionMayar(plan) {
     const referredByCode = isReferred ? uiState.referralCodeInput : null;
 
     try {
+        // <-- AWAL PERBAIKAN: "Menitipkan" kode rujukan di dalam merchant_ref -->
+        let finalMerchantRef = `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${Math.floor(Math.random() * 10000)}-${plan}`;
+        
+        // Jika ada kode rujukan, tambahkan ke merchant_ref dengan pemisah ':'
+        if (referredByCode) {
+            finalMerchantRef += `:${referredByCode}`;
+        }
+        // <-- AKHIR PERBAIKAN -->
+
         const response = await fetch('/api/create-mayar-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-    amount: priceToPay,
-    item_name: itemName,
-    customer_email: currentUser.value.email,
-    callback_url: 'https://appfashion.id/api/mayar-webhook',
-    redirect_url: `https://appfashion.id/langganan?status=success`,
-    merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${Math.floor(Math.random() * 10000)}-${plan}`, // <-- Kode yang diperbaiki
-    referredByCode: referredByCode,
-}),
+                amount: priceToPay,
+                item_name: itemName,
+                customer_email: currentUser.value.email,
+                callback_url: 'https://appfashion.id/api/mayar-webhook',
+                redirect_url: `https://appfashion.id/langganan?status=success`,
+                merchant_ref: finalMerchantRef, // <-- PERBAIKAN: Menggunakan variabel baru yang sudah digabung
+                // referredByCode: referredByCode, <-- PERBAIKAN: Baris ini dihapus karena sudah tidak diperlukan
+            }),
         });
 
         const data = await response.json();

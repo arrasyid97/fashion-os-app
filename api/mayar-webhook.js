@@ -1,6 +1,5 @@
 const admin = require('firebase-admin');
 
-// Inisialisasi Firebase Admin SDK
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -18,28 +17,29 @@ export default async function handler(request, response) {
     return response.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  // <-- PERBAIKAN: Log seluruh body dari Mayar untuk debugging -->
   console.log("--- LOG: Menerima Webhook dari Mayar ---");
   console.log("Body:", JSON.stringify(request.body, null, 2));
 
-  // <-- PERBAIKAN: Ambil semua data yang relevan dari payload webhook -->
-  const { status, reference_id, metadata, customer, items } = request.body;
-  const merchantRef = request.body.merchant_ref; // Nama field di webhook adalah merchant_ref
+  const { status, reference_id, customer, items } = request.body;
+  const rawMerchantRef = request.body.merchant_ref;
 
   if (status !== 'paid') {
-    console.log(`LOG: Status pembayaran adalah '${status}', bukan 'paid'. Proses dihentikan.`);
     return response.status(200).json({ message: 'Webhook diterima, status bukan paid.' });
   }
   
-  if (!merchantRef || !customer?.email || !items || items.length === 0) {
+  if (!rawMerchantRef || !customer?.email || !items || items.length === 0) {
     return response.status(400).json({ message: 'Payload webhook tidak lengkap.' });
   }
 
-  // <-- PERBAIKAN: Ekstrak userId dan plan dari merchant_ref -->
-  const refParts = merchantRef.split('-');
-  const userId = refParts[1];
-  const plan = refParts[5]; // Mengambil 'bulanan' atau 'tahunan' dari akhir ref
-  const referredByCode = metadata?.referredByCode;
+  // <-- AWAL PERBAIKAN: Logika baru untuk mem-parsing merchant_ref -->
+  const refParts = rawMerchantRef.split(':');
+  const mainRef = refParts[0];
+  const referredByCode = refParts.length > 1 ? refParts[1] : null;
+
+  const mainRefParts = mainRef.split('-');
+  const userId = mainRefParts[1];
+  const plan = mainRefParts[mainRefParts.length - 1]; // Ambil plan dari bagian akhir
+  // <-- AKHIR PERBAIKAN -->
   
   const now = new Date();
   let subscriptionEndDate;
@@ -52,16 +52,14 @@ export default async function handler(request, response) {
   }
 
   try {
-    // <-- PERBAIKAN: Gunakan Transaksi Firestore -->
     await db.runTransaction(async (transaction) => {
-      // Langkah 1: Update status langganan pengguna
       const userDocRef = db.collection('users').doc(userId);
       transaction.set(userDocRef, {
         subscriptionStatus: 'active',
         subscriptionEndDate: subscriptionEndDate,
         plan: plan,
-        trialEndDate: admin.firestore.FieldValue.delete(), // Hapus masa trial jika ada
-        lastPayment: { // Catat detail pembayaran terakhir
+        trialEndDate: admin.firestore.FieldValue.delete(),
+        lastPayment: {
             date: now,
             amount: items[0].rate,
             invoiceId: reference_id
@@ -69,20 +67,18 @@ export default async function handler(request, response) {
       }, { merge: true });
       console.log(`LOG: Status langganan untuk user ${userId} akan diperbarui.`);
 
-      // Langkah 2: Jika ada kode rujukan, catat komisi
       if (referredByCode) {
-        console.log(`LOG: Kode rujukan ditemukan: ${referredByCode}. Mencari mitra...`);
+        console.log(`LOG: Kode rujukan ditemukan di merchant_ref: ${referredByCode}. Mencari mitra...`);
         
-        // Cari mitra yang memiliki referralCode ini
         const partnerQuery = db.collection('users').where('referralCode', '==', referredByCode).limit(1);
-        const partnerSnapshot = await partnerQuery.get();
+        const partnerSnapshot = await transaction.get(partnerQuery); // Gunakan transaction.get
         
         if (!partnerSnapshot.empty) {
           const partnerDoc = partnerSnapshot.docs[0];
           const partnerId = partnerDoc.id;
-          const commissionAmount = items[0].rate * 0.10; // Komisi 10%
+          const commissionAmount = items[0].rate * 0.10;
 
-          const commissionDocRef = db.collection('commissions').doc(); // Buat ID dokumen baru
+          const commissionDocRef = db.collection('commissions').doc();
           transaction.set(commissionDocRef, {
             partnerId: partnerId,
             partnerEmail: partnerDoc.data().email,
@@ -101,7 +97,6 @@ export default async function handler(request, response) {
       }
     });
 
-    console.log(`LOG: Transaksi Firestore untuk ${userId} berhasil diselesaikan.`);
     return response.status(200).json({ message: 'Webhook berhasil diproses.' });
 
   } catch (error) {
