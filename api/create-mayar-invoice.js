@@ -11,7 +11,6 @@ export default async function (req, res) {
     try {
         const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode } = req.body;
         
-        // --- PERBAIKAN: merchant_ref dibuat unik di sini ---
         const uniqueMerchantRef = `FASHIONOS-${customer_email}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
         if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
@@ -20,6 +19,9 @@ export default async function (req, res) {
 
         const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
         const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
+        
+        // --- KODE PERBAIKAN DI SINI ---
+        const uniqueDescription = `${item_name} (Ref: ${uniqueMerchantRef})`;
 
         const mayarPayload = {
             name: 'Customer Name',
@@ -27,12 +29,12 @@ export default async function (req, res) {
             mobile: '081234567890',
             redirectUrl: redirect_url,
             callbackUrl: callback_url,
-            description: item_name,
+            description: uniqueDescription, // <-- PERBAIKAN: Gunakan deskripsi unik di sini
             merchant_ref: uniqueMerchantRef,
             items: [{
                 quantity: 1,
                 rate: amount,
-                description: `${item_name} (${uniqueMerchantRef})` // Jadikan deskripsi unik
+                description: uniqueDescription // PERBAIKAN: Gunakan deskripsi unik yang sama
             }],
             metadata: {
                 referredByCode: referredByCode || null,
