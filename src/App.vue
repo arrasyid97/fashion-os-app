@@ -477,8 +477,8 @@ const state = reactive({
             investmentPage: true,
         }
 });
-const monthlyPrice = ref(200000);
-const yearlyPrice = ref(2000000);
+const monthlyPrice = ref(350000);
+const yearlyPrice = ref(4200000);
 async function submitAddProduct() {
     const form = uiState.modalData;
     if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian || !form.hpp || !form.hargaJualDefault) {
@@ -7326,7 +7326,6 @@ watch(activePage, (newPage) => {
             Pilih paket di bawah ini untuk memulai akses ke semua fitur dan kembangkan bisnis Anda bersama Fashion OS.
         </p>
         
-        <!-- Bagian Baru: Input Kode Rujukan -->
         <div class="max-w-xl mx-auto mb-8 p-6 rounded-xl border border-dashed border-indigo-300 bg-indigo-50 text-left">
             <h3 class="text-lg font-semibold text-indigo-700">Dapat Diskon?</h3>
             <p class="text-sm text-slate-600 mb-2">Masukkan kode rujukan dari mitra kami untuk mendapatkan diskon khusus.</p>
@@ -7339,17 +7338,20 @@ watch(activePage, (newPage) => {
             </p>
         </div>
         
-        <!-- Pilihan Paket -->
         <div class="flex flex-col md:flex-row gap-8 justify-center">
-            <div @click="selectedPlan = 'bulanan'" class="plan-card p-8 border-2 rounded-xl shadow-lg w-full md:w-80 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+            <div @click="selectedPlan = 'bulanan'"
+                class="plan-card p-8 border-2 rounded-xl shadow-lg w-full md:w-80 transition-all duration-300 cursor-pointer flex flex-col justify-between"
                 :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'bulanan', 'border-transparent': selectedPlan !== 'bulanan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Bulanan</h3>
-                    <p class="text-lg font-bold my-2" :class="uiState.referralCodeApplied ? 'line-through text-slate-400' : ''">
+                    <p v-if="uiState.referralCodeApplied" class="text-lg font-bold my-2 line-through text-slate-400">
                         {{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal">/bulan</span>
                     </p>
                     <p v-if="uiState.referralCodeApplied" class="text-4xl font-bold text-green-600">
                         {{ formatCurrency(250000) }} <span class="text-base font-normal">/bulan</span>
+                    </p>
+                    <p v-else class="text-4xl font-bold my-4">
+                        {{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal">/bulan</span>
                     </p>
                     <ul class="text-left space-y-2 text-slate-600 mt-4">
                         <li>✔️ Akses semua fitur</li>
@@ -7365,15 +7367,19 @@ watch(activePage, (newPage) => {
                 </button>
             </div>
 
-            <div @click="selectedPlan = 'tahunan'" class="plan-card p-8 border-2 rounded-xl shadow-lg w-full md:w-80 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+            <div @click="selectedPlan = 'tahunan'"
+                class="plan-card p-8 border-2 rounded-xl shadow-lg w-full md:w-80 transition-all duration-300 cursor-pointer flex flex-col justify-between"
                 :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'tahunan', 'border-transparent': selectedPlan !== 'tahunan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Tahunan</h3>
-                    <p class="text-lg font-bold my-2" :class="uiState.referralCodeApplied ? 'line-through text-slate-400' : ''">
+                    <p v-if="uiState.referralCodeApplied" class="text-lg font-bold my-2 line-through text-slate-400">
                         {{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal">/tahun</span>
                     </p>
                     <p v-if="uiState.referralCodeApplied" class="text-4xl font-bold text-green-600">
-                        {{ formatCurrency(3000000) }} <span class="text-base font-normal">/tahun</span>
+                        {{ formatCurrency(2500000) }} <span class="text-base font-normal">/tahun</span>
+                    </p>
+                    <p v-else class="text-4xl font-bold my-4">
+                        {{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal">/tahun</span>
                     </p>
                     <ul class="text-left space-y-2 text-slate-600 mt-4">
                         <li>✔️ Akses semua fitur</li>
