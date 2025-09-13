@@ -1,13 +1,8 @@
 import axios from 'axios/dist/node/axios.cjs';
 
 export default async function (req, res) {
-    // --- LOG: Request Diterima dari Frontend ---
-    console.log('--- LOG INI ADALAH PAYLOAD DARI FRONTEND KE BACKEND API ---');
-    console.log('Waktu Request:', new Date().toISOString());
-    console.log('Metode:', req.method);
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('--- LOG: Menerima request dari frontend ---');
     console.log('Body:', JSON.stringify(req.body, null, 2));
-    console.log('----------------------------------------------------');
 
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
@@ -16,70 +11,70 @@ export default async function (req, res) {
     try {
         const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode, merchant_ref } = req.body;
         
-        // --- BUAT ID UNIK DI BACKEND SEBAGAI SOLUSI KONTRA-LOGIKA ---
-        const finalMerchantRef = `FASHIONOS-Ref-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+        // --- BUAT LOGIKA PERULANGAN UNTUK MENGULANG PERMINTAAN ---
+        let mayarResponse;
+        let attempts = 0;
+        const maxAttempts = 3;
 
-        if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
-            return res.status(400).json({ message: 'Missing required fields' });
-        }
+        while (attempts < maxAttempts) {
+            try {
+                // Buat ID yang selalu unik di setiap percobaan
+                const finalMerchantRef = `${merchant_ref}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+                const uniqueDescription = `${item_name} (Ref: ${finalMerchantRef})`;
 
-        const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
-        const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
-        
-        const uniqueDescription = `${item_name} (Ref: ${finalMerchantRef})`;
+                const mayarPayload = {
+                    name: 'Customer Name',
+                    email: customer_email,
+                    mobile: '081234567890',
+                    redirectUrl: redirect_url,
+                    callbackUrl: callback_url,
+                    description: uniqueDescription,
+                    merchant_ref: finalMerchantRef,
+                    items: [{
+                        quantity: 1,
+                        rate: amount,
+                        description: uniqueDescription
+                    }],
+                    metadata: {
+                        referredByCode: referredByCode || null,
+                    }
+                };
+                
+                console.log(`--- LOG: Mengirim payload ke Mayar API (Percobaan ke-${attempts + 1}) ---`);
+                console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
 
-        const mayarPayload = {
-            name: 'Customer Name',
-            email: customer_email,
-            mobile: '081234567890',
-            redirectUrl: redirect_url,
-            callbackUrl: callback_url,
-            description: uniqueDescription,
-            merchant_ref: finalMerchantRef,
-            items: [{
-                quantity: 1,
-                rate: amount,
-                description: uniqueDescription
-            }],
-            metadata: {
-                referredByCode: referredByCode || null,
+                mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
+                    headers: {
+                        'Authorization': `Bearer ${MAYAR_API_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                // Jika berhasil, keluar dari loop
+                break; 
+
+            } catch (error) {
+                // Jika error adalah 409 (already exist), coba lagi
+                if (error.response?.status === 409) {
+                    console.error(`❌ PERINGATAN: Error 409 terdeteksi pada percobaan ke-${attempts + 1}. Mencoba lagi...`);
+                    attempts++;
+                    // Jeda sebentar sebelum mencoba lagi
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else {
+                    // Jika error bukan 409, lempar error
+                    throw error;
+                }
             }
-        };
+        }
         
-        // --- LOG: Payload yang Akan Dikirim ke Mayar API ---
-        console.log('--- LOG INI ADALAH PAYLOAD DARI BACKEND KE MAYAR API ---');
-        console.log('Mayar API URL:', mayarApiUrl);
-        console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
-        console.log('----------------------------------------------------');
-
-        const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
-            headers: {
-                'Authorization': `Bearer ${MAYAR_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
         if (mayarResponse.data?.data?.link) {
             return res.status(200).json({ invoice_url: mayarResponse.data.data.link });
         } else {
-            throw new Error('Gagal mendapatkan URL pembayaran dari Mayar.');
+            throw new Error('Gagal mendapatkan URL pembayaran dari Mayar setelah beberapa percobaan.');
         }
 
     } catch (error) {
-        // --- LOG: Menganalisis Error dari Mayar ---
-        console.log('--- LOG INI ADALAH ANALISIS ERROR DARI MAYAR ---');
-        if (error.response) {
-            console.error('Status Code:', error.response.status);
-            console.error('Response Data:', JSON.stringify(error.response.data, null, 2));
-        } else {
-            console.error('Error Message:', error.message);
-        }
-        console.log('----------------------------------------------------');
-
-        if (error.code === 'ENOTFOUND') {
-            return res.status(503).json({ message: 'Layanan Mayar tidak dapat dijangkau.', error: error.message });
-        }
-        
+        console.error('Fatal Error processing webhook:', error.message);
         return res.status(500).json({ message: 'Failed to create Mayar invoice', error: error.response?.data || error.message });
     }
 }
