@@ -5014,12 +5014,13 @@ async function loadAllDataFromFirebase() {
 
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
-    updateTime();
-    intervalId = setInterval(updateTime, 1000);
+    updateTime(); // Perbarui waktu saat komponen dimuat
+    intervalId = setInterval(updateTime, 1000); // Perbarui setiap detik
 
     onAuthStateChanged(auth, (user) => {
         isLoading.value = true;
 
+        // Bersihkan listener lama jika ada
         if (onSnapshotListener) {
             onSnapshotListener();
             onSnapshotListener = null;
@@ -5033,6 +5034,7 @@ onMounted(() => {
             currentUser.value = user;
             const userDocRef = doc(db, "users", user.uid);
 
+            // --- KODE PENTING: LISTENER REAL-TIME UNTUK DATA PENGGUNA ---
             onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
