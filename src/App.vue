@@ -929,12 +929,34 @@ async function handleSubscriptionMayar(plan) {
     const referredByCode = isReferred ? uiState.referralCodeInput : null;
 
     try {
-        // --- PERBAIKAN FINAL: Menitipkan kode rujukan di callback_url ---
+        // --- AWAL PERBAIKAN: Pasang pendengar event sebelum membuka pembayaran ---
+        const handleMayarMessage = (event) => {
+            // Filter keamanan: Pastikan pesan berasal dari Mayar
+            if (event.origin !== 'https://app.mayar.id' && event.origin !== 'https://mayar.id') {
+                return;
+            }
+
+            console.log('Menerima pesan dari iFrame Mayar:', event.data);
+
+            // Cek sinyal sukses dari Mayar (kemungkinan formatnya seperti ini)
+            if (event.data && (event.data.event === 'payment.success' || event.data.status === 'SUCCESS')) {
+                console.log('Sinyal pembayaran sukses terdeteksi! Melakukan redirect...');
+                
+                // Hapus pendengar agar tidak berjalan lagi
+                window.removeEventListener('message', handleMayarMessage);
+                
+                // Lakukan redirect secara manual dari aplikasi kita
+                window.location.href = `https://appfashion.id/langganan?status=success`;
+            }
+        };
+
+        window.addEventListener('message', handleMayarMessage, false);
+        // --- AKHIR PERBAIKAN ---
+
         let finalCallbackUrl = 'https://appfashion.id/api/mayar-webhook';
         if (referredByCode) {
-            finalCallbackUrl += `?refCode=${referredByCode}`; // Tambahkan sebagai query parameter
+            finalCallbackUrl += `?refCode=${referredByCode}`;
         }
-        // --- AKHIR PERBAIKAN ---
 
         const response = await fetch('/api/create-mayar-invoice', {
             method: 'POST',
@@ -943,28 +965,31 @@ async function handleSubscriptionMayar(plan) {
                 amount: priceToPay,
                 item_name: itemName,
                 customer_email: currentUser.value.email,
-                callback_url: finalCallbackUrl, // Menggunakan URL yang sudah dimodifikasi
+                callback_url: finalCallbackUrl,
                 redirect_url: `https://appfashion.id/langganan?status=success`,
-                // merchant_ref sekarang hanya untuk referensi, tidak lagi membawa data penting
                 merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
             }),
         });
 
         const data = await response.json();
         if (!response.ok) {
+            // Jika gagal, hapus pendengar yang sudah dipasang
+            window.removeEventListener('message', handleMayarMessage);
             throw new Error(data.message || `Mayar API Error: ${response.status}`);
         }
         if (data.invoice_url) {
             window.location.href = data.invoice_url;
         } else {
+            // Jika gagal, hapus pendengar yang sudah dipasang
+            window.removeEventListener('message', handleMayarMessage);
             throw new Error('Gagal mendapatkan URL pembayaran dari Mayar.');
         }
     } catch (error) {
         console.error("Gagal memproses langganan Mayar:", error);
         alert(`Gagal memproses langganan. Silakan coba lagi.\n\nError: ${error.message}`);
-    } finally {
-        isSubscribingPlan.value = false;
+        isSubscribingPlan.value = false; // Pastikan loading state berhenti jika ada error
     }
+    // 'finally' block tidak lagi dibutuhkan di sini karena state diatur oleh event listener atau error handling
 }
 
 const voucherTokoComputed = (channel) => computed({
