@@ -11,7 +11,10 @@ export default async function (req, res) {
     try {
         const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode } = req.body;
         
-        const uniqueMerchantRef = `FASHIONOS-${customer_email}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        // --- PERBAIKAN FINAL: Buat ID dan Deskripsi yang sangat unik ---
+        const randomId = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+        const uniqueMerchantRef = `FASHIONOS-Ref-${randomId}`;
+        const uniqueDescription = `${item_name} (Ref: ${randomId})`;
 
         if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
             return res.status(400).json({ message: 'Missing required fields' });
@@ -19,9 +22,6 @@ export default async function (req, res) {
 
         const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
         const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
-        
-        // --- KODE PERBAIKAN DI SINI ---
-        const uniqueDescription = `${item_name} (Ref: ${uniqueMerchantRef})`;
 
         const mayarPayload = {
             name: 'Customer Name',
@@ -29,12 +29,12 @@ export default async function (req, res) {
             mobile: '081234567890',
             redirectUrl: redirect_url,
             callbackUrl: callback_url,
-            description: uniqueDescription, // <-- PERBAIKAN: Gunakan deskripsi unik di sini
-            merchant_ref: uniqueMerchantRef,
+            description: uniqueDescription, // Gunakan deskripsi unik yang baru
+            merchant_ref: uniqueMerchantRef, // Gunakan merchant_ref yang baru
             items: [{
                 quantity: 1,
                 rate: amount,
-                description: uniqueDescription // PERBAIKAN: Gunakan deskripsi unik yang sama
+                description: uniqueDescription // Gunakan deskripsi unik yang sama
             }],
             metadata: {
                 referredByCode: referredByCode || null,
