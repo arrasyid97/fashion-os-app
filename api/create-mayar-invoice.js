@@ -1,7 +1,6 @@
 import axios from 'axios/dist/node/axios.cjs';
 
 export default async function (req, res) {
-    // --- KODE LOG BARU: untuk melihat apa yang dikirim dari frontend ---
     console.log('--- LOG: Menerima request dari frontend ---');
     console.log('Body:', JSON.stringify(req.body, null, 2));
 
@@ -14,6 +13,7 @@ export default async function (req, res) {
         
         // --- PERBAIKAN: merchant_ref dibuat unik di sini ---
         const uniqueMerchantRef = `FASHIONOS-${customer_email}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        const uniqueProductId = `PRODUCT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
         if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
             return res.status(400).json({ message: 'Missing required fields' });
@@ -29,21 +29,20 @@ export default async function (req, res) {
             redirectUrl: redirect_url,
             callbackUrl: callback_url,
             description: item_name,
-            merchant_ref: uniqueMerchantRef, // Menggunakan merchant_ref yang sudah unik
+            merchant_ref: uniqueMerchantRef,
             items: [{
                 quantity: 1,
                 rate: amount,
                 description: item_name
             }],
             metadata: {
-                referredByCode: referredByCode || null
+                referredByCode: referredByCode || null,
+                productId: uniqueProductId // Tambahkan product_id yang unik
             }
         };
 
-        // --- KODE LOG BARU: untuk melihat payload yang akan dikirim ke Mayar ---
         console.log('--- LOG: Mengirim payload ke Mayar API ---');
         console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
-
 
         const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
             headers: {
