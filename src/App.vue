@@ -931,6 +931,7 @@ async function handleSubscriptionMayar(plan) {
     }
 
     const itemName = `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`;
+    const referredByCode = isReferred ? uiState.referralCodeInput : null;
 
     try {
         const response = await fetch('/api/create-mayar-invoice', {
@@ -943,8 +944,7 @@ async function handleSubscriptionMayar(plan) {
                 callback_url: 'https://appfashion.id/api/mayar-webhook',
                 redirect_url: `https://appfashion.id/langganan?status=success`,
                 merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
-                // --- KODE PENTING: MENGIRIM KODE RUJUKAN KE BACKEND ---
-                referred_by_code: isReferred ? uiState.referralCodeInput : null
+                referred_by_code: referredByCode,
             }),
         });
 
@@ -967,8 +967,6 @@ async function handleSubscriptionMayar(plan) {
         isSubscribingPlan.value = false;
     }
 }
-
-
 
 const voucherTokoComputed = (channel) => computed({
     get() { return state.promotions.perChannel[channel.id]?.voucherToko ? state.promotions.perChannel[channel.id].voucherToko + '%' : ''; },
@@ -5048,13 +5046,12 @@ async function loadAllDataFromFirebase() {
 
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
-    updateTime(); // Perbarui waktu saat komponen dimuat
-    intervalId = setInterval(updateTime, 1000); // Perbarui setiap detik
+    updateTime();
+    intervalId = setInterval(updateTime, 1000);
 
     onAuthStateChanged(auth, (user) => {
         isLoading.value = true;
 
-        // Bersihkan listener lama jika ada
         if (onSnapshotListener) {
             onSnapshotListener();
             onSnapshotListener = null;
@@ -5068,7 +5065,6 @@ onMounted(() => {
             currentUser.value = user;
             const userDocRef = doc(db, "users", user.uid);
 
-            // --- KODE PENTING: LISTENER REAL-TIME UNTUK DATA PENGGUNA ---
             onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
