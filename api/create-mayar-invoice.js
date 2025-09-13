@@ -8,7 +8,7 @@ export default async function (req, res) {
     try {
         const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode } = req.body;
         
-        // --- KODE PERBAIKAN: merchant_ref dibuat unik di sini ---
+        // --- PERBAIKAN: merchant_ref dibuat unik di sini ---
         const uniqueMerchantRef = `FASHIONOS-${customer_email}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
         if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
