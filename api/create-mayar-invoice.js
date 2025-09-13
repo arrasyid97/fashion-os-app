@@ -8,11 +8,10 @@ export default async function (req, res) {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
-    // <-- PERBAIKAN: merchant_ref sekarang diambil dari body untuk konsistensi -->
     const { amount, item_name, customer_email, callback_url, redirect_url, merchant_ref, referredByCode } = req.body;
     
     if (!amount || !item_name || !customer_email || !callback_url || !redirect_url || !merchant_ref) {
-        return res.status(400).json({ message: 'Missing required fields, including merchant_ref' });
+        return res.status(400).json({ message: 'Missing required fields' });
     }
 
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
@@ -25,18 +24,17 @@ export default async function (req, res) {
     try {
         while (attempts < maxAttempts) {
             try {
-                // <-- PERBAIKAN: Payload disederhanakan dan diperbaiki -->
                 const mayarPayload = {
-                    name: customer_email, // Gunakan email sebagai nama customer
+                    name: customer_email,
                     email: customer_email,
-                    redirectUrl: redirect_url,
-                    callbackUrl: callback_url,
-                    description: `Pembayaran untuk ${item_name}`, // Deskripsi umum
-                    merchant_ref: `${merchant_ref}-${attempts}`, // <-- PERBAIKAN: Tambahkan counter percobaan untuk memastikan keunikan absolut
+                    redirect_url: redirect_url,           // <-- PERBAIKAN: Menggunakan snake_case
+                    callback_url: callback_url,           // <-- PERBAIKAN: Menggunakan snake_case
+                    description: `Pembayaran untuk ${item_name}`,
+                    merchant_ref: `${merchant_ref}-${attempts}`,
                     items: [{
+                        name: item_name,                  // <-- PERBAIKAN: Menggunakan 'name' untuk item
                         quantity: 1,
-                        rate: amount,
-                        description: item_name // <-- PERBAIKAN: Deskripsi item dibuat statis dan jelas
+                        rate: amount
                     }],
                     metadata: {
                         referredByCode: referredByCode || null,
@@ -53,22 +51,19 @@ export default async function (req, res) {
                     },
                 });
 
-                // Jika berhasil, keluar dari loop
                 break; 
 
             } catch (error) {
                 if (error.response?.status === 409) {
                     console.error(`❌ PERINGATAN: Error 409 terdeteksi pada percobaan ke-${attempts + 1}. Mencoba lagi...`);
                     attempts++;
-                    await new Promise(resolve => setTimeout(resolve, 500)); // Jeda sebelum mencoba lagi
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 } else {
-                    // Lemparkan error lain untuk ditangkap di luar loop
                     throw error;
                 }
             }
         }
         
-        // <-- PERBAIKAN: Penanganan error jika semua percobaan gagal -->
         if (!mayarResponse) {
              throw new Error('Gagal membuat invoice di Mayar setelah beberapa kali percobaan karena konflik (Error 409).');
         }
@@ -77,7 +72,6 @@ export default async function (req, res) {
             console.log('✅ BERHASIL: Invoice URL diterima dari Mayar:', mayarResponse.data.data.link);
             return res.status(200).json({ invoice_url: mayarResponse.data.data.link });
         } else {
-            // Tangani jika respons 200 tapi tidak ada link
             throw new Error('Respons dari Mayar tidak valid atau tidak berisi link invoice.');
         }
 
