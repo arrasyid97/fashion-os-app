@@ -1,117 +1,111 @@
-import admin from 'firebase-admin';
+const admin = require('firebase-admin');
 
 // Inisialisasi Firebase Admin SDK
 if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS))
-    });
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    }),
+  });
 }
-const firestoreAdmin = admin.firestore();
 
-export default async function (req, res) {
-    console.log('--- Webhook Mayar Diterima ---');
-    console.log('Method:', req.method);
-    console.log('Headers:', req.headers);
-    console.log('Body:', JSON.stringify(req.body, null, 2));
+const db = admin.firestore();
 
-    if (req.method !== 'POST') {
-        console.log('Status: 405 Method Not Allowed');
-        return res.status(405).json({ message: 'Method Not Allowed' });
-    }
+export default async function handler(request, response) {
+  if (request.method !== 'POST') {
+    return response.status(405).json({ message: 'Method Not Allowed' });
+  }
 
-    const mayarTokenHeader = req.headers['x-callback-token'];
-    const myWebhookToken = process.env.MAYAR_WEBHOOK_TOKEN;
+  // <-- PERBAIKAN: Log seluruh body dari Mayar untuk debugging -->
+  console.log("--- LOG: Menerima Webhook dari Mayar ---");
+  console.log("Body:", JSON.stringify(request.body, null, 2));
 
-    if (mayarTokenHeader !== myWebhookToken) {
-        console.error('Webhook Unauthorized: Invalid token');
-        return res.status(401).json({ message: 'Unauthorized' });
-    }
+  // <-- PERBAIKAN: Ambil semua data yang relevan dari payload webhook -->
+  const { status, reference_id, metadata, customer, items } = request.body;
+  const merchantRef = request.body.merchant_ref; // Nama field di webhook adalah merchant_ref
 
-    const event = req.body;
+  if (status !== 'paid') {
+    console.log(`LOG: Status pembayaran adalah '${status}', bukan 'paid'. Proses dihentikan.`);
+    return response.status(200).json({ message: 'Webhook diterima, status bukan paid.' });
+  }
+  
+  if (!merchantRef || !customer?.email || !items || items.length === 0) {
+    return response.status(400).json({ message: 'Payload webhook tidak lengkap.' });
+  }
 
-    try {
-        if (event.event === 'payment.received' && event.data.status === 'SUCCESS') {
-            console.log(`Event 'payment.received' dengan status 'SUCCESS' diterima.`);
-            
-            const customerEmail = event.data?.customerEmail;
-            const amountPaid = event.data?.amount;
-            const productDescription = event.data?.productDescription;
-            // --- PERBAIKAN: AMBIL KODE RUJUKAN DARI METADATA ---
-            const referredByCode = event.data?.metadata?.referredByCode;
-            
-            console.log(`Debugging: Customer Email: ${customerEmail}, Amount: ${amountPaid}, Description: ${productDescription}, Referral Code: ${referredByCode}`);
+  // <-- PERBAIKAN: Ekstrak userId dan plan dari merchant_ref -->
+  const refParts = merchantRef.split('-');
+  const userId = refParts[1];
+  const plan = refParts[5]; // Mengambil 'bulanan' atau 'tahunan' dari akhir ref
+  const referredByCode = metadata?.referredByCode;
+  
+  const now = new Date();
+  let subscriptionEndDate;
+  if (plan === 'bulanan') {
+    subscriptionEndDate = new Date(new Date().setMonth(now.getMonth() + 1));
+  } else if (plan === 'tahunan') {
+    subscriptionEndDate = new Date(new Date().setFullYear(now.getFullYear() + 1));
+  } else {
+    return response.status(400).json({ message: 'Plan tidak valid di merchant_ref' });
+  }
 
-            if (!customerEmail || !amountPaid || !productDescription) {
-                console.error('❌ ERROR: Data customerEmail, amount, atau productDescription tidak ditemukan di body webhook.');
-                return res.status(400).json({ message: 'Missing required data from webhook body' });
-            }
-
-            const usersCollection = firestoreAdmin.collection("users");
-            const q = usersCollection.where("email", "==", customerEmail).limit(1);
-            const userSnapshot = await q.get();
-
-            if (!userSnapshot.empty) {
-                const userDoc = userSnapshot.docs[0];
-                const userId = userDoc.id;
-                const userData = userDoc.data();
-                
-                console.log(`User ditemukan! User ID: ${userId}, Data:`, userData);
-
-                const plan = productDescription.includes('Paket Bulanan') ? 'bulanan' : 'tahunan';
-                console.log(`Paket langganan terdeteksi: ${plan}`);
-
-                const now = new Date();
-                const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + (plan === 'bulanan' ? 1 : 12)));
-                
-                console.log('Mencoba memperbarui dokumen user menggunakan Timestamp dari firebase-admin...');
-                await firestoreAdmin.collection("users").doc(userId).set({
-                    subscriptionStatus: 'active',
-                    subscriptionEndDate: admin.firestore.Timestamp.fromDate(subscriptionEndDate)
-                }, { merge: true });
-                
-                console.log(`✅ SUKSES: Langganan untuk user ${userId} berhasil diaktifkan.`);
-
-                // --- KODE BARU: MENCATAT KOMISI BERDASARKAN KODE DARI PAYLOAD ---
-                if (referredByCode) {
-                    const partnerQuery = firestoreAdmin.collection("users").where("referralCode", "==", referredByCode).limit(1);
-                    const partnerSnapshot = await partnerQuery.get();
-
-                    if (!partnerSnapshot.empty) {
-                        const partnerDoc = partnerSnapshot.docs[0];
-                        const partnerId = partnerDoc.id;
-                        
-                        const commissionAmount = plan === 'bulanan' ? 50000 : 500000;
-                        
-                        await firestoreAdmin.collection("commissions").add({
-                            referredByUserId: partnerId,
-                            customerUserId: userId,
-                            customerEmail: customerEmail,
-                            amount: commissionAmount,
-                            transactionAmount: amountPaid,
-                            status: 'unpaid',
-                            createdAt: admin.firestore.Timestamp.now(),
-                        });
-                        console.log(`✅ Komisi sebesar Rp ${commissionAmount} berhasil dicatat untuk user mitra ${referredByCode}.`);
-                    } else {
-                        console.log(`❌ Kode rujukan '${referredByCode}' tidak valid atau bukan mitra. Komisi tidak dicatat.`);
-                    }
-                } else {
-                    console.log('Pelanggan tidak memiliki kode rujukan. Tidak ada komisi yang dicatat.');
-                }
-                // --- AKHIR KODE KOMISI BARU ---
-
-            } else {
-                console.error(`❌ ERROR: User dengan email ${customerEmail} tidak ditemukan di database.`);
-            }
-        } else {
-            console.log(`Event bukan 'payment.received' atau status bukan 'SUCCESS'. Diabaikan.`);
+  try {
+    // <-- PERBAIKAN: Gunakan Transaksi Firestore -->
+    await db.runTransaction(async (transaction) => {
+      // Langkah 1: Update status langganan pengguna
+      const userDocRef = db.collection('users').doc(userId);
+      transaction.set(userDocRef, {
+        subscriptionStatus: 'active',
+        subscriptionEndDate: subscriptionEndDate,
+        plan: plan,
+        trialEndDate: admin.firestore.FieldValue.delete(), // Hapus masa trial jika ada
+        lastPayment: { // Catat detail pembayaran terakhir
+            date: now,
+            amount: items[0].rate,
+            invoiceId: reference_id
         }
-        
-        console.log('Webhook event diproses atau diabaikan. Mengirim respons 200.');
-        return res.status(200).json({ message: 'Webhook event processed or ignored' });
+      }, { merge: true });
+      console.log(`LOG: Status langganan untuk user ${userId} akan diperbarui.`);
 
-    } catch (error) {
-        console.error('Fatal Error processing webhook:', error.message);
-        return res.status(500).json({ message: 'Failed to process webhook', error: error.message });
-    }
+      // Langkah 2: Jika ada kode rujukan, catat komisi
+      if (referredByCode) {
+        console.log(`LOG: Kode rujukan ditemukan: ${referredByCode}. Mencari mitra...`);
+        
+        // Cari mitra yang memiliki referralCode ini
+        const partnerQuery = db.collection('users').where('referralCode', '==', referredByCode).limit(1);
+        const partnerSnapshot = await partnerQuery.get();
+        
+        if (!partnerSnapshot.empty) {
+          const partnerDoc = partnerSnapshot.docs[0];
+          const partnerId = partnerDoc.id;
+          const commissionAmount = items[0].rate * 0.10; // Komisi 10%
+
+          const commissionDocRef = db.collection('commissions').doc(); // Buat ID dokumen baru
+          transaction.set(commissionDocRef, {
+            partnerId: partnerId,
+            partnerEmail: partnerDoc.data().email,
+            referredUserId: userId,
+            referredUserEmail: customer.email,
+            transactionAmount: items[0].rate,
+            commissionAmount: commissionAmount,
+            status: 'unpaid',
+            createdAt: now,
+            mayarInvoiceId: reference_id
+          });
+          console.log(`✅ BERHASIL: Komisi sebesar ${commissionAmount} untuk mitra ${partnerId} akan dicatat.`);
+        } else {
+          console.error(`❌ PERINGATAN: Kode rujukan ${referredByCode} diterima, tetapi tidak ada mitra yang cocok ditemukan.`);
+        }
+      }
+    });
+
+    console.log(`LOG: Transaksi Firestore untuk ${userId} berhasil diselesaikan.`);
+    return response.status(200).json({ message: 'Webhook berhasil diproses.' });
+
+  } catch (error) {
+    console.error('FATAL ERROR: Gagal memproses transaksi webhook:', error);
+    return response.status(500).json({ message: 'Gagal memproses webhook', error: error.message });
+  }
 }

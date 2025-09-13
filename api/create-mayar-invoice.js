@@ -8,10 +8,11 @@ export default async function (req, res) {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
-    const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode } = req.body;
+    // <-- PERBAIKAN: merchant_ref sekarang diambil dari body untuk konsistensi -->
+    const { amount, item_name, customer_email, callback_url, redirect_url, merchant_ref, referredByCode } = req.body;
     
-    if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
-        return res.status(400).json({ message: 'Missing required fields' });
+    if (!amount || !item_name || !customer_email || !callback_url || !redirect_url || !merchant_ref) {
+        return res.status(400).json({ message: 'Missing required fields, including merchant_ref' });
     }
 
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
@@ -24,22 +25,18 @@ export default async function (req, res) {
     try {
         while (attempts < maxAttempts) {
             try {
-                // Buat ID yang selalu unik di setiap percobaan
-                const finalMerchantRef = `FASHIONOS-${customer_email}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-                const uniqueDescription = `${item_name} (Ref: ${finalMerchantRef})`;
-
+                // <-- PERBAIKAN: Payload disederhanakan dan diperbaiki -->
                 const mayarPayload = {
-                    name: 'Customer Name',
+                    name: customer_email, // Gunakan email sebagai nama customer
                     email: customer_email,
-                    mobile: '081234567890',
                     redirectUrl: redirect_url,
                     callbackUrl: callback_url,
-                    description: uniqueDescription,
-                    merchant_ref: finalMerchantRef,
+                    description: `Pembayaran untuk ${item_name}`, // Deskripsi umum
+                    merchant_ref: `${merchant_ref}-${attempts}`, // <-- PERBAIKAN: Tambahkan counter percobaan untuk memastikan keunikan absolut
                     items: [{
                         quantity: 1,
                         rate: amount,
-                        description: uniqueDescription
+                        description: item_name // <-- PERBAIKAN: Deskripsi item dibuat statis dan jelas
                     }],
                     metadata: {
                         referredByCode: referredByCode || null,
@@ -63,22 +60,29 @@ export default async function (req, res) {
                 if (error.response?.status === 409) {
                     console.error(`❌ PERINGATAN: Error 409 terdeteksi pada percobaan ke-${attempts + 1}. Mencoba lagi...`);
                     attempts++;
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Jeda sebelum mencoba lagi
                 } else {
+                    // Lemparkan error lain untuk ditangkap di luar loop
                     throw error;
                 }
             }
         }
         
-        // --- PERBAIKAN: Cek apakah mayarResponse ada sebelum diakses ---
-        if (mayarResponse && mayarResponse.data?.data?.link) {
+        // <-- PERBAIKAN: Penanganan error jika semua percobaan gagal -->
+        if (!mayarResponse) {
+             throw new Error('Gagal membuat invoice di Mayar setelah beberapa kali percobaan karena konflik (Error 409).');
+        }
+
+        if (mayarResponse.data?.data?.link) {
+            console.log('✅ BERHASIL: Invoice URL diterima dari Mayar:', mayarResponse.data.data.link);
             return res.status(200).json({ invoice_url: mayarResponse.data.data.link });
         } else {
-            throw new Error('Gagal mendapatkan URL pembayaran dari Mayar setelah beberapa percobaan.');
+            // Tangani jika respons 200 tapi tidak ada link
+            throw new Error('Respons dari Mayar tidak valid atau tidak berisi link invoice.');
         }
 
     } catch (error) {
-        console.error('Fatal Error processing webhook:', error.message);
-        return res.status(500).json({ message: 'Failed to create Mayar invoice', error: error.response?.data || error.message });
+        console.error('Fatal Error saat memproses pembuatan invoice:', error.message);
+        return res.status(500).json({ message: 'Gagal membuat invoice Mayar', error: error.response?.data || error.message });
     }
 }
