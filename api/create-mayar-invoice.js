@@ -17,70 +17,80 @@ export default async function (req, res) {
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
     const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
 
-    let mayarResponse;
-    let attempts = 0;
-    const maxAttempts = 3;
+    const mayarPayload = {
+        name: customer_email.split('@')[0],
+        email: customer_email,
+        mobile: '081234567890',
+        redirect_url: redirect_url,
+        callback_url: callback_url,
+        description: `Pembayaran untuk ${item_name}`,
+        merchant_ref: merchant_ref, // Kita gunakan referensi unik langsung dari frontend
+        items: [{
+            name: item_name,
+            quantity: 1,
+            rate: amount,
+            description: item_name 
+        }],
+        metadata: {
+            referredByCode: referredByCode || null,
+        }
+    };
 
     try {
-        // Mengembalikan retry loop untuk ketahanan
-        while (attempts < maxAttempts) {
-            try {
-                const mayarPayload = {
-                    name: customer_email.split('@')[0],
-                    email: customer_email,
-                    mobile: '081234567890',
-                    redirect_url: redirect_url,
-                    callback_url: callback_url,
-                    description: `Pembayaran untuk ${item_name}`,
-                    merchant_ref: `${merchant_ref}-${attempts}`,
-                    items: [{
-                        name: item_name,
-                        quantity: 1,
-                        rate: amount,
-                        description: item_name // <-- PERBAIKAN FINAL: Field ini ditambahkan kembali sesuai permintaan API Mayar
-                    }],
-                    metadata: {
-                        referredByCode: referredByCode || null,
-                    }
-                };
-                
-                console.log(`--- LOG: Mengirim payload ke Mayar API (Percobaan ke-${attempts + 1}) ---`);
-                console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
+        console.log('--- LOG: Mengirim payload ke Mayar API ---');
+        console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
 
-                mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
-                    headers: {
-                        'Authorization': `Bearer ${MAYAR_API_KEY}`,
-                        'Content-Type': 'application/json',
-                    },
-                });
+        const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
+            headers: {
+                'Authorization': `Bearer ${MAYAR_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+        });
 
-                break; 
-
-            } catch (error) {
-                if (error.response?.status === 409) {
-                    console.error(`❌ PERINGATAN: Error 409 terdeteksi pada percobaan ke-${attempts + 1}. Mencoba lagi...`);
-                    attempts++;
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                } else {
-                    throw error;
-                }
-            }
-        }
-        
-        if (!mayarResponse) {
-             throw new Error('Gagal membuat invoice di Mayar setelah beberapa kali percobaan karena konflik (Error 409).');
-        }
+        // Log jika berhasil
+        console.log('✅ BERHASIL: Respons Sukses dari Mayar:', JSON.stringify(mayarResponse.data, null, 2));
 
         if (mayarResponse.data?.data?.link) {
-            console.log('✅ BERHASIL: Invoice URL diterima dari Mayar:', mayarResponse.data.data.link);
             return res.status(200).json({ invoice_url: mayarResponse.data.data.link });
         } else {
-            throw new Error('Respons dari Mayar tidak valid atau tidak berisi link invoice.');
+            throw new Error('Respons sukses dari Mayar tetapi tidak berisi link invoice.');
         }
 
     } catch (error) {
-        console.error('Fatal Error saat memproses pembuatan invoice:', error.message);
-        console.error('Mayar Error Response:', JSON.stringify(error.response?.data, null, 2));
-        return res.status(500).json({ message: 'Gagal membuat invoice Mayar', error: error.response?.data || error.message });
+        // ==================================================================
+        // <-- BAGIAN UTAMA: LOG DIAGNOSTIK SUPER LENGKAP -->
+        // ==================================================================
+        console.error('--- ❌ FATAL ERROR SAAT MEMBUAT INVOICE ❌ ---');
+        
+        if (error.response) {
+            // Ini adalah error yang berasal dari respons server Mayar (4xx atau 5xx)
+            const errorDetails = {
+                message: error.message,
+                api_status_code: error.response.status,
+                api_status_text: error.response.statusText,
+                api_response_body: error.response.data, // INI YANG PALING PENTING
+                request_payload_sent: error.config.data ? JSON.parse(error.config.data) : "Tidak dapat membaca payload",
+                request_url: error.config.url,
+                request_method: error.config.method,
+            };
+            console.error('Detail Lengkap Error dari API Mayar:');
+            console.error(JSON.stringify(errorDetails, null, 2));
+            
+            return res.status(500).json({ 
+                message: 'Gagal membuat invoice Mayar, server Mayar memberikan error.', 
+                error: errorDetails 
+            });
+
+        } else if (error.request) {
+            // Request dibuat tapi tidak ada respons yang diterima
+            console.error('Error Jaringan: Tidak ada respons dari server Mayar.');
+            console.error(error.request);
+            return res.status(500).json({ message: 'Gagal menghubungi server Mayar.' });
+
+        } else {
+            // Error lain saat setup request
+            console.error('Error Konfigurasi Request:', error.message);
+            return res.status(500).json({ message: 'Terjadi error internal sebelum mengirim request.', error: error.message });
+        }
     }
 }
