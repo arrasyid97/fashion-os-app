@@ -17,56 +17,35 @@ export default async function (req, res) {
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
     const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
 
-    let mayarResponse;
-    let attempts = 0;
-    const maxAttempts = 3;
-
     try {
-        while (attempts < maxAttempts) {
-            try {
-                const mayarPayload = {
-                    name: customer_email,
-                    email: customer_email,
-                    redirect_url: redirect_url,           // <-- PERBAIKAN: Menggunakan snake_case
-                    callback_url: callback_url,           // <-- PERBAIKAN: Menggunakan snake_case
-                    description: `Pembayaran untuk ${item_name}`,
-                    merchant_ref: `${merchant_ref}-${attempts}`,
-                    items: [{
-                        name: item_name,                  // <-- PERBAIKAN: Menggunakan 'name' untuk item
-                        quantity: 1,
-                        rate: amount
-                    }],
-                    metadata: {
-                        referredByCode: referredByCode || null,
-                    }
-                };
-                
-                console.log(`--- LOG: Mengirim payload ke Mayar API (Percobaan ke-${attempts + 1}) ---`);
-                console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
-
-                mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
-                    headers: {
-                        'Authorization': `Bearer ${MAYAR_API_KEY}`,
-                        'Content-Type': 'application/json',
-                    },
-                });
-
-                break; 
-
-            } catch (error) {
-                if (error.response?.status === 409) {
-                    console.error(`❌ PERINGATAN: Error 409 terdeteksi pada percobaan ke-${attempts + 1}. Mencoba lagi...`);
-                    attempts++;
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                } else {
-                    throw error;
-                }
+        // Hanya satu kali percobaan untuk melihat error yang jelas
+        const mayarPayload = {
+            name: customer_email.split('@')[0], // <-- PERBAIKAN: Gunakan bagian depan email sebagai nama
+            email: customer_email,
+            mobile: '081234567890',          // <-- PERBAIKAN FINAL: Menambahkan kembali field 'mobile' yang kemungkinan wajib
+            redirect_url: redirect_url,
+            callback_url: callback_url,
+            description: `Pembayaran untuk ${item_name}`,
+            merchant_ref: merchant_ref, // <-- PERBAIKAN: Gunakan merchant_ref asli tanpa tambahan, karena sudah unik dari frontend
+            items: [{
+                name: item_name,
+                quantity: 1,
+                rate: amount
+            }],
+            metadata: {
+                referredByCode: referredByCode || null,
             }
-        }
+        };
         
-        if (!mayarResponse) {
-             throw new Error('Gagal membuat invoice di Mayar setelah beberapa kali percobaan karena konflik (Error 409).');
-        }
+        console.log(`--- LOG: Mengirim payload ke Mayar API ---`);
+        console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
+
+        const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
+            headers: {
+                'Authorization': `Bearer ${MAYAR_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+        });
 
         if (mayarResponse.data?.data?.link) {
             console.log('✅ BERHASIL: Invoice URL diterima dari Mayar:', mayarResponse.data.data.link);
@@ -77,6 +56,8 @@ export default async function (req, res) {
 
     } catch (error) {
         console.error('Fatal Error saat memproses pembuatan invoice:', error.message);
+        // <-- PERBAIKAN: Tampilkan juga detail error dari respons Mayar jika ada -->
+        console.error('Mayar Error Response:', JSON.stringify(error.response?.data, null, 2));
         return res.status(500).json({ message: 'Gagal membuat invoice Mayar', error: error.response?.data || error.message });
     }
 }
