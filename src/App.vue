@@ -1532,23 +1532,21 @@ const uiState = reactive({
     },
     // --- BARCODE GENERATOR STATE ---
     barcodeSettings: {
-      text: 'SKU-PRODUK-ANDA',
-      type: 'CODE128',
-      showText: true,
-      // Pengaturan Barcode
-      barWidth: 1.5,  // <-- BARU: Lebar garis (default 2)
-      barHeight: 50, // <-- BARU: Tinggi barcode (default 100)
-      // Pengaturan Kertas
-      paperSize: '100x150',
-      customWidth: 100,
-      customHeight: 150,
-      // Pengaturan Layout
-      layoutCols: 2, // <-- BARU: Jumlah kolom (menyamping)
-      layoutRows: 5, // <-- BARU: Jumlah baris (ke bawah)
-      // Pengaturan Cetak
-      printQty: 10,
-      printMode: 'label'
-    }
+  text: 'SKU-PRODUK-ANDA',
+  type: 'CODE128',
+  showText: true,
+  // Pengaturan Barcode
+  barWidth: 1.5,
+  barHeight: 40, // <-- Tinggi barcode kita buat lebih pendek
+  // Pengaturan Kertas & Label
+  paperSize: '33x15-3', // <-- Nilai default baru untuk preset
+  labelWidth: 33,     // <-- BARU: Lebar satu stiker (mm)
+  labelHeight: 15,    // <-- BARU: Tinggi satu stiker (mm)
+  layoutCols: 3,      // <-- BARU: Jumlah kolom (jejer ke samping)
+  // Pengaturan Cetak
+  printQty: 30, // Default cetak 30 label
+  printMode: 'label'
+}
     // --- AKHIR BARCODE STATE ---
 
 });
@@ -5168,27 +5166,33 @@ function generateBarcodes() {
   previewArea.innerHTML = '';
   
   const settings = uiState.barcodeSettings;
-  let [paperWidth, paperHeight] = settings.paperSize === 'custom' 
-      ? [settings.customWidth, settings.customHeight]
-      : settings.paperSize.split('x').map(Number);
-
-  // <-- AWAL PERUBAIKAN: Gunakan input kolom & baris langsung -->
-  const cols = Math.max(1, settings.layoutCols);
-  const rows = Math.max(1, settings.layoutRows);
-
-  previewArea.style.width = `${paperWidth}mm`;
-  previewArea.style.height = `${paperHeight}mm`;
-  previewArea.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  previewArea.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
   
-  const labelsPerPage = cols * rows;
-  // <-- AKHIR PERUBAIKAN -->
+  // Ambil data dari preset jika bukan custom
+  if (settings.paperSize !== 'custom') {
+    const [dims, cols] = settings.paperSize.split('-');
+    const [width, height] = dims.split('x');
+    settings.labelWidth = parseInt(width, 10);
+    settings.labelHeight = parseInt(height, 10);
+    settings.layoutCols = parseInt(cols, 10);
+  }
 
-  const totalLabelsToGenerate = settings.printMode === 'sheet' ? labelsPerPage * settings.printQty : settings.printQty;
+  const cols = Math.max(1, settings.layoutCols);
+  const totalLabelsToGenerate = settings.printMode === 'sheet' 
+      ? (cols * 10) * settings.printQty // Asumsi 1 lembar = 10 baris
+      : settings.printQty;
 
+  // Atur lebar area preview agar sesuai dengan total lebar label + gap
+  const previewWidth = (settings.labelWidth * cols) + ((cols - 1) * 2); // 2mm gap
+  previewArea.style.width = `${previewWidth}mm`;
+  previewArea.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+  // Buat elemen untuk setiap label
   for (let i = 1; i <= totalLabelsToGenerate; i++) {
     const label = document.createElement('div');
     label.className = 'barcode-label';
+    // Atur ukuran setiap blok label
+    label.style.width = `${settings.labelWidth}mm`;
+    label.style.height = `${settings.labelHeight}mm`;
     
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.id = `barcode-${i}`;
@@ -5197,6 +5201,7 @@ function generateBarcodes() {
     previewArea.appendChild(label);
   }
   
+  // Tunggu DOM update, lalu gambar barcodenya
   nextTick(() => {
     for (let i = 1; i <= totalLabelsToGenerate; i++) {
       const svgElement = document.getElementById(`barcode-${i}`);
@@ -5205,14 +5210,13 @@ function generateBarcodes() {
             JsBarcode(svgElement, settings.text, {
               format: settings.type,
               displayValue: settings.showText,
-              width: settings.barWidth,   // <-- BARU: Menggunakan lebar dari slider
-              height: settings.barHeight, // <-- BARU: Menggunakan tinggi dari slider
+              width: settings.barWidth,
+              height: settings.barHeight,
               margin: 4,
-              fontSize: 14,
-              textMargin: 2
+              fontSize: 12, // Perkecil font size untuk label kecil
+              textMargin: 0
             });
         } catch (e) {
-            // Tangani error jika teks tidak valid untuk barcode
             console.error("Error pembuatan barcode:", e);
             svgElement.outerHTML = `<div class="barcode-error">Teks tidak valid</div>`;
         }
@@ -6863,7 +6867,7 @@ onMounted(() => {
                     <option value="CODE39">CODE39</option>
                 </select>
             </div>
-             <div class="flex items-center">
+            <div class="flex items-center">
                 <input type="checkbox" v-model="uiState.barcodeSettings.showText" id="showTextCheck" class="h-4 w-4 rounded">
                 <label for="showTextCheck" class="ml-2 block text-sm">Tampilkan teks di bawah barcode</label>
             </div>
@@ -6872,41 +6876,40 @@ onMounted(() => {
                 <label class="block text-sm font-medium">Lebar Barcode (Ketebalan Garis)</label>
                 <input type="range" v-model.number="uiState.barcodeSettings.barWidth" min="1" max="4" step="0.1" class="w-full mt-1">
             </div>
-             <div>
+            <div>
                 <label class="block text-sm font-medium">Tinggi Barcode</label>
                 <input type="range" v-model.number="uiState.barcodeSettings.barHeight" min="20" max="100" step="5" class="w-full mt-1">
             </div>
 
             <h3 class="font-semibold text-lg border-b pb-2 pt-4">2. Pengaturan Kertas & Layout</h3>
+            
             <div>
-                <label class="block text-sm font-medium">Ukuran Kertas</label>
+                <label class="block text-sm font-medium">Pilih Preset Label Stiker</label>
                 <select v-model="uiState.barcodeSettings.paperSize" class="mt-1 w-full p-2 border rounded-md bg-white">
-                    <option value="100x150">Kertas Resi A6 (100 x 150 mm)</option>
-                    <option value="70x50">Label Thermal (70 x 50 mm)</option>
-                    <option value="50x30">Label Thermal (50 x 30 mm)</option>
+                    <option value="33x15-3">Label 33 x 15 mm (3 Kolom)</option>
+                    <option value="50x20-2">Label 50 x 20 mm (2 Kolom)</option>
+                    <option value="70x40-1">Label 70 x 40 mm (1 Kolom)</option>
                     <option value="custom">Ukuran Kustom...</option>
                 </select>
             </div>
-             <div v-if="uiState.barcodeSettings.paperSize === 'custom'" class="grid grid-cols-2 gap-2 animate-fade-in">
-                <div>
-                    <label class="block text-xs font-medium">Lebar (mm)</label>
-                    <input type="number" v-model.number="uiState.barcodeSettings.customWidth" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium">Tinggi (mm)</label>
-                    <input type="number" v-model.number="uiState.barcodeSettings.customHeight" class="mt-1 w-full p-2 border rounded-md">
+
+            <div class="pt-2">
+                <label class="block text-sm font-medium text-slate-700">Ukuran per 1 Stiker (mm)</label>
+                <div class="grid grid-cols-2 gap-2 mt-1">
+                    <div>
+                        <label class="block text-xs font-medium">Lebar Stiker</label>
+                        <input type="number" v-model.number="uiState.barcodeSettings.labelWidth" class="mt-1 w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium">Tinggi Stiker</label>
+                        <input type="number" v-model.number="uiState.barcodeSettings.labelHeight" class="mt-1 w-full p-2 border rounded-md">
+                    </div>
                 </div>
             </div>
-            
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block text-sm font-medium">Jumlah Kolom (samping)</label>
-                    <input type="number" v-model.number="uiState.barcodeSettings.layoutCols" min="1" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium">Jumlah Baris (bawah)</label>
-                    <input type="number" v-model.number="uiState.barcodeSettings.layoutRows" min="1" class="mt-1 w-full p-2 border rounded-md">
-                </div>
+
+            <div>
+                <label class="block text-sm font-medium">Jumlah Kolom (Jejer ke Samping)</label>
+                <input type="number" v-model.number="uiState.barcodeSettings.layoutCols" min="1" class="mt-1 w-full p-2 border rounded-md">
             </div>
 
             <h3 class="font-semibold text-lg border-b pb-2 pt-4">3. Pengaturan Cetak</h3>
@@ -6931,8 +6934,11 @@ onMounted(() => {
 
         <div class="lg:col-span-2 bg-white p-6 rounded-xl border">
             <h3 class="font-semibold text-slate-700 mb-4">Preview Cetak</h3>
-            <div ref="barcodePreview" class="border-2 border-dashed p-1 grid gap-1 bg-slate-50 overflow-hidden">
-                </div>
+            
+            <div class="print-container">
+                <div ref="barcodePreview" class="p-1 flex flex-wrap gap-1 bg-slate-200 overflow-hidden">
+                    </div>
+            </div>
         </div>
     </div>
 </div>
@@ -10240,34 +10246,49 @@ onMounted(() => {
 
 /* V V V STYLE BARU UNTUK BARCODE & PRINT V V V */
 .barcode-label {
+  border: 1px dashed #ccc;
+  background-color: white;
+  padding: 1mm;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  box-sizing: border-box;
   overflow: hidden;
-  height: 25mm; /* Sesuaikan dengan tinggi label default */
 }
 
 .barcode-label svg {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
+}
+
+.barcode-error {
+    color: red;
+    font-size: 10px;
+    text-align: center;
 }
 
 @media print {
-  /* Sembunyikan semua elemen kecuali area print */
   body * {
     visibility: hidden;
   }
-  [ref="barcodePreview"], [ref="barcodePreview"] * {
+  
+  /* Tampilkan hanya area preview dan isinya */
+  .print-container, .print-container * {
     visibility: visible;
-}
-[ref="barcodePreview"] {
+  }
+  
+  .print-container {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
-    height: 100%;
+  }
+
+  .barcode-label {
+    border: none; /* Hilangkan border saat dicetak */
+    page-break-inside: avoid; /* Mencegah label terpotong antar halaman */
   }
 }
 /* ^ ^ ^ AKHIR STYLE BARU ^ ^ ^ */
