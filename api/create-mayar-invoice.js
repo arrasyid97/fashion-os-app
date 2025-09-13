@@ -1,20 +1,23 @@
 import axios from 'axios/dist/node/axios.cjs';
 
 export default async function (req, res) {
-    console.log('--- LOG: Menerima request dari frontend ---');
+    // --- LOG: Request Diterima dari Frontend ---
+    console.log('--- LOG INI ADALAH PAYLOAD DARI FRONTEND KE BACKEND API ---');
+    console.log('Waktu Request:', new Date().toISOString());
+    console.log('Metode:', req.method);
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
     console.log('Body:', JSON.stringify(req.body, null, 2));
+    console.log('----------------------------------------------------');
 
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
     try {
-        const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode } = req.body;
+        const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode, merchant_ref } = req.body;
         
-        // --- PERBAIKAN FINAL: Buat ID dan Deskripsi yang sangat unik ---
-        const randomId = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-        const uniqueMerchantRef = `FASHIONOS-Ref-${randomId}`;
-        const uniqueDescription = `${item_name} (Ref: ${randomId})`;
+        // --- BUAT ID UNIK DI BACKEND SEBAGAI SOLUSI KONTRA-LOGIKA ---
+        const finalMerchantRef = `FASHIONOS-Ref-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
         if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
             return res.status(400).json({ message: 'Missing required fields' });
@@ -22,6 +25,8 @@ export default async function (req, res) {
 
         const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
         const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
+        
+        const uniqueDescription = `${item_name} (Ref: ${finalMerchantRef})`;
 
         const mayarPayload = {
             name: 'Customer Name',
@@ -29,20 +34,23 @@ export default async function (req, res) {
             mobile: '081234567890',
             redirectUrl: redirect_url,
             callbackUrl: callback_url,
-            description: uniqueDescription, // Gunakan deskripsi unik yang baru
-            merchant_ref: uniqueMerchantRef, // Gunakan merchant_ref yang baru
+            description: uniqueDescription,
+            merchant_ref: finalMerchantRef,
             items: [{
                 quantity: 1,
                 rate: amount,
-                description: uniqueDescription // Gunakan deskripsi unik yang sama
+                description: uniqueDescription
             }],
             metadata: {
                 referredByCode: referredByCode || null,
             }
         };
         
-        console.log('--- LOG: Mengirim payload ke Mayar API ---');
+        // --- LOG: Payload yang Akan Dikirim ke Mayar API ---
+        console.log('--- LOG INI ADALAH PAYLOAD DARI BACKEND KE MAYAR API ---');
+        console.log('Mayar API URL:', mayarApiUrl);
         console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
+        console.log('----------------------------------------------------');
 
         const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
             headers: {
@@ -58,12 +66,20 @@ export default async function (req, res) {
         }
 
     } catch (error) {
+        // --- LOG: Menganalisis Error dari Mayar ---
+        console.log('--- LOG INI ADALAH ANALISIS ERROR DARI MAYAR ---');
+        if (error.response) {
+            console.error('Status Code:', error.response.status);
+            console.error('Response Data:', JSON.stringify(error.response.data, null, 2));
+        } else {
+            console.error('Error Message:', error.message);
+        }
+        console.log('----------------------------------------------------');
+
         if (error.code === 'ENOTFOUND') {
-            console.error('Error DNS: Tidak dapat menemukan domain API Mayar. Pastikan URL sudah benar.');
             return res.status(503).json({ message: 'Layanan Mayar tidak dapat dijangkau.', error: error.message });
         }
         
-        console.error('Error creating Mayar invoice:', error.response?.data || error.message);
         return res.status(500).json({ message: 'Failed to create Mayar invoice', error: error.response?.data || error.message });
     }
 }
