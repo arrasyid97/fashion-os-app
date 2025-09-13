@@ -11,6 +11,10 @@ export default async function (req, res) {
     try {
         const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode, merchant_ref } = req.body;
         
+        // --- KODE PENTING: DEKLARASI DI SINI AGAR BISA DIAKSES DI MANA SAJA ---
+        const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
+        const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
+
         // --- BUAT LOGIKA PERULANGAN UNTUK MENGULANG PERMINTAAN ---
         let mayarResponse;
         let attempts = 0;
