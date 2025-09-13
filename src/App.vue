@@ -878,11 +878,16 @@ async function handleSubscriptionMayar(plan) {
     
     isSubscribingPlan.value = true;
     
-    const priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
+    // --- PERBAIKAN: Gunakan harga diskon jika kode rujukan diterapkan ---
+    let priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
+    if (uiState.referralCodeApplied) {
+        priceToPay = plan === 'bulanan' ? 250000 : 3000000;
+    }
+    
     const itemName = `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`;
 
     try {
-        const response = await fetch('/api/create-mayar-invoice', { // <-- INI YANG PENTING
+        const response = await fetch('/api/create-mayar-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -892,6 +897,8 @@ async function handleSubscriptionMayar(plan) {
                 callback_url: 'https://appfashion.id/api/mayar-webhook',
                 redirect_url: `https://appfashion.id/langganan?status=success`,
                 merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
+                // --- KODE PENTING: MENGIRIM KODE RUJUKAN KE BACKEND ---
+                referred_by_code: uiState.referralCodeApplied ? uiState.referralCodeInput : null
             }),
         });
 
@@ -955,6 +962,33 @@ const tieredDiskonComputed = (tier) => computed({
     get() { return tier.diskon ? tier.diskon + '%' : ''; },
     set(newValue) { tier.diskon = parsePercentageInput(newValue); }
 });
+
+async function applyReferralCode() {
+    if (!uiState.referralCode) {
+        uiState.referralCodeError = "Kode tidak boleh kosong.";
+        uiState.referralCodeApplied = false;
+        return;
+    }
+
+    try {
+        const codeRef = doc(db, "users", uiState.referralCode);
+        const codeDoc = await getDoc(codeRef);
+
+        if (codeDoc.exists() && codeDoc.data().isPartner) {
+            uiState.referralCodeApplied = true;
+            uiState.referralCodeError = "";
+            alert("Kode rujukan berhasil diterapkan!");
+        } else {
+            uiState.referralCodeError = "Kode rujukan tidak valid atau bukan milik mitra.";
+            uiState.referralCodeApplied = false;
+        }
+    } catch (error) {
+        console.error("Error applying referral code:", error);
+        uiState.referralCodeError = "Terjadi kesalahan saat memvalidasi kode.";
+        uiState.referralCodeApplied = false;
+    }
+}
+
 
 async function activateSubscriptionWithCode() {
     const code = authForm.activationCode;
@@ -1430,6 +1464,10 @@ const uiState = reactive({
     isInvestasiLocked: true,     // Status terkunci untuk halaman investasi
     investasiPinInput: '',       // Untuk input PIN di halaman investasi
     investasiPinError: '',       // Pesan error jika PIN salah
+
+    referralCode: '',
+    referralCodeApplied: false,
+    referralCodeError: '',
 
     pengaturanTab: 'umum',
     isKeuanganInfoVisible: false,
@@ -5140,10 +5178,6 @@ watch(activePage, (newPage) => {
     <label for="activation-code" class="block text-sm font-medium text-slate-700 mt-4">Kode Aktivasi (Opsional)</label>
     <input type="text" v-model="authForm.activationCode" id="activation-code" class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
     <p class="mt-2 text-xs text-slate-500">Masukkan kode aktivasi untuk mendapatkan langganan premium.</p>
-
-    <label for="referred-by" class="block text-sm font-medium text-slate-700 mt-4">Kode Rujukan (Opsional)</label>
-    <input type="text" v-model="authForm.referredBy" id="referred-by" placeholder="Contoh: PARTNER-ABCDE" class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
-    <p class="mt-2 text-xs text-slate-500">Jika Anda diajak oleh seorang mitra, masukkan kodenya di sini.</p>
 </div>
             <div v-if="authForm.error" class="p-3 mt-4 text-sm text-red-700 bg-red-100 rounded-md border border-red-300">
                 {{ authForm.error }}
@@ -7303,8 +7337,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 <div v-if="activePage === 'langganan'">
-    <div v-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()"
-        class="max-w-4xl mx-auto text-center py-12 px-4">
+    <div v-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()" class="max-w-4xl mx-auto text-center py-12 px-4">
         <div class="bg-white p-8 sm:p-12 rounded-xl shadow-lg border border-green-300 flex flex-col items-center">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -7324,50 +7357,38 @@ watch(activePage, (newPage) => {
         </div>
     </div>
     
-    <div v-else-if="currentUser?.userData?.subscriptionStatus === 'trial' && new Date(currentUser.userData.trialEndDate?.seconds * 1000) > Date.now()" class="max-w-4xl mx-auto text-center py-12 px-4">
-        <div class="bg-white p-8 sm:p-12 rounded-xl shadow-lg border border-indigo-300 flex flex-col items-center">
-            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <h2 class="text-3xl font-bold text-slate-800 mb-2">Anda dalam Masa Uji Coba Gratis</h2>
-            <p class="text-slate-600 mb-6 max-w-xl">
-                Masa uji coba gratis Anda akan segera berakhir. Tingkatkan paket Anda untuk terus menggunakan semua fitur premium.
-            </p>
-            <div class="bg-indigo-50 text-indigo-800 px-6 py-4 rounded-lg w-full text-center">
-                <p class="text-lg font-semibold">Status Langganan: Uji Coba</p>
-                <p v-if="currentUser?.userData?.trialEndDate" class="text-sm mt-1">
-                    Berakhir pada: {{ new Date(currentUser.userData.trialEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
-                </p>
-            </div>
-            
-            <div class="w-full mt-8 pt-6 border-t border-slate-200">
-                <h3 class="text-xl font-bold text-slate-800 mb-4">Aktivasi Langganan</h3>
-                <form @submit.prevent="activateSubscriptionWithCode">
-                    <label for="activation-code" class="block text-sm font-medium text-slate-700">Masukkan Kode Aktivasi Anda</label>
-                    <input type="text" v-model="authForm.activationCode" id="activation-code-page" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
-                    <button type="submit" class="w-full py-3 mt-4 rounded-xl shadow-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
-                        Aktifkan Sekarang
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <div v-else class="max-w-4xl mx-auto text-center py-12 px-4">
-        <h2 class="text-3xl font-bold text-slate-800">Masa Percobaan Anda Telah Berakhir</h2>
+        <h2 class="text-3xl font-bold text-slate-800">Mulai Langganan Anda</h2>
         <p class="text-slate-600 mt-4 mb-8 max-w-xl mx-auto">
-            Pilih paket di bawah ini untuk melanjutkan akses ke semua fitur dan kembangkan bisnis Anda bersama Fashion OS.
+            Pilih paket di bawah ini untuk memulai akses ke semua fitur dan kembangkan bisnis Anda bersama Fashion OS.
         </p>
+        
+        <!-- Bagian Baru: Input Kode Rujukan -->
+        <div class="max-w-xl mx-auto mb-8 p-6 rounded-xl border border-dashed border-indigo-300 bg-indigo-50 text-left">
+            <h3 class="text-lg font-semibold text-indigo-700">Dapat Diskon?</h3>
+            <p class="text-sm text-slate-600 mb-2">Masukkan kode rujukan dari mitra kami untuk mendapatkan diskon khusus.</p>
+            <div class="flex gap-2">
+                <input type="text" v-model="uiState.referralCodeInput" placeholder="Contoh: PARTNER-ABCDE" class="w-full p-2 border rounded-md">
+                <button @click.prevent="applyReferralCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Terapkan</button>
+            </div>
+            <p v-if="uiState.referralCodeMessage" class="mt-2 text-xs font-medium" :class="uiState.referralCodeApplied ? 'text-green-600' : 'text-red-600'">
+                {{ uiState.referralCodeMessage }}
+            </p>
+        </div>
+        
+        <!-- Pilihan Paket -->
         <div class="flex flex-col md:flex-row gap-8 justify-center">
-            <div @click="selectedPlan = 'bulanan'"
-                class="plan-card p-8 border-2 rounded-xl shadow-lg w-full md:w-80 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+            <div @click="selectedPlan = 'bulanan'" class="plan-card p-8 border-2 rounded-xl shadow-lg w-full md:w-80 transition-all duration-300 cursor-pointer flex flex-col justify-between"
                 :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'bulanan', 'border-transparent': selectedPlan !== 'bulanan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Bulanan</h3>
-                    <p class="text-4xl font-bold my-4">{{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal">/bulan</span></p>
-                    <ul class="text-left space-y-2 text-slate-600">
+                    <p class="text-lg font-bold my-2" :class="uiState.referralCodeApplied ? 'line-through text-slate-400' : ''">
+                        {{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal">/bulan</span>
+                    </p>
+                    <p v-if="uiState.referralCodeApplied" class="text-4xl font-bold text-green-600">
+                        {{ formatCurrency(250000) }} <span class="text-base font-normal">/bulan</span>
+                    </p>
+                    <ul class="text-left space-y-2 text-slate-600 mt-4">
                         <li>✔️ Akses semua fitur</li>
                         <li>✔️ Dukungan prioritas</li>
                         <li>✔️ Update berkala</li>
@@ -7381,13 +7402,17 @@ watch(activePage, (newPage) => {
                 </button>
             </div>
 
-            <div @click="selectedPlan = 'tahunan'"
-                class="plan-card p-8 border-2 rounded-xl shadow-lg w-full md:w-80 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+            <div @click="selectedPlan = 'tahunan'" class="plan-card p-8 border-2 rounded-xl shadow-lg w-full md:w-80 transition-all duration-300 cursor-pointer flex flex-col justify-between"
                 :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'tahunan', 'border-transparent': selectedPlan !== 'tahunan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Tahunan</h3>
-                    <p class="text-4xl font-bold my-4">{{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal">/tahun</span></p>
-                    <ul class="text-left space-y-2 text-slate-600">
+                    <p class="text-lg font-bold my-2" :class="uiState.referralCodeApplied ? 'line-through text-slate-400' : ''">
+                        {{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal">/tahun</span>
+                    </p>
+                    <p v-if="uiState.referralCodeApplied" class="text-4xl font-bold text-green-600">
+                        {{ formatCurrency(3000000) }} <span class="text-base font-normal">/tahun</span>
+                    </p>
+                    <ul class="text-left space-y-2 text-slate-600 mt-4">
                         <li>✔️ Akses semua fitur</li>
                         <li>✔️ Dukungan prioritas</li>
                         <li>✔️ Update berkala</li>
