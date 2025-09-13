@@ -2410,29 +2410,6 @@ async function saveData() {
     }
 }
 
-async function generateAndSaveCode() {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let newCode = '';
-    for (let i = 0; i < 8; i++) {
-        newCode += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-
-    try {
-        // 'db' sudah tersedia dari inisialisasi Firebase Anda
-        const codeRef = doc(db, "activation_codes", newCode);
-        await setDoc(codeRef, {
-            createdAt: new Date(),
-            status: 'unused',
-            generatedBy: currentUser.value.uid // Melacak siapa yang membuat
-        });
-
-        uiState.newActivationCode = newCode;
-        alert(`Kode aktivasi baru berhasil dibuat: ${newCode}`);
-    } catch (error) {
-        console.error("Gagal membuat kode aktivasi:", error);
-        alert("Gagal membuat kode aktivasi. Cek console.");
-    }
-}
 
 function unlockPemasukan() {
     if (uiState.pemasukanPinInput === state.settings.dashboardPin) {
