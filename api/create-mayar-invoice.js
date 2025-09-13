@@ -8,22 +8,24 @@ export default async function (req, res) {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
+    const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode } = req.body;
+    
+    if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
+        return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
+    const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
+
+    let mayarResponse;
+    let attempts = 0;
+    const maxAttempts = 3;
+
     try {
-        const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode, merchant_ref } = req.body;
-        
-        // --- KODE PENTING: DEKLARASI DI SINI AGAR BISA DIAKSES DI MANA SAJA ---
-        const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
-        const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
-
-        // --- BUAT LOGIKA PERULANGAN UNTUK MENGULANG PERMINTAAN ---
-        let mayarResponse;
-        let attempts = 0;
-        const maxAttempts = 3;
-
         while (attempts < maxAttempts) {
             try {
                 // Buat ID yang selalu unik di setiap percobaan
-                const finalMerchantRef = `${merchant_ref}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+                const finalMerchantRef = `FASHIONOS-${customer_email}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
                 const uniqueDescription = `${item_name} (Ref: ${finalMerchantRef})`;
 
                 const mayarPayload = {
@@ -58,20 +60,18 @@ export default async function (req, res) {
                 break; 
 
             } catch (error) {
-                // Jika error adalah 409 (already exist), coba lagi
                 if (error.response?.status === 409) {
                     console.error(`❌ PERINGATAN: Error 409 terdeteksi pada percobaan ke-${attempts + 1}. Mencoba lagi...`);
                     attempts++;
-                    // Jeda sebentar sebelum mencoba lagi
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 } else {
-                    // Jika error bukan 409, lempar error
                     throw error;
                 }
             }
         }
         
-        if (mayarResponse.data?.data?.link) {
+        // --- PERBAIKAN: Cek apakah mayarResponse ada sebelum diakses ---
+        if (mayarResponse && mayarResponse.data?.data?.link) {
             return res.status(200).json({ invoice_url: mayarResponse.data.data.link });
         } else {
             throw new Error('Gagal mendapatkan URL pembayaran dari Mayar setelah beberapa percobaan.');
