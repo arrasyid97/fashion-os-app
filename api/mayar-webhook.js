@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 
+// Inisialisasi Firebase Admin SDK
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_ADMIN_CREDENTIALS))
@@ -35,7 +36,8 @@ export default async function (req, res) {
             const customerEmail = event.data?.customerEmail;
             const amountPaid = event.data?.amount;
             const productDescription = event.data?.productDescription;
-            const referredByCode = event.referred_by_code; // Ambil kode dari payload frontend
+            // --- PERBAIKAN: AMBIL KODE RUJUKAN DARI METADATA ---
+            const referredByCode = event.data?.metadata?.referredByCode;
             
             console.log(`Debugging: Customer Email: ${customerEmail}, Amount: ${amountPaid}, Description: ${productDescription}, Referral Code: ${referredByCode}`);
 

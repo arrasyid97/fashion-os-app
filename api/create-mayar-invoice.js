@@ -6,7 +6,8 @@ export default async function (req, res) {
     }
 
     try {
-        const { amount, item_name, customer_email, callback_url, redirect_url, merchant_ref } = req.body;
+        // --- PERBAIKAN: Terima referredByCode dari frontend ---
+        const { amount, item_name, customer_email, callback_url, redirect_url, merchant_ref, referredByCode } = req.body;
         
         if (!amount || !item_name || !customer_email || !callback_url || !redirect_url || !merchant_ref) {
             return res.status(400).json({ message: 'Missing required fields' });
@@ -28,6 +29,10 @@ export default async function (req, res) {
                 rate: amount,
                 description: item_name
             }],
+            // --- KODE PENTING: Tambahkan metadata untuk kode rujukan ---
+            metadata: {
+                referredByCode: referredByCode || null
+            }
         };
 
         const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
