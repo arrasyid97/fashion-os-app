@@ -635,13 +635,13 @@ async function proceedToPartnerPayment() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                amount: priceToPay,
-                item_name: itemName,
-                customer_email: currentUser.value.email,
-                callback_url: 'https://appfashion.id/api/mayar-webhook',
-                redirect_url: `https://appfashion.id/langganan?status=success`, // Arahkan kembali ke halaman langganan setelah pembayaran
-                merchant_ref: `PARTNERREG-${currentUser.value.uid}-${Date.now()}`,
-            }),
+    amount: priceToPay,
+    item_name: itemName,
+    customer_email: currentUser.value.email,
+    callback_url: 'https://appfashion.id/api/mayar-webhook',
+    redirect_url: `https://appfashion.id/langganan?status=success`,
+    merchant_ref: `PARTNERREG-${currentUser.value.uid}-${Date.now()}-${Math.floor(Math.random() * 10000)}`, // <-- Kode yang diperbaiki
+}),
         });
 
         const data = await response.json();
@@ -938,15 +938,14 @@ async function handleSubscriptionMayar(plan) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                amount: priceToPay,
-                item_name: itemName,
-                customer_email: currentUser.value.email,
-                callback_url: 'https://appfashion.id/api/mayar-webhook',
-                redirect_url: `https://appfashion.id/langganan?status=success`,
-                merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${Math.floor(Math.random() * 10000)}-${plan}`,
-                // --- KODE PENTING: MENGIRIM KODE RUJUKAN KE BACKEND ---
-                referredByCode: referredByCode,
-            }),
+    amount: priceToPay,
+    item_name: itemName,
+    customer_email: currentUser.value.email,
+    callback_url: 'https://appfashion.id/api/mayar-webhook',
+    redirect_url: `https://appfashion.id/langganan?status=success`,
+    merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${Math.floor(Math.random() * 10000)}-${plan}`, // <-- Kode yang diperbaiki
+    referredByCode: referredByCode,
+}),
         });
 
         const data = await response.json();
