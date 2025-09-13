@@ -943,7 +943,7 @@ async function handleSubscriptionMayar(plan) {
                 customer_email: currentUser.value.email,
                 callback_url: 'https://appfashion.id/api/mayar-webhook',
                 redirect_url: `https://appfashion.id/langganan?status=success`,
-                merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
+                merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${Math.floor(Math.random() * 10000)}-${plan}`,
                 // --- KODE PENTING: MENGIRIM KODE RUJUKAN KE BACKEND ---
                 referredByCode: referredByCode,
             }),
