@@ -13,7 +13,6 @@ export default async function (req, res) {
         
         // --- PERBAIKAN: merchant_ref dibuat unik di sini ---
         const uniqueMerchantRef = `FASHIONOS-${customer_email}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-        const uniqueProductId = `PRODUCT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
         if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
             return res.status(400).json({ message: 'Missing required fields' });
@@ -33,14 +32,13 @@ export default async function (req, res) {
             items: [{
                 quantity: 1,
                 rate: amount,
-                description: item_name
+                description: `${item_name} (${uniqueMerchantRef})` // Jadikan deskripsi unik
             }],
             metadata: {
                 referredByCode: referredByCode || null,
-                productId: uniqueProductId // Tambahkan product_id yang unik
             }
         };
-
+        
         console.log('--- LOG: Mengirim payload ke Mayar API ---');
         console.log('Payload:', JSON.stringify(mayarPayload, null, 2));
 
