@@ -990,43 +990,6 @@ async function applyReferralCode() {
 }
 
 
-async function activateSubscriptionWithCode() {
-    const code = authForm.activationCode;
-    if (!code) {
-        alert("Kode aktivasi tidak boleh kosong.");
-        return;
-    }
-
-    try {
-        const codeRef = doc(db, "activation_codes", code);
-        const codeDoc = await getDoc(codeRef);
-
-        if (codeDoc.exists() && codeDoc.data().status === 'unused') {
-            const userRef = doc(db, "users", currentUser.value.uid);
-            const now = new Date();
-            const nextMonth = new Date(now.setMonth(now.getMonth() + 1));
-
-            // PERBAIKAN: Gunakan `setDoc` dengan `merge: true`
-            // Ini akan menambahkan/mengupdate data langganan tanpa menghapus data PIN yang sudah ada
-            await setDoc(userRef, {
-                subscriptionStatus: 'active',
-                subscriptionEndDate: nextMonth,
-                trialEndDate: null
-            }, { merge: true }); // <--- BARIS PENTING DITAMBAHKAN
-
-            await updateDoc(codeRef, { status: 'used', usedBy: currentUser.value.uid, usedAt: new Date() });
-            
-            alert('Langganan Anda berhasil diaktifkan selama 30 hari!');
-            activePage.value = 'dashboard';
-        } else {
-            alert('Kode aktivasi tidak valid atau sudah digunakan.');
-        }
-    } catch (error) {
-        console.error("Error mengaktifkan langganan:", error);
-        alert(`Terjadi kesalahan: ${error.message}`);
-    }
-}
-
 const commissionModelComputed = (modelName, channelId) => computed({
     get() {
         return state.commissions.perModel[modelName]?.[channelId] ? state.commissions.perModel[modelName][channelId] + '%' : '';
