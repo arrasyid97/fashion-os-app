@@ -6,9 +6,12 @@ export default async function (req, res) {
     }
 
     try {
-        const { amount, item_name, customer_email, callback_url, redirect_url, merchant_ref, referredByCode } = req.body;
+        const { amount, item_name, customer_email, callback_url, redirect_url, referredByCode } = req.body;
         
-        if (!amount || !item_name || !customer_email || !callback_url || !redirect_url || !merchant_ref) {
+        // --- KODE PERBAIKAN: merchant_ref dibuat unik di sini ---
+        const uniqueMerchantRef = `FASHIONOS-${customer_email}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+        if (!amount || !item_name || !customer_email || !callback_url || !redirect_url) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
@@ -22,7 +25,7 @@ export default async function (req, res) {
             redirectUrl: redirect_url,
             callbackUrl: callback_url,
             description: item_name,
-            merchant_ref: merchant_ref,
+            merchant_ref: uniqueMerchantRef, // Menggunakan merchant_ref yang sudah unik
             items: [{
                 quantity: 1,
                 rate: amount,
