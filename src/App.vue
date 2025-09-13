@@ -1535,10 +1535,17 @@ const uiState = reactive({
       text: 'SKU-PRODUK-ANDA',
       type: 'CODE128',
       showText: true,
+      // Pengaturan Barcode
+      barWidth: 1.5,  // <-- BARU: Lebar garis (default 2)
+      barHeight: 50, // <-- BARU: Tinggi barcode (default 100)
+      // Pengaturan Kertas
       paperSize: '100x150',
       customWidth: 100,
       customHeight: 150,
-      layoutCols: 'auto',
+      // Pengaturan Layout
+      layoutCols: 2, // <-- BARU: Jumlah kolom (menyamping)
+      layoutRows: 5, // <-- BARU: Jumlah baris (ke bawah)
+      // Pengaturan Cetak
       printQty: 10,
       printMode: 'label'
     }
@@ -5156,33 +5163,29 @@ function generateBarcodes() {
     return;
   }
   
-  // Bersihkan preview sebelum membuat yang baru
   const previewArea = barcodePreview.value;
   if (!previewArea) return;
   previewArea.innerHTML = '';
   
   const settings = uiState.barcodeSettings;
-  let labelWidth = 45;  // Ukuran default satu label dalam mm
-  let labelHeight = 25; // Ukuran default satu label dalam mm
-
   let [paperWidth, paperHeight] = settings.paperSize === 'custom' 
       ? [settings.customWidth, settings.customHeight]
       : settings.paperSize.split('x').map(Number);
 
-  // Atur jumlah kolom
-  let cols = settings.layoutCols === 'auto'
-      ? Math.floor(paperWidth / labelWidth)
-      : parseInt(settings.layoutCols, 10);
-  cols = Math.max(1, cols); // Pastikan minimal 1 kolom
+  // <-- AWAL PERUBAIKAN: Gunakan input kolom & baris langsung -->
+  const cols = Math.max(1, settings.layoutCols);
+  const rows = Math.max(1, settings.layoutRows);
 
   previewArea.style.width = `${paperWidth}mm`;
   previewArea.style.height = `${paperHeight}mm`;
   previewArea.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  previewArea.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  
+  const labelsPerPage = cols * rows;
+  // <-- AKHIR PERUBAIKAN -->
 
-  const labelsPerPage = Math.floor(paperWidth / (labelWidth + 4)) * Math.floor(paperHeight / (labelHeight + 4));
   const totalLabelsToGenerate = settings.printMode === 'sheet' ? labelsPerPage * settings.printQty : settings.printQty;
 
-  // Buat elemen untuk setiap label
   for (let i = 1; i <= totalLabelsToGenerate; i++) {
     const label = document.createElement('div');
     label.className = 'barcode-label';
@@ -5194,18 +5197,25 @@ function generateBarcodes() {
     previewArea.appendChild(label);
   }
   
-  // Tunggu DOM update, lalu gambar barcodenya
   nextTick(() => {
     for (let i = 1; i <= totalLabelsToGenerate; i++) {
       const svgElement = document.getElementById(`barcode-${i}`);
       if (svgElement) {
-        JsBarcode(svgElement, settings.text, {
-          format: settings.type,
-          displayValue: settings.showText,
-          margin: 4,
-          fontSize: 14,
-          textMargin: 2
-        });
+        try {
+            JsBarcode(svgElement, settings.text, {
+              format: settings.type,
+              displayValue: settings.showText,
+              width: settings.barWidth,   // <-- BARU: Menggunakan lebar dari slider
+              height: settings.barHeight, // <-- BARU: Menggunakan tinggi dari slider
+              margin: 4,
+              fontSize: 14,
+              textMargin: 2
+            });
+        } catch (e) {
+            // Tangani error jika teks tidak valid untuk barcode
+            console.error("Error pembuatan barcode:", e);
+            svgElement.outerHTML = `<div class="barcode-error">Teks tidak valid</div>`;
+        }
       }
     }
   });
@@ -6838,9 +6848,11 @@ onMounted(() => {
     
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         <div class="lg:col-span-1 bg-white p-6 rounded-xl border space-y-4 sticky top-4">
+            
+            <h3 class="font-semibold text-lg border-b pb-2">1. Konten Barcode</h3>
             <div>
                 <label class="block text-sm font-medium">Teks / SKU untuk Barcode</label>
-                <input type="text" v-model="uiState.barcodeSettings.text" class="mt-1 w-full p-2 border rounded-md">
+                <input type="text" v-model.lazy="uiState.barcodeSettings.text" class="mt-1 w-full p-2 border rounded-md">
             </div>
             <div>
                 <label class="block text-sm font-medium">Jenis Barcode (Rekomendasi: CODE128)</label>
@@ -6856,9 +6868,16 @@ onMounted(() => {
                 <label for="showTextCheck" class="ml-2 block text-sm">Tampilkan teks di bawah barcode</label>
             </div>
 
-            <hr class="my-4">
-            <h3 class="font-semibold text-lg">Pengaturan Kertas & Layout</h3>
+            <div class="pt-2">
+                <label class="block text-sm font-medium">Lebar Barcode (Ketebalan Garis)</label>
+                <input type="range" v-model.number="uiState.barcodeSettings.barWidth" min="1" max="4" step="0.1" class="w-full mt-1">
+            </div>
+             <div>
+                <label class="block text-sm font-medium">Tinggi Barcode</label>
+                <input type="range" v-model.number="uiState.barcodeSettings.barHeight" min="20" max="100" step="5" class="w-full mt-1">
+            </div>
 
+            <h3 class="font-semibold text-lg border-b pb-2 pt-4">2. Pengaturan Kertas & Layout</h3>
             <div>
                 <label class="block text-sm font-medium">Ukuran Kertas</label>
                 <select v-model="uiState.barcodeSettings.paperSize" class="mt-1 w-full p-2 border rounded-md bg-white">
@@ -6878,18 +6897,19 @@ onMounted(() => {
                     <input type="number" v-model.number="uiState.barcodeSettings.customHeight" class="mt-1 w-full p-2 border rounded-md">
                 </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium">Layout Kolom</label>
-                 <select v-model="uiState.barcodeSettings.layoutCols" class="mt-1 w-full p-2 border rounded-md bg-white">
-                    <option value="auto">Otomatis (Paling Efisien)</option>
-                    <option value="1">1 Kolom</option>
-                    <option value="2">2 Kolom</option>
-                    <option value="3">3 Kolom</option>
-                </select>
+            
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-sm font-medium">Jumlah Kolom (samping)</label>
+                    <input type="number" v-model.number="uiState.barcodeSettings.layoutCols" min="1" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Jumlah Baris (bawah)</label>
+                    <input type="number" v-model.number="uiState.barcodeSettings.layoutRows" min="1" class="mt-1 w-full p-2 border rounded-md">
+                </div>
             </div>
 
-            <hr class="my-4">
-            <h3 class="font-semibold text-lg">Pengaturan Cetak</h3>
+            <h3 class="font-semibold text-lg border-b pb-2 pt-4">3. Pengaturan Cetak</h3>
              <div class="grid grid-cols-2 gap-2">
                 <div>
                     <label class="block text-sm font-medium">Cetak Sebanyak</label>
@@ -6911,7 +6931,7 @@ onMounted(() => {
 
         <div class="lg:col-span-2 bg-white p-6 rounded-xl border">
             <h3 class="font-semibold text-slate-700 mb-4">Preview Cetak</h3>
-            <div ref="barcodePreview" class="border-2 border-dashed p-2 grid gap-4 bg-slate-50">
+            <div ref="barcodePreview" class="border-2 border-dashed p-1 grid gap-1 bg-slate-50 overflow-hidden">
                 </div>
         </div>
     </div>
