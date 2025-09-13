@@ -477,8 +477,12 @@ const state = reactive({
             investmentPage: true,
         }
 });
+
 const monthlyPrice = ref(350000);
 const yearlyPrice = ref(4200000);
+const discountedMonthlyPrice = ref(250000);
+const discountedYearlyPrice = ref(2500000);
+
 async function submitAddProduct() {
     const form = uiState.modalData;
     if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian || !form.hpp || !form.hargaJualDefault) {
@@ -878,12 +882,14 @@ async function handleSubscriptionMayar(plan) {
     
     isSubscribingPlan.value = true;
     
-    // --- PERBAIKAN: Gunakan harga diskon jika kode rujukan diterapkan ---
+    // --- LOGIKA HARGA BARU ---
     let priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
-    if (uiState.referralCodeApplied) {
+    const isReferred = uiState.referralCodeApplied || currentUser.value?.userData?.referredBy;
+    
+    if (isReferred) {
         priceToPay = plan === 'bulanan' ? 250000 : 3000000;
     }
-    
+
     const itemName = `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`;
 
     try {
@@ -898,7 +904,7 @@ async function handleSubscriptionMayar(plan) {
                 redirect_url: `https://appfashion.id/langganan?status=success`,
                 merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
                 // --- KODE PENTING: MENGIRIM KODE RUJUKAN KE BACKEND ---
-                referred_by_code: uiState.referralCodeApplied ? uiState.referralCodeInput : null
+                referred_by_code: isReferred ? uiState.referralCodeInput : null
             }),
         });
 
@@ -964,6 +970,10 @@ const tieredDiskonComputed = (tier) => computed({
 });
 
 async function applyReferralCode() {
+    if (currentUser.value?.userData?.referredBy) {
+        uiState.referralCodeMessage = "Anda sudah memiliki diskon rujukan.";
+        return;
+    }
     if (!uiState.referralCodeInput) {
         uiState.referralCodeMessage = "Kode rujukan tidak boleh kosong.";
         uiState.referralCodeApplied = false;
@@ -971,13 +981,11 @@ async function applyReferralCode() {
     }
 
     try {
-        // --- KODE PERBAIKAN: Gunakan query untuk mencari field referralCode ---
         const usersCollection = collection(db, "users");
         const q = query(usersCollection, where("referralCode", "==", uiState.referralCodeInput));
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-            // Kode ditemukan! Ambil datanya
             const partnerDoc = querySnapshot.docs[0];
             if (partnerDoc.data().isPartner) {
                 uiState.referralCodeApplied = true;
@@ -1436,9 +1444,9 @@ const uiState = reactive({
     investasiPinInput: '',       // Untuk input PIN di halaman investasi
     investasiPinError: '',       // Pesan error jika PIN salah
 
-    referralCode: '',
+    referralCodeInput: '',
     referralCodeApplied: false,
-    referralCodeError: '',
+    referralCodeMessage: '',
 
     pengaturanTab: 'umum',
     isKeuanganInfoVisible: false,
@@ -7336,13 +7344,18 @@ watch(activePage, (newPage) => {
         
         <div class="max-w-xl mx-auto mb-8 p-6 rounded-xl border border-dashed border-indigo-300 bg-indigo-50 text-left">
             <h3 class="text-lg font-semibold text-indigo-700">Dapat Diskon?</h3>
-            <p class="text-sm text-slate-600 mb-2">Masukkan kode rujukan dari mitra kami untuk mendapatkan diskon khusus.</p>
-            <div class="flex gap-2">
-                <input type="text" v-model="uiState.referralCodeInput" placeholder="Contoh: PARTNER-ABCDE" class="w-full p-2 border rounded-md">
+            <p v-if="!currentUser?.userData?.referredBy" class="text-sm text-slate-600 mb-2">
+                Masukkan kode rujukan dari mitra kami untuk mendapatkan diskon khusus.
+            </p>
+            <div v-if="!currentUser?.userData?.referredBy" class="flex gap-2">
+                <input type="text" v-model="uiState.referralCodeInput" class="w-full p-2 border rounded-md">
                 <button @click.prevent="applyReferralCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Terapkan</button>
             </div>
             <p v-if="uiState.referralCodeMessage" class="mt-2 text-xs font-medium" :class="uiState.referralCodeApplied ? 'text-green-600' : 'text-red-600'">
                 {{ uiState.referralCodeMessage }}
+            </p>
+            <p v-if="currentUser?.userData?.referredBy" class="text-sm text-green-600 font-medium">
+                Selamat! Diskon rujukan sudah berlaku selamanya untuk akun Anda.
             </p>
         </div>
         
@@ -7352,11 +7365,11 @@ watch(activePage, (newPage) => {
                 :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'bulanan', 'border-transparent': selectedPlan !== 'bulanan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Bulanan</h3>
-                    <p v-if="uiState.referralCodeApplied" class="text-lg font-bold my-2 line-through text-slate-400">
+                    <p v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="text-lg font-bold my-2 line-through text-slate-400">
                         {{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal">/bulan</span>
                     </p>
-                    <p v-if="uiState.referralCodeApplied" class="text-4xl font-bold text-green-600">
-                        {{ formatCurrency(250000) }} <span class="text-base font-normal">/bulan</span>
+                    <p v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="text-4xl font-bold text-green-600">
+                        {{ formatCurrency(discountedMonthlyPrice) }} <span class="text-base font-normal">/bulan</span>
                     </p>
                     <p v-else class="text-4xl font-bold my-4">
                         {{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal">/bulan</span>
@@ -7380,11 +7393,11 @@ watch(activePage, (newPage) => {
                 :class="{ 'border-indigo-600 plan-card-selected': selectedPlan === 'tahunan', 'border-transparent': selectedPlan !== 'tahunan' }">
                 <div>
                     <h3 class="text-xl font-semibold">Paket Tahunan</h3>
-                    <p v-if="uiState.referralCodeApplied" class="text-lg font-bold my-2 line-through text-slate-400">
+                    <p v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="text-lg font-bold my-2 line-through text-slate-400">
                         {{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal">/tahun</span>
                     </p>
-                    <p v-if="uiState.referralCodeApplied" class="text-4xl font-bold text-green-600">
-                        {{ formatCurrency(2500000) }} <span class="text-base font-normal">/tahun</span>
+                    <p v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="text-4xl font-bold text-green-600">
+                        {{ formatCurrency(discountedYearlyPrice) }} <span class="text-base font-normal">/tahun</span>
                     </p>
                     <p v-else class="text-4xl font-bold my-4">
                         {{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal">/tahun</span>

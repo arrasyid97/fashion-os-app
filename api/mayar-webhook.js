@@ -1,5 +1,3 @@
-import { doc, getDoc, setDoc, collection, query, where, getDocs, addDoc } from 'firebase/firestore';
-import { db } from '../src/firebase';
 import admin from 'firebase-admin';
 
 // Inisialisasi Firebase Admin SDK
@@ -38,8 +36,7 @@ export default async function (req, res) {
             const customerEmail = event.data?.customerEmail;
             const amountPaid = event.data?.amount;
             const productDescription = event.data?.productDescription;
-            // --- KODE PENTING: AMBIL KODE RUJUKAN DARI PAYLOAD WEBHOOK ---
-            const referredByCode = event.referred_by_code; 
+            const referredByCode = req.body.referred_by_code; // Ambil kode dari payload frontend
             
             console.log(`Debugging: Customer Email: ${customerEmail}, Amount: ${amountPaid}, Description: ${productDescription}, Referral Code: ${referredByCode}`);
 
@@ -73,16 +70,19 @@ export default async function (req, res) {
                 
                 console.log(`✅ SUKSES: Langganan untuk user ${userId} berhasil diaktifkan.`);
 
-                // --- KODE BARU: MENCATAT KOMISI BERDASARKAN KODE DARI PAYLOAD ---
+                // --- KODE PENTING: MENCATAT KOMISI BERDASARKAN KODE DARI PAYLOAD ---
                 if (referredByCode) {
-                    const partnerRef = firestoreAdmin.collection("users").doc(referredByCode);
-                    const partnerDoc = await partnerRef.get();
-                    
-                    if (partnerDoc.exists() && partnerDoc.data().isPartner) {
-                        const commissionAmount = 50000; // Komisi tetap 50.000
+                    const partnerQuery = firestoreAdmin.collection("users").where("referralCode", "==", referredByCode).limit(1);
+                    const partnerSnapshot = await partnerQuery.get();
+
+                    if (!partnerSnapshot.empty) {
+                        const partnerDoc = partnerSnapshot.docs[0];
+                        const partnerId = partnerDoc.id;
+                        
+                        const commissionAmount = 50000; // Komisi tetap Rp 50.000
                         
                         await firestoreAdmin.collection("commissions").add({
-                            referredByUserId: referredByCode,
+                            referredByUserId: partnerId,
                             customerUserId: userId,
                             customerEmail: customerEmail,
                             amount: commissionAmount,
