@@ -32,12 +32,12 @@ export default async function (req, res) {
     try {
         if (event.event === 'payment.received' && event.data.status === 'SUCCESS') {
             console.log(`Event 'payment.received' dengan status 'SUCCESS' diterima.`);
-            
+
             const customerEmail = event.data?.customerEmail;
             const amountPaid = event.data?.amount;
             const productDescription = event.data?.productDescription;
-            const referredByCode = req.body.referred_by_code; // Ambil kode dari payload frontend
-            
+            const referredByCode = event.referred_by_code; // Ambil kode dari payload frontend
+
             console.log(`Debugging: Customer Email: ${customerEmail}, Amount: ${amountPaid}, Description: ${productDescription}, Referral Code: ${referredByCode}`);
 
             if (!customerEmail || !amountPaid || !productDescription) {
@@ -53,7 +53,7 @@ export default async function (req, res) {
                 const userDoc = userSnapshot.docs[0];
                 const userId = userDoc.id;
                 const userData = userDoc.data();
-                
+
                 console.log(`User ditemukan! User ID: ${userId}, Data:`, userData);
 
                 const plan = productDescription.includes('Paket Bulanan') ? 'bulanan' : 'tahunan';
@@ -61,13 +61,13 @@ export default async function (req, res) {
 
                 const now = new Date();
                 const subscriptionEndDate = new Date(now.setMonth(now.getMonth() + (plan === 'bulanan' ? 1 : 12)));
-                
+
                 console.log('Mencoba memperbarui dokumen user menggunakan Timestamp dari firebase-admin...');
                 await firestoreAdmin.collection("users").doc(userId).set({
                     subscriptionStatus: 'active',
                     subscriptionEndDate: admin.firestore.Timestamp.fromDate(subscriptionEndDate)
                 }, { merge: true });
-                
+
                 console.log(`✅ SUKSES: Langganan untuk user ${userId} berhasil diaktifkan.`);
 
                 // --- KODE PENTING: MENCATAT KOMISI BERDASARKAN KODE DARI PAYLOAD ---
@@ -78,9 +78,9 @@ export default async function (req, res) {
                     if (!partnerSnapshot.empty) {
                         const partnerDoc = partnerSnapshot.docs[0];
                         const partnerId = partnerDoc.id;
-                        
+
                         const commissionAmount = 50000; // Komisi tetap Rp 50.000
-                        
+
                         await firestoreAdmin.collection("commissions").add({
                             referredByUserId: partnerId,
                             customerUserId: userId,
@@ -105,7 +105,7 @@ export default async function (req, res) {
         } else {
             console.log(`Event bukan 'payment.received' atau status bukan 'SUCCESS'. Diabaikan.`);
         }
-        
+
         console.log('Webhook event diproses atau diabaikan. Mengirim respons 200.');
         return res.status(200).json({ message: 'Webhook event processed or ignored' });
 

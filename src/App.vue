@@ -116,6 +116,46 @@ async function fetchAllUsers() {
     }
 }
 
+// Fungsi baru untuk membuat kode rujukan yang lebih profesional
+function generatePartnerCode() {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = 'PARTNER-';
+    for (let i = 0; i < 5; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+}
+
+// Fungsi baru untuk menjadikan pengguna sebagai mitra
+async function makeUserPartner(userId) {
+    if (!confirm("Anda yakin ingin menjadikan pengguna ini sebagai mitra? Kode rujukan unik akan dibuat.")) {
+        return;
+    }
+
+    try {
+        const userRef = doc(db, "users", userId);
+        const referralCode = generatePartnerCode();
+
+        await updateDoc(userRef, {
+            isPartner: true,
+            referralCode: referralCode
+        });
+
+        // Perbarui state lokal
+        const userInState = uiState.allUsers.find(u => u.uid === userId);
+        if (userInState) {
+            userInState.isPartner = true;
+            userInState.referralCode = referralCode;
+        }
+
+        alert(`Pengguna berhasil menjadi mitra! Kode rujukan: ${referralCode}`);
+    } catch (error) {
+        console.error("Gagal menjadikan pengguna mitra:", error);
+        alert("Gagal menjadikan pengguna mitra. Silakan coba lagi.");
+    }
+}
+
+
 async function deleteInvestor(investorId) {
     if (!confirm("Anda yakin ingin menghapus data investor ini secara permanen? Aksi ini tidak dapat dibatalkan.")) {
         return;
@@ -879,13 +919,13 @@ async function handleSubscriptionMayar(plan) {
     if (isSubscribingPlan.value) {
         return;
     }
-    
+
     isSubscribingPlan.value = true;
-    
+
     // --- LOGIKA HARGA BARU ---
     let priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
     const isReferred = uiState.referralCodeApplied || currentUser.value?.userData?.referredBy;
-    
+
     if (isReferred) {
         priceToPay = plan === 'bulanan' ? 250000 : 3000000;
     }
@@ -7109,89 +7149,76 @@ watch(activePage, (newPage) => {
         </div>
 
         <div v-if="uiState.pengaturanTab === 'admin' && isAdmin" class="space-y-6">
-            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4">Export Data Pelanggan</h3>
-                <p class="text-sm text-slate-500 mb-4">Pilih pelanggan dan rentang waktu untuk mengunduh semua data mereka.</p>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700">Pilih Pelanggan</label>
-                        <select v-model="uiState.selectedUserForExport" class="mt-1 w-full p-2 border rounded-md">
-                            <option :value="null" disabled>-- Daftar Pelanggan --</option>
-                            <option v-for="user in uiState.allUsers" :key="user.uid" :value="user">
-                                {{ user.email }}
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
-                        <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
-                            <option value="today">Hari Ini</option>
-                            <option value="last_7_days">1 Minggu Terakhir</option>
-                            <option value="last_30_days">1 Bulan Terakhir</option>
-                            <option value="this_year">1 Tahun Terakhir</option>
-                            <option value="by_date_range">Rentang Tanggal</option>
-                            <option value="by_month_range">Rentang Bulan</option>
-                            <option value="by_year_range">Rentang Tahun</option>
-                            <option value="all_time">Semua</option>
-                        </select>
-                    </div>
-                    <div v-if="uiState.exportFilter === 'by_date_range'" class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Dari Tanggal</label>
-                            <input type="date" v-model="uiState.exportStartDate" class="w-full p-2 border rounded-md">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Sampai Tanggal</label>
-                            <input type="date" v-model="uiState.exportEndDate" class="w-full p-2 border rounded-md">
-                        </div>
-                    </div>
-                    <div v-if="uiState.exportFilter === 'by_month_range'" class="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
-                            <div>
-                                <label class="block text-xs font-medium">Dari Bulan</label>
-                                <select v-model.number="uiState.exportStartMonth" class="w-full p-2 border rounded-md bg-white"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium">Tahun</label>
-                                <input type="number" v-model.number="uiState.exportStartYear" class="w-full p-2 border rounded-md bg-white">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium">Sampai Bulan</label>
-                                <select v-model.number="uiState.exportEndMonth" class="w-full p-2 border rounded-md bg-white"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium">Tahun</label>
-                                <input type="number" v-model.number="uiState.exportEndYear" class="w-full p-2 border rounded-md bg-white">
-                            </div>
-                    </div>
-                    <div v-if="uiState.exportFilter === 'by_year_range'" class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-sm font-medium mb-1">Dari Tahun</label>
-                                <input type="number" v-model.number="uiState.exportStartYear" placeholder="Tahun" class="w-full p-2 border rounded-md">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium mb-1">Sampai Tahun</label>
-                                <input type="number" v-model.number="uiState.exportEndYear" placeholder="Tahun" class="w-full p-2 border rounded-md">
-                            </div>
-                    </div>
-                    <button @click="exportAllDataForUser(uiState.selectedUserForExport.uid, uiState.selectedUserForExport.email, uiState.exportFilter, uiState.exportStartDate, uiState.exportEndDate, uiState.exportStartMonth, uiState.exportEndMonth, uiState.exportStartYear, uiState.exportEndYear)" :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
-                        <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
-                        <span v-else>Export Data Pelanggan</span>
-                    </button>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4">Generator Kode Aktivasi</h3>
-                <p class="text-sm text-slate-500 mb-4">Buat kode aktivasi sekali pakai untuk pelanggan baru.</p>
-                <button @click="generateAndSaveCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">
-                    Buat Kode Baru
-                </button>
-                <div v-if="uiState.newActivationCode" class="mt-4 p-3 bg-slate-100 rounded-md">
-                    <p class="text-sm">Kode Baru Berhasil Dibuat:</p>
-                    <p class="text-2xl font-mono font-bold text-indigo-700">{{ uiState.newActivationCode }}</p>
-                </div>
-            </div>
+    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Akun Mitra</h3>
+        <p class="text-sm text-slate-500 mb-4">
+            Pilih pengguna di bawah ini untuk menjadikannya mitra. Kode rujukan unik akan dibuat otomatis.
+        </p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-slate-500">
+                        <th class="p-2 font-medium">Email Pengguna</th>
+                        <th class="p-2 font-medium text-center">Status Mitra</th>
+                        <th class="p-2 font-medium text-center">Kode Rujukan</th>
+                        <th class="p-2 font-medium text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    <tr v-if="uiState.allUsers.length === 0">
+                        <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada pengguna terdaftar.</td>
+                    </tr>
+                    <tr v-for="user in uiState.allUsers" :key="user.uid" class="hover:bg-slate-50">
+                        <td class="p-3">{{ user.email }}</td>
+                        <td class="p-3 text-center">
+                            <span v-if="user.isPartner" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">Ya</span>
+                            <span v-else class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800">Tidak</span>
+                        </td>
+                        <td class="p-3 text-center font-mono text-sm">
+                            {{ user.referralCode || '-' }}
+                        </td>
+                        <td class="p-3 text-right">
+                            <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
+                                Jadikan Mitra
+                            </button>
+                            <button v-else @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
+                                Lihat Kode
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">Export Data Pelanggan</h3>
+        <p class="text-sm text-slate-500 mb-4">Pilih pelanggan dan rentang waktu untuk mengunduh semua data mereka.</p>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Pilih Pelanggan</label>
+                <select v-model="uiState.selectedUserForExport" class="mt-1 w-full p-2 border rounded-md">
+                    <option :value="null" disabled>-- Daftar Pelanggan --</option>
+                    <option v-for="user in uiState.allUsers" :key="user.uid" :value="user">
+                        {{ user.email }}
+                    </option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
+                <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
+                    <option value="all_time">Semua</option>
+                    <option value="last_30_days">1 Bulan Terakhir</option>
+                    <option value="this_year">1 Tahun Terakhir</option>
+                </select>
+            </div>
+            <button @click="exportAllDataForUser(uiState.selectedUserForExport?.uid, uiState.selectedUserForExport?.email, uiState.exportFilter)" :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
+                <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
+                <span v-else>Export Data Pelanggan</span>
+            </button>
+        </div>
+    </div>
+</div>
 
     </div>
 </div>
