@@ -5124,11 +5124,7 @@ onMounted(() => {
     });
 });
 
-// Perbaikan pada fungsi loadAllDataFromFirebase
-async function loadAllDataFromFirebase() {
-    // ... (kode di dalamnya tetap sama seperti sebelumnya, karena kita sudah memperbaiki bagian commissions di atas)
-    // Cukup pastikan bagian `getDoc(doc(db, "commissions", userId))` sudah TIDAK ADA.
-}
+
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
@@ -10233,5 +10229,4 @@ const printBarcode = async () => {
   width: 100%;
   min-height: 10px;
 }
-</style>
 </style>
