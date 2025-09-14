@@ -5190,66 +5190,50 @@ function updatePaperSettings() {
 
 function printLabels() {
   const settings = barcodePage.paperSettings;
-  const styleId = 'dynamic-print-style';
+  const previewSheet = document.querySelector('.preview-sheet');
+  if (!previewSheet) return;
 
-  // Hapus style lama jika ada, untuk mencegah duplikasi
+  // Sembunyikan semua label KECUALI yang pertama
+  const labels = previewSheet.querySelectorAll('.label-box');
+  labels.forEach((label, index) => {
+    if (index > 0) {
+      label.style.display = 'none';
+    }
+  });
+
+  const styleId = 'dynamic-print-style';
   const oldStyle = document.getElementById(styleId);
-  if (oldStyle) {
-    oldStyle.remove();
-  }
+  if (oldStyle) oldStyle.remove();
 
   const style = document.createElement('style');
   style.id = styleId;
 
-  let pageRule = '';
-
-  // ### LOGIKA CERDAS DIMULAI DI SINI ###
-  // Tentukan aturan @page berdasarkan jenis kertas
-  if (settings.type === 'sheet') {
-    // 1. Untuk kertas lembaran seperti A4
-    pageRule = `@page { size: A4; margin: 10mm; }`;
-
-  } else {
-    // 2. Untuk kertas roll (Termal atau Kustom)
-    // Hitung lebar total kertas roll
-    const totalWidth = (settings.labelWidth * settings.cols) + (settings.gapHorizontal * (settings.cols - 1)) + (settings.marginLeft + settings.marginRight);
-    
-    // Atur lebar sesuai kertas, dan tinggi OTOMATIS (auto) agar menjadi satu gulungan panjang
-    pageRule = `@page { size: ${totalWidth}mm auto; margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm; }`;
-  }
-
-  // Gabungkan semua aturan CSS untuk print
+  // Aturan @page sekarang berukuran persis SATU stiker
+  const pageRule = `@page { size: ${settings.labelWidth}mm ${settings.labelHeight}mm; margin: 0; }`;
+  
   style.innerHTML = `
     ${pageRule}
     @media print {
-      body * { visibility: hidden; }
-      .print-area, .print-area * { visibility: visible; }
-      .print-area { position: absolute; left: 0; top: 0; width: 100%; }
-      .barcode-page-grid, .barcode-preview-area {
-         display: block !important;
-         height: auto !important;
-         overflow: visible !important;
-         padding: 0 !important;
-         border: none !important;
-      }
-      .preview-sheet {
-         box-shadow: none;
-         border: none;
-         justify-content: start;
-      }
-      .label-box {
-        border: 1px solid #ccc;
-        page-break-inside: avoid;
+      /* Reset semua posisi agar pas */
+      .print-area, .preview-sheet, .label-box {
+        position: static;
+        display: block;
+        margin: 0;
+        padding: 0;
+        border: none;
+        box-shadow: none;
       }
     }
   `;
-
   document.head.appendChild(style);
   
-  // Beri jeda singkat agar browser sempat menerapkan style baru sebelum print
-  setTimeout(() => {
-      window.print();
-  }, 100);
+  window.print();
+
+  // Kembalikan tampilan preview seperti semula setelah dialog print ditutup
+  labels.forEach(label => {
+    label.style.display = 'flex'; // Kembalikan ke display aslinya
+  });
+  document.head.removeChild(style);
 }
 
 watch(barcodePage, () => {
@@ -6918,69 +6902,11 @@ watch(barcodePage, () => {
 
       <div class="setting-section">
         <h3 class="setting-title">2. Desain Label</h3>
-        <div class="label-preview">
-          <p v-if="barcodePage.labelSettings.showTitle">Title</p>
-          <div class="barcode-placeholder">Barcode Text</div>
-          <p v-if="barcodePage.labelSettings.showDescription">Description</p>
         </div>
-
-        <div class="field-settings">
-          <input type="checkbox" v-model="barcodePage.labelSettings.showTitle"> <span>Judul</span>
-          <div class="controls" v-if="barcodePage.labelSettings.showTitle">
-            <input type="number" v-model.number="barcodePage.labelSettings.titleFontSize" class="font-size-input"> pt
-            <button @click="barcodePage.labelSettings.titleBold = !barcodePage.labelSettings.titleBold" :class="{'active': barcodePage.labelSettings.titleBold}">B</button>
-            <button @click="barcodePage.labelSettings.titleAlign = 'center'" :class="{'active': barcodePage.labelSettings.titleAlign === 'center'}">Center</button>
-          </div>
-        </div>
-
-        <div class="field-settings">
-            <span>Barcode</span>
-            <div class="controls">
-                <select v-model="barcodePage.labelSettings.barcodeType">
-                    <option value="CODE128">Code 128</option>
-                    <option value="EAN13">EAN-13</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="field-settings">
-          <span>Teks Barcode</span>
-           <div class="controls">
-                <input type="number" v-model.number="barcodePage.labelSettings.barcodeTextFontSize" class="font-size-input"> pt
-                <button @click="barcodePage.labelSettings.barcodeTextBold = !barcodePage.labelSettings.barcodeTextBold" :class="{'active': barcodePage.labelSettings.barcodeTextBold}">B</button>
-                <button @click="barcodePage.labelSettings.barcodeTextAlign = 'center'" :class="{'active': barcodePage.labelSettings.barcodeTextAlign === 'center'}">Center</button>
-            </div>
-        </div>
-
-        <div class="field-settings">
-            <input type="checkbox" v-model="barcodePage.labelSettings.showDescription"> <span>Deskripsi</span>
-             <div class="controls" v-if="barcodePage.labelSettings.showDescription">
-                <input type="number" v-model.number="barcodePage.labelSettings.descriptionFontSize" class="font-size-input"> pt
-                <button @click="barcodePage.labelSettings.descriptionBold = !barcodePage.labelSettings.descriptionBold" :class="{'active': barcodePage.labelSettings.descriptionBold}">B</button>
-                <button @click="barcodePage.labelSettings.descriptionAlign = 'center'" :class="{'active': barcodePage.labelSettings.descriptionAlign === 'center'}">Center</button>
-            </div>
-        </div>
-      </div>
 
       <div class="setting-section">
           <h3 class="setting-title">3. Data & Cetak</h3>
-           <div>
-              <label class="block text-sm font-medium">Judul (Title)</label>
-              <input type="text" v-model="barcodePage.title" class="mt-1 w-full p-2 border rounded-md">
-            </div>
-            <div class="mt-2">
-              <label class="block text-sm font-medium">Deskripsi</label>
-              <input type="text" v-model="barcodePage.description" class="mt-1 w-full p-2 border rounded-md">
-            </div>
-             <div class="mt-2">
-              <label class="block text-sm font-medium">Teks / SKU untuk Barcode (Code)</label>
-              <input type="text" v-model="barcodePage.code" class="mt-1 w-full p-2 border rounded-md">
-            </div>
-           <div class="mt-2">
-              <label class="block text-sm font-medium">Jumlah Label yang Akan Dicetak</label>
-              <input type="number" v-model.number="barcodePage.printQty" min="1" class="mt-1 w-full p-2 border rounded-md">
-          </div>
-      </div>
+           </div>
 
       <button @click="printLabels" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 mt-4">
           🖨️ Cetak Label
@@ -6988,9 +6914,10 @@ watch(barcodePage, () => {
 
     </div>
 
-    <div class="barcode-preview-area print-area">
-      <div class="preview-sheet" :style="{
+    <div class="barcode-preview-area">
+      <div class="preview-sheet print-area" :style="{
           gridTemplateColumns: `repeat(${barcodePage.paperSettings.cols}, ${barcodePage.paperSettings.labelWidth}mm)`,
+          gridTemplateRows: `repeat(${barcodePage.paperSettings.rows}, auto)`,
           gap: `${barcodePage.paperSettings.gapVertical}mm ${barcodePage.paperSettings.gapHorizontal}mm`
         }">
         <div v-for="i in barcodePage.printQty" :key="i" class="label-box" :style="{ 
