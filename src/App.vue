@@ -6896,22 +6896,34 @@ watch(barcodePage, () => {
       <h2 class="text-xl font-bold mb-4">Pencetakan Barcode</h2>
 
       <div class="setting-section">
-        <h3 class="setting-title">1. Pengaturan Label</h3>
-        
-        <div>
-            <label class="block text-sm font-medium">Pilih Jenis Stiker Anda</label>
-            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="mt-1 w-full p-2 border rounded-md bg-white">
-                <option value="33x15-1">LABEL BARCODE 33 x 15 (1 LINE)</option>
-                <option value="33x15-2">LABEL BARCODE 33 x 15 (2 LINE)</option>
-                <option value="33x15-3">LABEL BARCODE 33 x 15 (3 LINE)</option>
-                <option value="33x19-3">LABEL BARCODE 33 x 19 (3 LINE)</option>
-                <option value="33x25-3">LABEL BARCODE 33 x 25 (3 LINE)</option>
-                <option value="40x20-2">LABEL BARCODE 40 x 20 (2 LINE)</option>
-                <option value="custom">Ukuran & Layout Kustom...</option>
-            </select>
+        <h3 class="setting-title">1. Jenis Kertas</h3>
+        <div class="radio-group">
+          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="sheet"> Lembar Label (A4)</label>
+          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="thermal"> Label Termal (Roll)</label>
+          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="custom"> Kustom</label>
         </div>
         
-        <div v-if="barcodePage.paperSettings.preset === 'custom'" class="pt-2 animate-fade-in space-y-2">
+        <div v-if="barcodePage.paperSettings.type === 'sheet'" class="mt-2">
+            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="w-full p-2 border rounded-md bg-white">
+                <option v-for="preset in labelPresets" :key="preset.id" :value="preset.id">
+                    {{ preset.name }}
+                </option>
+            </select>
+        </div>
+      
+        <div v-if="barcodePage.paperSettings.type === 'thermal'" class="mt-2">
+            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="w-full p-2 border rounded-md bg-white">
+                <option value="33x15-1">LABEL 33 x 15 mm (1 Line)</option>
+                <option value="33x15-2">LABEL 33 x 15 mm (2 Line)</option>
+                <option value="33x15-3">LABEL 33 x 15 mm (3 Line)</option>
+                <option value="33x19-3">LABEL 33 x 19 mm (3 Line)</option>
+                <option value="33x25-3">LABEL 33 x 25 mm (3 Line)</option>
+                <option value="40x20-2">LABEL 40 x 20 mm (2 Line)</option>
+                <option value="70x40-1">LABEL 70 x 40 mm (1 Line)</option>
+            </select>
+        </div>
+
+        <div v-if="barcodePage.paperSettings.type === 'custom'" class="pt-2 animate-fade-in space-y-2">
             <p class="text-xs text-slate-500">Isi manual untuk ukuran stiker yang tidak ada di daftar.</p>
             <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -6923,16 +6935,22 @@ watch(barcodePage, () => {
                     <input type="number" v-model.number="barcodePage.paperSettings.labelHeight" class="mt-1 w-full p-2 border rounded-md">
                 </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium">Jumlah Kolom (Line)</label>
-                <input type="number" v-model.number="barcodePage.paperSettings.layoutCols" min="1" class="mt-1 w-full p-2 border rounded-md">
+            <div class="grid grid-cols-2 gap-2">
+                 <div>
+                    <label class="block text-xs font-medium">Kolom (Samping)</label>
+                    <input type="number" v-model.number="barcodePage.paperSettings.cols" min="1" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+                 <div>
+                    <label class="block text-xs font-medium">Baris (Bawah)</label>
+                    <input type="number" v-model.number="barcodePage.paperSettings.rows" min="1" class="mt-1 w-full p-2 border rounded-md">
+                </div>
             </div>
         </div>
 
       </div>
 
       <div class="setting-section">
-        <h3 class="setting-title">2. Desain Tampilan di Dalam Stiker</h3>
+        <h3 class="setting-title">2. Desain Label</h3>
         <div class="label-preview">
           <p v-if="barcodePage.labelSettings.showTitle">Title</p>
           <div class="barcode-placeholder">Barcode Text</div>
@@ -7017,6 +7035,7 @@ watch(barcodePage, () => {
     <div class="barcode-preview-area print-area">
       <div class="preview-sheet" :style="{
           gridTemplateColumns: `repeat(${barcodePage.paperSettings.cols}, 1fr)`,
+          gridTemplateRows: `repeat(${barcodePage.paperSettings.rows}, auto)`,
           gap: `${barcodePage.paperSettings.gapVertical}mm ${barcodePage.paperSettings.gapHorizontal}mm`
         }">
         <div v-for="item in barcodePage.data" :key="item.id" class="label-box" :style="{ 
