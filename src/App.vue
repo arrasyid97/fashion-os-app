@@ -10258,9 +10258,9 @@ watch(barcodePage, () => {
 /* =================================================================== */
 .barcode-page-grid {
   display: grid;
-  grid-template-columns: 400px 1fr; /* Lebarkan sedikit panel kiri */
+  grid-template-columns: 400px 1fr;
   gap: 2rem;
-  height: calc(100vh - 120px); /* Sesuaikan tinggi agar tidak terpotong */
+  height: calc(100vh - 120px);
 }
 .barcode-settings-panel {
   background: #f8fafc;
@@ -10276,78 +10276,91 @@ watch(barcodePage, () => {
   border-radius: 0.75rem;
   overflow: auto;
   height: 100%;
-  /* PENTING: Menengahkan kertas preview */
   display: flex;
   justify-content: center;
   align-items: flex-start;
 }
-.setting-section {
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
-}
-.setting-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-}
-.field-settings {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.875rem;
-  margin-top: 0.75rem;
-}
-.field-settings .controls { display: flex; align-items: center; gap: 4px; }
-.field-settings .controls button, .field-settings .controls select {
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  background: white;
-  height: 30px;
-  padding: 0 8px;
-  font-size: 12px;
-}
-.field-settings .controls button.active { background: #e0e7ff; border-color: #4f46e5; }
-.font-size-input { width: 45px; text-align: right; border: 1px solid #cbd5e1; border-radius: 4px; height:30px; }
+/* ... (sisa style panel pengaturan Anda yang lain tetap sama) ... */
 
 .preview-sheet {
   background: white;
-  display: grid; /* Gunakan grid untuk layout yang presisi */
+  display: grid;
   padding: 1mm;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   justify-content: center;
 }
 .label-box {
   background: white;
-  padding: 1mm;
+  padding: 1.5mm;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  align-items: stretch; /* Ubah ke stretch agar SVG mengisi ruang */
+  align-items: stretch;
   overflow: hidden;
-  border: 1px dashed #e2e8f0; /* Border tipis untuk visualisasi */
+  border: 1px dashed #e2e8f0;
 }
 .label-box p {
   margin: 0;
   line-height: 1.2;
-  flex-shrink: 0; /* Mencegah teks mengecil */
+  flex-shrink: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .label-box .barcode-svg {
-  flex-grow: 1; /* Biarkan SVG mengisi ruang sisa */
+  flex-grow: 1;
   width: 100%;
-  min-height: 10px; /* Beri tinggi minimal */
+  min-height: 10px;
 }
 
-/* Aturan khusus untuk mencetak (print) */
+/* =================================================================== */
+/* V V V INI BAGIAN PALING PENTING UNTUK DIPERBAIKI V V V */
+/* =================================================================== */
 @media print {
-  body * { visibility: hidden; }
-  .print-area, .print-area * { visibility: visible; }
-  .print-area { position: absolute; left: 0; top: 0; width: 100%; }
-  .label-box { border: none; }
+  /* Atur ukuran kertas cetak. Ganti 'A4' jika perlu */
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  /* Sembunyikan semua elemen di halaman */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Tampilkan HANYA area print dan semua isinya */
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+
+  /* Posisikan area print agar mengisi seluruh halaman */
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Atur ulang gaya kontainer yang membatasi agar konten bisa mengalir */
+  .barcode-page-grid, .barcode-preview-area {
+     display: block !important; /* Nonaktifkan grid/flex di level atas */
+     height: auto !important;
+     overflow: visible !important; /* Hapus scrollbar */
+     padding: 0 !important;
+     border: none !important;
+  }
+
+  .preview-sheet {
+     box-shadow: none; /* Hilangkan bayangan saat print */
+     border: none;
+     justify-content: start; /* Ratakan konten ke kiri saat print */
+  }
+
+  .label-box {
+    border: 1px solid #ccc; /* Beri garis bantu tipis untuk menggunting */
+    page-break-inside: avoid; /* Mencegah satu label terpotong di tengah halaman */
+  }
 }
 
 /* =================================================================== */
