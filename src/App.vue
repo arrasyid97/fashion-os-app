@@ -6859,39 +6859,85 @@ watch(barcodePage, () => {
       <h2 class="text-xl font-bold mb-4">Pencetakan Barcode</h2>
 
       <div class="setting-section">
-        <h3 class="setting-title">1. Data Label</h3>
-        <div>
-          <label class="block text-sm font-medium">Judul (Title)</label>
-          <input type="text" v-model="barcodePage.title" class="mt-1 w-full p-2 border rounded-md">
+        <h3 class="setting-title">1. Jenis Kertas</h3>
+        <div class="radio-group">
+          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="sheet"> Lembar Label (A4)</label>
+          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="thermal"> Label Termal (Roll)</label>
+          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="custom"> Kustom</label>
         </div>
-        <div class="mt-2">
-          <label class="block text-sm font-medium">Deskripsi</label>
-          <input type="text" v-model="barcodePage.description" class="mt-1 w-full p-2 border rounded-md">
+        
+        <div v-if="barcodePage.paperSettings.type === 'sheet'" class="mt-2">
+            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="w-full p-2 border rounded-md bg-white">
+                <option v-for="preset in labelPresets" :key="preset.id" :value="preset.id">
+                    {{ preset.name }}
+                </option>
+            </select>
         </div>
-         <div class="mt-2">
-          <label class="block text-sm font-medium">Teks / SKU untuk Barcode (Code)</label>
-          <input type="text" v-model="barcodePage.code" class="mt-1 w-full p-2 border rounded-md">
+      
+        <div v-if="barcodePage.paperSettings.type === 'thermal'" class="mt-2">
+            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="w-full p-2 border rounded-md bg-white">
+                <option value="33x15-1">LABEL 33 x 15 mm (1 Line)</option>
+                <option value="33x15-2">LABEL 33 x 15 mm (2 Line)</option>
+                <option value="33x15-3">LABEL 33 x 15 mm (3 Line)</option>
+                <option value="33x19-3">LABEL 33 x 19 mm (3 Line)</option>
+                <option value="33x25-3">LABEL 33 x 25 mm (3 Line)</option>
+                <option value="40x20-2">LABEL 40 x 20 mm (2 Line)</option>
+                <option value="70x40-1">LABEL 70 x 40 mm (1 Line)</option>
+            </select>
+        </div>
+
+        <div v-if="barcodePage.paperSettings.type === 'custom'" class="pt-2 animate-fade-in space-y-2">
+            <p class="text-xs text-slate-500">Isi manual untuk ukuran stiker yang tidak ada di daftar.</p>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-xs font-medium">Lebar 1 Stiker (mm)</label>
+                    <input type="number" v-model.number="barcodePage.paperSettings.labelWidth" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium">Tinggi 1 Stiker (mm)</label>
+                    <input type="number" v-model.number="barcodePage.paperSettings.labelHeight" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                 <div>
+                    <label class="block text-xs font-medium">Kolom (Samping)</label>
+                    <input type="number" v-model.number="barcodePage.paperSettings.cols" min="1" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+                 <div>
+                    <label class="block text-xs font-medium">Baris (Bawah)</label>
+                    <input type="number" v-model.number="barcodePage.paperSettings.rows" min="1" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+            </div>
         </div>
       </div>
 
       <div class="setting-section">
         <h3 class="setting-title">2. Desain Label</h3>
+        <div class="label-preview">
+          <p v-if="barcodePage.labelSettings.showTitle">Title</p>
+          <div class="barcode-placeholder">Barcode Text</div>
+          <p v-if="barcodePage.labelSettings.showDescription">Description</p>
+        </div>
+
         <div class="field-settings">
-          <input type="checkbox" v-model="barcodePage.labelSettings.showTitle" id="showTitleCheck"> <label for="showTitleCheck">Judul</label>
+          <input type="checkbox" v-model="barcodePage.labelSettings.showTitle"> <span>Judul</span>
           <div class="controls" v-if="barcodePage.labelSettings.showTitle">
             <input type="number" v-model.number="barcodePage.labelSettings.titleFontSize" class="font-size-input"> pt
             <button @click="barcodePage.labelSettings.titleBold = !barcodePage.labelSettings.titleBold" :class="{'active': barcodePage.labelSettings.titleBold}">B</button>
             <button @click="barcodePage.labelSettings.titleAlign = 'center'" :class="{'active': barcodePage.labelSettings.titleAlign === 'center'}">Center</button>
           </div>
         </div>
+
         <div class="field-settings">
             <span>Barcode</span>
             <div class="controls">
                 <select v-model="barcodePage.labelSettings.barcodeType">
-                    <option value="CODE128">Code 128</option><option value="EAN13">EAN-13</option>
+                    <option value="CODE128">Code 128</option>
+                    <option value="EAN13">EAN-13</option>
                 </select>
             </div>
         </div>
+
         <div class="field-settings">
           <span>Teks Barcode</span>
            <div class="controls">
@@ -6900,8 +6946,9 @@ watch(barcodePage, () => {
                 <button @click="barcodePage.labelSettings.barcodeTextAlign = 'center'" :class="{'active': barcodePage.labelSettings.barcodeTextAlign === 'center'}">Center</button>
             </div>
         </div>
+
         <div class="field-settings">
-            <input type="checkbox" v-model="barcodePage.labelSettings.showDescription" id="showDescCheck"> <label for="showDescCheck">Deskripsi</label>
+            <input type="checkbox" v-model="barcodePage.labelSettings.showDescription"> <span>Deskripsi</span>
              <div class="controls" v-if="barcodePage.labelSettings.showDescription">
                 <input type="number" v-model.number="barcodePage.labelSettings.descriptionFontSize" class="font-size-input"> pt
                 <button @click="barcodePage.labelSettings.descriptionBold = !barcodePage.labelSettings.descriptionBold" :class="{'active': barcodePage.labelSettings.descriptionBold}">B</button>
@@ -6911,32 +6958,19 @@ watch(barcodePage, () => {
       </div>
 
       <div class="setting-section">
-          <h3 class="setting-title">3. Kertas & Cetak</h3>
-          <div>
-            <label class="block text-sm font-medium">Preset Kertas Label</label>
-            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="mt-1 w-full p-2 border rounded-md bg-white">
-                <option value="33x15-1">33x15mm (1 Kolom)</option>
-                <option value="33x15-2">33x15mm (2 Kolom)</option>
-                <option value="33x15-3">33x15mm (3 Kolom)</option>
-                <option value="custom">Kustom...</option>
-            </select>
-          </div>
-          <div v-if="barcodePage.paperSettings.preset === 'custom'" class="mt-2 space-y-2">
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="block text-xs font-medium">Lebar Stiker (mm)</label>
-                <input type="number" v-model.number="barcodePage.paperSettings.labelWidth" class="mt-1 w-full p-2 border rounded-md">
-              </div>
-              <div>
-                <label class="block text-xs font-medium">Tinggi Stiker (mm)</label>
-                <input type="number" v-model.number="barcodePage.paperSettings.labelHeight" class="mt-1 w-full p-2 border rounded-md">
-              </div>
+          <h3 class="setting-title">3. Data & Cetak</h3>
+           <div>
+              <label class="block text-sm font-medium">Judul (Title)</label>
+              <input type="text" v-model="barcodePage.title" class="mt-1 w-full p-2 border rounded-md">
             </div>
-             <div>
-                <label class="block text-sm font-medium">Jumlah Kolom (Line)</label>
-                <input type="number" v-model.number="barcodePage.paperSettings.cols" min="1" class="mt-1 w-full p-2 border rounded-md">
+            <div class="mt-2">
+              <label class="block text-sm font-medium">Deskripsi</label>
+              <input type="text" v-model="barcodePage.description" class="mt-1 w-full p-2 border rounded-md">
             </div>
-          </div>
+             <div class="mt-2">
+              <label class="block text-sm font-medium">Teks / SKU untuk Barcode (Code)</label>
+              <input type="text" v-model="barcodePage.code" class="mt-1 w-full p-2 border rounded-md">
+            </div>
            <div class="mt-2">
               <label class="block text-sm font-medium">Jumlah Label yang Akan Dicetak</label>
               <input type="number" v-model.number="barcodePage.printQty" min="1" class="mt-1 w-full p-2 border rounded-md">
