@@ -5177,20 +5177,23 @@ function generateBarcodes() {
   }
 
   const cols = Math.max(1, settings.layoutCols);
-  const totalLabelsToGenerate = settings.printMode === 'sheet' 
-      ? (cols * 10) * settings.printQty // Asumsi 1 lembar = 10 baris
-      : settings.printQty;
-
-  // Atur lebar area preview agar sesuai dengan total lebar label + gap
-  const previewWidth = (settings.labelWidth * cols) + ((cols - 1) * 2); // 2mm gap
+  
+  // <-- AWAL PERBAIKAN: Hitung dan atur lebar total area preview -->
+  const gap = 2; // Jarak antar stiker dalam mm
+  const padding = 2; // Padding di tepi dalam mm
+  const previewWidth = (settings.labelWidth * cols) + ((cols - 1) * gap) + (padding * 2);
   previewArea.style.width = `${previewWidth}mm`;
-  previewArea.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  // <-- AKHIR PERBAIKAN -->
+
+  const labelsPerPage = cols * settings.layoutRows;
+  const totalLabelsToGenerate = settings.printMode === 'sheet' 
+      ? labelsPerPage * settings.printQty 
+      : settings.printQty;
 
   // Buat elemen untuk setiap label
   for (let i = 1; i <= totalLabelsToGenerate; i++) {
     const label = document.createElement('div');
     label.className = 'barcode-label';
-    // Atur ukuran setiap blok label
     label.style.width = `${settings.labelWidth}mm`;
     label.style.height = `${settings.labelHeight}mm`;
     
@@ -5213,7 +5216,7 @@ function generateBarcodes() {
               width: settings.barWidth,
               height: settings.barHeight,
               margin: 4,
-              fontSize: 12, // Perkecil font size untuk label kecil
+              fontSize: 12,
               textMargin: 0
             });
         } catch (e) {
@@ -10246,24 +10249,25 @@ onMounted(() => {
 
 /* V V V STYLE BARU UNTUK BARCODE & PRINT V V V */
 [ref="barcodePreview"] {
-    display: flex;       /* <-- Mengatur label agar berjejer */
-    flex-wrap: wrap;     /* <-- Membuat label pindah ke baris baru jika tidak muat */
-    gap: 2mm;            /* <-- PENTING: Memberi jarak antar stiker */
-    padding: 2mm;        /* <-- Memberi sedikit ruang di tepi kertas */
-    background-color: #e2e8f0; /* <-- Warna abu-abu untuk simulasi kertas backing */
+    display: flex;
+    flex-direction: row; /* <-- Mengatur item secara horizontal */
+    flex-wrap: wrap;     /* <-- Membuat item pindah ke baris baru jika tidak muat */
+    gap: 2mm;            /* <-- Memberi jarak antar stiker */
+    padding: 2mm;
+    background-color: #e2e8f0;
     border: 1px dashed #94a3b8;
-    min-height: 100px;   /* <-- Memberi tinggi minimal agar area terlihat */
+    min-height: 50mm;   
+    /* Hapus width dari sini, karena akan diatur oleh JavaScript */
 }
 
 /* Untuk setiap stiker barcode individual (blok kotak-kotak) */
 .barcode-label {
-    background-color: white;    /* <-- Membuat stiker berwarna putih */
-    border: 1px solid #d1d5db;  /* <-- Memberi garis tepi tipis pada setiap stiker */
-    border-radius: 2px;         /* <-- Sedikit melengkungkan sudut stiker */
-    padding: 1mm;               /* <-- Memberi ruang di dalam stiker */
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 2px;
+    padding: 1.5mm; /* Sedikit padding di dalam stiker */
     box-sizing: border-box;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
     overflow: hidden;
@@ -10273,38 +10277,6 @@ onMounted(() => {
     width: 100%;
     height: 100%;
     object-fit: contain;
-}
-
-/* Style untuk pesan error jika teks tidak valid */
-.barcode-error {
-    color: red;
-    font-size: 10px;
-    text-align: center;
-    font-family: sans-serif;
-}
-
-/* Aturan khusus untuk mencetak (print) */
-@media print {
-    body * {
-        visibility: hidden;
-    }
-    
-    /* Tampilkan hanya area preview dan isinya */
-    .print-container, .print-container * {
-        visibility: visible;
-    }
-    
-    .print-container {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-    }
-
-    .barcode-label {
-        border: 1px solid #ccc; /* <-- Tampilkan border tipis saat dicetak agar mudah digunting */
-        page-break-inside: avoid; /* Mencegah label terpotong antar halaman */
-    }
 }
 /* ^ ^ ^ AKHIR STYLE BARU ^ ^ ^ */
 
