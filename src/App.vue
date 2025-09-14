@@ -10354,7 +10354,10 @@ watch(barcodePage, () => {
 /* V V V INI BAGIAN PALING PENTING UNTUK DIPERBAIKI V V V */
 /* =================================================================== */
 @media print {
-  /* Aturan @page tetap dinamis dari JavaScript, tidak perlu diubah di sini */
+  /* Aturan @page akan dibuat secara dinamis oleh JavaScript, biarkan kosong di sini */
+  @page {
+    margin: 0;
+  }
 
   /* Sembunyikan semua elemen di halaman */
   body * {
@@ -10373,34 +10376,26 @@ watch(barcodePage, () => {
     top: 0;
     width: 100%;
     height: 100%;
-    /* PENTING: Gunakan flexbox untuk menengahkan konten */
-    display: flex;
-    justify-content: center;
-    align-items: center;
   }
   
-  /* Hentikan grid/flex di level atas yang tidak perlu */
-  .barcode-page-grid, .barcode-preview-area {
+  /* Atur ulang gaya kontainer yang tidak perlu saat mencetak */
+  .barcode-preview-area, .preview-sheet {
      display: block !important;
      height: auto !important;
      overflow: visible !important;
      padding: 0 !important;
      border: none !important;
      background: none !important;
+     box-shadow: none !important;
   }
 
-  /* Atur agar lembar preview tidak memakan seluruh lebar halaman */
-  .preview-sheet {
-     box-shadow: none;
-     border: none;
-     /* PENTING: Jangan biarkan ukurannya melebihi area cetak */
-     max-width: 100%;
-     max-height: 100%;
-  }
-
+  /* PERBAIKAN KUNCI DI SINI: */
+  /* Pastikan .label-box tetap menggunakan flexbox dan tidak memiliki border */
   .label-box {
-    border: 1px solid #ccc;
-    page-break-inside: avoid;
+    display: flex !important; /* <-- Pastikan layout flex tetap aktif */
+    page-break-inside: avoid !important;
+    border: none !important;
+    padding: 1.5mm !important; /* Pastikan padding tetap ada */
   }
 }
 
