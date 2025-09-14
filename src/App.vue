@@ -5209,41 +5209,49 @@ function updatePaperSettings() {
 }
 
 function printLabels() {
-    const settings = barcodePage.paperSettings;
-    const styleId = 'dynamic-print-style';
-    const oldStyle = document.getElementById(styleId);
-    if (oldStyle) oldStyle.remove();
+  const settings = barcodePage.paperSettings;
+  const styleId = 'dynamic-print-style';
 
-    const style = document.createElement('style');
-    style.id = styleId;
-    let pageRule = '';
+  const oldStyle = document.getElementById(styleId);
+  if (oldStyle) oldStyle.remove();
 
-    if (settings.type === 'sheet') {
-        pageRule = `@page { size: A4; margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm; }`;
-    } else {
-        const totalWidth = (settings.labelWidth * settings.cols) + (settings.gapHorizontal * (settings.cols - 1)) + (settings.marginLeft + settings.marginRight);
-        pageRule = `@page { size: ${totalWidth}mm auto; margin: 0; }`;
+  const style = document.createElement('style');
+  style.id = styleId;
+
+  let pageRule = '';
+
+  // Logika Cerdas: Tentukan aturan @page berdasarkan jenis kertas
+  if (settings.type === 'sheet') {
+    // Untuk kertas lembaran seperti A4
+    pageRule = `@page { size: A4; margin: 10mm; }`;
+  } else {
+    // Untuk kertas roll (Termal atau Kustom)
+    const totalWidth = (settings.labelWidth * settings.cols) + (settings.gapHorizontal * (settings.cols - 1)) + (settings.marginLeft + settings.marginRight);
+    // Atur tinggi OTOMATIS (auto) agar menjadi satu gulungan panjang
+    pageRule = `@page { size: ${totalWidth}mm auto; margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm; }`;
+  }
+
+  style.innerHTML = `
+    ${pageRule}
+    @media print {
+      body * { visibility: hidden; }
+      .print-area, .print-area * { visibility: visible; }
+      .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+      .barcode-page-grid, .barcode-preview-area { display: block !important; height: auto !important; overflow: visible !important; padding: 0 !important; border: none !important; background: none !important; }
+      .preview-sheet { box-shadow: none; border: none; justify-content: start; }
+      .label-box { border: 1px solid #ccc; page-break-inside: avoid; }
     }
-    
-    style.innerHTML = `
-        ${pageRule}
-        @media print {
-          body * { visibility: hidden; }
-          .print-area, .print-area * { visibility: visible; }
-          .print-area { position: absolute; left: 0; top: 0; width: 100%; }
-          .barcode-page-grid, .barcode-preview-area { display: block !important; height: auto !important; overflow: visible !important; padding: 0 !important; border: none !important; background: none !important; }
-          .preview-sheet { box-shadow: none; border: none; justify-content: start; }
-          .label-box { border: 1px solid #ccc; page-break-inside: avoid; }
-        }
-    `;
-    document.head.appendChild(style);
-    
-    setTimeout(() => { window.print(); }, 100);
+  `;
+
+  document.head.appendChild(style);
+  
+  setTimeout(() => { window.print(); }, 100);
 }
 
 // 4. WATCHER (PENGAWAS OTOMATIS)
 watch(barcodePage, () => {
     nextTick(() => {
+        // Loop sebanyak Jumlah Cetak untuk menggambar semua barcode
         for (let i = 1; i <= barcodePage.printQty; i++) {
             const svgElement = document.getElementById(`barcode-${i}`);
             if (svgElement && barcodePage.code) {
