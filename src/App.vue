@@ -5155,54 +5155,40 @@ watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
-// ===================================================================
-// V V V KODE BARU UNTUK LOGIKA BARCODE (Gantikan yang Lama) V V V
-// ===================================================================
-
-// 1. STATE MANAGEMENT (MEMORI)
 const barcodePage = reactive({
-  // Bagian 3: Data yang akan dicetak
-  data: [
-    { id: 1, title: 'SLW', description: 'HTM', code: 'SLW-HTM-M' },
-    { id: 2, title: 'Kemeja Flanel', description: 'Kotak Merah - L', code: 'KFL-MERAH-L' },
-  ],
-  newData: { title: '', description: '', code: '' },
+  // Data untuk satu label master
+  title: 'Nama Produk',
+  description: 'Varian Produk',
+  code: 'SKU-PRODUK-ANDA',
 
-  // Bagian 2: Pengaturan Desain Label
+  // Pengaturan Desain Label
   labelSettings: {
     showTitle: true,
     titleFontSize: 10,
     titleBold: true,
     titleAlign: 'center',
-    showDescription: false,
+    showDescription: true,
     descriptionFontSize: 8,
     descriptionBold: false,
     descriptionAlign: 'center',
     barcodeType: 'CODE128',
-    showBarcodeText: true,
-    barcodeTextFontSize: 8,
-    barcodeTextBold: false,
-    barcodeTextAlign: 'center',
+    showBarcodeText: false, // <-- Kita akan render manual, jadi ini false
     barcodeHeight: 40,
     barcodeWidth: 1.5,
   },
 
-  // Bagian 1: Pengaturan Kertas
+  // Pengaturan Kertas
   paperSettings: {
-    type: 'thermal', // 'sheet', 'thermal', 'custom'
-    preset: '70x40', // Nilai dari dropdown
-    // Dimensi dalam mm
-    labelWidth: 70,
-    labelHeight: 40,
-    marginTop: 2,
-    marginRight: 2,
-    marginLeft: 2,
-    marginBottom: 2,
-    gapHorizontal: 2,
-    gapVertical: 2,
-    cols: 1,
-    rows: 1,
-  }
+    preset: '33x15-3',
+    labelWidth: 33,
+    labelHeight: 15,
+    marginTop: 2, marginRight: 2, marginLeft: 2, marginBottom: 2,
+    gapHorizontal: 2, gapVertical: 2,
+    cols: 3, rows: 10, // Default baris (untuk mode 'sheet')
+  },
+  
+  // Pengaturan Cetak
+  printQty: 30,
 });
 
 // 2. FUNGSI-FUNGSI (OTAK)
@@ -5273,36 +5259,25 @@ function printLabels() {
   document.head.removeChild(style);
 }
 
-// 3. WATCHER (PENGAWAS OTOMATIS)
-// Menggambar ulang barcode setiap kali ada perubahan data atau pengaturan
 watch(barcodePage, () => {
     nextTick(() => {
-        barcodePage.data.forEach(item => {
-            const svgElement = document.getElementById(`barcode-${item.id}`);
-            if (svgElement && item.code) {
+        // Loop sebanyak jumlah cetak
+        for (let i = 1; i <= barcodePage.printQty; i++) {
+            const svgElement = document.getElementById(`barcode-${i}`);
+            if (svgElement && barcodePage.code) {
                 try {
-                    JsBarcode(svgElement, item.code, {
+                    JsBarcode(svgElement, barcodePage.code, {
                         format: barcodePage.labelSettings.barcodeType,
-                        displayValue: barcodePage.labelSettings.showBarcodeText,
+                        displayValue: false, // <-- PENTING: Teks dirender manual
                         width: barcodePage.labelSettings.barcodeWidth,
                         height: barcodePage.labelSettings.barcodeHeight,
-                        fontSize: barcodePage.labelSettings.barcodeTextFontSize,
-                        textAlign: barcodePage.labelSettings.barcodeTextAlign,
-                        fontWeight: barcodePage.labelSettings.barcodeTextBold ? 'bold' : 'normal',
-                        margin: 2,
-                        textMargin: 0,
+                        margin: 0,
                     });
-                } catch (e) {
-                    console.error("Error Barcode:", e.message);
-                }
+                } catch (e) { console.error("Error Barcode:", e.message); }
             }
-        });
+        }
     });
 }, { deep: true, immediate: true });
-
-// ===================================================================
-// ^ ^ ^ AKHIR DARI KODE BARU UNTUK LOGIKA BARCODE ^ ^ ^
-// ===================================================================
 
 </script>
 
@@ -6896,134 +6871,88 @@ watch(barcodePage, () => {
       <h2 class="text-xl font-bold mb-4">Pencetakan Barcode</h2>
 
       <div class="setting-section">
-        <h3 class="setting-title">1. Jenis Kertas</h3>
-        <div class="radio-group">
-          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="sheet"> Lembar Label (A4)</label>
-          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="thermal"> Label Termal (Roll)</label>
-          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="custom"> Kustom</label>
+        <h3 class="setting-title">1. Data Label</h3>
+        <div>
+          <label class="block text-sm font-medium">Judul (Title)</label>
+          <input type="text" v-model="barcodePage.title" class="mt-1 w-full p-2 border rounded-md">
         </div>
-        
-        <div v-if="barcodePage.paperSettings.type === 'sheet'" class="mt-2">
-            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="w-full p-2 border rounded-md bg-white">
-                <option v-for="preset in labelPresets" :key="preset.id" :value="preset.id">
-                    {{ preset.name }}
-                </option>
-            </select>
+        <div class="mt-2">
+          <label class="block text-sm font-medium">Deskripsi</label>
+          <input type="text" v-model="barcodePage.description" class="mt-1 w-full p-2 border rounded-md">
         </div>
-      
-        <div v-if="barcodePage.paperSettings.type === 'thermal'" class="mt-2">
-            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="w-full p-2 border rounded-md bg-white">
-                <option value="33x15-1">LABEL 33 x 15 mm (1 Line)</option>
-                <option value="33x15-2">LABEL 33 x 15 mm (2 Line)</option>
-                <option value="33x15-3">LABEL 33 x 15 mm (3 Line)</option>
-                <option value="33x19-3">LABEL 33 x 19 mm (3 Line)</option>
-                <option value="33x25-3">LABEL 33 x 25 mm (3 Line)</option>
-                <option value="40x20-2">LABEL 40 x 20 mm (2 Line)</option>
-                <option value="70x40-1">LABEL 70 x 40 mm (1 Line)</option>
-            </select>
+         <div class="mt-2">
+          <label class="block text-sm font-medium">Teks / SKU untuk Barcode (Code)</label>
+          <input type="text" v-model="barcodePage.code" class="mt-1 w-full p-2 border rounded-md">
         </div>
-
-        <div v-if="barcodePage.paperSettings.type === 'custom'" class="pt-2 animate-fade-in space-y-2">
-            <p class="text-xs text-slate-500">Isi manual untuk ukuran stiker yang tidak ada di daftar.</p>
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block text-xs font-medium">Lebar 1 Stiker (mm)</label>
-                    <input type="number" v-model.number="barcodePage.paperSettings.labelWidth" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium">Tinggi 1 Stiker (mm)</label>
-                    <input type="number" v-model.number="barcodePage.paperSettings.labelHeight" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                 <div>
-                    <label class="block text-xs font-medium">Kolom (Samping)</label>
-                    <input type="number" v-model.number="barcodePage.paperSettings.cols" min="1" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-                 <div>
-                    <label class="block text-xs font-medium">Baris (Bawah)</label>
-                    <input type="number" v-model.number="barcodePage.paperSettings.rows" min="1" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-            </div>
-        </div>
-
       </div>
 
       <div class="setting-section">
         <h3 class="setting-title">2. Desain Label</h3>
-        <div class="label-preview">
-          <p v-if="barcodePage.labelSettings.showTitle">Title</p>
-          <div class="barcode-placeholder">Barcode Text</div>
-          <p v-if="barcodePage.labelSettings.showDescription">Description</p>
-        </div>
-
         <div class="field-settings">
-          <input type="checkbox" v-model="barcodePage.labelSettings.showTitle"> <span>Judul</span>
+          <input type="checkbox" v-model="barcodePage.labelSettings.showTitle" id="showTitleCheck"> <label for="showTitleCheck">Judul</label>
           <div class="controls" v-if="barcodePage.labelSettings.showTitle">
-            <input type="number" v-model.number="barcodePage.labelSettings.titleFontSize" class="font-size-input">
+            <input type="number" v-model.number="barcodePage.labelSettings.titleFontSize" class="font-size-input"> pt
             <button @click="barcodePage.labelSettings.titleBold = !barcodePage.labelSettings.titleBold" :class="{'active': barcodePage.labelSettings.titleBold}">B</button>
-            <button @click="barcodePage.labelSettings.titleAlign = 'left'" :class="{'active': barcodePage.labelSettings.titleAlign === 'left'}">L</button>
-            <button @click="barcodePage.labelSettings.titleAlign = 'center'" :class="{'active': barcodePage.labelSettings.titleAlign === 'center'}">C</button>
-            <button @click="barcodePage.labelSettings.titleAlign = 'right'" :class="{'active': barcodePage.labelSettings.titleAlign === 'right'}">R</button>
+            <button @click="barcodePage.labelSettings.titleAlign = 'center'" :class="{'active': barcodePage.labelSettings.titleAlign === 'center'}">Center</button>
           </div>
         </div>
-
         <div class="field-settings">
             <span>Barcode</span>
             <div class="controls">
                 <select v-model="barcodePage.labelSettings.barcodeType">
-                    <option value="CODE128">Code 128</option>
-                    <option value="EAN13">EAN-13</option>
+                    <option value="CODE128">Code 128</option><option value="EAN13">EAN-13</option>
                 </select>
             </div>
         </div>
-
         <div class="field-settings">
-            <input type="checkbox" v-model="barcodePage.labelSettings.showBarcodeText"> <span>Teks Barcode</span>
-            <div class="controls" v-if="barcodePage.labelSettings.showBarcodeText">
-                <input type="number" v-model.number="barcodePage.labelSettings.barcodeTextFontSize" class="font-size-input">
+          <span>Teks Barcode</span>
+           <div class="controls">
+                <input type="number" v-model.number="barcodePage.labelSettings.barcodeTextFontSize" class="font-size-input"> pt
                 <button @click="barcodePage.labelSettings.barcodeTextBold = !barcodePage.labelSettings.barcodeTextBold" :class="{'active': barcodePage.labelSettings.barcodeTextBold}">B</button>
-                <button @click="barcodePage.labelSettings.barcodeTextAlign = 'left'" :class="{'active': barcodePage.labelSettings.barcodeTextAlign === 'left'}">L</button>
-                <button @click="barcodePage.labelSettings.barcodeTextAlign = 'center'" :class="{'active': barcodePage.labelSettings.barcodeTextAlign === 'center'}">C</button>
-                <button @click="barcodePage.labelSettings.barcodeTextAlign = 'right'" :class="{'active': barcodePage.labelSettings.barcodeTextAlign === 'right'}">R</button>
+                <button @click="barcodePage.labelSettings.barcodeTextAlign = 'center'" :class="{'active': barcodePage.labelSettings.barcodeTextAlign === 'center'}">Center</button>
             </div>
         </div>
-
         <div class="field-settings">
-            <input type="checkbox" v-model="barcodePage.labelSettings.showDescription"> <span>Deskripsi</span>
+            <input type="checkbox" v-model="barcodePage.labelSettings.showDescription" id="showDescCheck"> <label for="showDescCheck">Deskripsi</label>
              <div class="controls" v-if="barcodePage.labelSettings.showDescription">
-                <input type="number" v-model.number="barcodePage.labelSettings.descriptionFontSize" class="font-size-input">
+                <input type="number" v-model.number="barcodePage.labelSettings.descriptionFontSize" class="font-size-input"> pt
                 <button @click="barcodePage.labelSettings.descriptionBold = !barcodePage.labelSettings.descriptionBold" :class="{'active': barcodePage.labelSettings.descriptionBold}">B</button>
-                <button @click="barcodePage.labelSettings.descriptionAlign = 'left'" :class="{'active': barcodePage.labelSettings.descriptionAlign === 'left'}">L</button>
-                <button @click="barcodePage.labelSettings.descriptionAlign = 'center'" :class="{'active': barcodePage.labelSettings.descriptionAlign === 'center'}">C</button>
-                <button @click="barcodePage.labelSettings.descriptionAlign = 'right'" :class="{'active': barcodePage.labelSettings.descriptionAlign === 'right'}">R</button>
+                <button @click="barcodePage.labelSettings.descriptionAlign = 'center'" :class="{'active': barcodePage.labelSettings.descriptionAlign === 'center'}">Center</button>
             </div>
         </div>
       </div>
 
       <div class="setting-section">
-          <h3 class="setting-title">3. Data</h3>
-          <div class="data-table-container">
-            <table>
-                <thead>
-                    <tr><th>Title</th><th>Description</th><th>Code</th><th>Aksi</th></tr>
-                </thead>
-                <tbody>
-                    <tr v-for="item in barcodePage.data" :key="item.id">
-                        <td><input type="text" v-model="item.title"></td>
-                        <td><input type="text" v-model="item.description"></td>
-                        <td><input type="text" v-model="item.code"></td>
-                        <td><button @click="removeBarcodeData(item.id)" class="delete-btn">×</button></td>
-                    </tr>
-                </tbody>
-            </table>
+          <h3 class="setting-title">3. Kertas & Cetak</h3>
+          <div>
+            <label class="block text-sm font-medium">Preset Kertas Label</label>
+            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="mt-1 w-full p-2 border rounded-md bg-white">
+                <option value="33x15-1">33x15mm (1 Kolom)</option>
+                <option value="33x15-2">33x15mm (2 Kolom)</option>
+                <option value="33x15-3">33x15mm (3 Kolom)</option>
+                <option value="custom">Kustom...</option>
+            </select>
           </div>
-          <form @submit.prevent="addBarcodeData" class="add-data-form">
-              <input type="text" v-model="barcodePage.newData.title" placeholder="Title">
-              <input type="text" v-model="barcodePage.newData.description" placeholder="Description">
-              <input type="text" v-model="barcodePage.newData.code" placeholder="Teks Barcode (Wajib)">
-              <button type="submit">+</button>
-          </form>
+          <div v-if="barcodePage.paperSettings.preset === 'custom'" class="mt-2 space-y-2">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium">Lebar Stiker (mm)</label>
+                <input type="number" v-model.number="barcodePage.paperSettings.labelWidth" class="mt-1 w-full p-2 border rounded-md">
+              </div>
+              <div>
+                <label class="block text-xs font-medium">Tinggi Stiker (mm)</label>
+                <input type="number" v-model.number="barcodePage.paperSettings.labelHeight" class="mt-1 w-full p-2 border rounded-md">
+              </div>
+            </div>
+             <div>
+                <label class="block text-sm font-medium">Jumlah Kolom (Line)</label>
+                <input type="number" v-model.number="barcodePage.paperSettings.cols" min="1" class="mt-1 w-full p-2 border rounded-md">
+            </div>
+          </div>
+           <div class="mt-2">
+              <label class="block text-sm font-medium">Jumlah Label yang Akan Dicetak</label>
+              <input type="number" v-model.number="barcodePage.printQty" min="1" class="mt-1 w-full p-2 border rounded-md">
+          </div>
       </div>
 
       <button @click="printLabels" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 mt-4">
@@ -7034,11 +6963,10 @@ watch(barcodePage, () => {
 
     <div class="barcode-preview-area print-area">
       <div class="preview-sheet" :style="{
-          gridTemplateColumns: `repeat(${barcodePage.paperSettings.cols}, 1fr)`,
-          gridTemplateRows: `repeat(${barcodePage.paperSettings.rows}, auto)`,
+          gridTemplateColumns: `repeat(${barcodePage.paperSettings.cols}, ${barcodePage.paperSettings.labelWidth}mm)`,
           gap: `${barcodePage.paperSettings.gapVertical}mm ${barcodePage.paperSettings.gapHorizontal}mm`
         }">
-        <div v-for="item in barcodePage.data" :key="item.id" class="label-box" :style="{ 
+        <div v-for="i in barcodePage.printQty" :key="i" class="label-box" :style="{ 
           width: `${barcodePage.paperSettings.labelWidth}mm`, 
           height: `${barcodePage.paperSettings.labelHeight}mm`
         }">
@@ -7046,13 +6974,21 @@ watch(barcodePage, () => {
               fontSize: `${barcodePage.labelSettings.titleFontSize}pt`,
               fontWeight: barcodePage.labelSettings.titleBold ? 'bold' : 'normal',
               textAlign: barcodePage.labelSettings.titleAlign
-          }">{{ item.title }}</p>
-          <svg :id="`barcode-${item.id}`"></svg>
+          }">{{ barcodePage.title }}</p>
+          
+          <svg :id="`barcode-${i}`" class="barcode-svg"></svg>
+          
+           <p :style="{ 
+              fontSize: `${barcodePage.labelSettings.barcodeTextFontSize}pt`,
+              fontWeight: barcodePage.labelSettings.barcodeTextBold ? 'bold' : 'normal',
+              textAlign: barcodePage.labelSettings.barcodeTextAlign
+          }">{{ barcodePage.code }}</p>
+
            <p v-if="barcodePage.labelSettings.showDescription" :style="{ 
               fontSize: `${barcodePage.labelSettings.descriptionFontSize}pt`,
               fontWeight: barcodePage.labelSettings.descriptionBold ? 'bold' : 'normal',
               textAlign: barcodePage.labelSettings.descriptionAlign
-          }">{{ item.description }}</p>
+          }">{{ barcodePage.description }}</p>
         </div>
       </div>
     </div>
@@ -10366,14 +10302,15 @@ watch(barcodePage, () => {
 /* =================================================================== */
 .barcode-page-grid {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: 400px 1fr; /* Lebarkan sedikit panel kiri */
   gap: 2rem;
-  height: calc(100vh - 80px); /* Sesuaikan tinggi */
+  height: calc(100vh - 120px); /* Sesuaikan tinggi agar tidak terpotong */
 }
 .barcode-settings-panel {
   background: #f8fafc;
   padding: 1.5rem;
   border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
   overflow-y: auto;
   height: 100%;
 }
@@ -10383,6 +10320,10 @@ watch(barcodePage, () => {
   border-radius: 0.75rem;
   overflow: auto;
   height: 100%;
+  /* PENTING: Menengahkan kertas preview */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
 .setting-section {
   border-bottom: 1px solid #e2e8f0;
@@ -10394,58 +10335,31 @@ watch(barcodePage, () => {
   font-weight: 600;
   margin-bottom: 0.75rem;
 }
-.radio-group {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.875rem;
-}
-.label-preview {
-  border: 1px dashed #cbd5e1;
-  padding: 0.5rem;
-  font-size: 8pt;
-  text-align: center;
-  margin-bottom: 1rem;
-}
-.barcode-placeholder {
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  height: 20px;
-  line-height: 20px;
-  font-size: 7pt;
-  margin: 4px 0;
-}
 .field-settings {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 0.875rem;
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
 }
-.field-settings .controls { display: flex; gap: 4px; }
+.field-settings .controls { display: flex; align-items: center; gap: 4px; }
 .field-settings .controls button, .field-settings .controls select {
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   background: white;
-  height: 28px;
+  height: 30px;
   padding: 0 8px;
   font-size: 12px;
 }
 .field-settings .controls button.active { background: #e0e7ff; border-color: #4f46e5; }
-.font-size-input { width: 45px; text-align: right; }
-.data-table-container { max-height: 150px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 4px; }
-.data-table-container table { width: 100%; font-size: 12px; }
-.data-table-container th, .data-table-container td { padding: 4px; }
-.data-table-container input { width: 100%; border: 1px solid #e2e8f0; padding: 2px; border-radius: 2px; }
-.delete-btn { color: #ef4444; font-weight: bold; }
-.add-data-form { display: grid; grid-template-columns: 1fr 1fr 1fr 40px; gap: 4px; margin-top: 8px; }
-.add-data-form input { font-size: 12px; border: 1px solid #cbd5e1; padding: 4px; border-radius: 4px; }
-.add-data-form button { background: #4f46e5; color: white; font-weight: bold; border-radius: 4px; }
+.font-size-input { width: 45px; text-align: right; border: 1px solid #cbd5e1; border-radius: 4px; height:30px; }
 
 .preview-sheet {
   background: white;
-  display: grid;
+  display: grid; /* Gunakan grid untuk layout yang presisi */
   padding: 1mm;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  justify-content: center;
 }
 .label-box {
   background: white;
@@ -10454,11 +10368,31 @@ watch(barcodePage, () => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  align-items: center;
+  align-items: stretch; /* Ubah ke stretch agar SVG mengisi ruang */
   overflow: hidden;
+  border: 1px dashed #e2e8f0; /* Border tipis untuk visualisasi */
 }
-.label-box p { margin: 0; line-height: 1.2; }
-.label-box svg { width: 100%; height: 100%; object-fit: contain; }
+.label-box p {
+  margin: 0;
+  line-height: 1.2;
+  flex-shrink: 0; /* Mencegah teks mengecil */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.label-box .barcode-svg {
+  flex-grow: 1; /* Biarkan SVG mengisi ruang sisa */
+  width: 100%;
+  min-height: 10px; /* Beri tinggi minimal */
+}
+
+/* Aturan khusus untuk mencetak (print) */
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+  .label-box { border: none; }
+}
 
 /* =================================================================== */
 /* ^ ^ ^ AKHIR DARI STYLE BARU UNTUK BARCODE ^ ^ ^ */
