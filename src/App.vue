@@ -5203,16 +5203,18 @@ function printLabels() {
 
   let pageRule = '';
 
-  // Logika Cerdas: Tentukan aturan @page berdasarkan jenis kertas
+  // ### LOGIKA CERDAS DIMULAI DI SINI ###
+  // Tentukan aturan @page berdasarkan jenis kertas
   if (settings.type === 'sheet') {
-    // Untuk kertas lembaran seperti A4
+    // 1. Untuk kertas lembaran seperti A4
     pageRule = `@page { size: A4; margin: 10mm; }`;
+
   } else {
-    // Untuk kertas roll (Termal atau Kustom)
+    // 2. Untuk kertas roll (Termal atau Kustom)
     // Hitung lebar total kertas roll
     const totalWidth = (settings.labelWidth * settings.cols) + (settings.gapHorizontal * (settings.cols - 1)) + (settings.marginLeft + settings.marginRight);
     
-    // Atur lebar sesuai kertas, dan tinggi otomatis (auto) agar menjadi satu gulungan panjang
+    // Atur lebar sesuai kertas, dan tinggi OTOMATIS (auto) agar menjadi satu gulungan panjang
     pageRule = `@page { size: ${totalWidth}mm auto; margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm; }`;
   }
 
@@ -5244,7 +5246,10 @@ function printLabels() {
 
   document.head.appendChild(style);
   
-  window.print();
+  // Beri jeda singkat agar browser sempat menerapkan style baru sebelum print
+  setTimeout(() => {
+      window.print();
+  }, 100);
 }
 
 watch(barcodePage, () => {
