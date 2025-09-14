@@ -10406,7 +10406,7 @@ watch(barcodePage, () => {
         padding: 1.5mm !important; /* Pastikan padding tetap ada */
     }
     
-    /* Tambahkan aturan ini untuk memaksa layout grid pada saat cetak */
+    /* Tambahkann aturan ini untuk memaksa layout grid pada saat cetak */
     .preview-sheet {
         display: grid !important;
         grid-template-columns: repeat(3, 33mm) !important;
