@@ -10301,110 +10301,119 @@ watch(barcodePage, () => {
 /* V V V GANTI SEMUA STYLE BARCODE DENGAN INI V V V */
 /* =================================================================== */
 .barcode-page-grid {
-  display: grid;
-  grid-template-columns: 400px 1fr;
-  gap: 2rem;
-  height: calc(100vh - 120px);
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 2rem;
+    height: calc(100vh - 120px);
 }
 .barcode-settings-panel {
-  background: #f8fafc;
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  border: 1px solid #e2e8f0;
-  overflow-y: auto;
-  height: 100%;
+    background: #f8fafc;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid #e2e8f0;
+    overflow-y: auto;
+    height: 100%;
 }
 .barcode-preview-area {
-  background: #f1f5f9;
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  overflow: auto;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+    background: #f1f5f9;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    overflow: auto;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
 }
 /* ... (sisa style panel pengaturan Anda yang lain tetap sama) ... */
 
 .preview-sheet {
-  background: white;
-  display: grid;
-  padding: 1mm;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  justify-content: center;
+    background: white;
+    display: grid;
+    padding: 1mm;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    justify-content: center;
 }
 .label-box {
-  background: white;
-  padding: 1.5mm;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: stretch;
-  overflow: hidden;
-  border: 1px dashed #e2e8f0;
+    background: white;
+    padding: 1.5mm;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: stretch;
+    overflow: hidden;
+    border: 1px dashed #e2e8f0;
 }
 .label-box p {
-  margin: 0;
-  line-height: 1.2;
-  flex-shrink: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    margin: 0;
+    line-height: 1.2;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .label-box .barcode-svg {
-  flex-grow: 1;
-  width: 100%;
-  min-height: 10px;
+    flex-grow: 1;
+    width: 100%;
+    min-height: 10px;
 }
 
 /* =================================================================== */
 /* V V V INI BAGIAN PALING PENTING UNTUK DIPERBAIKI V V V */
 /* =================================================================== */
 @media print {
-  /* Aturan @page akan dibuat secara dinamis oleh JavaScript, biarkan kosong di sini */
-  @page {
-    margin: 0;
-  }
+    /* Aturan @page akan dibuat secara dinamis oleh JavaScript, biarkan kosong di sini */
+    @page {
+        margin: 0;
+    }
 
-  /* Sembunyikan semua elemen di halaman */
-  body * {
-    visibility: hidden;
-  }
+    /* Sembunyikan semua elemen di halaman */
+    body * {
+        visibility: hidden;
+    }
 
-  /* Tampilkan HANYA area print dan semua isinya */
-  .print-area, .print-area * {
-    visibility: visible;
-  }
+    /* Tampilkan HANYA area print dan semua isinya */
+    .print-area, .print-area * {
+        visibility: visible;
+    }
 
-  /* Posisikan area print agar mengisi seluruh halaman */
-  .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-  }
-  
-  /* Atur ulang gaya kontainer yang tidak perlu saat mencetak */
-  .barcode-preview-area, .preview-sheet {
-     display: block !important;
-     height: auto !important;
-     overflow: visible !important;
-     padding: 0 !important;
-     border: none !important;
-     background: none !important;
-     box-shadow: none !important;
-  }
+    /* Posisikan area print agar mengisi seluruh halaman */
+    .print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+    }
+    
+    /* Atur ulang gaya kontainer yang tidak perlu saat mencetak */
+    .barcode-preview-area, .preview-sheet {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        border: none !important;
+        background: none !important;
+        box-shadow: none !important;
+    }
 
-  /* PERBAIKAN KUNCI DI SINI: */
-  /* Pastikan .label-box tetap menggunakan flexbox dan tidak memiliki border */
-  .label-box {
-    display: flex !important; /* <-- Pastikan layout flex tetap aktif */
-    page-break-inside: avoid !important;
-    border: none !important;
-    padding: 1.5mm !important; /* Pastikan padding tetap ada */
-  }
+    /* PERBAIKAN KUNCI DI SINI: */
+    /* Pastikan .label-box tetap menggunakan flexbox dan tidak memiliki border */
+    .label-box {
+        display: flex !important; /* <-- Pastikan layout flex tetap aktif */
+        page-break-inside: avoid !important;
+        border: none !important;
+        padding: 1.5mm !important; /* Pastikan padding tetap ada */
+    }
+    
+    /* Tambahkan aturan ini untuk memaksa layout grid pada saat cetak */
+    .preview-sheet {
+        display: grid !important;
+        grid-template-columns: repeat(3, 33mm) !important;
+        gap: 2mm 2mm !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }
 }
 
 /* =================================================================== */
