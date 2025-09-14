@@ -5085,16 +5085,16 @@ onMounted(() => {
 
                         if (currentUser.value.isPartner && currentUser.value.referralCode) {
                             const commissionsQuery = query(
-                                collection(db, 'commissions'),
-                                where('referredByUserId', '==', currentUser.value.referralCode)
-                            );
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                const fetchedCommissions = [];
-                                snapshot.forEach(doc => {
-                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
-                                });
-                                commissions.value = fetchedCommissions;
-                            });
+    collection(db, 'commissions'),
+    where('partnerId', '==', currentUser.value.uid)
+);
+commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+    const fetchedCommissions = [];
+    snapshot.forEach(doc => {
+        fetchedCommissions.push({ id: doc.id, ...doc.data() });
+    });
+    commissions.value = fetchedCommissions;
+});
                         }
 
                         const storedPage = localStorage.getItem('lastActivePage');
