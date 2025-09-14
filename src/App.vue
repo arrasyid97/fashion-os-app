@@ -7022,14 +7022,14 @@ const printBarcode = async () => {
 </div>
 
 <div v-if="activePage === 'mitra'" class="animate-fade-in">
-    <div v-if="!currentUser.isPartner" class="flex items-center justify-center h-full p-4">
+    <div v-if="currentUser && !currentUser.isPartner" class="flex items-center justify-center h-full p-4">
         <div class="bg-white rounded-xl shadow-lg p-8 max-w-sm w-full text-center">
             <h3 class="text-xl font-bold text-slate-800 mb-4">Daftar Menjadi Mitra</h3>
             <p class="text-sm text-slate-600 mb-4">Dapatkan komisi 10% setiap bulan dari pelanggan yang Anda ajak. Jadilah bagian dari tim kami!</p>
             <button @click="showModal('registerPartner')" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg">Daftar Sekarang</button>
         </div>
     </div>
-    <div v-else>
+    <div v-else-if="currentUser && currentUser.isPartner">
         <h2 class="text-3xl font-bold">Dashboard Mitra</h2>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 mb-8">
