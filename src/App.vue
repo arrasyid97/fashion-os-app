@@ -10199,10 +10199,6 @@ const printBarcode = async () => {
     margin-bottom: 0.5rem;
 }
 
-
-/* =================================================================== */
-/* V V V GANTI SEMUA STYLE BARCODE DENGAN INI V V V */
-/* =================================================================== */
 .barcode-page-grid {
     display: grid;
     grid-template-columns: 400px 1fr;
@@ -10227,7 +10223,6 @@ const printBarcode = async () => {
     justify-content: center;
     align-items: flex-start;
 }
-/* ... (sisa style panel pengaturan Anda yang lain tetap sama) ... */
 
 .preview-sheet {
     background: white;
