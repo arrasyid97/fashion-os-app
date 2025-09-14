@@ -585,32 +585,6 @@ async function submitAddProduct() {
     }
 }
 
-// ===================================================================
-// V V V DATABASE PRESET LABEL (TAMBAHKAN INI) V V V
-// ===================================================================
-const labelPresets = [
-  { id: '3M-21312', name: '3M Asia Pacific 21312 (A4)', cols: 2, rows: 6, width: 99.1, height: 42.3, marginTop: 15.1, marginLeft: 5.45 },
-  { id: '3M-21314', name: '3M Asia Pacific 21314 (A4)', cols: 2, rows: 7, width: 99.1, height: 38.1, marginTop: 10.7, marginLeft: 5.45 },
-  { id: '3M-21316', name: '3M Asia Pacific 21316 (A4)', cols: 2, rows: 8, width: 99.1, height: 33.9, marginTop: 11.2, marginLeft: 5.45 },
-  { id: '3M-21318', name: '3M Asia Pacific 21318 (A4)', cols: 2, rows: 9, width: 99.1, height: 28.2, marginTop: 19, marginLeft: 5.45 },
-  { id: '3M-21321', name: '3M Asia Pacific 21321 (A4)', cols: 3, rows: 7, width: 70, height: 38.1, marginTop: 10.7, marginLeft: 0 },
-  { id: '3M-21324', name: '3M Asia Pacific 21324 (A4)', cols: 3, rows: 8, width: 70, height: 33.9, marginTop: 11.2, marginLeft: 0 },
-  { id: '3M-21327', name: '3M Asia Pacific 21327 (A4)', cols: 3, rows: 9, width: 70, height: 29.6, marginTop: 10.6, marginLeft: 0 },
-  { id: '3M-21340', name: '3M Asia Pacific 21340 (A4)', cols: 4, rows: 10, width: 52.5, height: 29.7, marginTop: 0, marginLeft: 0 },
-  { id: 'Avery-959005', name: 'Avery 959005 (A4)', cols: 3, rows: 8, width: 64, height: 33.9, marginTop: 11.1, marginLeft: 7.5 },
-  { id: 'Avery-959009', name: 'Avery 959009 (A4)', cols: 3, rows: 11, width: 64, height: 24.2, marginTop: 9.9, marginLeft: 7.5 },
-  { id: 'Avery-959012', name: 'Avery 959012 (A4)', cols: 2, rows: 6, width: 99.1, height: 42.3, marginTop: 15.1, marginLeft: 5.4 },
-  { id: 'Formtec-3100', name: 'Formtec 3100 (A4)', cols: 1, rows: 1, width: 210, height: 297, marginTop: 0, marginLeft: 0 },
-  { id: 'Formtec-3104', name: 'Formtec 3104 (A4)', cols: 2, rows: 2, width: 105, height: 148.5, marginTop: 0, marginLeft: 0 },
-  { id: 'Formtec-3108', name: 'Formtec 3108 (A4)', cols: 2, rows: 4, width: 105, height: 74.25, marginTop: 0, marginLeft: 0 },
-  { id: 'Formtec-3110', name: 'Formtec 3110 (A4)', cols: 2, rows: 5, width: 105, height: 59.4, marginTop: 0, marginLeft: 0 },
-  { id: 'Printec-V3130', name: 'Printec V3130 (A4)', cols: 1, rows: 1, width: 210, height: 297, marginTop: 0, marginLeft: 0 },
-  { id: 'Printec-V3260', name: 'Printec V3260 (A4)', cols: 2, rows: 3, width: 99, height: 93.1, marginTop: 5, marginLeft: 6 },
-  { id: 'Printec-V3414', name: 'Printec V3414 (A4)', cols: 2, rows: 7, width: 99, height: 38.1, marginTop: 10.6, marginLeft: 6 },
-];
-// ===================================================================
-// ^ ^ ^ AKHIR DARI DATABASE PRESET LABEL ^ ^ ^
-// ===================================================================
 
 async function cashoutCommission() {
     if (!confirm(`Anda akan mencairkan komisi sebesar ${formatCurrency(totalUnpaidCommission.value)}. Lanjutkan?`)) return;
@@ -5191,24 +5165,6 @@ const barcodePage = reactive({
   printQty: 30,
 });
 
-// 2. FUNGSI-FUNGSI (OTAK)
-
-function addBarcodeData() {
-  if (!barcodePage.newData.code) {
-    alert('Teks Barcode (Code) wajib diisi.');
-    return;
-  }
-  barcodePage.data.push({
-    id: Date.now(),
-    ...barcodePage.newData
-  });
-  // Reset form
-  barcodePage.newData = { title: '', description: '', code: '' };
-}
-
-function removeBarcodeData(id) {
-  barcodePage.data = barcodePage.data.filter(item => item.id !== id);
-}
 
 function updatePaperSettings() {
     const presetId = barcodePage.paperSettings.preset;
