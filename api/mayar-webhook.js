@@ -22,17 +22,15 @@ export default async function handler(request, response) {
   console.log("Body:", JSON.stringify(request.body, null, 2));
 
   const { event, data } = request.body;
-  if (!data) {
-    return response.status(400).json({ message: 'Struktur webhook tidak valid.' });
-  }
-  const { status, customerEmail, amount, id: mayarTransactionId } = data;
 
-  if (event !== 'payment.received' || status !== 'SUCCESS') {
-    return response.status(200).json({ message: 'Webhook diterima, tetapi bukan event pembayaran sukses.' });
-  }
+if (event !== 'payment.received' || data.status !== 'SUCCESS') {
+    console.log(`INFO: Webhook diterima, tetapi bukan event pembayaran sukses. Status: ${data.status}`);
+    return response.status(200).json({ message: 'Webhook diterima, tetapi tidak ada aksi yang diperlukan.' });
+}
+
+const { status, customerEmail, amount, id: mayarTransactionId } = data;
   
-  const { refCode } = request.query;
-  const referredByCode = refCode || null;
+  const referredByCode = data.referredBy || null;
   
   try {
     const usersRef = db.collection('users');
