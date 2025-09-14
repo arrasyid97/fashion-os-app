@@ -5136,12 +5136,13 @@ const connectionError = ref('');
 
 // State untuk pengaturan label yang dikirim ke printer
 const labelSettings = reactive({
-  width: 33, // Lebar label dalam mm
-  height: 15, // Tinggi label dalam mm
-  gapHorizontal: 2, // Jarak antar kolom
-  gapVertical: 2, // Jarak antar baris
-  columns: 3, // Jumlah kolom
-  rows: 1, // Jumlah baris
+  width: 33,
+  height: 15,
+  columns: 3,
+  labelGap: 2,
+  paperType: 'gap', // 'gap', 'black-mark', 'continuous'
+  printSpeed: 2, // 1-5 ips (inches per second)
+  printDensity: 8, // 1-15 tingkat
 });
 
 const barcodeContent = ref('1234567890');
@@ -6799,32 +6800,55 @@ const printBarcode = async () => {
       </div>
 
       <!-- Pengaturan Label -->
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-slate-700">Lebar Label (mm)</label>
-          <input type="number" v-model.number="labelSettings.width" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700">Tinggi Label (mm)</label>
-          <input type="number" v-model.number="labelSettings.height" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700">Jarak Horizontal (mm)</label>
-          <input type="number" v-model.number="labelSettings.gapHorizontal" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700">Jarak Vertikal (mm)</label>
-          <input type="number" v-model.number="labelSettings.gapVertical" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700">Kolom</label>
-          <input type="number" v-model.number="labelSettings.columns" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700">Baris</label>
-          <input type="number" v-model.number="labelSettings.rows" class="mt-1 w-full p-2 border rounded-md">
-        </div>
+      <div class="space-y-4">
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Lebar Label (mm)</label>
+        <input type="number" v-model.number="labelSettings.width" class="mt-1 w-full p-2 border rounded-md">
       </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Tinggi Label (mm)</label>
+        <input type="number" v-model.number="labelSettings.height" class="mt-1 w-full p-2 border rounded-md">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-700">Jenis Kertas</label>
+      <select v-model="labelSettings.paperType" class="mt-1 w-full p-2 border rounded-md bg-white">
+        <option value="gap">Celah (Gap)</option>
+        <option value="black-mark">Tanda Hitam</option>
+        <option value="continuous">Terus Menerus</option>
+      </select>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Kolom</label>
+        <input type="number" v-model.number="labelSettings.columns" class="mt-1 w-full p-2 border rounded-md">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Jarak Label (mm)</label>
+        <input type="number" v-model.number="labelSettings.labelGap" class="mt-1 w-full p-2 border rounded-md">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Kecepatan Cetak</label>
+        <select v-model="labelSettings.printSpeed" class="mt-1 w-full p-2 border rounded-md bg-white">
+          <option value="1">1 ips</option>
+          <option value="2">2 ips</option>
+          <option value="3">3 ips</option>
+          <option value="4">4 ips</option>
+          <option value="5">5 ips</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Kepadatan Cetak</label>
+        <input type="number" v-model.number="labelSettings.printDensity" min="1" max="15" class="mt-1 w-full p-2 border rounded-md">
+      </div>
+    </div>
+</div>
 
       <!-- Opsi Cetak Lanjutan -->
       <div class="border-t pt-4">
