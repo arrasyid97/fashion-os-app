@@ -4,12 +4,16 @@ export default async function (req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
+
     const { amount, item_name, customer_email, callback_url, redirect_url, merchant_ref } = req.body;
+    
     if (!amount || !item_name || !customer_email || !callback_url || !redirect_url || !merchant_ref) {
         return res.status(400).json({ message: 'Missing required fields' });
     }
+
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
     const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
+
     try {
         const mayarPayload = {
             name: customer_email.split('@')[0],
@@ -26,9 +30,11 @@ export default async function (req, res) {
                 description: item_name
             }]
         };
+
         const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
             headers: { 'Authorization': `Bearer ${MAYAR_API_KEY}`, 'Content-Type': 'application/json' },
         });
+
         if (mayarResponse.data?.data?.link) {
             return res.status(200).json({ invoice_url: mayarResponse.data.data.link });
         } else {

@@ -913,38 +913,36 @@ async function handleSubscriptionMayar(plan) {
         alert("Silakan login terlebih dahulu.");
         return;
     }
+
     let isSubscribingPlan = plan === 'bulanan' ? isSubscribingMonthly : isSubscribingYearly;
     if (isSubscribingPlan.value) {
         return;
     }
     isSubscribingPlan.value = true;
 
-    let priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
-    const isReferred = uiState.referralCodeApplied || currentUser.value?.userData?.referredBy;
-    if (isReferred) {
-        priceToPay = plan === 'bulanan' ? 250000 : 3000000;
-    }
-    const itemName = `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`;
-    const referredByCode = isReferred ? uiState.referralCodeInput : null;
+    const referredByCode = uiState.referralCodeApplied ? uiState.referralCodeInput : (currentUser.value?.userData?.referredBy || null);
 
     try {
-        // --- PERBAIKAN FINAL: Menitipkan kode rujukan di callback_url ---
-        let finalCallbackUrl = 'https://appfashion.id/api/mayar-webhook';
         if (referredByCode) {
-            finalCallbackUrl += `?refCode=${referredByCode}`; // Tambahkan sebagai query parameter
+            // --- AWAL PERBAIKAN: Menyimpan data referral di Firestore sebelum pembayaran ---
+            const pendingCommissionRef = doc(db, 'pending_commissions', currentUser.value.email);
+            await setDoc(pendingCommissionRef, {
+                referredByCode: referredByCode,
+                timestamp: new Date(),
+            }, { merge: true });
+            console.log(`INFO: Data referral untuk ${currentUser.value.email} disimpan di Firestore.`);
+            // --- AKHIR PERBAIKAN ---
         }
-        // --- AKHIR PERBAIKAN ---
 
         const response = await fetch('/api/create-mayar-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                amount: priceToPay,
-                item_name: itemName,
+                amount: plan === 'bulanan' ? discountedMonthlyPrice.value : discountedYearlyPrice.value,
+                item_name: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
                 customer_email: currentUser.value.email,
-                callback_url: finalCallbackUrl, // Menggunakan URL yang sudah dimodifikasi
+                callback_url: 'https://appfashion.id/api/mayar-webhook',
                 redirect_url: `https://appfashion.id/langganan?status=success`,
-                // merchant_ref sekarang hanya untuk referensi
                 merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
             }),
         });
