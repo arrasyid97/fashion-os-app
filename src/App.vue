@@ -10091,68 +10091,58 @@ const printBarcode = async () => {
 <style scoped>
 .help-icon-button {
   position: absolute;
-  top: 0.5rem; /* 8px */
-  right: 0.5rem; /* 8px */
-  width: 1.25rem; /* 20px */
-  height: 1.25rem; /* 20px */
-  border-radius: 9999px; /* rounded-full */
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f1f5f9; /* slate-100 */
-  color: #64748b; /* slate-500 */
+  background-color: #f1f5f9;
+  color: #64748b;
   font-weight: bold;
-  font-size: 0.875rem; /* text-sm */
+  font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 }
-
 .help-icon-button:hover {
-  background-color: #6366f1; /* indigo-500 */
+  background-color: #6366f1;
   color: white;
   transform: scale(1.1);
 }
-
-/* Gaya Sidebar Baru yang Profesional */
 .sidebar-link {
   display: flex;
   align-items: center;
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
   font-weight: 500;
-  color: #9ca3af; /* gray-400 */
+  color: #9ca3af;
   transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
 }
-
 .sidebar-link:hover {
-  background-color: #374151; /* gray-700 */
+  background-color: #374151;
   color: #ffffff;
 }
-
 .sidebar-link-active {
-  background-image: linear-gradient(to right, #4f46e5, #6d28d9); /* gradasi indigo -> violet */
+  background-image: linear-gradient(to right, #4f46e5, #6d28d9);
   color: #ffffff;
   font-weight: 600;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
-
-/* Style dasar untuk komponen lain */
 .chart-container {
   position: relative;
   width: 100%;
   height: 320px;
 }
-
 .kpi-card {
   transition: transform 0.2s, box-shadow 0.2s;
   border-color: #e2e8f0;
 }
-
 .kpi-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
-
 .stock-badge {
   display: inline-block;
   padding: 0.2rem 0.6rem;
@@ -10161,22 +10151,18 @@ const printBarcode = async () => {
   font-size: 0.8rem;
   line-height: 1;
 }
-
 .stock-safe {
-  background-color: #dcfce7; /* green-100 */
-  color: #166534; /* green-800 */
+  background-color: #dcfce7;
+  color: #166534;
 }
-
 .stock-low {
-  background-color: #fef3c7; /* yellow-100 */
-  color: #92400e; /* yellow-800 */
+  background-color: #fef3c7;
+  color: #92400e;
 }
-
 .stock-empty {
-  background-color: #fee2e2; /* red-100 */
-  color: #991b1b; /* red-800 */
+  background-color: #fee2e2;
+  color: #991b1b;
 }
-
 .accordion-content {
   max-height: 0;
   overflow: hidden;
@@ -10185,8 +10171,6 @@ const printBarcode = async () => {
 .accordion-content.open {
   max-height: 1000px;
 }
-
-/* Styling untuk konten di dalam v-html */
 .panduan-content ul {
   list-style-position: outside;
   padding-left: 1.5rem;
@@ -10194,10 +10178,6 @@ const printBarcode = async () => {
 .panduan-content li {
   margin-bottom: 0.5rem;
 }
-
-/* =================================================================== */
-/* V V V GANTI SEMUA STYLE BARCODE DENGAN INI V V V */
-/* =================================================================== */
 .barcode-page-grid {
   display: grid;
   grid-template-columns: 400px 1fr;
@@ -10222,7 +10202,6 @@ const printBarcode = async () => {
   justify-content: center;
   align-items: flex-start;
 }
-
 .preview-sheet {
   background: white;
   display: grid;
@@ -10254,4 +10233,5 @@ const printBarcode = async () => {
   width: 100%;
   min-height: 10px;
 }
+</style>
 </style>
