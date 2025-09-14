@@ -10354,11 +10354,7 @@ watch(barcodePage, () => {
 /* V V V INI BAGIAN PALING PENTING UNTUK DIPERBAIKI V V V */
 /* =================================================================== */
 @media print {
-  /* Atur ukuran kertas cetak. Ganti 'A4' jika perlu */
-  @page {
-    size: A4;
-    margin: 10mm;
-  }
+  /* Aturan @page tetap dinamis dari JavaScript, tidak perlu diubah di sini */
 
   /* Sembunyikan semua elemen di halaman */
   body * {
@@ -10376,26 +10372,35 @@ watch(barcodePage, () => {
     left: 0;
     top: 0;
     width: 100%;
+    height: 100%;
+    /* PENTING: Gunakan flexbox untuk menengahkan konten */
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
-
-  /* Atur ulang gaya kontainer yang membatasi agar konten bisa mengalir */
+  
+  /* Hentikan grid/flex di level atas yang tidak perlu */
   .barcode-page-grid, .barcode-preview-area {
-     display: block !important; /* Nonaktifkan grid/flex di level atas */
+     display: block !important;
      height: auto !important;
-     overflow: visible !important; /* Hapus scrollbar */
+     overflow: visible !important;
      padding: 0 !important;
      border: none !important;
+     background: none !important;
   }
 
+  /* Atur agar lembar preview tidak memakan seluruh lebar halaman */
   .preview-sheet {
-     box-shadow: none; /* Hilangkan bayangan saat print */
+     box-shadow: none;
      border: none;
-     justify-content: start; /* Ratakan konten ke kiri saat print */
+     /* PENTING: Jangan biarkan ukurannya melebihi area cetak */
+     max-width: 100%;
+     max-height: 100%;
   }
 
   .label-box {
-    border: 1px solid #ccc; /* Beri garis bantu tipis untuk menggunting */
-    page-break-inside: avoid; /* Mencegah satu label terpotong di tengah halaman */
+    border: 1px solid #ccc;
+    page-break-inside: avoid;
   }
 }
 
