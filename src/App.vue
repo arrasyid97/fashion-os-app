@@ -5190,29 +5190,61 @@ function updatePaperSettings() {
 
 function printLabels() {
   const settings = barcodePage.paperSettings;
-  const style = document.createElement('style');
-  
-  let pageSize = 'auto';
-  if (settings.type === 'sheet') {
-    pageSize = 'A4'; // Contoh untuk kertas A4
-  } else if (settings.type === 'thermal') {
-    pageSize = `${settings.labelWidth * settings.cols + settings.gapHorizontal * (settings.cols -1)}mm ${settings.labelHeight}mm`;
+  const styleId = 'dynamic-print-style';
+
+  // Hapus style lama jika ada, untuk mencegah duplikasi
+  const oldStyle = document.getElementById(styleId);
+  if (oldStyle) {
+    oldStyle.remove();
   }
 
+  const style = document.createElement('style');
+  style.id = styleId;
+
+  let pageRule = '';
+
+  // Logika Cerdas: Tentukan aturan @page berdasarkan jenis kertas
+  if (settings.type === 'sheet') {
+    // Untuk kertas lembaran seperti A4
+    pageRule = `@page { size: A4; margin: 10mm; }`;
+  } else {
+    // Untuk kertas roll (Termal atau Kustom)
+    // Hitung lebar total kertas roll
+    const totalWidth = (settings.labelWidth * settings.cols) + (settings.gapHorizontal * (settings.cols - 1)) + (settings.marginLeft + settings.marginRight);
+    
+    // Atur lebar sesuai kertas, dan tinggi otomatis (auto) agar menjadi satu gulungan panjang
+    pageRule = `@page { size: ${totalWidth}mm auto; margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm; }`;
+  }
+
+  // Gabungkan semua aturan CSS untuk print
   style.innerHTML = `
-    @page { 
-      size: ${pageSize}; 
-      margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm;
-    }
+    ${pageRule}
     @media print {
       body * { visibility: hidden; }
       .print-area, .print-area * { visibility: visible; }
       .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+      .barcode-page-grid, .barcode-preview-area {
+         display: block !important;
+         height: auto !important;
+         overflow: visible !important;
+         padding: 0 !important;
+         border: none !important;
+      }
+      .preview-sheet {
+         box-shadow: none;
+         border: none;
+         justify-content: start;
+      }
+      .label-box {
+        border: 1px solid #ccc;
+        page-break-inside: avoid;
+      }
     }
   `;
+
   document.head.appendChild(style);
+  
   window.print();
-  document.head.removeChild(style);
 }
 
 watch(barcodePage, () => {
