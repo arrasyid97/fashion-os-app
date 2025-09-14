@@ -33,18 +33,35 @@ export default async function handler(request, response) {
             const usersRef = db.collection('users');
             const pendingCommissionRef = db.collection('pending_commissions').doc(customerEmail);
 
-            // 1. Ambil data pengguna dan data referral yang tertunda dalam satu transaksi
-            const userQuery = await transaction.get(usersRef.where('email', '==', customerEmail).limit(1));
+            // ===========================================
+            // --- BAGIAN 1: BACA SEMUA DATA TERLEBIH DAHULU ---
+            // ===========================================
+            const userQuery = usersRef.where('email', '==', customerEmail).limit(1);
+            const userSnapshot = await transaction.get(userQuery);
             const pendingCommissionDoc = await transaction.get(pendingCommissionRef);
             
-            if (userQuery.empty) {
+            if (userSnapshot.empty) {
                 console.error(`FATAL ERROR: Tidak ada pengguna yang ditemukan dengan email ${customerEmail}`);
                 return; // Membatalkan transaksi
             }
 
-            const userDoc = userQuery.docs[0];
+            const userDoc = userSnapshot.docs[0];
             const userId = userDoc.id;
             
+            const referredByCode = pendingCommissionDoc.exists ? pendingCommissionDoc.data().referredByCode : null;
+            let partnerDoc = null;
+
+            if (referredByCode) {
+                const partnerQuery = usersRef.where('referralCode', '==', referredByCode).limit(1);
+                const partnerSnapshot = await transaction.get(partnerQuery);
+                if (!partnerSnapshot.empty) {
+                    partnerDoc = partnerSnapshot.docs[0];
+                }
+            }
+
+            // ===========================================
+            // --- BAGIAN 2: BARU LAKUKAN SEMUA OPERASI TULIS ---
+            // ===========================================
             const plan = (amount === 250000 || amount === 3000000) ? 'bulanan' : 'tahunan';
             const now = new Date();
             let subscriptionEndDate;
@@ -54,8 +71,8 @@ export default async function handler(request, response) {
                 subscriptionEndDate = new Date(new Date().setFullYear(now.getFullYear() + 1));
             }
 
-            // 2. Perbarui status langganan pengguna
-            const userDocRef = db.collection('users').doc(userId);
+            // Perbarui status langganan pengguna
+            const userDocRef = usersRef.doc(userId);
             transaction.set(userDocRef, {
                 subscriptionStatus: 'active',
                 subscriptionEndDate: subscriptionEndDate,
@@ -64,33 +81,25 @@ export default async function handler(request, response) {
                 lastPayment: { date: now, amount: amount, invoiceId: mayarTransactionId }
             }, { merge: true });
 
-            // 3. Jika ada data referral yang tertunda, catat komisi
-            if (pendingCommissionDoc.exists) {
-                const referredByCode = pendingCommissionDoc.data().referredByCode;
-                const partnerQuery = await transaction.get(usersRef.where('referralCode', '==', referredByCode).limit(1));
-                
-                if (!partnerQuery.empty) {
-                    const partnerDoc = partnerQuery.docs[0];
-                    const partnerId = partnerDoc.id;
-                    const commissionAmount = amount * 0.10;
+            if (partnerDoc) {
+                const partnerId = partnerDoc.id;
+                const commissionAmount = amount * 0.10;
 
-                    const commissionDocRef = db.collection('commissions').doc();
-                    transaction.set(commissionDocRef, {
-                        partnerId: partnerId, partnerEmail: partnerDoc.data().email,
-                        referredUserId: userId, referredUserEmail: customerEmail,
-                        transactionAmount: amount, commissionAmount: commissionAmount,
-                        status: 'unpaid', createdAt: now, mayarInvoiceId: mayarTransactionId
-                    });
-                    console.log(`✅ BERHASIL: Komisi untuk mitra ${partnerId} dicatat.`);
+                const commissionDocRef = db.collection('commissions').doc();
+                transaction.set(commissionDocRef, {
+                    partnerId: partnerId, partnerEmail: partnerDoc.data().email,
+                    referredUserId: userId, referredUserEmail: customerEmail,
+                    transactionAmount: amount, commissionAmount: commissionAmount,
+                    status: 'unpaid', createdAt: now, mayarInvoiceId: mayarTransactionId
+                });
+                console.log(`✅ BERHASIL: Komisi untuk mitra ${partnerId} dicatat.`);
 
-                    // 4. Hapus data pending setelah komisi berhasil dicatat
-                    transaction.delete(pendingCommissionRef);
-                    console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
-                } else {
-                    console.error(`❌ PERINGATAN: Kode rujukan ${referredByCode} ditemukan, tetapi tidak ada mitra yang cocok.`);
-                    // Hapus data pending untuk mencegah bug di masa depan
-                    transaction.delete(pendingCommissionRef);
-                }
+                // Hapus data pending setelah komisi berhasil dicatat
+                transaction.delete(pendingCommissionRef);
+                console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
+            } else if (referredByCode) {
+                console.error(`❌ PERINGATAN: Kode rujukan ${referredByCode} ditemukan, tetapi tidak ada mitra yang cocok.`);
+                transaction.delete(pendingCommissionRef);
             }
         });
 
