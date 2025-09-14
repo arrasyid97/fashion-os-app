@@ -5173,26 +5173,14 @@ const connectBluetooth = async () => {
   }
 };
 
-// --- FUNGSI BARU UNTUK MENCETAK ---
 const printBarcode = async () => {
   if (!bluetoothDevice.value || !barcodeContent.value) {
     alert('Harap hubungkan ke printer dan masukkan konten barcode.');
     return;
   }
-
-  // Bagian ini adalah kode inti yang harus disesuaikan dengan bahasa printer (ZPL, TSPL, dll.)
   try {
-    // Contoh untuk bahasa ZPL (Zebra Programming Language)
-    const zplCommand = `
-      ^XA
-      ^FO50,50^BY3
-      ^BCN,100,Y,N,N
-      ^FD${barcodeContent.value}^FS
-      ^XZ
-    `;
-    
-    // Ini hanyalah contoh, implementasi nyata akan berbeda.
-    // Anda harus membuka koneksi GATT, mendapatkan karakteristik, dan menulis data.
+    // Di sini Anda perlu menambahkan logika untuk mengirim data cetak
+    // ke printer thermal dalam format yang benar (misalnya, bahasa ZPL atau TSPL)
     
     alert('Perintah cetak berhasil dikirim! (Simulasi)');
   } catch (error) {
