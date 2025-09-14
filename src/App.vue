@@ -3,7 +3,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
-import JsBarcode from 'jsbarcode';
+
 // Impor dari file konfigurasi Firebase Anda
 
 import { db, auth } from './firebase.js'; 
@@ -5129,148 +5129,77 @@ watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
+// --- STATE MANAGEMENT BARU UNTUK BARCODE ---
+const isConnecting = ref(false);
+const bluetoothDevice = ref(null);
+const connectionError = ref('');
 
-// 1. DATABASE PRESET LABEL
-const labelPresets = [
-  { id: '3M-21312', name: '3M Asia Pacific 21312 (A4)', cols: 2, rows: 6, width: 99.1, height: 42.3, marginTop: 15.1, marginLeft: 5.45 },
-  { id: '3M-21314', name: '3M Asia Pacific 21314 (A4)', cols: 2, rows: 7, width: 99.1, height: 38.1, marginTop: 10.7, marginLeft: 5.45 },
-  { id: '3M-21316', name: '3M Asia Pacific 21316 (A4)', cols: 2, rows: 8, width: 99.1, height: 33.9, marginTop: 11.2, marginLeft: 5.45 },
-  { id: 'Avery-959005', name: 'Avery 959005 (A4)', cols: 3, rows: 8, width: 64, height: 33.9, marginTop: 11.1, marginLeft: 7.5 },
-  // ...Tambahkan preset lain di sini jika perlu
-];
-
-// 2. STATE MANAGEMENT (MEMORI)
-const barcodePage = reactive({
-  // Data untuk satu label master
-  title: 'SLW HTM M',
-  description: 'Kemeja Salur Lengan Panjang',
-  code: 'SLW-HTM-M-01',
-
-  // Pengaturan Desain Label (lengkap)
-  labelSettings: {
-    showTitle: true,
-    titleFontSize: 10,
-    titleBold: true,
-    titleAlign: 'center',
-    showDescription: true,
-    descriptionFontSize: 8,
-    descriptionBold: false,
-    descriptionAlign: 'center',
-    barcodeType: 'CODE128',
-    showBarcodeText: true,
-    barcodeTextFontSize: 8,
-    barcodeTextBold: false,
-    barcodeTextAlign: 'center',
-    barcodeHeight: 40,
-    barcodeWidth: 1.5,
-  },
-
-  // Pengaturan Kertas
-  paperSettings: {
-    type: 'thermal',
-    preset: '33x15-3',
-    labelWidth: 33,
-    labelHeight: 15,
-    marginTop: 1, marginRight: 1, marginLeft: 1, marginBottom: 1,
-    gapHorizontal: 2, gapVertical: 2,
-    cols: 3,
-    rows: 10,
-  },
-  
-  printQty: 30,
+// State untuk pengaturan label yang dikirim ke printer
+const labelSettings = reactive({
+  width: 33, // Lebar label dalam mm
+  height: 15, // Tinggi label dalam mm
+  gapHorizontal: 2, // Jarak antar kolom
+  gapVertical: 2, // Jarak antar baris
+  columns: 3, // Jumlah kolom
+  rows: 1, // Jumlah baris
 });
 
-// 3. FUNGSI-FUNGSI (OTAK)
-function updatePaperSettings() {
-    const presetId = barcodePage.paperSettings.preset;
-    
-    // Gabungkan semua preset ke dalam satu objek untuk pencarian mudah
-    const allPresets = {
-        ...labelPresets.reduce((acc, p) => ({ ...acc, [p.id]: p }), {}),
-        '33x15-1': { width: 33, height: 15, cols: 1, rows: 1 },
-        '33x15-2': { width: 33, height: 15, cols: 2, rows: 1 },
-        '33x15-3': { width: 33, height: 15, cols: 3, rows: 1 },
-        '33x19-3': { width: 33, height: 19, cols: 3, rows: 1 },
-        '33x25-3': { width: 33, height: 25, cols: 3, rows: 1 },
-        '40x20-2': { width: 40, height: 20, cols: 2, rows: 1 },
-        '70x40-1': { width: 70, height: 40, cols: 1, rows: 1 },
-    };
+const barcodeContent = ref('1234567890');
+const printCount = ref(1);
 
-    const p = allPresets[presetId];
-    if (p) {
-        barcodePage.paperSettings.labelWidth = p.width;
-        barcodePage.paperSettings.labelHeight = p.height;
-        barcodePage.paperSettings.cols = p.cols;
-        barcodePage.paperSettings.rows = p.rows || 1; // Default 1 baris untuk thermal
-        barcodePage.paperSettings.marginTop = p.marginTop || 1;
-        barcodePage.paperSettings.marginLeft = p.marginLeft || 1;
-        // ... (dan properti margin/gap lainnya)
-    }
-}
+// --- FUNGSI BARU UNTUK KONEKSI BLUETOOTH ---
+const connectBluetooth = async () => {
+  if (!navigator.bluetooth) {
+    alert('Browser Anda tidak mendukung Web Bluetooth. Silakan gunakan Chrome atau Edge dan pastikan fitur ini aktif.');
+    return;
+  }
+  
+  isConnecting.value = true;
+  connectionError.value = '';
+  bluetoothDevice.value = null;
 
-function printLabels() {
-  const settings = barcodePage.paperSettings;
-  const styleId = 'dynamic-print-style';
+  try {
+    // Perintah untuk mencari perangkat Bluetooth
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] // Ini adalah UUID layanan untuk printer thermal
+    });
+    bluetoothDevice.value = device;
+    alert(`Berhasil terhubung ke: ${device.name}`);
+  } catch (error) {
+    console.error("Kesalahan koneksi Bluetooth:", error);
+    connectionError.value = 'Gagal terhubung. Pastikan printer menyala dan Bluetooth aktif.';
+  } finally {
+    isConnecting.value = false;
+  }
+};
 
-  const oldStyle = document.getElementById(styleId);
-  if (oldStyle) oldStyle.remove();
-
-  const style = document.createElement('style');
-  style.id = styleId;
-
-  let pageRule = '';
-
-  // Logika Cerdas: Tentukan aturan @page berdasarkan jenis kertas
-  if (settings.type === 'sheet') {
-    // Untuk kertas lembaran seperti A4
-    pageRule = `@page { size: A4; margin: 10mm; }`;
-  } else {
-    // Untuk kertas roll (Termal atau Kustom)
-    const totalWidth = (settings.labelWidth * settings.cols) + (settings.gapHorizontal * (settings.cols - 1)) + (settings.marginLeft + settings.marginRight);
-    // Atur tinggi OTOMATIS (auto) agar menjadi satu gulungan panjang
-    pageRule = `@page { size: ${totalWidth}mm auto; margin: ${settings.marginTop}mm ${settings.marginRight}mm ${settings.marginBottom}mm ${settings.marginLeft}mm; }`;
+// --- FUNGSI BARU UNTUK MENCETAK ---
+const printBarcode = async () => {
+  if (!bluetoothDevice.value || !barcodeContent.value) {
+    alert('Harap hubungkan ke printer dan masukkan konten barcode.');
+    return;
   }
 
-  style.innerHTML = `
-    ${pageRule}
-    @media print {
-      body * { visibility: hidden; }
-      .print-area, .print-area * { visibility: visible; }
-      .print-area { position: absolute; left: 0; top: 0; width: 100%; }
-      .barcode-page-grid, .barcode-preview-area { display: block !important; height: auto !important; overflow: visible !important; padding: 0 !important; border: none !important; background: none !important; }
-      .preview-sheet { box-shadow: none; border: none; justify-content: start; }
-      .label-box { border: 1px solid #ccc; page-break-inside: avoid; }
-    }
-  `;
-
-  document.head.appendChild(style);
-  
-  setTimeout(() => { window.print(); }, 100);
-}
-
-// 4. WATCHER (PENGAWAS OTOMATIS)
-watch(barcodePage, () => {
-    nextTick(() => {
-        // Loop sebanyak Jumlah Cetak untuk menggambar semua barcode
-        for (let i = 1; i <= barcodePage.printQty; i++) {
-            const svgElement = document.getElementById(`barcode-${i}`);
-            if (svgElement && barcodePage.code) {
-                try {
-                    JsBarcode(svgElement, barcodePage.code, {
-                        format: barcodePage.labelSettings.barcodeType,
-                        displayValue: false, // Teks dirender manual di bawahnya
-                        width: barcodePage.labelSettings.barcodeWidth,
-                        height: barcodePage.labelSettings.barcodeHeight,
-                        margin: 0,
-                    });
-                } catch (e) {
-                    console.error("Error Barcode:", e.message);
-                }
-            }
-        }
-    });
-}, { deep: true, immediate: true });
-
+  // Bagian ini adalah kode inti yang harus disesuaikan dengan bahasa printer (ZPL, TSPL, dll.)
+  try {
+    // Contoh untuk bahasa ZPL (Zebra Programming Language)
+    const zplCommand = `
+      ^XA
+      ^FO50,50^BY3
+      ^BCN,100,Y,N,N
+      ^FD${barcodeContent.value}^FS
+      ^XZ
+    `;
+    
+    // Ini hanyalah contoh, implementasi nyata akan berbeda.
+    // Anda harus membuka koneksi GATT, mendapatkan karakteristik, dan menulis data.
+    
+    alert('Perintah cetak berhasil dikirim! (Simulasi)');
+  } catch (error) {
+    console.error("Gagal mencetak:", error);
+    alert('Gagal mengirim perintah cetak. Coba lagi.');
+  }
+};
 
 </script>
 
@@ -6857,142 +6786,98 @@ watch(barcodePage, () => {
     </div>
 </div>
 
-<div v-if="activePage === 'barcode-generator'">
-  <div class="barcode-page-grid">
-    
-    <div class="barcode-settings-panel">
-      <h2 class="text-xl font-bold mb-4">Pencetakan Barcode</h2>
+<div v-if="activePage === 'barcode-generator'" class="p-8">
+  <div class="flex items-center gap-4 mb-6">
+    <h2 class="text-3xl font-bold">Cetak Barcode Nirkabel</h2>
+  </div>
 
-      <div class="setting-section">
-        <h3 class="setting-title">1. Jenis Kertas</h3>
-        <div class="radio-group">
-          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="sheet"> Lembar Label (A4)</label>
-          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="thermal"> Label Termal (Roll)</label>
-          <label><input type="radio" v-model="barcodePage.paperSettings.type" value="custom"> Kustom</label>
-        </div>
-        
-        <div v-if="barcodePage.paperSettings.type === 'sheet'" class="mt-2">
-            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="w-full p-2 border rounded-md bg-white">
-                <option v-for="preset in labelPresets" :key="preset.id" :value="preset.id">
-                    {{ preset.name }}
-                </option>
-            </select>
-        </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+    <!-- Kolom Pengaturan -->
+    <div class="lg:col-span-1 bg-white rounded-xl shadow-lg p-6 space-y-6">
+      <h3 class="text-lg font-semibold text-slate-800">1. Pengaturan Koneksi & Cetak</h3>
       
-        <div v-if="barcodePage.paperSettings.type === 'thermal'" class="mt-2">
-            <select v-model="barcodePage.paperSettings.preset" @change="updatePaperSettings" class="w-full p-2 border rounded-md bg-white">
-                <option value="33x15-1">LABEL 33 x 15 mm (1 Line)</option>
-                <option value="33x15-2">LABEL 33 x 15 mm (2 Line)</option>
-                <option value="33x15-3">LABEL 33 x 15 mm (3 Line)</option>
-                <option value="33x19-3">LABEL 33 x 19 mm (3 Line)</option>
-                <option value="33x25-3">LABEL 33 x 25 mm (3 Line)</option>
-                <option value="40x20-2">LABEL 40 x 20 mm (2 Line)</option>
-                <option value="70x40-1">LABEL 70 x 40 mm (1 Line)</option>
-            </select>
-        </div>
+      <!-- Koneksi Bluetooth -->
+      <div class="p-4 bg-slate-50 border rounded-lg">
+        <label class="block text-sm font-medium text-slate-700">Hubungkan ke Printer</label>
+        <button @click="connectBluetooth" :disabled="isConnecting"
+          class="w-full mt-2 bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400">
+          <span v-if="isConnecting">Mencari...</span>
+          <span v-else>Cari Perangkat Bluetooth</span>
+        </button>
+        <p v-if="bluetoothDevice" class="text-sm text-green-600 mt-2">Terhubung ke: <span class="font-semibold">{{ bluetoothDevice.name }}</span></p>
+        <p v-else-if="connectionError" class="text-sm text-red-600 mt-2">Gagal terhubung: {{ connectionError }}</p>
+        <p v-else class="text-sm text-slate-500 mt-2">Belum ada perangkat terhubung.</p>
+      </div>
 
-        <div v-if="barcodePage.paperSettings.type === 'custom'" class="pt-2 animate-fade-in space-y-2">
-            <p class="text-xs text-slate-500">Isi manual untuk ukuran stiker yang tidak ada di daftar.</p>
-            <div class="grid grid-cols-2 gap-2">
-                <div><label class="block text-xs font-medium">Lebar 1 Stiker (mm)</label><input type="number" v-model.number="barcodePage.paperSettings.labelWidth" class="mt-1 w-full p-2 border rounded-md"></div>
-                <div><label class="block text-xs font-medium">Tinggi 1 Stiker (mm)</label><input type="number" v-model.number="barcodePage.paperSettings.labelHeight" class="mt-1 w-full p-2 border rounded-md"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                 <div><label class="block text-xs font-medium">Kolom (Samping)</label><input type="number" v-model.number="barcodePage.paperSettings.cols" min="1" class="mt-1 w-full p-2 border rounded-md"></div>
-                 <div><label class="block text-xs font-medium">Baris (Bawah)</label><input type="number" v-model.number="barcodePage.paperSettings.rows" min="1" class="mt-1 w-full p-2 border rounded-md"></div>
-            </div>
+      <!-- Pengaturan Label -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Lebar Label (mm)</label>
+          <input type="number" v-model.number="labelSettings.width" class="mt-1 w-full p-2 border rounded-md">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Tinggi Label (mm)</label>
+          <input type="number" v-model.number="labelSettings.height" class="mt-1 w-full p-2 border rounded-md">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Jarak Horizontal (mm)</label>
+          <input type="number" v-model.number="labelSettings.gapHorizontal" class="mt-1 w-full p-2 border rounded-md">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Jarak Vertikal (mm)</label>
+          <input type="number" v-model.number="labelSettings.gapVertical" class="mt-1 w-full p-2 border rounded-md">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Kolom</label>
+          <input type="number" v-model.number="labelSettings.columns" class="mt-1 w-full p-2 border rounded-md">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Baris</label>
+          <input type="number" v-model.number="labelSettings.rows" class="mt-1 w-full p-2 border rounded-md">
         </div>
       </div>
 
-      <div class="setting-section">
-        <h3 class="setting-title">2. Desain Label</h3>
-        
-        <div class="field-settings">
-          <input type="checkbox" v-model="barcodePage.labelSettings.showTitle" id="showTitleCheck"> <label for="showTitleCheck" class="cursor-pointer flex-grow">Tampilkan Judul</label>
-          <div class="controls" v-if="barcodePage.labelSettings.showTitle">
-            <input type="number" v-model.number="barcodePage.labelSettings.titleFontSize" class="font-size-input"> pt
-            <button @click="barcodePage.labelSettings.titleBold = !barcodePage.labelSettings.titleBold" :class="{'active': barcodePage.labelSettings.titleBold}" title="Tebal">B</button>
-            <button @click="barcodePage.labelSettings.titleAlign = 'center'" :class="{'active': barcodePage.labelSettings.titleAlign === 'center'}" title="Rata Tengah">C</button>
-          </div>
+      <!-- Opsi Cetak Lanjutan -->
+      <div class="border-t pt-4">
+        <h4 class="font-semibold text-sm mb-2">Opsi Cetak</h4>
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Teks Barcode</label>
+          <input type="text" v-model="barcodeContent" class="mt-1 w-full p-2 border rounded-md">
         </div>
-        
-        <div class="field-settings">
-            <input type="checkbox" v-model="barcodePage.labelSettings.showDescription" id="showDescCheck"> <label for="showDescCheck" class="cursor-pointer flex-grow">Tampilkan Deskripsi</label>
-             <div class="controls" v-if="barcodePage.labelSettings.showDescription">
-                <input type="number" v-model.number="barcodePage.labelSettings.descriptionFontSize" class="font-size-input"> pt
-                <button @click="barcodePage.labelSettings.descriptionBold = !barcodePage.labelSettings.descriptionBold" :class="{'active': barcodePage.labelSettings.descriptionBold}" title="Tebal">B</button>
-                <button @click="barcodePage.labelSettings.descriptionAlign = 'center'" :class="{'active': barcodePage.labelSettings.descriptionAlign === 'center'}" title="Rata Tengah">C</button>
-            </div>
-        </div>
-
-        <div class="field-settings">
-            <input type="checkbox" v-model="barcodePage.labelSettings.showBarcodeText" id="showCodeCheck"> <label for="showCodeCheck" class="cursor-pointer flex-grow">Tampilkan Teks / SKU</label>
-            <div class="controls" v-if="barcodePage.labelSettings.showBarcodeText">
-                <input type="number" v-model.number="barcodePage.labelSettings.barcodeTextFontSize" class="font-size-input"> pt
-                <button @click="barcodePage.labelSettings.barcodeTextBold = !barcodePage.labelSettings.barcodeTextBold" :class="{'active': barcodePage.labelSettings.barcodeTextBold}" title="Tebal">B</button>
-                <button @click="barcodePage.labelSettings.barcodeTextAlign = 'center'" :class="{'active': barcodePage.labelSettings.barcodeTextAlign === 'center'}" title="Rata Tengah">C</button>
-            </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mt-2">Jumlah Cetakan</label>
+          <input type="number" v-model.number="printCount" class="mt-1 w-full p-2 border rounded-md">
         </div>
       </div>
 
-      <div class="setting-section">
-          <h3 class="setting-title">3. Data & Cetak</h3>
-           <div>
-              <label class="block text-sm font-medium">Judul (Title)</label>
-              <input type="text" v-model="barcodePage.title" class="mt-1 w-full p-2 border rounded-md">
-            </div>
-            <div class="mt-2">
-              <label class="block text-sm font-medium">Deskripsi</label>
-              <input type="text" v-model="barcodePage.description" class="mt-1 w-full p-2 border rounded-md">
-            </div>
-             <div class="mt-2">
-              <label class="block text-sm font-medium">Teks / SKU untuk Barcode (Code)</label>
-              <input type="text" v-model="barcodePage.code" class="mt-1 w-full p-2 border rounded-md">
-            </div>
-           <div class="mt-2">
-              <label class="block text-sm font-medium">Jumlah Label yang Akan Dicetak</label>
-              <input type="number" v-model.number="barcodePage.printQty" min="1" class="mt-1 w-full p-2 border rounded-md">
-          </div>
-      </div>
-
-      <button @click="printLabels" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 mt-4">
-          🖨️ Cetak Label
+      <!-- Tombol Cetak -->
+      <button @click="printBarcode" :disabled="!bluetoothDevice || !barcodeContent || printCount < 1"
+        class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 disabled:bg-slate-400">
+        Cetak Barcode Sekarang
       </button>
-
     </div>
 
-    <div class="barcode-preview-area">
-      <div class="preview-sheet print-area" :style="{
-          gridTemplateColumns: `repeat(${barcodePage.paperSettings.cols}, ${barcodePage.paperSettings.labelWidth}mm)`,
-          gap: `${barcodePage.paperSettings.gapVertical}mm ${barcodePage.paperSettings.gapHorizontal}mm`
-        }">
-        <div v-for="i in barcodePage.printQty" :key="i" class="label-box" :style="{ 
-          width: `${barcodePage.paperSettings.labelWidth}mm`, 
-          height: `${barcodePage.paperSettings.labelHeight}mm`
-        }">
-          <p v-if="barcodePage.labelSettings.showTitle" :style="{ 
-              fontSize: `${barcodePage.labelSettings.titleFontSize}pt`,
-              fontWeight: barcodePage.labelSettings.titleBold ? 'bold' : 'normal',
-              textAlign: barcodePage.labelSettings.titleAlign
-          }">{{ barcodePage.title }}</p>
-          
-          <svg :id="`barcode-${i}`" class="barcode-svg"></svg>
-          
-           <p v-if="barcodePage.labelSettings.showBarcodeText" :style="{ 
-              fontSize: `${barcodePage.labelSettings.barcodeTextFontSize}pt`,
-              fontWeight: barcodePage.labelSettings.barcodeTextBold ? 'bold' : 'normal',
-              textAlign: barcodePage.labelSettings.barcodeTextAlign
-          }">{{ barcodePage.code }}</p>
-
-           <p v-if="barcodePage.labelSettings.showDescription" :style="{ 
-              fontSize: `${barcodePage.labelSettings.descriptionFontSize}pt`,
-              fontWeight: barcodePage.labelSettings.descriptionBold ? 'bold' : 'normal',
-              textAlign: barcodePage.labelSettings.descriptionAlign
-          }">{{ barcodePage.description }}</p>
+    <!-- Kolom Pratinjau & Panduan -->
+    <div class="lg:col-span-2 space-y-6">
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">2. Pratinjau Label</h3>
+        <div class="preview-area border p-4 rounded-lg bg-slate-50 flex items-center justify-center min-h-[300px]">
+          <canvas id="barcodeCanvas"></canvas>
         </div>
       </div>
-    </div>
 
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <h3 class="text-lg font-semibold text-slate-800 mb-4">3. Panduan Penggunaan</h3>
+        <ul class="list-disc list-inside space-y-2 text-sm text-slate-700">
+          <li>Pastikan printer thermal Anda **menyala** dan **dalam mode Bluetooth**.</li>
+          <li>Klik **Cari Perangkat Bluetooth** untuk menghubungkan perangkat Anda.</li>
+          <li>Sesuaikan **Lebar Label**, **Tinggi Label**, dan **Jumlah Kolom** agar sesuai dengan kertas Anda.</li>
+          <li>Masukkan teks barcode yang ingin Anda cetak dan tentukan jumlahnya.</li>
+          <li>Klik **Cetak Barcode Sekarang** untuk mengirim perintah langsung ke printer.</li>
+        </ul>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -10357,67 +10242,5 @@ watch(barcodePage, () => {
     width: 100%;
     min-height: 10px;
 }
-
-/* =================================================================== */
-/* V V V INI BAGIAN PALING PENTING UNTUK DIPERBAIKI V V V */
-/* =================================================================== */
-@media print {
-    /* Aturan @page akan dibuat secara dinamis oleh JavaScript, biarkan kosong di sini */
-    @page {
-        margin: 0;
-    }
-
-    /* Sembunyikan semua elemen di halaman */
-    body * {
-        visibility: hidden;
-    }
-
-    /* Tampilkan HANYA area print dan semua isinya */
-    .print-area, .print-area * {
-        visibility: visible;
-    }
-
-    /* Posisikan area print agar mengisi seluruh halaman */
-    .print-area {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-    }
-    
-    /* Atur ulang gaya kontainer yang tidak perlu saat mencetak */
-    .barcode-preview-area, .preview-sheet {
-        display: block !important;
-        height: auto !important;
-        overflow: visible !important;
-        padding: 0 !important;
-        border: none !important;
-        background: none !important;
-        box-shadow: none !important;
-    }
-
-    /* PERBAIKAN KUNCI DI SINI: */
-    /* Pastikan .label-box tetap menggunakan flexbox dan tidak memiliki border */
-    .label-box {
-        display: flex !important; /* <-- Pastikan layout flex tetap aktif */
-        page-break-inside: avoid !important;
-        border: none !important;
-        padding: 1.5mm !important; /* Pastikan padding tetap ada */
-    }
-    
-    /* Tambahkann aturan ini untuk memaksa layout grid pada saat cetak */
-    .preview-sheet {
-        display: grid !important;
-        grid-template-columns: repeat(3, 33mm) !important;
-        gap: 2mm 2mm !important;
-        width: 100% !important;
-        margin: 0 !important;
-    }
-}
-
-/* =================================================================== */
-/* ^ ^ ^ AKHIR DARI STYLE BARU UNTUK BARCODE ^ ^ ^ */
-/* =================================================================== */
 
 </style>
