@@ -10245,51 +10245,66 @@ onMounted(() => {
 
 
 /* V V V STYLE BARU UNTUK BARCODE & PRINT V V V */
+[ref="barcodePreview"] {
+    display: flex;       /* <-- Mengatur label agar berjejer */
+    flex-wrap: wrap;     /* <-- Membuat label pindah ke baris baru jika tidak muat */
+    gap: 2mm;            /* <-- PENTING: Memberi jarak antar stiker */
+    padding: 2mm;        /* <-- Memberi sedikit ruang di tepi kertas */
+    background-color: #e2e8f0; /* <-- Warna abu-abu untuk simulasi kertas backing */
+    border: 1px dashed #94a3b8;
+    min-height: 100px;   /* <-- Memberi tinggi minimal agar area terlihat */
+}
+
+/* Untuk setiap stiker barcode individual (blok kotak-kotak) */
 .barcode-label {
-  border: 1px dashed #ccc;
-  background-color: white;
-  padding: 1mm;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
+    background-color: white;    /* <-- Membuat stiker berwarna putih */
+    border: 1px solid #d1d5db;  /* <-- Memberi garis tepi tipis pada setiap stiker */
+    border-radius: 2px;         /* <-- Sedikit melengkungkan sudut stiker */
+    padding: 1mm;               /* <-- Memberi ruang di dalam stiker */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
 }
 
 .barcode-label svg {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
+/* Style untuk pesan error jika teks tidak valid */
 .barcode-error {
     color: red;
     font-size: 10px;
     text-align: center;
+    font-family: sans-serif;
 }
 
+/* Aturan khusus untuk mencetak (print) */
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  
-  /* Tampilkan hanya area preview dan isinya */
-  .print-container, .print-container * {
-    visibility: visible;
-  }
-  
-  .print-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-  }
+    body * {
+        visibility: hidden;
+    }
+    
+    /* Tampilkan hanya area preview dan isinya */
+    .print-container, .print-container * {
+        visibility: visible;
+    }
+    
+    .print-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
 
-  .barcode-label {
-    border: none; /* Hilangkan border saat dicetak */
-    page-break-inside: avoid; /* Mencegah label terpotong antar halaman */
-  }
+    .barcode-label {
+        border: 1px solid #ccc; /* <-- Tampilkan border tipis saat dicetak agar mudah digunting */
+        page-break-inside: avoid; /* Mencegah label terpotong antar halaman */
+    }
 }
 /* ^ ^ ^ AKHIR STYLE BARU ^ ^ ^ */
 
