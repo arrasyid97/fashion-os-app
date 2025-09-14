@@ -37,7 +37,7 @@ const { status, customerEmail, amount, id: mayarTransactionId } = data;
     const userQuery = await usersRef.where('email', '==', customerEmail).limit(1).get();
 
     if (userQuery.empty) {
-      console.error(`FATAL ERROR: Tidak ada pengguna yang ditemukan dengan email ${customerEmail}`);
+      console.error(`FATAL ERROR: Tidak aada pengguna yang ditemukan dengan email ${customerEmail}`);
       return response.status(404).json({ message: 'User not found' });
     }
 
