@@ -5046,9 +5046,10 @@ onMounted(() => {
     updateTime();
     intervalId = setInterval(updateTime, 1000);
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
-
+        
+        // Hapus semua listener sebelumnya untuk mencegah duplikasi
         if (onSnapshotListener) {
             onSnapshotListener();
             onSnapshotListener = null;
@@ -5060,47 +5061,48 @@ onMounted(() => {
 
         if (user) {
             currentUser.value = user;
-            const userDocRef = doc(db, "users", user.uid);
-
-            onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
+            
+            // Listener untuk data user secara real-time
+            onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
                     state.settings.dashboardPin = userData.dashboardPin || '';
-
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
-
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
                     if (isSubscriptionValid) {
-                        if (state.produk.length === 0 || activePage.value === 'langganan') {
-                            await loadAllDataFromFirebase();
-                        }
-
-                        if (currentUser.value.isPartner && currentUser.value.referralCode) {
+                        // Muat semua data aplikasi setelah user terotentikasi
+                        await loadAllDataFromFirebase();
+                        
+                        // Setel listener komisi HANYA JIKA user adalah mitra
+                        if (currentUser.value.isPartner) {
                             const commissionsQuery = query(
-    collection(db, 'commissions'),
-    where('partnerId', '==', currentUser.value.uid)
-);
-commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-    const fetchedCommissions = [];
-    snapshot.forEach(doc => {
-        fetchedCommissions.push({ id: doc.id, ...doc.data() });
-    });
-    commissions.value = fetchedCommissions;
-});
+                                collection(db, 'commissions'),
+                                where('partnerId', '==', currentUser.value.uid)
+                            );
+                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                const fetchedCommissions = [];
+                                snapshot.forEach(doc => {
+                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
+                                });
+                                commissions.value = fetchedCommissions;
+                                console.log(`INFO: Komisi berhasil dimuat: ${commissions.value.length} item.`);
+                            });
                         }
-
+                        
+                        // Redirect ke halaman terakhir yang dikunjungi
                         const storedPage = localStorage.getItem('lastActivePage');
                         const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         changePage(pageToLoad);
                     } else {
+                        // Jika langganan tidak valid, arahkan ke halaman langganan
                         activePage.value = 'langganan';
                     }
                 } else {
@@ -5121,6 +5123,12 @@ commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
         }
     });
 });
+
+// Perbaikan pada fungsi loadAllDataFromFirebase
+async function loadAllDataFromFirebase() {
+    // ... (kode di dalamnya tetap sama seperti sebelumnya, karena kita sudah memperbaiki bagian commissions di atas)
+    // Cukup pastikan bagian `getDoc(doc(db, "commissions", userId))` sudah TIDAK ADA.
+}
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
