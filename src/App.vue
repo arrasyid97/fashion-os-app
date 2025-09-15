@@ -4889,24 +4889,6 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
     }
 });
 
-watch(barcodeContent, (newContent) => {
-  if (newContent) {
-    nextTick(() => {
-      try {
-        const imgElement = document.getElementById('barcodePreviewImage');
-        JsBarcode(imgElement, newContent, {
-          format: "CODE128", // Ganti dengan format yang Anda inginkan
-          displayValue: true,
-          fontSize: 14,
-          height: 60,
-        });
-      } catch (error) {
-        console.error("Gagal membuat barcode pratinjau:", error);
-      }
-    });
-  }
-});
-
 
 watch(() => uiState.bulk_scan_input, async (newValue) => {
     const scannedValue = newValue.trim();
@@ -5180,57 +5162,73 @@ const connectBluetooth = async () => {
   }
 };
 
-const printBarcode = async () => {
-    if (!bluetoothDevice.value || !barcodeContent.value) {
-        alert('Harap hubungkan ke printer dan masukkan konten barcode.');
-        return;
-    }
-
-    try {
-        const gattServer = await bluetoothDevice.value.gatt.connect();
-        const service = await gattServer.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-
-        // Deklarasi variabel yang penting
-        const barcodeWidth = 300;
-        const barcodeHeight = 100;
-        const barcodeX = 50;
-        const barcodeY = 50;
-        const textX = 50;
-        const textY = 150;
-
-        // Perbaikan: Pastikan semua variabel digunakan di sini
-        let command = '';
-        command += 'CLS\r\n';
-        command += `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`;
-        command += `GAP ${labelSettings.labelGap} mm,0 mm\r\n`;
-        command += `SPEED ${labelSettings.printSpeed}\r\n`;
-        command += `DENSITY ${labelSettings.printDensity}\r\n`;
-        command += `DIRECTION 1,0\r\n`;
-        command += `SET TEAR OFF\r\n`;
-        command += `CODEPAGE 1252\r\n`;
-
-        // Gunakan variabel barcodeHeight, barcodeWidth, textX, dan textY
-        command += `BARCODE ${barcodeX},${barcodeY},"128",${barcodeHeight},1,0,2,2,"${barcodeContent.value}"\r\n`;
-        command += `TEXT ${textX},${textY},"TSS24.BF2",0,1,1,"Width: ${barcodeWidth}"\r\n`;
-        command += `TEXT ${textX},${textY + 20},"TSS24.BF2",0,1,1,"Height: ${barcodeHeight}"\r\n`;
-        
-        command += `PRINT ${printCount.value},1\r\n`;
-
-        const encoder = new TextEncoder();
-        const data = encoder.encode(command);
-        
-        for (let i = 0; i < data.length; i += 512) {
-            await characteristic.writeValue(data.slice(i, i + 512));
+const renderBarcodePreview = () => {
+  if (barcodeContent.value) {
+    nextTick(() => {
+      const imgElement = document.getElementById('barcodePreviewImage');
+      if (imgElement) {
+        try {
+          JsBarcode(imgElement, barcodeContent.value, {
+            format: "CODE128",
+            displayValue: true,
+            fontSize: 14,
+            height: 60,
+          });
+        } catch (error) {
+          console.error("Gagal membuat barcode pratinjau:", error);
         }
-
-        alert('Perintah cetak berhasil dikirim ke printer!');
-
-    } catch (error) {
-        console.error("Gagal mencetak:", error);
-        alert(`Gagal mengirim perintah cetak. Pastikan printer terhubung dengan benar.\n\nError: ${error.message}`);
-    }
+      }
+    });
+  }
 };
+
+const printBarcode = async () => {
+  if (!bluetoothDevice.value || !barcodeContent.value) {
+    alert('Harap hubungkan ke printer dan masukkan konten barcode.');
+    return;
+  }
+
+  try {
+    const gattServer = await bluetoothDevice.value.gatt.connect();
+    const service = await gattServer.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+    const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+    const barcodeWidth = 300;
+    const barcodeHeight = 100;
+    const barcodeX = 50;
+    const barcodeY = 50;
+    const textX = 50;
+    const textY = 150;
+
+    let command = '';
+    command += 'CLS\r\n';
+    command += `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`;
+    command += `GAP ${labelSettings.labelGap} mm,0 mm\r\n`;
+    command += `SPEED ${labelSettings.printSpeed}\r\n`;
+    command += `DENSITY ${labelSettings.printDensity}\r\n`;
+    command += `DIRECTION 1,0\r\n`;
+    command += `SET TEAR OFF\r\n`;
+    command += `CODEPAGE 1252\r\n`;
+    command += `BARCODE ${barcodeX},${barcodeY},"128",${barcodeHeight},1,0,2,2,"${barcodeContent.value}"\r\n`;
+    command += `TEXT ${textX},${textY},"TSS24.BF2",0,1,1,"Width: ${barcodeWidth}"\r\n`;
+    command += `TEXT ${textX},${textY + 20},"TSS24.BF2",0,1,1,"Height: ${barcodeHeight}"\r\n`;
+    command += `PRINT ${printCount.value},1\r\n`;
+
+    const encoder = new TextEncoder();
+    const data = encoder.encode(command);
+    
+    for (let i = 0; i < data.length; i += 512) {
+      await characteristic.writeValue(data.slice(i, i + 512));
+    }
+
+    alert('Perintah cetak berhasil dikirim ke printer!');
+  } catch (error) {
+    console.error("Gagal mencetak:", error);
+    alert(`Gagal mengirim perintah cetak. Pastikan printer terhubung dengan benar.\n\nError: ${error.message}`);
+  }
+};
+
+watch(barcodeContent, renderBarcodePreview);
 
 </script>
 
