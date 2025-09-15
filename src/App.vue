@@ -5030,71 +5030,43 @@ async function loadAllDataFromFirebase() {
 }
 
 onMounted(() => {
-    updateTime();
-    intervalId = setInterval(updateTime, 1000);
+    // Hentikan listener lama jika ada
+    if (onSnapshotListener) onSnapshotListener();
+    if (commissionsListener) commissionsListener();
 
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
-        // Hentikan listener lama jika ada
-        if (onSnapshotListener) onSnapshotListener();
-        if (commissionsListener) commissionsListener();
 
         if (user) {
             currentUser.value = user;
 
-            // Listener untuk data pengguna
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
-                    state.settings.dashboardPin = userData.dashboardPin || '';
-                    currentUser.value.isPartner = userData.isPartner || false;
-                    currentUser.value.referralCode = userData.referralCode || null;
 
-                    const now = new Date();
-                    const endDate = userData.subscriptionEndDate?.toDate();
-                    const trialDate = userData.trialEndDate?.toDate();
-                    const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                        (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-
-                    if (isSubscriptionValid) {
-                        if (currentUser.value.isPartner) {
-                            const commissionsQuery = query(
-                                collection(db, 'commissions'),
-                                where('partnerId', '==', currentUser.value.uid)
-                            );
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                const fetchedCommissions = [];
-                                snapshot.forEach(doc => {
-                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
-                                });
-                                commissions.value = fetchedCommissions;
-                                console.log(`INFO: Komisi berhasil dimuat. Total: ${commissions.value.length} item.`);
+                    if (currentUser.value.isPartner) {
+                        const commissionsQuery = query(
+                            collection(db, 'commissions'),
+                            where('partnerId', '==', currentUser.value.uid)
+                        );
+                        commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                            const fetchedCommissions = [];
+                            snapshot.forEach(doc => {
+                                fetchedCommissions.push({ id: doc.id, ...doc.data() });
                             });
-                        }
-                        const storedPage = localStorage.getItem('lastActivePage');
-                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                        changePage(pageToLoad);
-                    } else {
-                        activePage.value = 'langganan';
+                            commissions.value = fetchedCommissions;
+                        });
                     }
-                } else {
-                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
-                    handleLogout();
                 }
-                isLoading.value = false;
-            }, (error) => {
-                console.error("Gagal mendengarkan data pengguna:", error);
-                alert("Gagal memuat data pengguna. Silakan coba lagi.");
-                isLoading.value = false;
-                handleLogout();
             });
-        } else {
-            currentUser.value = null;
-            activePage.value = 'login';
-            isLoading.value = false;
         }
     });
+});
+
+onUnmounted(() => {
+    if (onSnapshotListener) onSnapshotListener();
+    if (commissionsListener) commissionsListener();
 });
 
 onMounted(() => {
