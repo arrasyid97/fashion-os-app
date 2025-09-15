@@ -7,42 +7,6 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import JsBarcode from 'jsbarcode';
 import { db, auth } from './firebase.js';
 
-// Tambahkan ref untuk elemen canvas
-const barcodeCanvas = ref(null);
-const isPrinting = ref(false);
-// Impor dari file konfigurasi Firebase Anda
-const printBarcode = async () => {
-    if (!bluetoothDevice.value || !barcodeContent.value) {
-        alert('Harap hubungkan ke printer dan masukkan konten barcode.');
-        return;
-    }
-
-    try {
-        isPrinting.value = true;
-        const server = await bluetoothDevice.value.gatt.connect();
-        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); // Service UUID
-        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); // Characteristic UUID
-
-        // Perintah TSPL yang diperbaiki dengan '\r\n'
-        const tsplCommands = `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`
-                          + `GAP ${labelSettings.labelGap} mm,0 mm\r\n`
-                          + `CLS\r\n`
-                          + `BARCODE 100,100,"128",50,1,0,2,2,"${barcodeContent.value}"\r\n`
-                          + `PRINT ${printCount.value}\r\n`;
-
-        const encoder = new TextEncoder();
-        await characteristic.writeValue(encoder.encode(tsplCommands));
-
-        alert('Perintah cetak berhasil dikirim!');
-    } catch (error) {
-        console.error("Gagal mencetak:", error);
-        alert('Gagal mengirim perintah cetak. Pastikan printer menyala dan terhubung dengan benar.');
-    } finally {
-        isPrinting.value = false;
-    }
-};
-
-
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
 let onSnapshotListener = null;
@@ -5231,7 +5195,62 @@ const connectBluetooth = async () => {
   }
 };
 
+const isConnecting = ref(false);
+const bluetoothDevice = ref(null);
+const connectionError = ref('');
+const isPrinting = ref(false); // DEKLARASI YANG BENAR
 
+// State untuk pengaturan label yang dikirim ke printer
+const labelSettings = reactive({
+    width: 33,
+    height: 15,
+    columns: 3,
+    labelGap: 2,
+    paperType: 'gap',
+    printSpeed: 2,
+    printDensity: 8,
+});
+
+const barcodeContent = ref('1234567890');
+const printCount = ref(1);
+const barcodeCanvas = ref(null); // DEKLARASI YANG BENAR
+
+// --- FUNGSI BARU UNTUK KONEKSI BLUETOOTH ---
+// (Pindahkan fungsi connectBluetooth ke sini)
+const connectBluetooth = async () => {
+  // ... (kode di dalam fungsi tetap sama) ...
+};
+
+// --- FUNGSI printBarcode DENGAN PERBAIKAN TSPL ---
+// (Tambahkan fungsi printBarcode di sini)
+const printBarcode = async () => {
+    if (!bluetoothDevice.value || !barcodeContent.value) {
+        alert('Harap hubungkan ke printer dan masukkan konten barcode.');
+        return;
+    }
+    try {
+        isPrinting.value = true;
+        const server = await bluetoothDevice.value.gatt.connect();
+        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+        const tsplCommands = `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`
+                          + `GAP ${labelSettings.labelGap} mm,0 mm\r\n`
+                          + `CLS\r\n`
+                          + `BARCODE 100,100,"128",50,1,0,2,2,"${barcodeContent.value}"\r\n`
+                          + `PRINT ${printCount.value}\r\n`;
+
+        const encoder = new TextEncoder();
+        await characteristic.writeValue(encoder.encode(tsplCommands));
+
+        alert('Perintah cetak berhasil dikirim!');
+    } catch (error) {
+        console.error("Gagal mencetak:", error);
+        alert('Gagal mengirim perintah cetak. Pastikan printer menyala dan terhubung dengan benar.');
+    } finally {
+        isPrinting.value = false;
+    }
+};
 
 </script>
 
