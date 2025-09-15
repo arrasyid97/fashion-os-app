@@ -626,12 +626,11 @@ async function handleCashoutRequest() {
 
         await batch.commit();
 
-        // --- ▼▼▼ BAGIAN INI TELAH DIPERBAIKI ▼▼▼ ---
+        // --- ▼▼▼ BAGIAN INI TELAH DIPERBAIKI LAGI ▼▼▼ ---
         
         // GANTI NOMOR DI BAWAH DENGAN NOMOR WHATSAPP ANDA (diawali 62)
-        const yourWhatsAppNumber = '6281234567890'; 
+        const yourWhatsAppNumber = '6285691803476'; 
 
-        // Membuat pesan baris per baris untuk hasil yang lebih konsisten
         const messageLines = [
             "Halo Admin Fashion OS,",
             "",
@@ -645,10 +644,11 @@ async function handleCashoutRequest() {
             "Terima kasih."
         ];
         
-        const messageTemplate = messageLines.join('\n'); // Menggabungkan setiap baris dengan karakter "enter"
-        
+        const messageTemplate = messageLines.join('\n');
         const encodedMessage = encodeURIComponent(messageTemplate);
-        const whatsappUrl = `https://wa.me/${yourWhatsAppNumber}?text=${encodedMessage}`;
+
+        // MENGGUNAKAN URL API WHATSAPP YANG LEBIH STABIL
+        const whatsappUrl = `https://api.whatsapp.com/send?phone=${yourWhatsAppNumber}&text=${encodedMessage}`;
         
         // --- ▲▲▲ AKHIR DARI BAGIAN YANG DIPERBAIKI ▲▲▲ ---
         
