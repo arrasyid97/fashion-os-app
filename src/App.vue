@@ -5004,7 +5004,7 @@ async function loadAllDataFromFirebase() {
         ];
 
         const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
-        
+        console.log('Hasil mentah dari semua koleksi:', results);
         const [
             settingsSnap, promotionsSnap, commissionsSnap, productsSnap, pricesSnap, allocationsSnap,
             transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
