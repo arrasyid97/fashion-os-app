@@ -7386,31 +7386,30 @@ const printBarcode = async () => {
 </div>
 
 <div v-if="activePage === 'panduan'">
-  <div class="max-w-5xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm">
-      <div class="border-b pb-6 mb-8">
-          <h2 class="text-4xl font-bold text-slate-800">Pusat Panduan Aplikasi</h2>
-          <p class="text-slate-500 mt-2 text-lg">Panduan komprehensif untuk membantu Anda menguasai setiap fitur dan memaksimalkan potensi bisnis Anda dengan Fashion OS.</p>
-      </div>
+    <div class="max-w-5xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm">
+        <div class="border-b pb-6 mb-8">
+            <h2 class="text-4xl font-bold text-slate-800">Pusat Panduan Aplikasi</h2>
+            <p class="text-slate-500 mt-2 text-lg">Panduan komprehensif untuk membantu Anda menguasai setiap fitur dan memaksimalkan potensi bisnis Anda dengan Fashion OS.</p>
+        </div>
 
-      <div class="space-y-4">
-          <div v-for="panduan in panduanData" :key="panduan.title" class="border rounded-lg transition-all duration-300" :class="panduanAccordion === panduan.title ? 'bg-slate-50' : 'bg-white'">
-              <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" class="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 rounded-lg">
-                  <div class="text-3xl flex-shrink-0">{{ panduan.icon }}</div>
-                  <div class="flex-1">
-                      <h3 class="text-lg font-semibold text-slate-800">{{ panduan.title }}</h3>
-                      <p class="text-sm text-slate-500">{{ panduan.subtitle }}</p>
-                  </div>
-                  <svg class="w-6 h-6 text-slate-400 flex-shrink-0 transition-transform duration-300" :class="{ 'rotate-180': panduanAccordion === panduan.title }" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-              </div>
+        <div class="space-y-4">
+            <div v-for="panduan in panduanData" :key="panduan.title" class="border rounded-lg transition-all duration-300" :class="panduanAccordion === panduan.title ? 'bg-slate-50' : 'bg-white'">
+                <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" class="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 rounded-lg">
+                    <div class="text-3xl flex-shrink-0">{{ panduan.icon }}</div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-slate-800">{{ panduan.title }}</h3>
+                        <p class="text-sm text-slate-500">{{ panduan.subtitle }}</p>
+                    </div>
+                    <svg class="w-6 h-6 text-slate-400 flex-shrink-0 transition-transform duration-300" :class="{ 'rotate-180': panduanAccordion === panduan.title }" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
 
-              <div class="accordion-content" :class="{ 'open': panduanAccordion === panduan.title }">
-                  <div v-if="panduan.content" class="panduan-content p-4 pt-0 pl-14 text-slate-600 leading-relaxed" v-html="panduan.content"></div>
-              </div>
-          </div>
-      </div>
-  </div>
+                <div class="accordion-content" :class="{ 'open': panduanAccordion === panduan.title }">
+                    <div class="panduan-content p-4 pt-0 pl-14 text-slate-600 leading-relaxed" v-html="panduan.content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-            
 <div v-if="activePage === 'tentang'">
     <div class="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm">
         <h2 class="text-3xl font-bold text-slate-800 border-b pb-4 mb-6">Tentang Aplikasi Fashion OS</h2>
@@ -10090,148 +10089,171 @@ const printBarcode = async () => {
 </template>
 
 <style scoped>
+
+
 .help-icon-button {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 1.25rem;
-  height: 1.25rem;
-  border-radius: 9999px;
+  top: 0.5rem; /* 8px */
+  right: 0.5rem; /* 8px */
+  width: 1.25rem; /* 20px */
+  height: 1.25rem; /* 20px */
+  border-radius: 9999px; /* rounded-full */
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f1f5f9;
-  color: #64748b;
+  background-color: #f1f5f9; /* slate-100 */
+  color: #64748b; /* slate-500 */
   font-weight: bold;
-  font-size: 0.875rem;
+  font-size: 0.875rem; /* text-sm */
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 }
+
 .help-icon-button:hover {
-  background-color: #6366f1;
+  background-color: #6366f1; /* indigo-500 */
   color: white;
   transform: scale(1.1);
 }
+
+
+/* Gaya Sidebar Baru yang Profesional */
 .sidebar-link {
-  display: flex;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  font-weight: 500;
-  color: #9ca3af;
-  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    color: #9ca3af; /* gray-400 */
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
 }
+
 .sidebar-link:hover {
-  background-color: #374151;
-  color: #ffffff;
+    background-color: #374151; /* gray-700 */
+    color: #ffffff;
 }
+
 .sidebar-link-active {
-  background-image: linear-gradient(to right, #4f46e5, #6d28d9);
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    background-image: linear-gradient(to right, #4f46e5, #6d28d9); /* gradasi indigo -> violet */
+    color: #ffffff;
+    font-weight: 600;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
+
+/* Style dasar untuk komponen lain */
 .chart-container {
-  position: relative;
-  width: 100%;
-  height: 320px;
+    position: relative;
+    width: 100%;
+    height: 320px;
 }
+
 .kpi-card {
-  transition: transform 0.2s, box-shadow 0.2s;
-  border-color: #e2e8f0;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-color: #e2e8f0;
 }
+
 .kpi-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
+
 .stock-badge {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 9999px;
-  font-weight: 600;
-  font-size: 0.8rem;
-  line-height: 1;
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    line-height: 1;
 }
+
 .stock-safe {
-  background-color: #dcfce7;
-  color: #166534;
+    background-color: #dcfce7; /* green-100 */
+    color: #166534; /* green-800 */
 }
+
 .stock-low {
-  background-color: #fef3c7;
-  color: #92400e;
+    background-color: #fef3c7; /* yellow-100 */
+    color: #92400e; /* yellow-800 */
 }
+
 .stock-empty {
-  background-color: #fee2e2;
-  color: #991b1b;
+    background-color: #fee2e2; /* red-100 */
+    color: #991b1b; /* red-800 */
 }
+
+
 .accordion-content {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.5s ease-in-out;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease-in-out;
 }
 .accordion-content.open {
-  max-height: 1000px;
+    max-height: 1000px; /* Cukup besar untuk menampung konten */
 }
+
+/* Styling untuk konten di dalam v-html */
 .panduan-content ul {
-  list-style-position: outside;
-  padding-left: 1.5rem;
+    list-style-position: outside;
+    padding-left: 1.5rem;
 }
 .panduan-content li {
-  margin-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
 }
+
 .barcode-page-grid {
-  display: grid;
-  grid-template-columns: 400px 1fr;
-  gap: 2rem;
-  height: calc(100vh - 120px);
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 2rem;
+    height: calc(100vh - 120px);
 }
 .barcode-settings-panel {
-  background: #f8fafc;
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  border: 1px solid #e2e8f0;
-  overflow-y: auto;
-  height: 100%;
+    background: #f8fafc;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid #e2e8f0;
+    overflow-y: auto;
+    height: 100%;
 }
 .barcode-preview-area {
-  background: #f1f5f9;
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  overflow: auto;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+    background: #f1f5f9;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    overflow: auto;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
 }
+
 .preview-sheet {
-  background: white;
-  display: grid;
-  padding: 1mm;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  justify-content: center;
+    background: white;
+    display: grid;
+    padding: 1mm;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    justify-content: center;
 }
 .label-box {
-  background: white;
-  padding: 1.5mm;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: stretch;
-  overflow: hidden;
-  border: 1px dashed #e2e8f0;
+    background: white;
+    padding: 1.5mm;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: stretch;
+    overflow: hidden;
+    border: 1px dashed #e2e8f0;
 }
 .label-box p {
-  margin: 0;
-  line-height: 1.2;
-  flex-shrink: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    margin: 0;
+    line-height: 1.2;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .label-box .barcode-svg {
-  flex-grow: 1;
-  width: 100%;
-  min-height: 10px;
+    flex-grow: 1;
+    width: 100%;
+    min-height: 10px;
 }
+
 </style>
