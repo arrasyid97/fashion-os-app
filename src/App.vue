@@ -5091,14 +5091,12 @@ onMounted(() => {
 
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
-        // Hentikan listener lama jika ada
         if (onSnapshotListener) onSnapshotListener();
         if (commissionsListener) commissionsListener();
 
         if (user) {
             currentUser.value = user;
 
-            // Listener untuk data pengguna
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
@@ -5111,9 +5109,12 @@ onMounted(() => {
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                        (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
                     if (isSubscriptionValid) {
+                        // ▼▼▼ BARIS INI YANG MEMPERBAIKI MASALAH ANDA ▼▼▼
+                        await loadAllDataFromFirebase(); // Memuat semua data utama DARI Firestore
+
                         if (currentUser.value.isPartner) {
                             const commissionsQuery = query(
                                 collection(db, 'commissions'),
@@ -5125,12 +5126,13 @@ onMounted(() => {
                                     fetchedCommissions.push({ id: doc.id, ...doc.data() });
                                 });
                                 commissions.value = fetchedCommissions;
-                                console.log(`INFO: Komisi berhasil dimuat. Total: ${commissions.value.length} item.`);
                             });
                         }
+                        
                         const storedPage = localStorage.getItem('lastActivePage');
                         const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         changePage(pageToLoad);
+
                     } else {
                         activePage.value = 'langganan';
                     }
