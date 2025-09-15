@@ -4988,7 +4988,7 @@ async function loadAllDataFromFirebase() {
         const collectionsToFetch = [
             getDoc(doc(db, "settings", userId)),
             getDoc(doc(db, "promotions", userId)),
-            getDoc(doc(db, "commissions", userId)),
+            
             getDocs(query(collection(db, "products"), where("userId", "==", userId))),
             getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
             getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
