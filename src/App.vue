@@ -4935,11 +4935,10 @@ async function loadAllDataFromFirebase() {
         return;
     }
     try {
-        // --- [PERUBAHAN 1: Menambahkan 'commissions' untuk diambil] ---
         const collectionsToFetch = [
             getDoc(doc(db, "settings", userId)),
             getDoc(doc(db, "promotions", userId)),
-            getDoc(doc(db, "commissions", userId)), // <-- BARIS BARU DITAMBAHKAN
+            getDoc(doc(db, "commissions", userId)),
             getDocs(query(collection(db, "products"), where("userId", "==", userId))),
             getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
             getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
@@ -4955,8 +4954,7 @@ async function loadAllDataFromFirebase() {
         ];
 
         const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
-
-        // --- [PERUBAHAN 2: Menambahkan variabel 'commissionsSnap'] ---
+        
         const [
             settingsSnap, promotionsSnap, commissionsSnap, productsSnap, pricesSnap, allocationsSnap,
             transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
@@ -4985,17 +4983,14 @@ async function loadAllDataFromFirebase() {
         if (promotionsSnap.exists()) {
             Object.assign(state.promotions, promotionsSnap.data());
         }
-
-        // --- [PERUBAHAN 3: Memproses data komisi yang baru diambil] ---
+        
         if (commissionsSnap && commissionsSnap.exists()) {
             Object.assign(state.commissions, commissionsSnap.data());
         }
-        // --- [AKHIR PERUBAHAN 3] ---
 
         const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
         
-        // --- [PERUBAHAN 4: Menghapus logika komisi lama dari data produk] ---
         state.produk = productsSnap.docs.map(docSnap => {
             const p = { id: docSnap.id, ...docSnap.data() };
             const hargaJual = {};
@@ -5017,7 +5012,6 @@ async function loadAllDataFromFirebase() {
                 hpp: p.hpp, 
                 hargaJual, 
                 stokAlokasi,
-                // Properti 'commissions' dihapus dari sini karena sekarang dikelola secara global
                 userId: p.userId
             };
         });
@@ -5048,8 +5042,6 @@ onMounted(() => {
 
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
-        
-        // Hapus semua listener sebelumnya untuk mencegah duplikasi
         if (onSnapshotListener) {
             onSnapshotListener();
             onSnapshotListener = null;
@@ -5061,8 +5053,6 @@ onMounted(() => {
 
         if (user) {
             currentUser.value = user;
-            
-            // Listener untuk data user secara real-time
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
@@ -5075,13 +5065,10 @@ onMounted(() => {
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+                        (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
                     if (isSubscriptionValid) {
-                        // Muat semua data aplikasi setelah user terotentikasi
                         await loadAllDataFromFirebase();
-                        
-                        // Setel listener komisi HANYA JIKA user adalah mitra
                         if (currentUser.value.isPartner) {
                             const commissionsQuery = query(
                                 collection(db, 'commissions'),
@@ -5096,13 +5083,10 @@ onMounted(() => {
                                 console.log(`INFO: Komisi berhasil dimuat: ${commissions.value.length} item.`);
                             });
                         }
-                        
-                        // Redirect ke halaman terakhir yang dikunjungi
                         const storedPage = localStorage.getItem('lastActivePage');
                         const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         changePage(pageToLoad);
                     } else {
-                        // Jika langganan tidak valid, arahkan ke halaman langganan
                         activePage.value = 'langganan';
                     }
                 } else {
@@ -5125,10 +5109,7 @@ onMounted(() => {
 });
 
 // Perbaikan pada fungsi loadAllDataFromFirebase
-async function loadAllDataFromFirebase() {
-    // ... (kode di dalamnya tetap sama seperti sebelumnya, karena kita sudah memperbaiki bagian commissions di atas)
-    // Cukup pastikan bagian `getDoc(doc(db, "commissions", userId))` sudah TIDAK ADA.
-}
+
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
