@@ -5027,7 +5027,6 @@ async function loadAllDataFromFirebase() {
     }
 }
 
-// GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
     updateTime();
     intervalId = setInterval(updateTime, 1000);
@@ -5057,8 +5056,6 @@ onMounted(() => {
                         (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
                     if (isSubscriptionValid) {
-                        // Anda dapat memanggil fungsi-fungsi pemuat data lainnya di sini jika diperlukan
-                        // await loadAllDataFromFirebase();
                         if (currentUser.value.isPartner) {
                             const commissionsQuery = query(
                                 collection(db, 'commissions'),
