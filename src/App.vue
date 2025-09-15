@@ -35,12 +35,28 @@ const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
 
 const commissions = ref([]);
+
 const totalUnpaidCommission = computed(() => {
-    return commissions.value.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + c.amount, 0);
+    return commissions.value.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + c.commissionAmount, 0);
 });
 
 const totalPaidCommission = computed(() => {
-    return commissions.value.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0);
+    return commissions.value.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.commissionAmount, 0);
+});
+
+const totalRevenue = computed(() => {
+  // Total semua komisi yang pernah didapat (dibayar + belum dibayar)
+  return totalPaidCommission.value + totalUnpaidCommission.value;
+});
+
+const availableForWithdrawal = computed(() => {
+  // Alias untuk totalUnpaidCommission agar lebih jelas
+  return totalUnpaidCommission.value;
+});
+
+const totalWithdrawn = computed(() => {
+  // Alias untuk totalPaidCommission agar lebih jelas
+  return totalPaidCommission.value;
 });
 
 const unpaidCommissions = computed(() => {
