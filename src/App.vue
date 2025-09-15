@@ -5191,13 +5191,12 @@ const printBarcode = async () => {
         const service = await gattServer.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
         const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
 
-        // Buat perintah cetak dalam bahasa printer TSPL (contoh)
-        const barcodeWidth = 300; // Lebar barcode dalam dot
-        const barcodeHeight = 100; // Tinggi barcode dalam dot
-        const barcodeX = 50; // Posisi X
-        const barcodeY = 50; // Posisi Y
-        const textX = 50; // Posisi X teks
-        const textY = 150; // Posisi Y teks
+        const barcodeWidth = 300;
+        const barcodeHeight = 100;
+        const barcodeX = 50;
+        const barcodeY = 50;
+        const textX = 50;
+        const textY = 150;
 
         // Ini adalah contoh perintah TSPL. Anda mungkin perlu menyesuaikannya
         // dengan model printer spesifik Anda.
@@ -5210,7 +5209,7 @@ const printBarcode = async () => {
         command += `DIRECTION 1,0\r\n`; // Arah cetak
         command += `SET TEAR OFF\r\n`; // Nonaktifkan mode sobek otomatis
         command += `CODEPAGE 1252\r\n`; // Karakter set
-        command += `BARCODE ${barcodeX},${barcodeY},"128",${barcodeHeight},1,0,2,2,"${barcodeContent.value}"\r\n`;
+        command += `BARCODE ${barcodeX},${barcodeY},"128",1,1,1,2,2,"${barcodeContent.value}"\r\n`;
         command += `PRINT ${printCount.value},1\r\n`; // Mencetak sebanyak 'printCount'
 
         const encoder = new TextEncoder();
