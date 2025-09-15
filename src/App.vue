@@ -5048,6 +5048,7 @@ onMounted(() => {
             onSnapshotListener();
             onSnapshotListener = null;
         }
+        // Pastikan listener komisi dihentikan dengan benar
         if (commissionsListener) {
             commissionsListener();
             commissionsListener = null;
@@ -5072,6 +5073,7 @@ onMounted(() => {
                     if (isSubscriptionValid) {
                         await loadAllDataFromFirebase();
                         if (currentUser.value.isPartner) {
+                            // --- KODE PERBAIKAN: Menggunakan query untuk mengambil komisi
                             const commissionsQuery = query(
                                 collection(db, 'commissions'),
                                 where('partnerId', '==', currentUser.value.uid)
@@ -5109,8 +5111,6 @@ onMounted(() => {
         }
     });
 });
-
-// Perbaikan pada fungsi loadAllDataFromFirebase
 
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
