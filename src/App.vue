@@ -5026,6 +5026,8 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 async function loadAllDataFromFirebase() {
     isLoading.value = true;
     const userId = currentUser.value?.uid;
+    console.log('--- Memuat Data ---');
+    console.log('Mencari semua data untuk userId:', userId);
     if (!userId) {
         isLoading.value = false;
         return;
