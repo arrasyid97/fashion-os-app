@@ -4,9 +4,8 @@ import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 
-// Impor dari file konfigurasi Firebase Anda
-
-import { db, auth } from './firebase.js'; 
+import JsBarcode from 'jsbarcode';
+import { db, auth } from './firebase.js';
 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
@@ -48,7 +47,27 @@ const unpaidCommissions = computed(() => {
     return commissions.value.filter(c => c.status === 'unpaid').sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000));
 });
 
+const renderBarcodePreview = () => {
+    if (barcodeCanvas.value && barcodeContent.value) {
+        JsBarcode(barcodeCanvas.value, barcodeContent.value, {
+            format: "CODE128", // Jenis format barcode, sesuaikan jika perlu
+            width: 2,
+            height: 50,
+            displayValue: true
+        });
+    }
+};
 
+// Panggil fungsi render setiap kali konten berubah
+watch(barcodeContent, () => {
+    nextTick(renderBarcodePreview);
+});
+
+// Panggil fungsi render saat halaman dimuat
+onMounted(() => {
+    // ... (kode onMounted lama Anda)
+    nextTick(renderBarcodePreview);
+});
 
 const isDashboardLocked = ref(true);
 const dashboardPinInput = ref('');
@@ -5124,11 +5143,7 @@ onMounted(() => {
     });
 });
 
-// Perbaikan pada fungsi loadAllDataFromFirebase
-async function loadAllDataFromFirebase() {
-    // ... (kode di dalamnya tetap sama seperti sebelumnya, karena kita sudah memperbaiki bagian commissions di atas)
-    // Cukup pastikan bagian `getDoc(doc(db, "commissions", userId))` sudah TIDAK ADA.
-}
+
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
@@ -5136,65 +5151,93 @@ watch(activePage, (newPage) => {
 });
 
 // --- STATE MANAGEMENT BARU UNTUK BARCODE ---
+
+
 const isConnecting = ref(false);
-const bluetoothDevice = ref(null);
-const connectionError = ref('');
+    const bluetoothDevice = ref(null);
+    const connectionError = ref('');
+    const isPrinting = ref(false);
+    const barcodeCanvas = ref(null);
 
-// State untuk pengaturan label yang dikirim ke printer
-const labelSettings = reactive({
-  width: 33,
-  height: 15,
-  columns: 3,
-  labelGap: 2,
-  paperType: 'gap', // 'gap', 'black-mark', 'continuous'
-  printSpeed: 2, // 1-5 ips (inches per second)
-  printDensity: 8, // 1-15 tingkat
-});
-
-const barcodeContent = ref('1234567890');
-const printCount = ref(1);
-
-// --- FUNGSI BARU UNTUK KONEKSI BLUETOOTH ---
-const connectBluetooth = async () => {
-  if (!navigator.bluetooth) {
-    alert('Browser Anda tidak mendukung Web Bluetooth. Silakan gunakan Chrome atau Edge dan pastikan fitur ini aktif.');
-    return;
-  }
-  
-  isConnecting.value = true;
-  connectionError.value = '';
-  bluetoothDevice.value = null;
-
-  try {
-    // Perintah untuk mencari perangkat Bluetooth
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] // Ini adalah UUID layanan untuk printer thermal
+    const labelSettings = reactive({
+      width: 33,
+      height: 15,
+      columns: 3,
+      labelGap: 2,
+      paperType: 'gap',
+      printSpeed: 2,
+      printDensity: 8,
     });
-    bluetoothDevice.value = device;
-    alert(`Berhasil terhubung ke: ${device.name}`);
-  } catch (error) {
-    console.error("Kesalahan koneksi Bluetooth:", error);
-    connectionError.value = 'Gagal terhubung. Pastikan printer menyala dan Bluetooth aktif.';
-  } finally {
-    isConnecting.value = false;
-  }
-};
 
-const printBarcode = async () => {
-  if (!bluetoothDevice.value || !barcodeContent.value) {
-    alert('Harap hubungkan ke printer dan masukkan konten barcode.');
-    return;
-  }
-  try {
-    // Di sini Anda perlu menambahkan logika untuk mengirim data cetak
-    // ke printer thermal dalam format yang benar (misalnya, bahasa ZPL atau TSPL)
+    const barcodeContent = ref('1234567890');
+    const printCount = ref(1);
+
+    const renderBarcodePreview = () => {
+        if (barcodeCanvas.value && barcodeContent.value) {
+            JsBarcode(barcodeCanvas.value, barcodeContent.value, {
+                format: "CODE128",
+                width: 2,
+                height: 50,
+                displayValue: true
+            });
+        }
+    };
     
-    alert('Perintah cetak berhasil dikirim! (Simulasi)');
-  } catch (error) {
-    console.error("Gagal mencetak:", error);
-    alert('Gagal mengirim perintah cetak. Coba lagi.');
-  }
-};
+    // Fungsi ini dipanggil dari button @click
+    const connectBluetooth = async () => {
+      if (!navigator.bluetooth) {
+        alert('Browser Anda tidak mendukung Web Bluetooth. Silakan gunakan Chrome atau Edge dan pastikan fitur ini aktif.');
+        return;
+      }
+    
+      isConnecting.value = true;
+      connectionError.value = '';
+      bluetoothDevice.value = null;
+    
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }]
+        });
+        bluetoothDevice.value = device;
+        alert(`Berhasil terhubung ke: ${device.name}`);
+      } catch (error) {
+        console.error("Kesalahan koneksi Bluetooth:", error);
+        connectionError.value = 'Gagal terhubung. Pastikan printer menyala dan Bluetooth aktif.';
+      } finally {
+        isConnecting.value = false;
+      }
+    };
+
+    // Fungsi ini dipanggil dari button @click
+    const printBarcode = async () => {
+        if (!bluetoothDevice.value || !barcodeContent.value) {
+            alert('Harap hubungkan ke printer dan masukkan konten barcode.');
+            return;
+        }
+
+        try {
+            isPrinting.value = true;
+            const server = await bluetoothDevice.value.gatt.connect();
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+            const tsplCommands = `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`
+                              + `GAP ${labelSettings.labelGap} mm,0 mm\r\n`
+                              + `CLS\r\n`
+                              + `BARCODE 100,100,"128",50,1,0,2,2,"${barcodeContent.value}"\r\n`
+                              + `PRINT ${printCount.value}\r\n`;
+
+            const encoder = new TextEncoder();
+            await characteristic.writeValue(encoder.encode(tsplCommands));
+
+            alert('Perintah cetak berhasil dikirim!');
+        } catch (error) {
+            console.error("Gagal mencetak:", error);
+            alert('Gagal mengirim perintah cetak. Pastikan printer menyala dan terhubung dengan benar.');
+        } finally {
+            isPrinting.value = false;
+        }
+    };
 
 </script>
 
@@ -6881,7 +6924,7 @@ const printBarcode = async () => {
       <div class="bg-white rounded-xl shadow-lg p-6">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">2. Pratinjau Label</h3>
         <div class="preview-area border p-4 rounded-lg bg-slate-50 flex items-center justify-center min-h-[300px]">
-          <canvas id="barcodeCanvas"></canvas>
+          <canvas id="barcodeCanvas" ref="barcodeCanvas"></canvas>
         </div>
       </div>
 
@@ -10089,176 +10132,148 @@ const printBarcode = async () => {
 </template>
 
 <style scoped>
-
-
 .help-icon-button {
   position: absolute;
-  top: 0.5rem; /* 8px */
-  right: 0.5rem; /* 8px */
-  width: 1.25rem; /* 20px */
-  height: 1.25rem; /* 20px */
-  border-radius: 9999px; /* rounded-full */
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f1f5f9; /* slate-100 */
-  color: #64748b; /* slate-500 */
+  background-color: #f1f5f9;
+  color: #64748b;
   font-weight: bold;
-  font-size: 0.875rem; /* text-sm */
+  font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 }
-
 .help-icon-button:hover {
-  background-color: #6366f1; /* indigo-500 */
+  background-color: #6366f1;
   color: white;
   transform: scale(1.1);
 }
-
-
-/* Gaya Sidebar Baru yang Profesional */
 .sidebar-link {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    font-weight: 500;
-    color: #9ca3af; /* gray-400 */
-    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  color: #9ca3af;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
 }
-
 .sidebar-link:hover {
-    background-color: #374151; /* gray-700 */
-    color: #ffffff;
+  background-color: #374151;
+  color: #ffffff;
 }
-
 .sidebar-link-active {
-    background-image: linear-gradient(to right, #4f46e5, #6d28d9); /* gradasi indigo -> violet */
-    color: #ffffff;
-    font-weight: 600;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  background-image: linear-gradient(to right, #4f46e5, #6d28d9);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
-
-/* Style dasar untuk komponen lain */
 .chart-container {
-    position: relative;
-    width: 100%;
-    height: 320px;
+  position: relative;
+  width: 100%;
+  height: 320px;
 }
-
 .kpi-card {
-    transition: transform 0.2s, box-shadow 0.2s;
-    border-color: #e2e8f0;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-color: #e2e8f0;
 }
-
 .kpi-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
-
 .stock-badge {
-    display: inline-block;
-    padding: 0.2rem 0.6rem;
-    border-radius: 9999px;
-    font-weight: 600;
-    font-size: 0.8rem;
-    line-height: 1;
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  line-height: 1;
 }
-
 .stock-safe {
-    background-color: #dcfce7; /* green-100 */
-    color: #166534; /* green-800 */
+  background-color: #dcfce7;
+  color: #166534;
 }
-
 .stock-low {
-    background-color: #fef3c7; /* yellow-100 */
-    color: #92400e; /* yellow-800 */
+  background-color: #fef3c7;
+  color: #92400e;
 }
-
 .stock-empty {
-    background-color: #fee2e2; /* red-100 */
-    color: #991b1b; /* red-800 */
+  background-color: #fee2e2;
+  color: #991b1b;
 }
-
-
 .accordion-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.5s ease-in-out;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.5s ease-in-out;
 }
 .accordion-content.open {
-    max-height: 1000px; /* Cukup besar untuk menampung konten */
+  max-height: 1000px;
 }
-
-/* Styling untuk konten di dalam v-html */
 .panduan-content ul {
-    list-style-position: outside;
-    padding-left: 1.5rem;
+  list-style-position: outside;
+  padding-left: 1.5rem;
 }
 .panduan-content li {
-    margin-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
 }
-
-
-/* =================================================================== */
-/* V V V GANTI SEMUA STYLE BARCODE DENGAN INI V V V */
-/* =================================================================== */
 .barcode-page-grid {
-    display: grid;
-    grid-template-columns: 400px 1fr;
-    gap: 2rem;
-    height: calc(100vh - 120px);
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 2rem;
+  height: calc(100vh - 120px);
 }
 .barcode-settings-panel {
-    background: #f8fafc;
-    padding: 1.5rem;
-    border-radius: 0.75rem;
-    border: 1px solid #e2e8f0;
-    overflow-y: auto;
-    height: 100%;
+  background: #f8fafc;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  overflow-y: auto;
+  height: 100%;
 }
 .barcode-preview-area {
-    background: #f1f5f9;
-    padding: 1.5rem;
-    border-radius: 0.75rem;
-    overflow: auto;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
+  background: #f1f5f9;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  overflow: auto;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
-/* ... (sisa style panel pengaturan Anda yang lain tetap sama) ... */
-
 .preview-sheet {
-    background: white;
-    display: grid;
-    padding: 1mm;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    justify-content: center;
+  background: white;
+  display: grid;
+  padding: 1mm;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  justify-content: center;
 }
 .label-box {
-    background: white;
-    padding: 1.5mm;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: stretch;
-    overflow: hidden;
-    border: 1px dashed #e2e8f0;
+  background: white;
+  padding: 1.5mm;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px dashed #e2e8f0;
 }
 .label-box p {
-    margin: 0;
-    line-height: 1.2;
-    flex-shrink: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  margin: 0;
+  line-height: 1.2;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .label-box .barcode-svg {
-    flex-grow: 1;
-    width: 100%;
-    min-height: 10px;
+  flex-grow: 1;
+  width: 100%;
+  min-height: 10px;
 }
-
 </style>
