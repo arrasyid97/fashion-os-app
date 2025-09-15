@@ -5073,20 +5073,19 @@ onMounted(() => {
                     if (isSubscriptionValid) {
                         await loadAllDataFromFirebase();
                         if (currentUser.value.isPartner) {
-                            // --- KODE PERBAIKAN: Menggunakan query untuk mengambil komisi
-                            const commissionsQuery = query(
-                                collection(db, 'commissions'),
-                                where('partnerId', '==', currentUser.value.uid)
-                            );
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                const fetchedCommissions = [];
-                                snapshot.forEach(doc => {
-                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
-                                });
-                                commissions.value = fetchedCommissions;
-                                console.log(`INFO: Komisi berhasil dimuat: ${commissions.value.length} item.`);
-                            });
-                        }
+    const commissionsQuery = query(
+        collection(db, 'commissions'),
+        where('partnerId', '==', currentUser.value.uid)
+    );
+    commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+        const fetchedCommissions = [];
+        snapshot.forEach(doc => {
+            fetchedCommissions.push({ id: doc.id, ...doc.data() });
+        });
+        commissions.value = fetchedCommissions;
+        // Opsional: Anda bisa tambahkan console.log di sini untuk debugging
+    });
+}
                         const storedPage = localStorage.getItem('lastActivePage');
                         const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         changePage(pageToLoad);
