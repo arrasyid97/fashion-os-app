@@ -4855,7 +4855,7 @@ function saveSpecialPrice() {
 
     alert(`Harga spesial untuk SKU ${sku} di channel terpilih berhasil disimpan!`);
     
-    // Reset form di dalam modal
+    // Reset form dii dalam modal
     uiState.selectedProductForSpecialPrice = null;
     uiState.specialPriceSearch = '';
     uiState.specialPriceInput = null;
