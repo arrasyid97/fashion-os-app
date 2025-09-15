@@ -4988,7 +4988,7 @@ async function loadAllDataFromFirebase() {
         const collectionsToFetch = [
             getDoc(doc(db, "settings", userId)),
             getDoc(doc(db, "promotions", userId)),
-            
+            // Baris untuk 'commissions' sudah benar dihapus dari sini
             getDocs(query(collection(db, "products"), where("userId", "==", userId))),
             getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
             getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
@@ -5004,19 +5004,21 @@ async function loadAllDataFromFirebase() {
         ];
 
         const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
-        console.log('Hasil mentah dari semua koleksi:', results);
+        
+        // Cek apakah ada error dari salah satu promise
+        const firstError = results.find(res => res instanceof Error);
+        if (firstError) {
+            console.error("Salah satu kueri data gagal:", firstError);
+            throw new Error("Gagal mengambil data. Periksa aturan keamanan Firestore Anda.");
+        }
+        
+        // ▼▼▼ BAGIAN INI TELAH DIPERBAIKI (variabel commissionsSnap dihapus) ▼▼▼
         const [
-            settingsSnap, promotionsSnap, commissionsSnap, productsSnap, pricesSnap, allocationsSnap,
+            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
             transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
             categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap
         ] = results;
 
-        const firstError = results.find(res => res instanceof Error);
-        if (firstError) {
-            console.error("Salah satu query gagal:", firstError);
-            throw new Error("Gagal mengambil data. Periksa aturan keamanan Firestore Anda.");
-        }
-        
         if (settingsSnap.exists()) {
             Object.assign(state.settings, settingsSnap.data());
             if (!state.settings.pinProtection) {
@@ -5034,9 +5036,8 @@ async function loadAllDataFromFirebase() {
             Object.assign(state.promotions, promotionsSnap.data());
         }
         
-        if (commissionsSnap && commissionsSnap.exists()) {
-            Object.assign(state.commissions, commissionsSnap.data());
-        }
+        // ▼▼▼ BAGIAN INI TELAH DIPERBAIKI (pengecekan commissionsSnap dihapus) ▼▼▼
+        // Data komisi sudah dimuat oleh listener terpisah, jadi tidak perlu diproses di sini.
 
         const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
@@ -5045,22 +5046,22 @@ async function loadAllDataFromFirebase() {
             const p = { id: docSnap.id, ...docSnap.data() };
             const hargaJual = {};
             const stokAlokasi = {};
-            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id); 
+            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
             (state.settings.marketplaces || []).forEach(mp => {
-                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id); 
+                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
                 hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
                 stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
             });
             return {
                 docId: p.id,
                 sku: p.sku,
-                nama: p.product_name, 
-                model_id: p.model_id, 
-                warna: p.color, 
+                nama: p.product_name,
+                model_id: p.model_id,
+                warna: p.color,
                 varian: p.variant,
-                stokFisik: p.physical_stock, 
-                hpp: p.hpp, 
-                hargaJual, 
+                stokFisik: p.physical_stock,
+                hpp: p.hpp,
+                hargaJual,
                 stokAlokasi,
                 userId: p.userId
             };
