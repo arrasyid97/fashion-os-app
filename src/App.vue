@@ -3,17 +3,28 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
-import JsBarcode from 'jsbarcode';
 
+import JsBarcode from 'jsbarcode';
 import { db, auth } from './firebase.js';
-import { 
-    collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, 
-    addDoc, onSnapshot, query, where, getDocs, getDoc 
-} from 'firebase/firestore';
-import { 
-    onAuthStateChanged, signOut, GoogleAuthProvider, 
-    signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword 
+
+
+// Impor fungsi-fungsi untuk Database (Firestore)
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
+let onSnapshotListener = null;
+let commissionsListener = null;
+let bulkSearchDebounceTimer = null;
+// Impor fungsi-fungsi BARU untuk Autentikasii
+import { 
+    onAuthStateChanged, 
+    signOut,
+    GoogleAuthProvider, // <-- Impor Google Provider
+    
+    signInWithPopup, // <-- Impor signInWithPopup
+    
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword 
 } from "firebase/auth";
+
 // --- STATE MANAGEMENT ---
 const activePage = ref('dashboard');
 const isLoading = ref(true);
@@ -37,6 +48,16 @@ const unpaidCommissions = computed(() => {
     return commissions.value.filter(c => c.status === 'unpaid').sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000));
 });
 
+const renderBarcodePreview = () => {
+    if (barcodeCanvas.value && barcodeContent.value) {
+        JsBarcode(barcodeCanvas.value, barcodeContent.value, {
+            format: "CODE128", // Jenis format barcode, sesuaikan jika perlu
+            width: 2,
+            height: 50,
+            displayValue: true
+        });
+    }
+};
 
 // Panggil fungsi render setiap kali konten berubah
 watch(barcodeContent, () => {
@@ -5040,102 +5061,57 @@ async function loadAllDataFromFirebase() {
     }
 }
 
+// GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
     updateTime();
     intervalId = setInterval(updateTime, 1000);
-
-    // Pastikan pratinjau barcode dimuat saat halaman dimuat
-    nextTick(renderBarcodePreview);
-
+    
+    // Perbaikan utama ada di sini:
+    // Gunakan onAuthStateChanged untuk mendengarkan status login pengguna
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
-        // Hapus semua listener sebelumnya untuk mencegah duplikasi
+        // Hapus semua listener onSnapshot sebelumnya untuk mencegah duplikasi
         if (onSnapshotListener) {
             onSnapshotListener();
             onSnapshotListener = null;
         }
-        if (commissionsListener) {
-            commissionsListener();
-            commissionsListener = null;
-        }
-
+        
         if (user) {
             currentUser.value = user;
-
-            // Langsung memuat data pengguna
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-
-            if (!userDocSnap.exists()) {
-                // Jika pengguna baru, buat dokumen dasarnya dengan trial
-                const now = new Date();
-                const threeDaysLater = new Date(now.setDate(now.getDate() + 3));
-                const newUserData = {
-                    email: user.email,
-                    subscriptionStatus: 'trial',
-                    subscriptionEndDate: null,
-                    trialEndDate: threeDaysLater,
-                    dashboardPin: null,
-                    isPartner: false,
-                    referralCode: null,
-                    referredBy: null
-                };
-                await setDoc(userDocRef, newUserData);
-                // Langsung muat data dari Firebase setelah dokumen dibuat
-                await loadAllDataFromFirebase();
-                activePage.value = 'dashboard';
-                isLoading.value = false;
-                return;
-            }
-
-            // Jika pengguna lama, set listener untuk data user secara real-time
-            onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
+            
+            // Atur listener onSnapshot untuk data pengguna secara real-time
+            onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
                     state.settings.dashboardPin = userData.dashboardPin || '';
-                    currentUser.value.isPartner = userData.isPartner || false;
-                    currentUser.value.referralCode = userData.referralCode || null;
 
+                    // Cek status langganan
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
-                    const trialDate = userData.trialEndDate?.toDate();
-                    const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                        (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+                    const isSubscriptionValid = userData.subscriptionStatus === 'active' && endDate && now <= endDate;
 
                     if (isSubscriptionValid) {
+                        // Jika langganan aktif, muat semua data aplikasi
                         await loadAllDataFromFirebase();
-                        if (currentUser.value.isPartner) {
-                            const commissionsQuery = query(
-                                collection(db, 'commissions'),
-                                where('partnerId', '==', currentUser.value.uid)
-                            );
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                const fetchedCommissions = [];
-                                snapshot.forEach(doc => {
-                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
-                                });
-                                commissions.value = fetchedCommissions;
-                                console.log(`INFO: Komisi berhasil dimuat: ${commissions.value.length} item.`);
-                            });
-                        }
                         const storedPage = localStorage.getItem('lastActivePage');
                         const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         changePage(pageToLoad);
                     } else {
+                        // Jika langganan tidak aktif, arahkan ke halaman langganan
                         activePage.value = 'langganan';
                     }
                 } else {
-                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
+                    console.error("Dokumen pengguna tidak ditemukan di Firestore.");
                     handleLogout();
                 }
                 isLoading.value = false;
             }, (error) => {
                 console.error("Gagal mendengarkan data pengguna:", error);
-                alert("Gagal memuat data pengguna. Silakan coba lagi.");
                 isLoading.value = false;
                 handleLogout();
             });
+            
         } else {
             currentUser.value = null;
             activePage.value = 'login';
@@ -5145,99 +5121,58 @@ onMounted(() => {
 });
 
 
+
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
 // --- STATE MANAGEMENT BARU UNTUK BARCODE ---
-
-
 const isConnecting = ref(false);
-    const bluetoothDevice = ref(null);
-    const connectionError = ref('');
-    const isPrinting = ref(false);
-    const barcodeCanvas = ref(null);
+const bluetoothDevice = ref(null);
+const connectionError = ref('');
 
-    const labelSettings = reactive({
-      width: 33,
-      height: 15,
-      columns: 3,
-      labelGap: 2,
-      paperType: 'gap',
-      printSpeed: 2,
-      printDensity: 8,
+// State untuk pengaturan label yang dikirim ke printer
+const labelSettings = reactive({
+  width: 33,
+  height: 15,
+  columns: 3,
+  labelGap: 2,
+  paperType: 'gap', // 'gap', 'black-mark', 'continuous'
+  printSpeed: 2, // 1-5 ips (inches per second)
+  printDensity: 8, // 1-15 tingkat
+});
+
+const barcodeContent = ref('1234567890');
+const printCount = ref(1);
+
+// --- FUNGSI BARU UNTUK KONEKSI BLUETOOTH ---
+const connectBluetooth = async () => {
+  if (!navigator.bluetooth) {
+    alert('Browser Anda tidak mendukung Web Bluetooth. Silakan gunakan Chrome atau Edge dan pastikan fitur ini aktif.');
+    return;
+  }
+  
+  isConnecting.value = true;
+  connectionError.value = '';
+  bluetoothDevice.value = null;
+
+  try {
+    // Perintah untuk mencari perangkat Bluetooth
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] // Ini adalah UUID layanan untuk printer thermal
     });
+    bluetoothDevice.value = device;
+    alert(`Berhasil terhubung ke: ${device.name}`);
+  } catch (error) {
+    console.error("Kesalahan koneksi Bluetooth:", error);
+    connectionError.value = 'Gagal terhubung. Pastikan printer menyala dan Bluetooth aktif.';
+  } finally {
+    isConnecting.value = false;
+  }
+};
 
-    const barcodeContent = ref('1234567890');
-    const printCount = ref(1);
 
-    const renderBarcodePreview = () => {
-        if (barcodeCanvas.value && barcodeContent.value) {
-            JsBarcode(barcodeCanvas.value, barcodeContent.value, {
-                format: "CODE128",
-                width: 2,
-                height: 50,
-                displayValue: true
-            });
-        }
-    };
-    
-    // Fungsi ini dipanggil dari button @click
-    const connectBluetooth = async () => {
-      if (!navigator.bluetooth) {
-        alert('Browser Anda tidak mendukung Web Bluetooth. Silakan gunakan Chrome atau Edge dan pastikan fitur ini aktif.');
-        return;
-      }
-    
-      isConnecting.value = true;
-      connectionError.value = '';
-      bluetoothDevice.value = null;
-    
-      try {
-        const device = await navigator.bluetooth.requestDevice({
-          filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }]
-        });
-        bluetoothDevice.value = device;
-        alert(`Berhasil terhubung ke: ${device.name}`);
-      } catch (error) {
-        console.error("Kesalahan koneksi Bluetooth:", error);
-        connectionError.value = 'Gagal terhubung. Pastikan printer menyala dan Bluetooth aktif.';
-      } finally {
-        isConnecting.value = false;
-      }
-    };
-
-    // Fungsi ini dipanggil dari button @click
-    const printBarcode = async () => {
-        if (!bluetoothDevice.value || !barcodeContent.value) {
-            alert('Harap hubungkan ke printer dan masukkan konten barcode.');
-            return;
-        }
-
-        try {
-            isPrinting.value = true;
-            const server = await bluetoothDevice.value.gatt.connect();
-            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-            const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-
-            const tsplCommands = `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`
-                              + `GAP ${labelSettings.labelGap} mm,0 mm\r\n`
-                              + `CLS\r\n`
-                              + `BARCODE 100,100,"128",50,1,0,2,2,"${barcodeContent.value}"\r\n`
-                              + `PRINT ${printCount.value}\r\n`;
-
-            const encoder = new TextEncoder();
-            await characteristic.writeValue(encoder.encode(tsplCommands));
-
-            alert('Perintah cetak berhasil dikirim!');
-        } catch (error) {
-            console.error("Gagal mencetak:", error);
-            alert('Gagal mengirim perintah cetak. Pastikan printer menyala dan terhubung dengan benar.');
-        } finally {
-            isPrinting.value = false;
-        }
-    };
 
 </script>
 
