@@ -4,6 +4,14 @@ import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 
+import JsBarcode from 'jsbarcode';
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import Chart from 'chart.js/auto';
+// ... impor lainnya
+
+// Tambahkan ref untuk elemen canvas
+const barcodeCanvas = ref(null);
+
 // Impor dari file konfigurasi Firebase Anda
 
 import { db, auth } from './firebase.js'; 
@@ -48,7 +56,27 @@ const unpaidCommissions = computed(() => {
     return commissions.value.filter(c => c.status === 'unpaid').sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000));
 });
 
+const renderBarcodePreview = () => {
+    if (barcodeCanvas.value && barcodeContent.value) {
+        JsBarcode(barcodeCanvas.value, barcodeContent.value, {
+            format: "CODE128", // Jenis format barcode, sesuaikan jika perlu
+            width: 2,
+            height: 50,
+            displayValue: true
+        });
+    }
+};
 
+// Panggil fungsi render setiap kali konten berubah
+watch(barcodeContent, () => {
+    nextTick(renderBarcodePreview);
+});
+
+// Panggil fungsi render saat halaman dimuat
+onMounted(() => {
+    // ... (kode onMounted lama Anda)
+    nextTick(renderBarcodePreview);
+});
 
 const isDashboardLocked = ref(true);
 const dashboardPinInput = ref('');
@@ -5177,19 +5205,36 @@ const connectBluetooth = async () => {
 };
 
 const printBarcode = async () => {
-  if (!bluetoothDevice.value || !barcodeContent.value) {
-    alert('Harap hubungkan ke printer dan masukkan konten barcode.');
-    return;
-  }
-  try {
-    // Di sini Anda perlu menambahkan logika untuk mengirim data cetak
-    // ke printer thermal dalam format yang benar (misalnya, bahasa ZPL atau TSPL)
-    
-    alert('Perintah cetak berhasil dikirim! (Simulasi)');
-  } catch (error) {
-    console.error("Gagal mencetak:", error);
-    alert('Gagal mengirim perintah cetak. Coba lagi.');
-  }
+    if (!bluetoothDevice.value || !barcodeContent.value) {
+        alert('Harap hubungkan ke printer dan masukkan konten barcode.');
+        return;
+    }
+
+    try {
+        isPrinting.value = true;
+        const server = await bluetoothDevice.value.gatt.connect();
+        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); // Service UUID untuk printer thermal
+        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb'); // Characteristic UUID untuk data cetak
+        
+        // Buat perintah cetak dalam bahasa TSPL (Thermal Label Printer Language)
+        const tsplCommands = `
+            SIZE ${labelSettings.width} mm,${labelSettings.height} mm
+            GAP ${labelSettings.labelGap} mm,0 mm
+            CLS
+            BARCODE 100,100,"128",50,1,0,2,2,"${barcodeContent.value}"
+            PRINT ${printCount.value}
+        `;
+        
+        const encoder = new TextEncoder();
+        await characteristic.writeValue(encoder.encode(tsplCommands));
+
+        alert('Perintah cetak berhasil dikirim!');
+    } catch (error) {
+        console.error("Gagal mencetak:", error);
+        alert('Gagal mengirim perintah cetak. Pastikan printer terhubung dengan benar.');
+    } finally {
+        isPrinting.value = false;
+    }
 };
 
 </script>
@@ -6877,7 +6922,7 @@ const printBarcode = async () => {
       <div class="bg-white rounded-xl shadow-lg p-6">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">2. Pratinjau Label</h3>
         <div class="preview-area border p-4 rounded-lg bg-slate-50 flex items-center justify-center min-h-[300px]">
-          <canvas id="barcodeCanvas"></canvas>
+          <canvas id="barcodeCanvas" ref="barcodeCanvas"></canvas>
         </div>
       </div>
 
