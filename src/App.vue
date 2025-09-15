@@ -179,6 +179,39 @@ async function makeUserPartner(userId) {
     }
 }
 
+async function updateReferralCode() {
+    const user = uiState.modalData.user;
+    const newCode = uiState.modalData.newReferralCode.trim();
+
+    if (!user || !newCode) {
+        return alert("Kode rujukan tidak boleh kosong.");
+    }
+    if (newCode.length < 5) {
+        return alert("Kode rujukan harus memiliki minimal 5 karakter.");
+    }
+
+    try {
+        isSaving.value = true;
+        const userRef = doc(db, "users", user.uid);
+        await updateDoc(userRef, {
+            referralCode: newCode
+        });
+
+        // Update data di state lokal agar tampilan langsung berubah
+        const userInState = uiState.allUsers.find(u => u.uid === user.uid);
+        if (userInState) {
+            userInState.referralCode = newCode;
+        }
+
+        hideModal();
+        alert(`Kode rujukan untuk ${user.email} berhasil diubah menjadi ${newCode}`);
+    } catch (error) {
+        console.error("Gagal mengubah kode rujukan:", error);
+        alert("Terjadi kesalahan saat mengubah kode rujukan.");
+    } finally {
+        isSaving.value = false;
+    }
+}
 
 async function deleteInvestor(investorId) {
     if (!confirm("Anda yakin ingin menghapus data investor ini secara permanen? Aksi ini tidak dapat dibatalkan.")) {
@@ -7415,14 +7448,19 @@ const printBarcode = async () => {
                                 <td class="p-3 text-center font-mono text-sm">
                                     {{ user.referralCode || '-' }}
                                 </td>
-                                <td class="p-3 text-right">
-                                    <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
-                                        Jadikan Mitra
-                                    </button>
-                                    <button v-else @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
-                                        Lihat Kode
-                                    </button>
-                                </td>
+                                <td class="p-3 text-right space-x-2">
+    <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
+        Jadikan Mitra
+    </button>
+    <div v-else class="inline-flex items-center gap-2">
+        <button @click="showModal('editReferralCode', { user: user, newReferralCode: user.referralCode })" class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-md hover:bg-blue-200 text-xs">
+            Edit
+        </button>
+        <button @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
+            Lihat Kode
+        </button>
+    </div>
+</td>
                             </tr>
                         </tbody>
                     </table>
@@ -7768,6 +7806,32 @@ const printBarcode = async () => {
     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
+</div>
+
+<div v-if="uiState.modalType === 'editReferralCode'" class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
+    <h3 class="text-xl font-bold mb-2">Edit Kode Rujukan</h3>
+    <p v-if="uiState.modalData.user" class="text-sm text-slate-500 mb-4">Mengubah kode untuk: <span class="font-semibold">{{ uiState.modalData.user.email }}</span></p>
+    
+    <form @submit.prevent="updateReferralCode">
+        <div>
+            <label class="block text-sm font-medium text-slate-700">Kode Rujukan Baru</label>
+            <input 
+                type="text" 
+                v-model="uiState.modalData.newReferralCode" 
+                class="mt-1 w-full p-2 border rounded-md font-mono text-lg" 
+                required
+            >
+            <p class="text-xs text-slate-500 mt-1">Gunakan huruf besar dan angka. Minimal 5 karakter.</p>
+        </div>
+        
+        <div class="flex justify-end gap-3 pt-6 border-t mt-4">
+            <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+            <button type="submit" :disabled="isSaving" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg disabled:bg-indigo-400">
+                <span v-if="isSaving">Menyimpan...</span>
+                <span v-else>Simpan Perubahan</span>
+            </button>
+        </div>
+    </form>
 </div>
 
 <div v-if="uiState.modalType === 'registerPartner'" class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
