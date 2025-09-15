@@ -11,7 +11,7 @@ import { db, auth } from './firebase.js';
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
 let onSnapshotListener = null;
-let commissionsListener = null;
+const barcodeCanvas = ref(null);
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
@@ -114,14 +114,21 @@ const updateTime = () => {
 };
 
 onMounted(() => {
-    updateTime(); // Perbarui waktu saat komponen dimuat
-    intervalId = setInterval(updateTime, 1000); // Perbarui setiap detik
+  updateTime();
+  intervalId = setInterval(updateTime, 1000);
+
+  // Panggil render barcode setelah DOM siap
+  nextTick(() => {
+    renderBarcodePreview();
+  });
+
+  // onAuthStateChanged harus tetap ada di sini
+  // ... (pertahankan onAuthStateChanged yang sudah saya berikan sebelumnya)
 });
 
-onUnmounted(() => { // <-- PINDAHKAN KE SINI
-    clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
+onUnmounted(() => {
+  clearInterval(intervalId);
 });
-
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
@@ -135,6 +142,8 @@ async function fetchAllUsers() {
         alert("Gagal mengambil daftar pengguna.");
     }
 }
+
+
 
 // Fungsi baru untuk membuat kode rujukan yang lebih profesional
 function generatePartnerCode() {
@@ -5060,6 +5069,10 @@ async function loadAllDataFromFirebase() {
         isLoading.value = false;
     }
 }
+
+watch(barcodeContent, () => {
+  nextTick(renderBarcodePreview);
+});
 
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
