@@ -5,7 +5,7 @@ import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 
 // Impor dari file konfigurasi Firebase Anda
-
+import JsBarcode from 'jsbarcode';
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
@@ -4889,6 +4889,25 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
     }
 });
 
+watch(barcodeContent, (newContent) => {
+  if (newContent) {
+    nextTick(() => {
+      try {
+        const imgElement = document.getElementById('barcodePreviewImage');
+        JsBarcode(imgElement, newContent, {
+          format: "CODE128", // Ganti dengan format yang Anda inginkan
+          displayValue: true,
+          fontSize: 14,
+          height: 60,
+        });
+      } catch (error) {
+        console.error("Gagal membuat barcode pratinjau:", error);
+      }
+    });
+  }
+});
+
+
 watch(() => uiState.bulk_scan_input, async (newValue) => {
     const scannedValue = newValue.trim();
     if (!scannedValue || !uiState.activeCartChannel) {
@@ -5162,19 +5181,52 @@ const connectBluetooth = async () => {
 };
 
 const printBarcode = async () => {
-  if (!bluetoothDevice.value || !barcodeContent.value) {
-    alert('Harap hubungkan ke printer dan masukkan konten barcode.');
-    return;
-  }
-  try {
-    // Di sini Anda perlu menambahkan logika untuk mengirim data cetak
-    // ke printer thermal dalam format yang benar (misalnya, bahasa ZPL atau TSPL)
-    
-    alert('Perintah cetak berhasil dikirim! (Simulasi)');
-  } catch (error) {
-    console.error("Gagal mencetak:", error);
-    alert('Gagal mengirim perintah cetak. Coba lagi.');
-  }
+    if (!bluetoothDevice.value || !barcodeContent.value) {
+        alert('Harap hubungkan ke printer dan masukkan konten barcode.');
+        return;
+    }
+
+    try {
+        const gattServer = await bluetoothDevice.value.gatt.connect();
+        const service = await gattServer.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+        // Buat perintah cetak dalam bahasa printer TSPL (contoh)
+        const barcodeWidth = 300; // Lebar barcode dalam dot
+        const barcodeHeight = 100; // Tinggi barcode dalam dot
+        const barcodeX = 50; // Posisi X
+        const barcodeY = 50; // Posisi Y
+        const textX = 50; // Posisi X teks
+        const textY = 150; // Posisi Y teks
+
+        // Ini adalah contoh perintah TSPL. Anda mungkin perlu menyesuaikannya
+        // dengan model printer spesifik Anda.
+        let command = '';
+        command += 'CLS\r\n'; // Menghapus buffer
+        command += `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`; // Ukuran label
+        command += `GAP ${labelSettings.labelGap} mm,0 mm\r\n`; // Jarak antar label
+        command += `SPEED ${labelSettings.printSpeed}\r\n`; // Kecepatan cetak
+        command += `DENSITY ${labelSettings.printDensity}\r\n`; // Kerapatan cetak
+        command += `DIRECTION 1,0\r\n`; // Arah cetak
+        command += `SET TEAR OFF\r\n`; // Nonaktifkan mode sobek otomatis
+        command += `CODEPAGE 1252\r\n`; // Karakter set
+        command += `BARCODE ${barcodeX},${barcodeY},"128",${barcodeHeight},1,0,2,2,"${barcodeContent.value}"\r\n`;
+        command += `PRINT ${printCount.value},1\r\n`; // Mencetak sebanyak 'printCount'
+
+        const encoder = new TextEncoder();
+        const data = encoder.encode(command);
+        
+        // Kirim data cetak per 512 byte
+        for (let i = 0; i < data.length; i += 512) {
+            await characteristic.writeValue(data.slice(i, i + 512));
+        }
+
+        alert('Perintah cetak berhasil dikirim ke printer!');
+
+    } catch (error) {
+        console.error("Gagal mencetak:", error);
+        alert(`Gagal mengirim perintah cetak. Pastikan printer terhubung dengan benar.\n\nError: ${error.message}`);
+    }
 };
 
 </script>
@@ -6862,8 +6914,8 @@ const printBarcode = async () => {
       <div class="bg-white rounded-xl shadow-lg p-6">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">2. Pratinjau Label</h3>
         <div class="preview-area border p-4 rounded-lg bg-slate-50 flex items-center justify-center min-h-[300px]">
-          <canvas id="barcodeCanvas"></canvas>
-        </div>
+    <img id="barcodePreviewImage" alt="Barcode Preview" class="max-w-full max-h-full">
+</div>
       </div>
 
       <div class="bg-white rounded-xl shadow-lg p-6">
