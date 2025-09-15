@@ -9,21 +9,19 @@ import { db, auth } from './firebase.js';
 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
+
 let onSnapshotListener = null;
 let commissionsListener = null;
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
-import { 
-    onAuthStateChanged, 
-    signOut,
-    GoogleAuthProvider, // <-- Impor Google Provider
-    
-    signInWithPopup, // <-- Impor signInWithPopup
-    
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword 
+import { 
+    onAuthStateChanged, 
+    signOut,
+    GoogleAuthProvider,
+    signInWithPopup,
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword 
 } from "firebase/auth";
-
 // --- STATE MANAGEMENT ---
 const activePage = ref('dashboard');
 const isLoading = ref(true);
