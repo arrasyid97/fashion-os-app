@@ -5,7 +5,7 @@ import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 
 // Impor dari file konfigurasi Firebase Anda
-import JsBarcode from 'jsbarcode';
+
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
@@ -4855,7 +4855,7 @@ function saveSpecialPrice() {
 
     alert(`Harga spesial untuk SKU ${sku} di channel terpilih berhasil disimpan!`);
     
-    // Reset form dii dalam modal
+    // Reset form di dalam modal
     uiState.selectedProductForSpecialPrice = null;
     uiState.specialPriceSearch = '';
     uiState.specialPriceInput = null;
@@ -4873,13 +4873,7 @@ function deleteSpecialPrice(channelId, sku) {
     }
 }
 // --- LIFECYCLE & WATCHERS ---
-watch(activePage, (newPage) => { 
-    if (newPage === 'dashboard') nextTick(renderCharts); 
-    // Panggil fungsi pratinjau saat halaman barcode dibuka
-    if (newPage === 'barcode-generator') {
-      showBarcodePreview();
-    }
-});
+watch(activePage, (newPage) => { if (newPage === 'dashboard') nextTick(renderCharts); });
 watch(dashboardFilteredData, () => { if (activePage.value === 'dashboard') nextTick(renderCharts); });
 watch(() => uiState.activeCartChannel, (newChannel) => { if (newChannel && !state.carts[newChannel]) state.carts[newChannel] = []; });
 watch(() => uiState.promosiSelectedModel, (newModel) => {
@@ -4898,13 +4892,19 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
 watch(() => uiState.bulk_scan_input, async (newValue) => {
     const scannedValue = newValue.trim();
     if (!scannedValue || !uiState.activeCartChannel) {
+        // Jika input kosong atau channel belum dipilih, abaikan.
         return;
     }
+
+    // Tunda eksekusi utama untuk memastikan nilai baru sudah dirender di input
     await nextTick();
     const product = getProductBySku(scannedValue);
+
     if (product) {
+        // Jika yang di-scan adalah produk, tambahkan ke pesanan yang sedang aktif
         addProductToBulkQueue(product);
     } else {
+        // Jika bukan produk, ini pasti resi. Cari pesanan yang sedang diisi dan finalisasi.
         let orderToFinalize = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
         if (orderToFinalize) {
             orderToFinalize.id = scannedValue;
@@ -4913,24 +4913,17 @@ watch(() => uiState.bulk_scan_input, async (newValue) => {
         }
     }
     
+    // --- PERUBAHAN UTAMA DI SINI ---
+    // Gunakan setTimeout untuk memberi jeda sebelum mengosongkan kolom input
     setTimeout(() => {
         uiState.bulk_scan_input = '';
-    }, 200);
+    }, 200); // Jeda 200 milidetik (0.2 detik)
 });
 
 watch(() => uiState.pengaturanTab, (newTab) => {
     if (newTab === 'admin' && isAdmin.value && uiState.allUsers.length === 0) {
         fetchAllUsers();
     }
-});
-// Tambahkan watcher untuk memperbarui pratinjau saat konten barcode berubah
-watch(barcodeContent, showBarcodePreview);
-
-// Panggil showBarcodePreview saat halaman dimuat
-onMounted(() => {
-  if (activePage.value === 'barcode-generator') {
-    showBarcodePreview();
-  }
 });
 
 
@@ -5168,69 +5161,19 @@ const connectBluetooth = async () => {
   }
 };
 
-const showBarcodePreview = () => {
-  if (barcodeContent.value) {
-    nextTick(() => {
-      try {
-        const imgElement = document.getElementById('barcodePreviewImage');
-        if (imgElement) {
-          JsBarcode(imgElement, barcodeContent.value, {
-            format: "CODE128",
-            displayValue: true,
-            fontSize: 14,
-            height: 60,
-          });
-        }
-      } catch (error) {
-        console.error("Gagal membuat barcode pratinjau:", error);
-      }
-    });
-  }
-};
-
 const printBarcode = async () => {
   if (!bluetoothDevice.value || !barcodeContent.value) {
     alert('Harap hubungkan ke printer dan masukkan konten barcode.');
     return;
   }
-
   try {
-    const gattServer = await bluetoothDevice.value.gatt.connect();
-    const service = await gattServer.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-    const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-
-    const barcodeWidth = 300;
-    const barcodeHeight = 100;
-    const barcodeX = 50;
-    const barcodeY = 50;
-    const textX = 50;
-    const textY = 150;
-
-    let command = '';
-    command += 'CLS\r\n';
-    command += `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`;
-    command += `GAP ${labelSettings.labelGap} mm,0 mm\r\n`;
-    command += `SPEED ${labelSettings.printSpeed}\r\n`;
-    command += `DENSITY ${labelSettings.printDensity}\r\n`;
-    command += `DIRECTION 1,0\r\n`;
-    command += `SET TEAR OFF\r\n`;
-    command += `CODEPAGE 1252\r\n`;
-    command += `BARCODE ${barcodeX},${barcodeY},"128",${barcodeHeight},1,0,2,2,"${barcodeContent.value}"\r\n`;
-    command += `TEXT ${textX},${textY},"TSS24.BF2",0,1,1,"Width: ${barcodeWidth}"\r\n`;
-    command += `TEXT ${textX},${textY + 20},"TSS24.BF2",0,1,1,"Height: ${barcodeHeight}"\r\n`;
-    command += `PRINT ${printCount.value},1\r\n`;
-
-    const encoder = new TextEncoder();
-    const data = encoder.encode(command);
+    // Di sini Anda perlu menambahkan logika untuk mengirim data cetak
+    // ke printer thermal dalam format yang benar (misalnya, bahasa ZPL atau TSPL)
     
-    for (let i = 0; i < data.length; i += 512) {
-      await characteristic.writeValue(data.slice(i, i + 512));
-    }
-
-    alert('Perintah cetak berhasil dikirim ke printer!');
+    alert('Perintah cetak berhasil dikirim! (Simulasi)');
   } catch (error) {
     console.error("Gagal mencetak:", error);
-    alert(`Gagal mengirim perintah cetak. Pastikan printer terhubung dengan benar.\n\nError: ${error.message}`);
+    alert('Gagal mengirim perintah cetak. Coba lagi.');
   }
 };
 
@@ -6919,8 +6862,8 @@ const printBarcode = async () => {
       <div class="bg-white rounded-xl shadow-lg p-6">
         <h3 class="text-lg font-semibold text-slate-800 mb-4">2. Pratinjau Label</h3>
         <div class="preview-area border p-4 rounded-lg bg-slate-50 flex items-center justify-center min-h-[300px]">
-    <img id="barcodePreviewImage" alt="Barcode Preview" class="max-w-full max-h-full">
-</div>
+          <canvas id="barcodeCanvas"></canvas>
+        </div>
       </div>
 
       <div class="bg-white rounded-xl shadow-lg p-6">
