@@ -47,16 +47,6 @@ const unpaidCommissions = computed(() => {
     return commissions.value.filter(c => c.status === 'unpaid').sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000));
 });
 
-const renderBarcodePreview = () => {
-    if (barcodeCanvas.value && barcodeContent.value) {
-        JsBarcode(barcodeCanvas.value, barcodeContent.value, {
-            format: "CODE128", // Jenis format barcode, sesuaikan jika perlu
-            width: 2,
-            height: 50,
-            displayValue: true
-        });
-    }
-};
 
 // Panggil fungsi render setiap kali konten berubah
 watch(barcodeContent, () => {
@@ -5151,59 +5141,93 @@ watch(activePage, (newPage) => {
 });
 
 // --- STATE MANAGEMENT BARU UNTUK BARCODE ---
+
+
 const isConnecting = ref(false);
-const bluetoothDevice = ref(null);
-const connectionError = ref('');
-const isPrinting = ref(false);
-const barcodeCanvas = ref(null);
+    const bluetoothDevice = ref(null);
+    const connectionError = ref('');
+    const isPrinting = ref(false);
+    const barcodeCanvas = ref(null);
 
-const labelSettings = reactive({
-  width: 33,
-  height: 15,
-  columns: 3,
-  labelGap: 2,
-  paperType: 'gap',
-  printSpeed: 2,
-  printDensity: 8,
-});
+    const labelSettings = reactive({
+      width: 33,
+      height: 15,
+      columns: 3,
+      labelGap: 2,
+      paperType: 'gap',
+      printSpeed: 2,
+      printDensity: 8,
+    });
 
-const barcodeContent = ref('1234567890');
-const printCount = ref(1);
+    const barcodeContent = ref('1234567890');
+    const printCount = ref(1);
 
-const connectBluetooth = async () => {
-  // ... (kode di dalam fungsi Anda sudah benar, tidak perlu diubah) ...
-};
-
-const printBarcode = async () => {
-    if (!bluetoothDevice.value || !barcodeContent.value) {
-        alert('Harap hubungkan ke printer dan masukkan konten barcode.');
+    const renderBarcodePreview = () => {
+        if (barcodeCanvas.value && barcodeContent.value) {
+            JsBarcode(barcodeCanvas.value, barcodeContent.value, {
+                format: "CODE128",
+                width: 2,
+                height: 50,
+                displayValue: true
+            });
+        }
+    };
+    
+    // Fungsi ini dipanggil dari button @click
+    const connectBluetooth = async () => {
+      if (!navigator.bluetooth) {
+        alert('Browser Anda tidak mendukung Web Bluetooth. Silakan gunakan Chrome atau Edge dan pastikan fitur ini aktif.');
         return;
-    }
+      }
+    
+      isConnecting.value = true;
+      connectionError.value = '';
+      bluetoothDevice.value = null;
+    
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }]
+        });
+        bluetoothDevice.value = device;
+        alert(`Berhasil terhubung ke: ${device.name}`);
+      } catch (error) {
+        console.error("Kesalahan koneksi Bluetooth:", error);
+        connectionError.value = 'Gagal terhubung. Pastikan printer menyala dan Bluetooth aktif.';
+      } finally {
+        isConnecting.value = false;
+      }
+    };
 
-    try {
-        isPrinting.value = true;
-        const server = await bluetoothDevice.value.gatt.connect();
-        const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-        const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+    // Fungsi ini dipanggil dari button @click
+    const printBarcode = async () => {
+        if (!bluetoothDevice.value || !barcodeContent.value) {
+            alert('Harap hubungkan ke printer dan masukkan konten barcode.');
+            return;
+        }
 
-        // Perintah TSPL yang diperbaiki dengan '\r\n'
-        const tsplCommands = `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`
-                          + `GAP ${labelSettings.labelGap} mm,0 mm\r\n`
-                          + `CLS\r\n`
-                          + `BARCODE 100,100,"128",50,1,0,2,2,"${barcodeContent.value}"\r\n`
-                          + `PRINT ${printCount.value}\r\n`;
+        try {
+            isPrinting.value = true;
+            const server = await bluetoothDevice.value.gatt.connect();
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
 
-        const encoder = new TextEncoder();
-        await characteristic.writeValue(encoder.encode(tsplCommands));
+            const tsplCommands = `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`
+                              + `GAP ${labelSettings.labelGap} mm,0 mm\r\n`
+                              + `CLS\r\n`
+                              + `BARCODE 100,100,"128",50,1,0,2,2,"${barcodeContent.value}"\r\n`
+                              + `PRINT ${printCount.value}\r\n`;
 
-        alert('Perintah cetak berhasil dikirim!');
-    } catch (error) {
-        console.error("Gagal mencetak:", error);
-        alert('Gagal mengirim perintah cetak. Pastikan printer menyala dan terhubung dengan benar.');
-    } finally {
-        isPrinting.value = false;
-    }
-};
+            const encoder = new TextEncoder();
+            await characteristic.writeValue(encoder.encode(tsplCommands));
+
+            alert('Perintah cetak berhasil dikirim!');
+        } catch (error) {
+            console.error("Gagal mencetak:", error);
+            alert('Gagal mengirim perintah cetak. Pastikan printer menyala dan terhubung dengan benar.');
+        } finally {
+            isPrinting.value = false;
+        }
+    };
 
 </script>
 
