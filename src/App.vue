@@ -7386,30 +7386,31 @@ const printBarcode = async () => {
 </div>
 
 <div v-if="activePage === 'panduan'">
-    <div class="max-w-5xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm">
-        <div class="border-b pb-6 mb-8">
-            <h2 class="text-4xl font-bold text-slate-800">Pusat Panduan Aplikasi</h2>
-            <p class="text-slate-500 mt-2 text-lg">Panduan komprehensif untuk membantu Anda menguasai setiap fitur dan memaksimalkan potensi bisnis Anda dengan Fashion OS.</p>
-        </div>
+  <div class="max-w-5xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm">
+      <div class="border-b pb-6 mb-8">
+          <h2 class="text-4xl font-bold text-slate-800">Pusat Panduan Aplikasi</h2>
+          <p class="text-slate-500 mt-2 text-lg">Panduan komprehensif untuk membantu Anda menguasai setiap fitur dan memaksimalkan potensi bisnis Anda dengan Fashion OS.</p>
+      </div>
 
-        <div class="space-y-4">
-            <div v-for="panduan in panduanData" :key="panduan.title" class="border rounded-lg transition-all duration-300" :class="panduanAccordion === panduan.title ? 'bg-slate-50' : 'bg-white'">
-                <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" class="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 rounded-lg">
-                    <div class="text-3xl flex-shrink-0">{{ panduan.icon }}</div>
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-slate-800">{{ panduan.title }}</h3>
-                        <p class="text-sm text-slate-500">{{ panduan.subtitle }}</p>
-                    </div>
-                    <svg class="w-6 h-6 text-slate-400 flex-shrink-0 transition-transform duration-300" :class="{ 'rotate-180': panduanAccordion === panduan.title }" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
+      <div class="space-y-4">
+          <div v-for="panduan in panduanData" :key="panduan.title" class="border rounded-lg transition-all duration-300" :class="panduanAccordion === panduan.title ? 'bg-slate-50' : 'bg-white'">
+              <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" class="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 rounded-lg">
+                  <div class="text-3xl flex-shrink-0">{{ panduan.icon }}</div>
+                  <div class="flex-1">
+                      <h3 class="text-lg font-semibold text-slate-800">{{ panduan.title }}</h3>
+                      <p class="text-sm text-slate-500">{{ panduan.subtitle }}</p>
+                  </div>
+                  <svg class="w-6 h-6 text-slate-400 flex-shrink-0 transition-transform duration-300" :class="{ 'rotate-180': panduanAccordion === panduan.title }" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+              </div>
 
-                <div class="accordion-content" :class="{ 'open': panduanAccordion === panduan.title }">
-                    <div class="panduan-content p-4 pt-0 pl-14 text-slate-600 leading-relaxed" v-html="panduan.content"></div>
-                </div>
-            </div>
-        </div>
-    </div>
+              <div class="accordion-content" :class="{ 'open': panduanAccordion === panduan.title }">
+                  <div v-if="panduan.content" class="panduan-content p-4 pt-0 pl-14 text-slate-600 leading-relaxed" v-html="panduan.content"></div>
+              </div>
+          </div>
+      </div>
+  </div>
 </div>
+            
 <div v-if="activePage === 'tentang'">
     <div class="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm">
         <h2 class="text-3xl font-bold text-slate-800 border-b pb-4 mb-6">Tentang Aplikasi Fashion OS</h2>
