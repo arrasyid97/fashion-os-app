@@ -75,26 +75,40 @@ export default async function handler(request, response) {
             }, { merge: true });
 
             if (partnerDoc) {
-                const partnerId = partnerDoc.id;
-                const commissionAmount = amount * 0.10;
+    const partnerId = partnerDoc.id;
+    let commissionAmount = 0; // <-- Variabel baru untuk menampung komisi
 
-                const commissionDocRef = db.collection('commissions').doc();
-                transaction.set(commissionDocRef, {
-                    partnerId: partnerId,
-                    partnerEmail: partnerDoc.data().email,
-                    referredUserId: userId,
-                    referredUserEmail: customerEmail,
-                    transactionAmount: amount,
-                    commissionAmount: commissionAmount,
-                    status: 'unpaid',
-                    createdAt: now,
-                    mayarInvoiceId: mayarTransactionId
-                });
-                console.log(`✅ BERHASIL: Komisi untuk mitra ${partnerId} dicatat.`);
+    // Cek jumlah pembayaran untuk menentukan komisi
+    if (amount === 250000) { // Harga paket bulanan (diskon)
+        commissionAmount = 50000;
+    } else if (amount === 2500000) { // Harga paket tahunan (diskon)
+        commissionAmount = 500000;
+    } else if (amount === 350000) { // Harga paket bulanan (normal)
+        commissionAmount = 50000;
+    } else if (amount === 4200000) { // Harga paket tahunan (normal)
+        commissionAmount = 500000;
+    }
 
-                transaction.delete(pendingCommissionRef);
-                console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
-            } else if (referredByCode) {
+    // Pastikan komisi hanya dicatat jika ada pembayaran yang valid
+    if (commissionAmount > 0) {
+        const commissionDocRef = db.collection('commissions').doc();
+        transaction.set(commissionDocRef, {
+            partnerId: partnerId,
+            partnerEmail: partnerDoc.data().email,
+            referredUserId: userId,
+            referredUserEmail: customerEmail,
+            transactionAmount: amount,
+            commissionAmount: commissionAmount, // <-- Gunakan variabel baru
+            status: 'unpaid',
+            createdAt: now,
+            mayarInvoiceId: mayarTransactionId
+        });
+        console.log(`✅ BERHASIL: Komisi sebesar ${commissionAmount} untuk mitra ${partnerId} dicatat.`);
+    }
+
+    transaction.delete(pendingCommissionRef);
+    console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
+} else if (referredByCode) {
                 console.error(`❌ PERINGATAN: Kode rujukan ${referredByCode} ditemukan, tetapi tidak ada mitra yang cocok.`);
                 transaction.delete(pendingCommissionRef);
             }

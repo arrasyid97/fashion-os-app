@@ -7046,8 +7046,8 @@ const printBarcode = async () => {
                         </tr>
                         <tr v-for="com in unpaidCommissions" :key="com.id" class="hover:bg-slate-50">
                             <td class="px-6 py-4">{{ new Date(com.createdAt.seconds * 1000).toLocaleDateString('id-ID') }}</td>
-                            <td class="px-6 py-4">{{ com.customerEmail }}</td>
-                            <td class="px-6 py-4 text-right font-bold text-green-600">{{ formatCurrency(com.amount) }}</td>
+                            <td class="px-6 py-4">{{ com.referredUserEmail }}</td>
+<td class="px-6 py-4 text-right font-bold text-green-600">{{ formatCurrency(com.commissionAmount) }}</td>
                             <td class="px-6 py-4 text-center">
                                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 capitalize">{{ com.status }}</span>
                             </td>
