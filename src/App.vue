@@ -3,24 +3,16 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
-
 import JsBarcode from 'jsbarcode';
+
 import { db, auth } from './firebase.js';
-
-// Impor fungsi-fungsi untuk Database (Firestore)
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
-
-let onSnapshotListener = null;
-let commissionsListener = null;
-let bulkSearchDebounceTimer = null;
-// Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
-    onAuthStateChanged, 
-    signOut,
-    GoogleAuthProvider,
-    signInWithPopup,
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword 
+    collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, 
+    addDoc, onSnapshot, query, where, getDocs, getDoc 
+} from 'firebase/firestore';
+import { 
+    onAuthStateChanged, signOut, GoogleAuthProvider, 
+    signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword 
 } from "firebase/auth";
 // --- STATE MANAGEMENT ---
 const activePage = ref('dashboard');
