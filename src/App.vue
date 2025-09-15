@@ -634,12 +634,12 @@ async function proceedToPartnerPayment() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-    amount: priceToPay,
-    item_name: itemName,
+    amount: plan === 'bulanan' ? discountedMonthlyPrice.value : discountedYearlyPrice.value,
+    item_name: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
     customer_email: currentUser.value.email,
     callback_url: 'https://appfashion.id/api/mayar-webhook',
     redirect_url: `https://appfashion.id/langganan?status=success`,
-    merchant_ref: `PARTNERREG-${currentUser.value.uid}-${Date.now()}-${Math.floor(Math.random() * 10000)}`, // <-- Kode yang diperbaiki
+    merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`, // <-- Kode yang diperbaiki
 }),
         });
 
