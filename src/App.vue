@@ -4873,7 +4873,13 @@ function deleteSpecialPrice(channelId, sku) {
     }
 }
 // --- LIFECYCLE & WATCHERS ---
-watch(activePage, (newPage) => { if (newPage === 'dashboard') nextTick(renderCharts); });
+watch(activePage, (newPage) => { 
+    if (newPage === 'dashboard') nextTick(renderCharts); 
+    // Panggil fungsi pratinjau saat halaman barcode dibuka
+    if (newPage === 'barcode-generator') {
+      showBarcodePreview();
+    }
+});
 watch(dashboardFilteredData, () => { if (activePage.value === 'dashboard') nextTick(renderCharts); });
 watch(() => uiState.activeCartChannel, (newChannel) => { if (newChannel && !state.carts[newChannel]) state.carts[newChannel] = []; });
 watch(() => uiState.promosiSelectedModel, (newModel) => {
@@ -4889,23 +4895,16 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
     }
 });
 
-
 watch(() => uiState.bulk_scan_input, async (newValue) => {
     const scannedValue = newValue.trim();
     if (!scannedValue || !uiState.activeCartChannel) {
-        // Jika input kosong atau channel belum dipilih, abaikan.
         return;
     }
-
-    // Tunda eksekusi utama untuk memastikan nilai baru sudah dirender di input
     await nextTick();
     const product = getProductBySku(scannedValue);
-
     if (product) {
-        // Jika yang di-scan adalah produk, tambahkan ke pesanan yang sedang aktif
         addProductToBulkQueue(product);
     } else {
-        // Jika bukan produk, ini pasti resi. Cari pesanan yang sedang diisi dan finalisasi.
         let orderToFinalize = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
         if (orderToFinalize) {
             orderToFinalize.id = scannedValue;
@@ -4914,17 +4913,24 @@ watch(() => uiState.bulk_scan_input, async (newValue) => {
         }
     }
     
-    // --- PERUBAHAN UTAMA DI SINI ---
-    // Gunakan setTimeout untuk memberi jeda sebelum mengosongkan kolom input
     setTimeout(() => {
         uiState.bulk_scan_input = '';
-    }, 200); // Jeda 200 milidetik (0.2 detik)
+    }, 200);
 });
 
 watch(() => uiState.pengaturanTab, (newTab) => {
     if (newTab === 'admin' && isAdmin.value && uiState.allUsers.length === 0) {
         fetchAllUsers();
     }
+});
+// Tambahkan watcher untuk memperbarui pratinjau saat konten barcode berubah
+watch(barcodeContent, showBarcodePreview);
+
+// Panggil showBarcodePreview saat halaman dimuat
+onMounted(() => {
+  if (activePage.value === 'barcode-generator') {
+    showBarcodePreview();
+  }
 });
 
 
@@ -5162,21 +5168,21 @@ const connectBluetooth = async () => {
   }
 };
 
-const renderBarcodePreview = () => {
+const showBarcodePreview = () => {
   if (barcodeContent.value) {
     nextTick(() => {
-      const imgElement = document.getElementById('barcodePreviewImage');
-      if (imgElement) {
-        try {
+      try {
+        const imgElement = document.getElementById('barcodePreviewImage');
+        if (imgElement) {
           JsBarcode(imgElement, barcodeContent.value, {
             format: "CODE128",
             displayValue: true,
             fontSize: 14,
             height: 60,
           });
-        } catch (error) {
-          console.error("Gagal membuat barcode pratinjau:", error);
         }
+      } catch (error) {
+        console.error("Gagal membuat barcode pratinjau:", error);
       }
     });
   }
@@ -5227,8 +5233,6 @@ const printBarcode = async () => {
     alert(`Gagal mengirim perintah cetak. Pastikan printer terhubung dengan benar.\n\nError: ${error.message}`);
   }
 };
-
-watch(barcodeContent, renderBarcodePreview);
 
 </script>
 
