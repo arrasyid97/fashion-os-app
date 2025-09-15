@@ -5152,15 +5152,24 @@ onMounted(() => {
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
+                    // ▼▼▼ KODE DEBUGGING DIMULAI DI SINI ▼▼▼
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
+                    
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
+                    console.log('--- Pemeriksaan Status Langganan ---');
+                    console.log('Waktu Sekarang (Browser):', now);
+                    console.log('Status Langganan dari DB:', userData.subscriptionStatus);
+                    console.log('Tanggal Kedaluwarsa dari DB:', endDate);
+                    console.log('Apakah langganan dianggap valid?:', isSubscriptionValid);
+                    console.log('--- Selesai ---');
+                    // ▲▲▲ AKHIR DARI KODE DEBUGGING ▲▲▲
+
                     if (isSubscriptionValid) {
-                        // ▼▼▼ BARIS INI YANG MEMPERBAIKI MASALAH ANDA ▼▼▼
-                        await loadAllDataFromFirebase(); // Memuat semua data utama DARI Firestore
+                        await loadAllDataFromFirebase();
 
                         if (currentUser.value.isPartner) {
                             const commissionsQuery = query(
