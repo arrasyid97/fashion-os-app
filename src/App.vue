@@ -615,6 +615,9 @@ async function handleCashoutRequest() {
         return alert("Tidak ada komisi yang tersedia untuk dicairkan.");
     }
 
+    // BUAT ID UNIK UNTUK PENCAIRAN INI
+    const withdrawalId = `WDRW-${Date.now()}`;
+
     if (!confirm(`Anda akan mengajukan pencairan seluruh komisi sebesar ${formatCurrency(amountToWithdraw)}. Lanjutkan?`)) {
         return;
     }
@@ -624,19 +627,19 @@ async function handleCashoutRequest() {
         const batch = writeBatch(db);
         const now = new Date();
 
-        // Proses update data komisi di Firestore (tetap sama)
         commissions.value.filter(c => c.status === 'unpaid').forEach(c => {
             const commissionRef = doc(db, "commissions", c.id);
             batch.update(commissionRef, { status: 'paid', paidDate: now });
         });
 
-        // Proses pencatatan pengeluaran (tetap sama)
         const expenseData = {
             kategori: 'Pembayaran Komisi Mitra',
             jumlah: amountToWithdraw,
-            catatan: `Pengajuan pencairan komisi untuk mitra ${currentUser.value.referralCode}`,
+            catatan: `ID Pencairan: ${withdrawalId} | Mitra: ${currentUser.value.referralCode}`,
             jenis: 'pengeluaran',
-            userId: currentUser.value.uid,
+            // ▼▼▼ INI ADALAH PERUBAHAN KUNCI ▼▼▼
+            // Mencatat pengeluaran ini di bawah akun Admin, bukan akun Mitra.
+            userId: '6m4bgRlZMDhL8niVyD4lZmGuarF3', 
             tanggal: now
         };
         const keuanganRef = doc(collection(db, "keuangan"));
@@ -644,15 +647,25 @@ async function handleCashoutRequest() {
 
         await batch.commit();
 
-        // --- ▼▼▼ BAGIAN INI TELAH DIPERBAIKI DAN DISIMPLIFIKASI ▼▼▼ ---
-        
-        // GANTI NOMOR DI BAWAH DENGAN NOMOR WHATSAPP ANDA (diawali 62)
-        const yourWhatsAppNumber = '6285691803476'; 
+        const yourWhatsAppNumber = '6285691803476'; // GANTI DENGAN NOMOR ANDA
 
-        // Membuat URL WhatsApp langsung ke nomor Anda TANPA template teks
-        const whatsappUrl = `https://wa.me/${yourWhatsAppNumber}`;
+        const messageLines = [
+            "Halo Admin Fashion OS,",
+            "",
+            "Saya ingin mengajukan permohonan pencairan komisi dengan rincian sebagai berikut:",
+            "",
+            `- *ID Pencairan:* ${withdrawalId}`,
+            `- *Kode Mitra:* ${currentUser.value.referralCode}`,
+            `- *Email Mitra:* ${currentUser.value.email}`,
+            `- *Jumlah Pencairan:* *${formatCurrency(amountToWithdraw)}*`,
+            "",
+            "Mohon untuk segera diproses.",
+            "Terima kasih."
+        ];
         
-        // --- ▲▲▲ AKHIR DARI BAGIAN YANG DIPERBAIKI ▲▲▲ ---
+        const messageTemplate = messageLines.join('\n');
+        const encodedMessage = encodeURIComponent(messageTemplate);
+        const whatsappUrl = `https://api.whatsapp.com/send?phone=${yourWhatsAppNumber}&text=${encodedMessage}`;
         
         window.open(whatsappUrl, '_blank');
 
