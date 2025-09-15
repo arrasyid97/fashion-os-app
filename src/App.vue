@@ -65,6 +65,8 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
+let onSnapshotListener = null;
+let commissionsListener = null;
 
 const currentTime = ref('');
 let intervalId = null;
