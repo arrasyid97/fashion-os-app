@@ -594,7 +594,6 @@ async function submitAddProduct() {
 }
 
 async function handleCashoutRequest() {
-    // 1. Langsung munculkan konfirmasi dengan jumlah total yang tersedia
     const amountToWithdraw = totalUnpaidCommission.value;
     if (amountToWithdraw <= 0) {
         return alert("Tidak ada komisi yang tersedia untuk dicairkan.");
@@ -609,13 +608,11 @@ async function handleCashoutRequest() {
         const batch = writeBatch(db);
         const now = new Date();
 
-        // 2. Tandai semua komisi 'unpaid' menjadi 'paid'
         commissions.value.filter(c => c.status === 'unpaid').forEach(c => {
             const commissionRef = doc(db, "commissions", c.id);
             batch.update(commissionRef, { status: 'paid', paidDate: now });
         });
 
-        // 3. Catat pengeluaran di koleksi 'keuangan'
         const expenseData = {
             kategori: 'Pembayaran Komisi Mitra',
             jumlah: amountToWithdraw,
@@ -629,28 +626,31 @@ async function handleCashoutRequest() {
 
         await batch.commit();
 
-        // --- INI BAGIAN BARU & PENTING ---
-        // 4. Buat template pesan WhatsApp
+        // --- ▼▼▼ BAGIAN INI TELAH DIPERBAIKI ▼▼▼ ---
         
         // GANTI NOMOR DI BAWAH DENGAN NOMOR WHATSAPP ANDA (diawali 62)
-        const yourWhatsAppNumber = '6285691803476'; 
+        const yourWhatsAppNumber = '6281234567890'; 
 
-        const messageTemplate = `
-Halo Admin Fashion OS,
-
-Saya ingin mengajukan permohonan pencairan komisi dengan rincian sebagai berikut:
-
-- *Kode Mitra:* ${currentUser.value.referralCode}
-- *Email Mitra:* ${currentUser.value.email}
-- *Jumlah Pencairan:* *${formatCurrency(amountToWithdraw)}*
-
-Mohon untuk segera diproses.
-Terima kasih.
-        `.trim();
-
-        // 5. Buat link WhatsApp dan buka di tab baru
+        // Membuat pesan baris per baris untuk hasil yang lebih konsisten
+        const messageLines = [
+            "Halo Admin Fashion OS,",
+            "",
+            "Saya ingin mengajukan permohonan pencairan komisi dengan rincian sebagai berikut:",
+            "",
+            `- *Kode Mitra:* ${currentUser.value.referralCode}`,
+            `- *Email Mitra:* ${currentUser.value.email}`,
+            `- *Jumlah Pencairan:* *${formatCurrency(amountToWithdraw)}*`,
+            "",
+            "Mohon untuk segera diproses.",
+            "Terima kasih."
+        ];
+        
+        const messageTemplate = messageLines.join('\n'); // Menggabungkan setiap baris dengan karakter "enter"
+        
         const encodedMessage = encodeURIComponent(messageTemplate);
         const whatsappUrl = `https://wa.me/${yourWhatsAppNumber}?text=${encodedMessage}`;
+        
+        // --- ▲▲▲ AKHIR DARI BAGIAN YANG DIPERBAIKI ▲▲▲ ---
         
         window.open(whatsappUrl, '_blank');
 
