@@ -593,26 +593,33 @@ async function submitAddProduct() {
     }
 }
 
+async function handleCashoutRequest() {
+    // 1. Langsung munculkan konfirmasi dengan jumlah total yang tersedia
+    const amountToWithdraw = totalUnpaidCommission.value;
+    if (amountToWithdraw <= 0) {
+        return alert("Tidak ada komisi yang tersedia untuk dicairkan.");
+    }
 
-async function cashoutCommission() {
-    if (!confirm(`Anda akan mencairkan komisi sebesar ${formatCurrency(totalUnpaidCommission.value)}. Lanjutkan?`)) return;
+    if (!confirm(`Anda akan mengajukan pencairan seluruh komisi sebesar ${formatCurrency(amountToWithdraw)}. Lanjutkan?`)) {
+        return;
+    }
 
     try {
         isSaving.value = true;
         const batch = writeBatch(db);
         const now = new Date();
 
-        // Tandaii semua komisi 'unpaid' menjadi 'paid'
+        // 2. Tandai semua komisi 'unpaid' menjadi 'paid'
         commissions.value.filter(c => c.status === 'unpaid').forEach(c => {
             const commissionRef = doc(db, "commissions", c.id);
             batch.update(commissionRef, { status: 'paid', paidDate: now });
         });
 
-        // Catat pengeluaran di koleksi 'keuangan'
+        // 3. Catat pengeluaran di koleksi 'keuangan'
         const expenseData = {
             kategori: 'Pembayaran Komisi Mitra',
-            jumlah: totalUnpaidCommission.value,
-            catatan: `Pembayaran komisi untuk mitra ${currentUser.value.referralCode}`,
+            jumlah: amountToWithdraw,
+            catatan: `Pengajuan pencairan komisi untuk mitra ${currentUser.value.referralCode}`,
             jenis: 'pengeluaran',
             userId: currentUser.value.uid,
             tanggal: now
@@ -621,8 +628,34 @@ async function cashoutCommission() {
         batch.set(keuanganRef, expenseData);
 
         await batch.commit();
-        alert('Permintaan pencairan komisi berhasil dicatat!');
-        hideModal();
+
+        // --- INI BAGIAN BARU & PENTING ---
+        // 4. Buat template pesan WhatsApp
+        
+        // GANTI NOMOR DI BAWAH DENGAN NOMOR WHATSAPP ANDA (diawali 62)
+        const yourWhatsAppNumber = '6285691803476'; 
+
+        const messageTemplate = `
+Halo Admin Fashion OS,
+
+Saya ingin mengajukan permohonan pencairan komisi dengan rincian sebagai berikut:
+
+- *Kode Mitra:* ${currentUser.value.referralCode}
+- *Email Mitra:* ${currentUser.value.email}
+- *Jumlah Pencairan:* *${formatCurrency(amountToWithdraw)}*
+
+Mohon untuk segera diproses.
+Terima kasih.
+        `.trim();
+
+        // 5. Buat link WhatsApp dan buka di tab baru
+        const encodedMessage = encodeURIComponent(messageTemplate);
+        const whatsappUrl = `https://wa.me/${yourWhatsAppNumber}?text=${encodedMessage}`;
+        
+        window.open(whatsappUrl, '_blank');
+
+        alert('Permintaan pencairan berhasil dicatat! Anda akan diarahkan ke WhatsApp untuk konfirmasi.');
+
     } catch (error) {
         console.error('Error saat mencairkan komisi:', error);
         alert('Gagal mencairkan komisi. Silakan coba lagi.');
@@ -7070,7 +7103,7 @@ const printBarcode = async () => {
         <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-semibold text-slate-800">Riwayat Komisi Belum Dibayar</h3>
-                <button @click="showModal('cashoutCommission')" :disabled="totalUnpaidCommission === 0" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:bg-green-400">
+                <button @click="handleCashoutRequest" :disabled="totalUnpaidCommission === 0" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:bg-green-400">
                     Cairkan Komisi
                 </button>
             </div>
@@ -7683,25 +7716,6 @@ const printBarcode = async () => {
     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
-</div>
-
-<div v-if="uiState.modalType === 'cashoutCommission'" class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
-    <h3 class="text-xl font-bold mb-4">Ajukan Pencairan Komisi</h3>
-    <p class="text-sm text-slate-600">Total komisi yang belum dibayar saat ini adalah: <span class="font-bold text-green-600">{{ formatCurrency(totalUnpaidCommission) }}</span></p>
-    <p class="text-sm text-slate-600">Pastikan rekening bank Anda sudah terdaftar di halaman Pengaturan.</p>
-
-    <form @submit.prevent="cashoutCommission">
-        <div class="mt-4">
-            <label class="block text-sm font-medium">Jumlah yang Ingin Dicairkan</label>
-            <input type="number" v-model.number="uiState.modalData.amount" :max="totalUnpaidCommission" class="mt-1 w-full p-2 border rounded-md" required>
-        </div>
-        <div class="flex justify-end gap-3 pt-6 border-t mt-4">
-            <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-            <button type="submit" :disabled="uiState.modalData.amount <= 0 || uiState.modalData.amount > totalUnpaidCommission" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg disabled:bg-indigo-400">
-                Ajukan Pencairan
-            </button>
-        </div>
-    </form>
 </div>
 
 <div v-if="uiState.modalType === 'registerPartner'" class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
