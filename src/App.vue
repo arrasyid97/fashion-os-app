@@ -10,8 +10,7 @@ import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
-let onSnapshotListener = null;
-let commissionsListener = null;
+
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
@@ -92,15 +91,6 @@ const updateTime = () => {
     // Gabungkan tanggal dan waktu tanpa kata "pukul"
     currentTime.value = `${datePart} ${timePart}`;
 };
-
-onMounted(() => {
-    updateTime(); // Perbarui waktu saat komponen dimuat
-    intervalId = setInterval(updateTime, 1000); // Perbarui setiap detik
-});
-
-onUnmounted(() => { // <-- PINDAHKAN KE SINI
-    clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
-});
 
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
@@ -5044,18 +5034,14 @@ onMounted(() => {
 
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
-        if (onSnapshotListener) {
-            onSnapshotListener();
-            onSnapshotListener = null;
-        }
-        // Pastikan listener komisi dihentikan dengan benar
-        if (commissionsListener) {
-            commissionsListener();
-            commissionsListener = null;
-        }
+        // Hentikan listener lama jika ada
+        if (onSnapshotListener) onSnapshotListener();
+        if (commissionsListener) commissionsListener();
 
         if (user) {
             currentUser.value = user;
+
+            // Listener untuk data pengguna
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
@@ -5071,21 +5057,22 @@ onMounted(() => {
                         (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
                     if (isSubscriptionValid) {
-                        await loadAllDataFromFirebase();
+                        // Anda dapat memanggil fungsi-fungsi pemuat data lainnya di sini jika diperlukan
+                        // await loadAllDataFromFirebase();
                         if (currentUser.value.isPartner) {
-    const commissionsQuery = query(
-        collection(db, 'commissions'),
-        where('partnerId', '==', currentUser.value.uid)
-    );
-    commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-        const fetchedCommissions = [];
-        snapshot.forEach(doc => {
-            fetchedCommissions.push({ id: doc.id, ...doc.data() });
-        });
-        commissions.value = fetchedCommissions;
-        // Opsional: Anda bisa tambahkan console.log di sini untuk debugging
-    });
-}
+                            const commissionsQuery = query(
+                                collection(db, 'commissions'),
+                                where('partnerId', '==', currentUser.value.uid)
+                            );
+                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                const fetchedCommissions = [];
+                                snapshot.forEach(doc => {
+                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
+                                });
+                                commissions.value = fetchedCommissions;
+                                console.log(`INFO: Komisi berhasil dimuat. Total: ${commissions.value.length} item.`);
+                            });
+                        }
                         const storedPage = localStorage.getItem('lastActivePage');
                         const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         changePage(pageToLoad);
@@ -5111,6 +5098,14 @@ onMounted(() => {
     });
 });
 
+onMounted(() => {
+    updateTime(); // Perbarui waktu saat komponen dimuat
+    intervalId = setInterval(updateTime, 1000); // Perbarui setiap detik
+});
+
+onUnmounted(() => { // <-- PINDAHKAN KE SINI
+    clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
+});
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
