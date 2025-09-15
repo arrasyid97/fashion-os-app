@@ -17,32 +17,28 @@ export default async function handler(request, response) {
         return response.status(405).json({ message: 'Method Not Allowed' });
     }
 
-    console.log("--- LOG: Menerima Webhook dari Mayar ---");
-    console.log("Body:", JSON.stringify(request.body, null, 2));
-
     const { event, data } = request.body;
+    
+    // Pastikan event adalah pembayaran sukses
     if (event !== 'payment.received' || data.status !== 'SUCCESS') {
         console.log(`INFO: Webhook diterima, tetapi bukan event pembayaran sukses. Status: ${data.status}`);
         return response.status(200).json({ message: 'Webhook diterima, tetapi tidak ada aksi yang diperlukan.' });
     }
 
-    const { customerEmail, amount, id: mayarTransactionId } = data;
+    const { customerEmail, amount, merchantRef, id: mayarTransactionId } = data; // Perbaikan: Tambahkan merchantRef di sini
 
     try {
         await db.runTransaction(async (transaction) => {
             const usersRef = db.collection('users');
             const pendingCommissionRef = db.collection('pending_commissions').doc(customerEmail);
 
-            // ===========================================
-            // --- BAGIAN 1: BACA SEMUA DATA TERLEBIH DAHULU ---
-            // ===========================================
             const userQuery = usersRef.where('email', '==', customerEmail).limit(1);
             const userSnapshot = await transaction.get(userQuery);
             const pendingCommissionDoc = await transaction.get(pendingCommissionRef);
             
             if (userSnapshot.empty) {
                 console.error(`FATAL ERROR: Tidak ada pengguna yang ditemukan dengan email ${customerEmail}`);
-                return; // Membatalkan transaksi
+                return;
             }
 
             const userDoc = userSnapshot.docs[0];
@@ -59,10 +55,8 @@ export default async function handler(request, response) {
                 }
             }
 
-            // ===========================================
-            // --- BAGIAN 2: BARU LAKUKAN SEMUA OPERASI TULIS ---
-            // ===========================================
-            const plan = (amount === 250000 || amount === 3000000) ? 'bulanan' : 'tahunan';
+            // Perbarui status langganan pengguna
+            const plan = (amount === 250000 || amount === 2500000) ? 'bulanan' : 'tahunan'; // Perbaikan: Sesuaikan harga diskon Anda
             const now = new Date();
             let subscriptionEndDate;
             if (plan === 'bulanan') {
@@ -71,7 +65,6 @@ export default async function handler(request, response) {
                 subscriptionEndDate = new Date(new Date().setFullYear(now.getFullYear() + 1));
             }
 
-            // Perbarui status langganan pengguna
             const userDocRef = usersRef.doc(userId);
             transaction.set(userDocRef, {
                 subscriptionStatus: 'active',
@@ -87,14 +80,18 @@ export default async function handler(request, response) {
 
                 const commissionDocRef = db.collection('commissions').doc();
                 transaction.set(commissionDocRef, {
-                    partnerId: partnerId, partnerEmail: partnerDoc.data().email,
-                    referredUserId: userId, referredUserEmail: customerEmail,
-                    transactionAmount: amount, commissionAmount: commissionAmount,
-                    status: 'unpaid', createdAt: now, mayarInvoiceId: mayarTransactionId
+                    partnerId: partnerId,
+                    partnerEmail: partnerDoc.data().email,
+                    referredUserId: userId,
+                    referredUserEmail: customerEmail,
+                    transactionAmount: amount,
+                    commissionAmount: commissionAmount,
+                    status: 'unpaid',
+                    createdAt: now,
+                    mayarInvoiceId: mayarTransactionId
                 });
                 console.log(`✅ BERHASIL: Komisi untuk mitra ${partnerId} dicatat.`);
 
-                // Hapus data pending setelah komisi berhasil dicatat
                 transaction.delete(pendingCommissionRef);
                 console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
             } else if (referredByCode) {
