@@ -11,7 +11,7 @@ import { db, auth } from './firebase.js';
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
 let onSnapshotListener = null;
-const barcodeCanvas = ref(null);
+
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
@@ -59,16 +59,6 @@ const renderBarcodePreview = () => {
     }
 };
 
-// Panggil fungsi render setiap kali konten berubah
-watch(barcodeContent, () => {
-    nextTick(renderBarcodePreview);
-});
-
-// Panggil fungsi render saat halaman dimuat
-onMounted(() => {
-    // ... (kode onMounted lama Anda)
-    nextTick(renderBarcodePreview);
-});
 
 const isDashboardLocked = ref(true);
 const dashboardPinInput = ref('');
@@ -112,23 +102,6 @@ const updateTime = () => {
     // Gabungkan tanggal dan waktu tanpa kata "pukul"
     currentTime.value = `${datePart} ${timePart}`;
 };
-
-onMounted(() => {
-  updateTime();
-  intervalId = setInterval(updateTime, 1000);
-
-  // Panggil render barcode setelah DOM siap
-  nextTick(() => {
-    renderBarcodePreview();
-  });
-
-  // onAuthStateChanged harus tetap ada di sini
-  // ... (pertahankan onAuthStateChanged yang sudah saya berikan sebelumnya)
-});
-
-onUnmounted(() => {
-  clearInterval(intervalId);
-});
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
@@ -5070,9 +5043,6 @@ async function loadAllDataFromFirebase() {
     }
 }
 
-watch(barcodeContent, () => {
-  nextTick(renderBarcodePreview);
-});
 
 // GANTI SELURUH KODE di dalam onMounted DENGAN KODE INI
 onMounted(() => {
@@ -5140,6 +5110,7 @@ watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
+
 // --- STATE MANAGEMENT BARU UNTUK BARCODE ---
 const isConnecting = ref(false);
 const bluetoothDevice = ref(null);
@@ -5157,6 +5128,7 @@ const labelSettings = reactive({
 });
 
 const barcodeContent = ref('1234567890');
+const barcodeCanvas = ref(null);
 const printCount = ref(1);
 
 // --- FUNGSI BARU UNTUK KONEKSI BLUETOOTH ---
