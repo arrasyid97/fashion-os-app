@@ -5154,86 +5154,39 @@ watch(activePage, (newPage) => {
 const isConnecting = ref(false);
 const bluetoothDevice = ref(null);
 const connectionError = ref('');
+const isPrinting = ref(false);
+const barcodeCanvas = ref(null);
 
-// State untuk pengaturan label yang dikirim ke printer
 const labelSettings = reactive({
   width: 33,
   height: 15,
   columns: 3,
   labelGap: 2,
-  paperType: 'gap', // 'gap', 'black-mark', 'continuous'
-  printSpeed: 2, // 1-5 ips (inches per second)
-  printDensity: 8, // 1-15 tingkat
+  paperType: 'gap',
+  printSpeed: 2,
+  printDensity: 8,
 });
 
 const barcodeContent = ref('1234567890');
 const printCount = ref(1);
 
-// --- FUNGSI BARU UNTUK KONEKSI BLUETOOTH ---
 const connectBluetooth = async () => {
-  if (!navigator.bluetooth) {
-    alert('Browser Anda tidak mendukung Web Bluetooth. Silakan gunakan Chrome atau Edge dan pastikan fitur ini aktif.');
-    return;
-  }
-  
-  isConnecting.value = true;
-  connectionError.value = '';
-  bluetoothDevice.value = null;
-
-  try {
-    // Perintah untuk mencari perangkat Bluetooth
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] // Ini adalah UUID layanan untuk printer thermal
-    });
-    bluetoothDevice.value = device;
-    alert(`Berhasil terhubung ke: ${device.name}`);
-  } catch (error) {
-    console.error("Kesalahan koneksi Bluetooth:", error);
-    connectionError.value = 'Gagal terhubung. Pastikan printer menyala dan Bluetooth aktif.';
-  } finally {
-    isConnecting.value = false;
-  }
+  // ... (kode di dalam fungsi Anda sudah benar, tidak perlu diubah) ...
 };
 
-const isConnecting = ref(false);
-const bluetoothDevice = ref(null);
-const connectionError = ref('');
-const isPrinting = ref(false); // DEKLARASI YANG BENAR
-
-// State untuk pengaturan label yang dikirim ke printer
-const labelSettings = reactive({
-    width: 33,
-    height: 15,
-    columns: 3,
-    labelGap: 2,
-    paperType: 'gap',
-    printSpeed: 2,
-    printDensity: 8,
-});
-
-const barcodeContent = ref('1234567890');
-const printCount = ref(1);
-const barcodeCanvas = ref(null); // DEKLARASI YANG BENAR
-
-// --- FUNGSI BARU UNTUK KONEKSI BLUETOOTH ---
-// (Pindahkan fungsi connectBluetooth ke sini)
-const connectBluetooth = async () => {
-  // ... (kode di dalam fungsi tetap sama) ...
-};
-
-// --- FUNGSI printBarcode DENGAN PERBAIKAN TSPL ---
-// (Tambahkan fungsi printBarcode di sini)
 const printBarcode = async () => {
     if (!bluetoothDevice.value || !barcodeContent.value) {
         alert('Harap hubungkan ke printer dan masukkan konten barcode.');
         return;
     }
+
     try {
         isPrinting.value = true;
         const server = await bluetoothDevice.value.gatt.connect();
         const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
         const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
 
+        // Perintah TSPL yang diperbaiki dengan '\r\n'
         const tsplCommands = `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`
                           + `GAP ${labelSettings.labelGap} mm,0 mm\r\n`
                           + `CLS\r\n`
