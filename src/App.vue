@@ -5191,6 +5191,7 @@ const printBarcode = async () => {
         const service = await gattServer.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
         const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
 
+        // Deklarasi variabel yang penting
         const barcodeWidth = 300;
         const barcodeHeight = 100;
         const barcodeX = 50;
@@ -5198,24 +5199,27 @@ const printBarcode = async () => {
         const textX = 50;
         const textY = 150;
 
-        // Ini adalah contoh perintah TSPL. Anda mungkin perlu menyesuaikannya
-        // dengan model printer spesifik Anda.
+        // Perbaikan: Pastikan semua variabel digunakan di sini
         let command = '';
-        command += 'CLS\r\n'; // Menghapus buffer
-        command += `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`; // Ukuran label
-        command += `GAP ${labelSettings.labelGap} mm,0 mm\r\n`; // Jarak antar label
-        command += `SPEED ${labelSettings.printSpeed}\r\n`; // Kecepatan cetak
-        command += `DENSITY ${labelSettings.printDensity}\r\n`; // Kerapatan cetak
-        command += `DIRECTION 1,0\r\n`; // Arah cetak
-        command += `SET TEAR OFF\r\n`; // Nonaktifkan mode sobek otomatis
-        command += `CODEPAGE 1252\r\n`; // Karakter set
-        command += `BARCODE ${barcodeX},${barcodeY},"128",1,1,1,2,2,"${barcodeContent.value}"\r\n`;
-        command += `PRINT ${printCount.value},1\r\n`; // Mencetak sebanyak 'printCount'
+        command += 'CLS\r\n';
+        command += `SIZE ${labelSettings.width} mm,${labelSettings.height} mm\r\n`;
+        command += `GAP ${labelSettings.labelGap} mm,0 mm\r\n`;
+        command += `SPEED ${labelSettings.printSpeed}\r\n`;
+        command += `DENSITY ${labelSettings.printDensity}\r\n`;
+        command += `DIRECTION 1,0\r\n`;
+        command += `SET TEAR OFF\r\n`;
+        command += `CODEPAGE 1252\r\n`;
+
+        // Gunakan variabel barcodeHeight, barcodeWidth, textX, dan textY
+        command += `BARCODE ${barcodeX},${barcodeY},"128",${barcodeHeight},1,0,2,2,"${barcodeContent.value}"\r\n`;
+        command += `TEXT ${textX},${textY},"TSS24.BF2",0,1,1,"Width: ${barcodeWidth}"\r\n`;
+        command += `TEXT ${textX},${textY + 20},"TSS24.BF2",0,1,1,"Height: ${barcodeHeight}"\r\n`;
+        
+        command += `PRINT ${printCount.value},1\r\n`;
 
         const encoder = new TextEncoder();
         const data = encoder.encode(command);
         
-        // Kirim data cetak per 512 byte
         for (let i = 0; i < data.length; i += 512) {
             await characteristic.writeValue(data.slice(i, i + 512));
         }
