@@ -19,13 +19,12 @@ export default async function handler(request, response) {
 
     const { event, data } = request.body;
     
-    // Pastikan event adalah pembayaran sukses
     if (event !== 'payment.received' || data.status !== 'SUCCESS') {
         console.log(`INFO: Webhook diterima, tetapi bukan event pembayaran sukses. Status: ${data.status}`);
         return response.status(200).json({ message: 'Webhook diterima, tetapi tidak ada aksi yang diperlukan.' });
     }
 
-    const { customerEmail, amount, merchantRef, id: mayarTransactionId } = data; // Perbaikan: Tambahkan merchantRef di sini
+    const { customerEmail, amount, merchantRef, id: mayarTransactionId } = data;
 
     try {
         await db.runTransaction(async (transaction) => {
@@ -55,15 +54,30 @@ export default async function handler(request, response) {
                 }
             }
 
-            // Perbarui status langganan pengguna
-            const plan = (amount === 250000 || amount === 2500000) ? 'bulanan' : 'tahunan'; // Perbaikan: Sesuaikan harga diskon Anda
+            // ▼▼▼ BAGIAN INI TELAH DIPERBAIKI ▼▼▼
+            let plan;
+            let commissionAmount = 0;
+
+            // Cek jumlah pembayaran untuk menentukan komisi DAN jenis paket
+            if (amount === 250000 || amount === 350000) { // Harga paket bulanan
+                plan = 'bulanan';
+                commissionAmount = 50000;
+            } else if (amount === 2500000 || amount === 4200000) { // Harga paket tahunan
+                plan = 'tahunan';
+                commissionAmount = 500000;
+            }
+            
             const now = new Date();
             let subscriptionEndDate;
             if (plan === 'bulanan') {
                 subscriptionEndDate = new Date(new Date().setMonth(now.getMonth() + 1));
-            } else {
+            } else if (plan === 'tahunan') {
                 subscriptionEndDate = new Date(new Date().setFullYear(now.getFullYear() + 1));
+            } else {
+                // Sebagai pengaman jika jenis paket tidak terdeteksi, berikan 1 bulan.
+                subscriptionEndDate = new Date(new Date().setMonth(now.getMonth() + 1));
             }
+            // ▲▲▲ AKHIR DARI BAGIAN YANG DIPERBAIKI ▲▲▲
 
             const userDocRef = usersRef.doc(userId);
             transaction.set(userDocRef, {
@@ -74,41 +88,25 @@ export default async function handler(request, response) {
                 lastPayment: { date: now, amount: amount, invoiceId: mayarTransactionId }
             }, { merge: true });
 
-            if (partnerDoc) {
-    const partnerId = partnerDoc.id;
-    let commissionAmount = 0; // <-- Variabel baru untuk menampung komisi
+            if (partnerDoc && commissionAmount > 0) {
+                const partnerId = partnerDoc.id;
+                const commissionDocRef = db.collection('commissions').doc();
+                transaction.set(commissionDocRef, {
+                    partnerId: partnerId,
+                    partnerEmail: partnerDoc.data().email,
+                    referredUserId: userId,
+                    referredUserEmail: customerEmail,
+                    transactionAmount: amount,
+                    commissionAmount: commissionAmount,
+                    status: 'unpaid',
+                    createdAt: now,
+                    mayarInvoiceId: mayarTransactionId
+                });
+                console.log(`✅ BERHASIL: Komisi sebesar ${commissionAmount} untuk mitra ${partnerId} dicatat.`);
 
-    // Cek jumlah pembayaran untuk menentukan komisi
-    if (amount === 250000) { // Harga paket bulanan (diskon)
-        commissionAmount = 50000;
-    } else if (amount === 2500000) { // Harga paket tahunan (diskon)
-        commissionAmount = 500000;
-    } else if (amount === 350000) { // Harga paket bulanan (normal)
-        commissionAmount = 50000;
-    } else if (amount === 4200000) { // Harga paket tahunan (normal)
-        commissionAmount = 500000;
-    }
-
-    // Pastikan komisi hanya dicatat jika ada pembayaran yang valid
-    if (commissionAmount > 0) {
-        const commissionDocRef = db.collection('commissions').doc();
-        transaction.set(commissionDocRef, {
-            partnerId: partnerId,
-            partnerEmail: partnerDoc.data().email,
-            referredUserId: userId,
-            referredUserEmail: customerEmail,
-            transactionAmount: amount,
-            commissionAmount: commissionAmount, // <-- Gunakan variabel baru
-            status: 'unpaid',
-            createdAt: now,
-            mayarInvoiceId: mayarTransactionId
-        });
-        console.log(`✅ BERHASIL: Komisi sebesar ${commissionAmount} untuk mitra ${partnerId} dicatat.`);
-    }
-
-    transaction.delete(pendingCommissionRef);
-    console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
-} else if (referredByCode) {
+                transaction.delete(pendingCommissionRef);
+                console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
+            } else if (referredByCode) {
                 console.error(`❌ PERINGATAN: Kode rujukan ${referredByCode} ditemukan, tetapi tidak ada mitra yang cocok.`);
                 transaction.delete(pendingCommissionRef);
             }
