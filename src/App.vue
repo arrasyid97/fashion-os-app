@@ -5926,109 +5926,118 @@ const printBarcode = async () => {
 </div>
 
     <div v-if="activePage === 'inventaris'">
-    <div class="flex flex-wrap justify-between items-center mb-6">
-        <div>
-            <h2 class="text-3xl font-bold text-slate-800">Manajemen Inventaris</h2>
-            <p class="text-slate-500 mt-1">Kelompokkan produk berdasarkan nama untuk manajemen yang lebih mudah.</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-            <button @click="showModal('addStockIn', { sku: '', qty: null, tipe: 'penambahan', alasan: 'Penyesuaian Inventaris' })" class="bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow">Penyesuaian Stok</button>
-            <button @click="showModal('addProduct', { sku: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors shadow">Tambah Produk Baru</button>
-        </div>
-    </div>
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
 
-    <div class="mb-6 p-4 bg-white rounded-xl border shadow-sm">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label class="block text-sm font-medium mb-1">Cari Nama Produk</label>
-                <input type="text" v-model="uiState.inventorySearch" placeholder="Ketik nama produk..." class="w-full p-2 border rounded-md shadow-sm">
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
+                
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Inventaris</h2>
+                        <p class="text-slate-500 mt-1">Kelola semua produk, varian, dan stok Anda secara terpusat.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button @click="showModal('addStockIn', { sku: '', qty: null, tipe: 'penambahan', alasan: 'Penyesuaian Inventaris' })" class="bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow">Penyesuaian Stok</button>
+                        <button @click="showModal('addProduct', { sku: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors shadow">+ Tambah Produk Baru</button>
+                    </div>
+                </div>
+
+                <div class="mb-6 p-4 bg-slate-50/50 rounded-xl border">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Cari Nama Produk</label>
+                            <input type="text" v-model="uiState.inventorySearch" placeholder="Ketik nama produk..." class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Filter Status Stok</label>
+                            <select v-model="uiState.inventoryFilterStock" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                                <option value="all">Semua Status</option>
+                                <option value="aman">Stok Aman</option>
+                                <option value="menipis">Stok Menipis</option>
+                                <option value="habis">Stok Habis</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Urutkan Berdasarkan</label>
+                            <select v-model="uiState.inventorySort" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                                <option value="nama-asc">Nama Produk (A-Z)</option>
+                                <option value="nama-desc">Nama Produk (Z-A)</option>
+                                <option value="stok-desc">Stok Terbanyak</option>
+                                <option value="stok-asc">Stok Terendah</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                            <tr>
+                                <th class="px-6 py-3 font-semibold">Nama Produk / Varian</th>
+                                <th class="px-6 py-3 font-semibold">SKU</th>
+                                <th class="px-6 py-3 font-semibold">Warna</th>
+                                <th class="px-6 py-3 font-semibold text-center">Stok</th>
+                                <th class="px-6 py-3 font-semibold text-right">Nilai Stok (HPP)</th>
+                                <th class="px-6 py-3 font-semibold text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="inventoryProductGroups.length === 0">
+                                <td colspan="6" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
+                            </tr>
+                            <template v-for="group in inventoryProductGroups" :key="group.nama">
+                                <tr class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.nama ? null : group.nama">
+                                    <td class="px-6 py-4 font-bold text-slate-800">
+                                        <div class="flex items-center">
+                                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.nama }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                            <div>
+                                                {{ group.nama }}
+                                                <span class="block text-xs font-normal text-slate-500">{{ group.totalVariants }} varian</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-3" colspan="2"></td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span class="font-bold text-base text-slate-800">{{ formatNumber(group.totalStock) }}</span>
+                                        <span class="text-xs"> pcs</span>
+                                    </td>
+                                    <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
+                                    <td class="px-6 py-3 text-center">
+                                        <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+
+                                <template v-if="uiState.activeAccordion === group.nama">
+                                    <tr v-for="v in group.variants" :key="v.docId" class="border-b border-slate-200/50 hover:bg-slate-50/50 animate-fade-in">
+                                        <td class="px-6 py-3 pl-12 text-slate-600">{{ v.varian }}</td>
+                                        <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
+                                        <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
+                                        <td class="px-6 py-3 text-center">
+                                            <span class="stock-badge" :class="{
+                                                'stock-safe': v.stokFisik > state.settings.minStok,
+                                                'stock-low': v.stokFisik > 0 && v.stokFisik <= state.settings.minStok,
+                                                'stock-empty': v.stokFisik === 0
+                                            }">
+                                                {{ formatNumber(v.stokFisik) }}
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
+                                        <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
+                                            <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline">Hapus</button>
+                                            <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(v)), original: v })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
+                                            <button @click.stop="goToAturHarga(v.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Filter Status Stok</label>
-                <select v-model="uiState.inventoryFilterStock" class="w-full p-2 border rounded-md shadow-sm">
-                    <option value="all">Semua Status</option>
-                    <option value="aman">Stok Aman</option>
-                    <option value="menipis">Stok Menipis</option>
-                    <option value="habis">Stok Habis</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Urutkan Berdasarkan</label>
-                <select v-model="uiState.inventorySort" class="w-full p-2 border rounded-md shadow-sm">
-                    <option value="nama-asc">Nama Produk (A-Z)</option>
-                    <option value="nama-desc">Nama Produk (Z-A)</option>
-                    <option value="stok-desc">Stok Terbanyak</option>
-                    <option value="stok-asc">Stok Terendah</option>
-                </select>
-            </div>
+
         </div>
-    </div>
-
-    <div class="bg-white rounded-xl border shadow-sm overflow-x-auto">
-        <table class="w-full text-sm text-left">
-            <thead class="text-xs text-slate-700 uppercase bg-slate-100">
-                <tr>
-                    <th class="px-6 py-3 font-semibold">Nama Produk / Varian</th>
-                    <th class="px-6 py-3 font-semibold">SKU</th>
-                    <th class="px-6 py-3 font-semibold">Warna</th>
-                    <th class="px-6 py-3 font-semibold text-center">Stok</th>
-                    <th class="px-6 py-3 font-semibold text-right">Nilai Stok (HPP)</th>
-                    <th class="px-6 py-3 font-semibold text-center">Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-if="inventoryProductGroups.length === 0">
-                    <td colspan="6" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
-                </tr>
-                <template v-for="group in inventoryProductGroups" :key="group.nama">
-                    <tr class="bg-slate-50 border-b border-t cursor-pointer hover:bg-slate-100" @click="uiState.activeAccordion = uiState.activeAccordion === group.nama ? null : group.nama">
-                        <td class="px-6 py-4 font-bold text-slate-800">
-                            <div class="flex items-center">
-                                <svg class="w-4 h-4 mr-2 transition-transform" :class="{ 'rotate-90': uiState.activeAccordion === group.nama }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                                <div>
-                                    {{ group.nama }}
-                                    <span class="block text-xs font-normal text-slate-500">{{ group.totalVariants }} varian</span>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-3" colspan="2"></td>
-                        <td class="px-6 py-3 text-center">
-                            <span class="font-bold text-base text-slate-800">{{ formatNumber(group.totalStock) }}</span>
-                            <span class="text-xs"> pcs</span>
-                        </td>
-                        <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
-                        <td class="px-6 py-3 text-center">
-                            <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            </button>
-                        </td>
-                    </tr>
-
-                    <template v-if="uiState.activeAccordion === group.nama">
-                        <tr v-for="v in group.variants" :key="v.docId" class="border-b hover:bg-gray-50">
-    <td class="px-6 py-3 pl-12 text-slate-600">{{ v.varian }}</td>
-    <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
-    <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
-    <td class="px-6 py-3 text-center">
-        <span class="stock-badge" :class="{
-            'stock-safe': v.stokFisik > state.settings.minStok,
-            'stock-low': v.stokFisik > 0 && v.stokFisik <= state.settings.minStok,
-            'stock-empty': v.stokFisik === 0
-        }">
-            {{ formatNumber(v.stokFisik) }}
-        </span>
-    </td>
-    <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
-    <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
-        <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline">Hapus</button>
-        <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(v)), original: v })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
-        <button @click.stop="goToAturHarga(v.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
-    </td>
-</tr>
-                    </template>
-                    </template>
-            </tbody>
-        </table>
     </div>
 </div>
 
