@@ -592,47 +592,6 @@ function exportInvestorPayments() {
     XLSX.writeFile(workbook, `Riwayat_Pembayaran_Investor_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
-function printPreview() {
-  const printContainer = document.getElementById('print-area-container');
-  if (!printContainer) return;
-
-  // 1. Kosongkan area cetak dari sisa cetakan sebelumnya
-  printContainer.innerHTML = '';
-
-  // 2. Atur tata letak grid berdasarkan jumlah kolom yang dipilih
-  printContainer.style.gridTemplateColumns = `repeat(${labelSettings.columns}, 1fr)`;
-
-  // 3. Ambil barcode asli yang sudah digambar di area review
-  const originalCanvas = document.getElementById('barcodeCanvas');
-  if (!originalCanvas || originalCanvas.width === 0) {
-    alert("Gagal memuat gambar barcode untuk dicetak.");
-    return;
-  }
-
-  // 4. Salin gambar barcode sebanyak jumlah yang diinginkan ke area cetak
-  for (let i = 0; i < printCount.value; i++) {
-    const newCanvas = document.createElement('canvas');
-    newCanvas.width = originalCanvas.width;
-    newCanvas.height = originalCanvas.height;
-    const ctx = newCanvas.getContext('2d');
-    ctx.drawImage(originalCanvas, 0, 0);
-
-    // Buat div pembungkus untuk setiap label
-    const labelBox = document.createElement('div');
-    labelBox.className = 'print-label-box'; // Gunakan class dari CSS
-    labelBox.style.width = `${labelSettings.width}mm`;
-    labelBox.style.height = `${labelSettings.height}mm`;
-
-    labelBox.appendChild(newCanvas);
-    printContainer.appendChild(labelBox);
-  }
-
-  // 5. Panggil fungsi cetak browser
-  nextTick(() => {
-    window.print();
-  });
-}
-
 async function submitInvestorForm(isEditing) {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.modalData;
@@ -5422,6 +5381,10 @@ watch(activePage, (newPage) => {
 });
 
 
+function printPreview() {
+    window.print();
+}
+
 </script>
 
 <template>
@@ -5865,7 +5828,7 @@ watch(activePage, (newPage) => {
                         </div>
                     </div>
 
-                    <div id="print-section" class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
                         <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                             <h3 class="text-xl font-semibold text-slate-800">Riwayat Transaksi</h3>
                             <div class="flex items-start gap-2">
@@ -10406,8 +10369,7 @@ watch(activePage, (newPage) => {
             </form>
         </div>
     </div>
-<div id="print-area-container">
-    </div>
+
 </template>
 
 <style scoped>
@@ -10612,42 +10574,44 @@ watch(activePage, (newPage) => {
     opacity: 0; /* Mulai dari tidak terlihat */
 }
 @media print {
-  /* 1. Sembunyikan semua elemen di halaman secara default */
-  body > * {
-    display: none !important;
-  }
-
-  /* 2. Tampilkan HANYA area cetak khusus kita dan semua isinya */
-  #print-area-container, #print-area-container * {
-    display: block !important;
-    visibility: visible !important;
-  }
-
-  /* 3. Atur tata letak untuk kertas cetak */
-  #print-area-container {
-    display: grid !important; /* Gunakan grid untuk tata letak kolom */
-    gap: 2mm; /* Jarak antar label */
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-  }
-
-  /* Styling untuk setiap label di dalam area cetak */
-  .print-label-box {
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-  }
-
-  .print-label-box canvas {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-  }
+    body {
+        background: none !important;
+    }
+    #main-content > div:not([id='barcode-page']) {
+        display: none !important;
+    }
+    #barcode-page, #barcode-page * {
+        visibility: visible !important;
+        display: block !important;
+    }
+    .min-h-screen.w-full {
+        padding: 0 !important;
+        background: white !important;
+    }
+    .lg\:col-span-1 {
+        display: none !important;
+    }
+    .lg\:col-span-2 {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .bg-white\/70, .shadow-xl, .border {
+        background: none !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+    #barcode-preview-area {
+        min-height: auto !important;
+        background: none !important;
+        padding: 0 !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .animate-fade-in-up, .mb-8 {
+        animation: none !important;
+        margin: 0 !important;
+    }
 }
 </style>
