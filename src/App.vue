@@ -5831,93 +5831,86 @@ const printBarcode = async () => {
 </div>
 
 <div v-if="activePage === 'bulk_process'">
-    <div class="flex items-center gap-4">
-        <h2 class="text-3xl font-bold text-slate-800">Smart Scan (Proses Super Cepat)</h2>
-        <button @click="showModal('panduanBulkProcess')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
-            Panduan
-        </button>
-    </div>
-    <p class="text-slate-500 mt-1 mb-6">Pilih metode input yang sesuai dengan perangkat Anda.</p>
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-1 space-y-4">
-            <div class="bg-white p-4 rounded-xl border">
-                <label class="block text-sm font-medium text-slate-600 mb-1">1. Pilih Channel Penjualan</label>
-                <select v-model="uiState.activeCartChannel" @change="uiState.bulk_order_queue = []" class="w-full p-2 border rounded-md">
-                    <option :value="null" disabled>-- Pilih Channel --</option>
-                    <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
-                </select>
-            </div>
-
-            <div class="bg-white p-4 rounded-xl border sticky top-4 space-y-4">
+            <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Input Manual (Tanpa Scanner)</label>
-                    <div class="relative">
-                        <input type="text" 
-                               v-model="uiState.bulk_manual_input" 
-                               @input="handleBulkManualSearch"
-                               :disabled="!uiState.activeCartChannel" 
-                               placeholder="Ketik SKU atau ID Pesanan..." 
-                               class="w-full p-3 text-lg border-2 rounded-lg" 
-                               autocomplete="off">
-                        
-                        <div v-if="uiState.bulk_recommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg z-10">
-    <div v-for="p in uiState.bulk_recommendations" :key="p.sku" @click="selectBulkRecommendation(p)" class="p-3 hover:bg-slate-100 cursor-pointer border-b">
-        <p class="font-semibold text-sm">{{ p.sku }}</p>
-        <p class="text-xs text-slate-500 mt-1">{{ p.modelNama }} - {{ p.warna }} - {{ p.varian }}</p>
-    </div>
-</div>
-                    </div>
-                    <button @click="finalizeManualOrder" 
-                            :disabled="!uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-')) || !uiState.bulk_manual_input"
-                            class="mt-2 w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
-                        Jadikan ID Pesanan
-                    </button>
+                    <h2 class="text-3xl font-bold text-slate-800">Smart Scan (Proses Super Cepat)</h2>
+                    <p class="text-slate-500 mt-1">Proses pesanan bervolume tinggi dengan cepat dan akurat.</p>
                 </div>
-
-                <hr>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">KHUSUS SCANNER (Otomatis)</label>
-                    <input type="text" 
-                           v-model="uiState.bulk_scan_input" 
-                           :disabled="!uiState.activeCartChannel" 
-                           placeholder="Scan Produk -> Scan Resi" 
-                           class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg">
-                </div>
-            </div>
-        </div>
-
-        <div class="lg:col-span-2 bg-white p-6 rounded-xl border">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold">Antrian Pesanan untuk Diproses ({{ uiState.bulk_order_queue.length }})</h3>
-                <button @click="processBatchOrders" :disabled="uiState.bulk_order_queue.length === 0" class="bg-green-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-green-700 disabled:bg-gray-400">
-                    Proses Semua Antrian
+                <button @click="showModal('panduanBulkProcess')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                    Panduan
                 </button>
             </div>
-            <div class="space-y-3 max-h-[70vh] overflow-y-auto p-2">
-                 <p v-if="uiState.bulk_order_queue.length === 0" class="text-center py-16 text-slate-400">
-                    Tidak ada pesanan di antrian.
-                </p>
-                <div v-for="(order, index) in uiState.bulk_order_queue" :key="order.id" class="p-4 border rounded-lg" :class="order.status === 'Mengantri' ? 'bg-white shadow-sm' : 'bg-yellow-50'">
-                    <div class="flex justify-between items-start">
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                
+                <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 lg:sticky lg:top-8 animate-fade-in-up" style="animation-delay: 100ms;">
+                    <div class="space-y-6">
                         <div>
-                            <p class="font-bold" :class="order.status === 'Mengantri' ? 'text-indigo-700' : 'text-yellow-700'">
-                                ID Pesanan: {{ order.marketplaceOrderId }}
-                            </p>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">1. Pilih Channel Penjualan</label>
+                            <select v-model="uiState.activeCartChannel" @change="uiState.bulk_order_queue = []" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                                <option :value="null" disabled>-- Pilih Channel --</option>
+                                <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
+                            </select>
                         </div>
-                        <div class="flex gap-2">
-    <button @click="deleteQueuedOrder(index)" class="text-xs font-semibold text-red-600 hover:underline">Hapus</button>
-</div>
+
+                        <div class="border-t pt-6">
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">2. Input Manual (Tanpa Scanner)</label>
+                            <div class="relative">
+                                <input type="text" v-model="uiState.bulk_manual_input" @input="handleBulkManualSearch" :disabled="!uiState.activeCartChannel" placeholder="Ketik SKU atau ID Pesanan..." class="w-full p-3 text-lg border-2 border-slate-300 rounded-lg" autocomplete="off">
+                                <div v-if="uiState.bulk_recommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg z-10">
+                                    <div v-for="p in uiState.bulk_recommendations" :key="p.sku" @click="selectBulkRecommendation(p)" class="p-3 hover:bg-slate-100 cursor-pointer border-b">
+                                        <p class="font-semibold text-sm">{{ p.sku }}</p>
+                                        <p class="text-xs text-slate-500 mt-1">{{ p.modelNama }} - {{ p.warna }} - {{ p.varian }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <button @click="finalizeManualOrder" :disabled="!uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-')) || !uiState.bulk_manual_input" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
+                                Jadikan ID Pesanan
+                            </button>
+                        </div>
+
+                        <div class="border-t pt-6">
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">3. KHUSUS SCANNER (Otomatis)</label>
+                            <input type="text" v-model="uiState.bulk_scan_input" :disabled="!uiState.activeCartChannel" placeholder="Scan Produk -> Scan Resi" class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg">
+                        </div>
                     </div>
-                    <div class="mt-2 border-t pt-2">
-                        <ul class="text-xs space-y-1 text-slate-600">
-                            <li v-for="item in order.items" :key="item.sku">
-                                <strong>{{ item.qty }}x</strong> {{ getProductBySku(item.sku)?.nama }} ({{item.sku}})
-                                <div class="pl-4 text-slate-500">Model: {{ state.settings.modelProduk.find(m => m.id === getProductBySku(item.sku)?.model_id)?.namaModel || 'N/A' }}, Warna: {{ getProductBySku(item.sku)?.warna }}, Ukuran: {{ getProductBySku(item.sku)?.varian }}</div>
-                            </li>
-                        </ul>
+                </div>
+
+                <div class="lg:col-span-2 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    <div class="flex justify-between items-center mb-4 pb-4 border-b border-slate-200/80">
+                        <h3 class="text-xl font-semibold text-slate-800">Antrian Pesanan untuk Diproses ({{ uiState.bulk_order_queue.length }})</h3>
+                        <button @click="processBatchOrders" :disabled="uiState.bulk_order_queue.length === 0" class="bg-green-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-green-700 disabled:bg-slate-400 shadow">
+                            Proses Semua Antrian
+                        </button>
+                    </div>
+                    <div class="space-y-3 max-h-[70vh] overflow-y-auto p-2 -mr-2">
+                        <p v-if="uiState.bulk_order_queue.length === 0" class="text-center py-16 text-slate-400">
+                            Tidak ada pesanan di antrian.
+                        </p>
+                        <div v-for="(order, index) in uiState.bulk_order_queue" :key="order.id" class="p-4 border rounded-lg animate-fade-in" :class="order.status === 'Mengantri' ? 'bg-white shadow-sm' : 'bg-yellow-50/50 border-yellow-300'">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-bold" :class="order.status === 'Mengantri' ? 'text-indigo-700' : 'text-yellow-700'">
+                                        ID Pesanan: {{ order.marketplaceOrderId }}
+                                    </p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button @click="deleteQueuedOrder(index)" class="text-xs font-semibold text-red-600 hover:underline">Hapus</button>
+                                </div>
+                            </div>
+                            <div class="mt-2 border-t border-slate-200/80 pt-2">
+                                <ul class="text-xs space-y-1 text-slate-600">
+                                    <li v-for="item in order.items" :key="item.sku">
+                                        <strong>{{ item.qty }}x</strong> {{ getProductBySku(item.sku)?.nama }} ({{item.sku}})
+                                        <div class="pl-4 text-slate-500">Model: {{ state.settings.modelProduk.find(m => m.id === getProductBySku(item.sku)?.model_id)?.namaModel || 'N/A' }}, Warna: {{ getProductBySku(item.sku)?.warna }}, Ukuran: {{ getProductBySku(item.sku)?.varian }}</div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
