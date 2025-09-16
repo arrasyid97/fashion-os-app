@@ -6601,271 +6601,252 @@ const printBarcode = async () => {
 </div>
 
 <div v-if="activePage === 'investasi'">
-    <div v-if="uiState.isInvestasiLocked" class="flex items-center justify-center h-full p-4">
-        <div class="bg-white rounded-xl shadow-lg p-8 max-w-sm w-full text-center">
-            <h3 class="text-xl font-bold text-slate-800 mb-4">Halaman Investasi Terkunci</h3>
-            <p class="text-sm text-slate-600 mb-4">Masukkan PIN untuk mengakses data investor dan laporan bagi hasil.</p>
-            <form @submit.prevent="unlockInvestasi">
-                <input 
-                    type="password" 
-                    v-model="uiState.investasiPinInput" 
-                    placeholder="Masukkan PIN" 
-                    class="w-full p-2 border rounded-md text-center text-lg mb-2"
-                >
-                <p v-if="uiState.investasiPinError" class="text-red-500 text-xs mb-2">{{ uiState.investasiPinError }}</p>
-                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700">
-                    Buka Halaman
-                </button>
-            </form>
-        </div>
-    </div>
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
 
-    <div v-else class="animate-fade-in">
-        <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
-            <div>
-                <div class="flex items-center gap-4">
-                    <h2 class="text-3xl font-bold text-slate-800">Manajemen Investor</h2>
-                    <button @click="showModal('investorInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                        Informasi
-                    </button>
-                </div>
-                <p class="text-slate-500 mt-1">Kelola data investor dan modal yang masuk.</p>
-            </div>
-            <button @click="showModal('addInvestor', { name: '', amount: null, profitShare: null, startDate: new Date().toISOString().split('T')[0], status: 'aktif' })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow">
-                + Tambah Investor Baru
-            </button>
-        </div>
-
-        <div class="mb-4">
-            <label class="block text-sm font-medium">Filter Status Investor</label>
-            <select v-model="uiState.investorStatusFilter" class="mt-1 p-2 border rounded-md bg-white shadow-sm">
-                <option value="aktif">Hanya Aktif</option>
-                <option value="selesai">Hanya Selesai</option>
-                <option value="semua">Tampilkan Semua</option>
-            </select>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-            <table class="w-full text-sm text-left text-slate-500">
-                <thead class="text-xs text-slate-700 uppercase bg-slate-50">
-                    <tr>
-                        <th class="px-6 py-3">Nama Investor</th>
-                        <th class="px-6 py-3 text-center">Status</th>
-                        <th class="px-6 py-3 text-right">Modal Masuk</th>
-                        <th class="px-6 py-3 text-right">Total Bagi Hasil</th>
-                        <th class="px-6 py-3 text-right">ROI</th>
-                        <th class="px-6 py-3 text-center">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <tr v-if="investorLedger.length === 0">
-                        <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data investor yang cocok dengan filter.</td>
-                    </tr>
-                    <tr v-for="inv in investorLedger" :key="inv.id" class="hover:bg-slate-50">
-                        <td class="px-6 py-4">
-                            <p class="font-semibold text-slate-800">{{ inv.name }}</p>
-                            <p class="text-xs text-slate-500">Bagi Hasil: {{ inv.profitShare }}% | Mulai: {{ new Date(inv.startDate).toLocaleDateString('id-ID') }}</p>
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                                    :class="inv.status === 'aktif' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'">
-                                {{ inv.status }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-right font-medium text-slate-600">{{ formatCurrency(inv.amount) }}</td>
-                        <td class="px-6 py-4 text-right font-semibold text-green-600">{{ formatCurrency(inv.totalPayout) }}</td>
-                        <td class="px-6 py-4 text-right font-bold" :class="inv.roi >= 100 ? 'text-emerald-600' : 'text-amber-600'">
-                            {{ inv.roi.toFixed(1) }}%
-                        </td>
-                        <td class="px-6 py-4 text-center space-x-2 whitespace-nowrap">
-                            <button @click="toggleInvestorStatus(inv)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Ubah Status</button>
-                            <button @click="showModal('editInvestor', inv)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
-                            
-                            <button v-if="inv.status === 'selesai'" @click="deleteInvestor(inv.id)" class="text-xs bg-red-100 text-red-700 font-bold py-1 px-2 rounded hover:bg-red-200">
-                                Hapus
-                            </button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="mt-8 pt-6 border-t">
-            <h2 class="text-2xl font-bold text-slate-800">Laporan Bagi Hasil Investor</h2>
-            <p class="text-slate-500 mt-1 mb-6">Pilih investor dan periode untuk menghitung pembagian keuntungan secara otomatis.</p>
-            <div class="p-4 bg-white rounded-xl border shadow-sm mb-6">
-                <form @submit.prevent="generateBagiHasilReport" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Investor</label>
-                        <select v-model="uiState.laporanBagiHasil.selectedInvestorId" class="w-full p-2 border border-slate-300 rounded-md">
-                            <option :value="null" disabled>-- Pilih Investor --</option>
-                            <option v-for="inv in (state.investor || [])" :key="inv.id" :value="inv.id">{{ inv.name }}</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Bulan</label>
-                        <select v-model.number="uiState.laporanBagiHasil.month" class="w-full p-2 border border-slate-300 rounded-md">
-                            <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Tahun</label>
-                        <input type="number" v-model.number="uiState.laporanBagiHasil.year" class="w-full p-2 border border-slate-300 rounded-md">
-                    </div>
-                    <div class="md:col-span-4">
-                        <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors">
-                            Buat Laporan
-                        </button>
-                    </div>
+        <div v-if="uiState.isInvestasiLocked" class="flex items-center justify-center h-full animate-fade-in">
+            <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
+                 <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                 </div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">Halaman Terkunci</h3>
+                <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan Anda untuk mengakses data investor.</p>
+                <form @submit.prevent="unlockInvestasi" class="w-full">
+                    <input type="password" v-model="uiState.investasiPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2">
+                    <p v-if="uiState.investasiPinError" class="text-red-500 text-xs mb-2">{{ uiState.investasiPinError }}</p>
+                    <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka Halaman</button>
                 </form>
             </div>
-            <div v-if="uiState.laporanBagiHasil.result" class="p-6 bg-white rounded-xl border-2 border-indigo-500 shadow-lg animate-fade-in">
-                <div class="border-b pb-4 mb-4">
-                    <h3 class="text-xl font-bold text-slate-800">Laporan Bagi Hasil untuk {{ uiState.laporanBagiHasil.result.investorName }}</h3>
-                    <p class="text-slate-600">Periode: <span class="font-semibold">{{ uiState.laporanBagiHasil.result.period }}</span></p>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
-                    
-                    <div class="space-y-2 p-4 bg-indigo-50 rounded-lg">
-                        <h4 class="font-bold text-base mb-2">Pembagian Hasil</h4>
-                        <div v-if="uiState.laporanBagiHasil.result.labaBersih > 0">
-                            <div class="flex justify-between"><span>Bagian Investor ({{ uiState.laporanBagiHasil.result.profitSharePercentage }}%)</span><span class="font-bold text-xl text-green-700">{{ formatCurrency(uiState.laporanBagiHasil.result.investorShare) }}</span></div>
-                            <div class="flex justify-between mt-2"><span>Bagian Perusahaan</span><span class="font-medium">{{ formatCurrency(uiState.laporanBagiHasil.result.companyShare) }}</span></div>
-                            <div class="mt-6 pt-4 border-t space-y-3">
-                                <div><label class="block text-sm font-medium">Metode Pembayaran</label><select v-model="uiState.laporanBagiHasil.paymentMethod" class="mt-1 w-full p-2 border rounded-md"><option value="transfer">Transfer Bank</option><option value="cash">Tunai (Cash)</option></select></div>
-                                <div v-if="uiState.laporanBagiHasil.paymentMethod === 'transfer'"><label class="block text-sm font-medium">Rekening Tujuan</label><select v-model="uiState.laporanBagiHasil.selectedBankAccountId" class="mt-1 w-full p-2 border rounded-md" required><option :value="null" disabled>-- Pilih Rekening --</option><option v-for="acc in state.bankAccounts" :key="acc.id" :value="acc.id">{{ acc.bankName }} - {{ acc.accountNumber }} ({{ acc.accountName }})</option></select></div>
-                                <div v-if="uiState.laporanBagiHasil.paymentMethod === 'transfer'"><label class="block text-sm font-medium">Biaya Admin Transfer (jika ada)</label><input type="number" v-model.number="uiState.laporanBagiHasil.adminFee" class="mt-1 w-full p-2 border rounded-md" placeholder="Contoh: 6500"></div>
-                            </div>
-                            <div class="flex justify-end items-center gap-3 pt-4 border-t mt-4">
-                                <button type="button" @click="uiState.laporanBagiHasil.result = null" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
-                                <button type="button" @click="recordBagiHasilPayment" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">Catat Pembayaran Bagi Hasil</button>
-                            </div>
+        </div>
+        
+        <div v-else class="max-w-7xl mx-auto">
+            <div class="mb-8 animate-fade-in-up">
+                <h2 class="text-3xl font-bold text-slate-800">Manajemen Investasi</h2>
+                <p class="text-slate-500 mt-1">Kelola data investor, laporan bagi hasil, dan riwayat pembayaran.</p>
+            </div>
+
+            <div class="space-y-8">
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+                    <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+                        <h3 class="text-xl font-bold text-slate-800">Daftar Investor</h3>
+                        <div class="flex items-center gap-4">
+                             <select v-model="uiState.investorStatusFilter" class="p-2 border border-slate-300 rounded-md bg-white shadow-sm text-sm">
+                                <option value="aktif">Hanya Aktif</option>
+                                <option value="selesai">Hanya Selesai</option>
+                                <option value="semua">Tampilkan Semua</option>
+                            </select>
+                            <button @click="showModal('addInvestor', { name: '', amount: null, profitShare: null, startDate: new Date().toISOString().split('T')[0], status: 'aktif' })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 shadow transition-colors text-sm">
+                                + Tambah Investor
+                            </button>
                         </div>
-                        <div v-else class="text-center py-8"><p class="font-semibold text-slate-700">Tidak ada keuntungan pada periode ini.</p></div>
                     </div>
-                    <div class="space-y-2 p-4 bg-slate-50 rounded-lg">
-                        <h4 class="font-bold text-base mb-2">Perhitungan Laba Bersih</h4>
-                        <div class="flex justify-between"><span>Omset Bersih Penjualan</span> <span class="font-medium text-green-600">{{ formatCurrency(uiState.laporanBagiHasil.result.omsetBersihPenjualan) }}</span></div>
-                        <div class="flex justify-between"><span>(-) Omset Bersih dari Retur</span> <span class="font-medium text-red-600">{{ formatCurrency(uiState.laporanBagiHasil.result.omsetBersihDariRetur) }}</span></div>
-                        <div class="flex justify-between font-semibold border-t pt-1"><span>= Total Omset Bersih</span> <span>{{ formatCurrency(uiState.laporanBagiHasil.result.omsetBersihFinal) }}</span></div>
-                        
-                        <div class="flex justify-between mt-3"><span>(-) HPP Terjual</span> <span class="font-medium text-red-600">{{ formatCurrency(uiState.laporanBagiHasil.result.totalHppTerjual) }}</span></div>
-                        <div class="flex justify-between"><span>(-) HPP dari Retur</span> <span class="font-medium text-red-600">{{ formatCurrency(uiState.laporanBagiHasil.result.totalHppRetur) }}</span></div>
-                        <div class="flex justify-between font-semibold border-t pt-1"><span>= Total HPP</span> <span class="text-red-600">{{ formatCurrency(uiState.laporanBagiHasil.result.hppTerjualFinal) }}</span></div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-50/50">
+                                <tr>
+                                    <th class="px-6 py-3">Nama Investor</th>
+                                    <th class="px-6 py-3 text-center">Status</th>
+                                    <th class="px-6 py-3 text-right">Modal Masuk</th>
+                                    <th class="px-6 py-3 text-right">Total Bagi Hasil</th>
+                                    <th class="px-6 py-3 text-right">ROI</th>
+                                    <th class="px-6 py-3 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/50">
+                                <tr v-if="investorLedger.length === 0">
+                                    <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data investor yang cocok dengan filter.</td>
+                                </tr>
+                                <tr v-for="inv in investorLedger" :key="inv.id" class="hover:bg-slate-50/50">
+                                    <td class="px-6 py-4">
+                                        <p class="font-semibold text-slate-800">{{ inv.name }}</p>
+                                        <p class="text-xs text-slate-500">Bagi Hasil: {{ inv.profitShare }}% | Mulai: {{ new Date(inv.startDate).toLocaleDateString('id-ID') }}</p>
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                                                :class="inv.status === 'aktif' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'">
+                                            {{ inv.status }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right font-medium text-slate-600">{{ formatCurrency(inv.amount) }}</td>
+                                    <td class="px-6 py-4 text-right font-semibold text-green-600">{{ formatCurrency(inv.totalPayout) }}</td>
+                                    <td class="px-6 py-4 text-right font-bold" :class="inv.roi >= 100 ? 'text-emerald-600' : 'text-amber-600'">
+                                        {{ inv.roi.toFixed(1) }}%
+                                    </td>
+                                    <td class="px-6 py-4 text-center space-x-2 whitespace-nowrap">
+                                        <button @click="toggleInvestorStatus(inv)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Ubah Status</button>
+                                        <button @click="showModal('editInvestor', inv)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
+                                        <button v-if="inv.status === 'selesai'" @click="deleteInvestor(inv.id)" class="text-xs bg-red-100 text-red-700 font-bold py-1 px-2 rounded hover:bg-red-200">
+                                            Hapus
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-                        <div class="flex justify-between font-bold border-t-2 pt-2 mt-2"><span>LABA KOTOR</span> <span>{{ formatCurrency(uiState.laporanBagiHasil.result.labaKotor) }}</span></div>
-
-                        <div class="flex justify-between mt-3"><span>(-) Biaya Marketplace (Penjualan)</span> <span class="font-medium text-red-600">{{ formatCurrency(uiState.laporanBagiHasil.result.biayaMarketplacePenjualan) }}</span></div>
-                        <div class="flex justify-between"><span>(-) Biaya Marketplace (dari Retur)</span> <span class="font-medium text-red-600">{{ formatCurrency(uiState.laporanBagiHasil.result.biayaMarketplaceBatal) }}</span></div>
-                        <div class="flex justify-between font-semibold border-t pt-1"><span>= Total Biaya Marketplace</span> <span class="text-red-600">{{ formatCurrency(uiState.laporanBagiHasil.result.totalBiayaTransaksi) }}</span></div>
-                        
-                        <div class="flex justify-between mt-2">
-                            <span class="flex items-center gap-2">
-                                (-) Biaya Operasional
-                                <button @click="showModal('biayaOperasionalHelp')" type="button" class="w-5 h-5 rounded-full flex items-center justify-center bg-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-300">?</button>
-                            </span> 
-                            <span class="font-medium text-red-600">{{ formatCurrency(uiState.laporanBagiHasil.result.totalBiayaOperasional) }}</span>
-                        </div>
-                        <div class="flex justify-between font-bold text-lg text-indigo-700 border-t-2 pt-2 mt-2">
-                            <div class="flex items-center gap-2">
-                                <span>LABA BERSIH</span>
-                                <button @click="showModal('labaBersihHelp')" type="button" class="w-5 h-5 rounded-full flex items-center justify-center bg-indigo-100 text-indigo-600 font-bold text-sm hover:bg-indigo-200">?</button>
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4">Laporan Bagi Hasil Investor</h3>
+                    <div class="p-4 bg-slate-50/50 rounded-xl border shadow-sm mb-6">
+                         <form @submit.prevent="generateBagiHasilReport" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Investor</label>
+                                <select v-model="uiState.laporanBagiHasil.selectedInvestorId" class="w-full p-2 border border-slate-300 rounded-md">
+                                    <option :value="null" disabled>-- Pilih Investor --</option>
+                                    <option v-for="inv in (state.investor || [])" :key="inv.id" :value="inv.id">{{ inv.name }}</option>
+                                </select>
                             </div>
-                            <span>{{ formatCurrency(uiState.laporanBagiHasil.result.labaBersih) }}</span>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Bulan</label>
+                                <select v-model.number="uiState.laporanBagiHasil.month" class="w-full p-2 border border-slate-300 rounded-md">
+                                    <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Tahun</label>
+                                <input type="number" v-model.number="uiState.laporanBagiHasil.year" class="w-full p-2 border border-slate-300 rounded-md">
+                            </div>
+                            <div class="md:col-span-4">
+                                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors">
+                                    Buat Laporan
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div v-if="uiState.laporanBagiHasil.result" class="p-6 bg-white rounded-xl border-2 border-indigo-500 shadow-lg animate-fade-in">
+                        <div class="border-b pb-4 mb-4">
+                            <h3 class="text-xl font-bold text-slate-800">Laporan Bagi Hasil untuk {{ uiState.laporanBagiHasil.result.investorName }}</h3>
+                            <p class="text-slate-600">Periode: <span class="font-semibold">{{ uiState.laporanBagiHasil.result.period }}</span></p>
                         </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+                            <div class="space-y-2 p-4 bg-indigo-50 rounded-lg">
+                                <h4 class="font-bold text-base mb-2">Pembagian Hasil</h4>
+                                <div v-if="uiState.laporanBagiHasil.result.labaBersih > 0">
+                                    <div class="flex justify-between"><span>Bagian Investor ({{ uiState.laporanBagiHasil.result.profitSharePercentage }}%)</span><span class="font-bold text-xl text-green-700">{{ formatCurrency(uiState.laporanBagiHasil.result.investorShare) }}</span></div>
+                                    <div class="flex justify-between mt-2"><span>Bagian Perusahaan</span><span class="font-medium">{{ formatCurrency(uiState.laporanBagiHasil.result.companyShare) }}</span></div>
+                                    <div class="mt-6 pt-4 border-t space-y-3">
+                                        <div><label class="block text-sm font-medium">Metode Pembayaran</label><select v-model="uiState.laporanBagiHasil.paymentMethod" class="mt-1 w-full p-2 border rounded-md"><option value="transfer">Transfer Bank</option><option value="cash">Tunai (Cash)</option></select></div>
+                                        <div v-if="uiState.laporanBagiHasil.paymentMethod === 'transfer'"><label class="block text-sm font-medium">Rekening Tujuan</label><select v-model="uiState.laporanBagiHasil.selectedBankAccountId" class="mt-1 w-full p-2 border rounded-md" required><option :value="null" disabled>-- Pilih Rekening --</option><option v-for="acc in state.bankAccounts" :key="acc.id" :value="acc.id">{{ acc.bankName }} - {{ acc.accountNumber }} ({{ acc.accountName }})</option></select></div>
+                                        <div v-if="uiState.laporanBagiHasil.paymentMethod === 'transfer'"><label class="block text-sm font-medium">Biaya Admin Transfer (jika ada)</label><input type="number" v-model.number="uiState.laporanBagiHasil.adminFee" class="mt-1 w-full p-2 border rounded-md" placeholder="Contoh: 6500"></div>
+                                    </div>
+                                    <div class="flex justify-end items-center gap-3 pt-4 border-t mt-4">
+                                        <button type="button" @click="uiState.laporanBagiHasil.result = null" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+                                        <button type="button" @click="recordBagiHasilPayment" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">Catat Pembayaran Bagi Hasil</button>
+                                    </div>
+                                </div>
+                                <div v-else class="text-center py-8"><p class="font-semibold text-slate-700">Tidak ada keuntungan pada periode ini.</p></div>
+                            </div>
+                            <div class="space-y-2 p-4 bg-slate-50 rounded-lg">
+                                <h4 class="font-bold text-base mb-2">Perhitungan Laba Bersih</h4>
+                                <div class="flex justify-between"><span>Omset Bersih Penjualan</span> <span class="font-medium text-green-600">{{ formatCurrency(uiState.laporanBagiHasil.result.omsetBersihPenjualan) }}</span></div>
+                                <div class="flex justify-between"><span>(-) Omset Bersih dari Retur</span> <span class="font-medium text-red-600">-{{ formatCurrency(uiState.laporanBagiHasil.result.omsetBersihDariRetur) }}</span></div>
+                                <div class="flex justify-between font-semibold border-t pt-1"><span>= Total Omset Bersih</span> <span>{{ formatCurrency(uiState.laporanBagiHasil.result.omsetBersihFinal) }}</span></div>
+                                <div class="flex justify-between mt-3"><span>(-) HPP Terjual</span> <span class="font-medium text-red-600">-{{ formatCurrency(uiState.laporanBagiHasil.result.totalHppTerjual) }}</span></div>
+                                <div class="flex justify-between"><span>(-) HPP dari Retur</span> <span class="font-medium text-red-600">-{{ formatCurrency(uiState.laporanBagiHasil.result.totalHppRetur) }}</span></div>
+                                <div class="flex justify-between font-semibold border-t pt-1"><span>= Total HPP</span> <span class="text-red-600">-{{ formatCurrency(uiState.laporanBagiHasil.result.hppTerjualFinal) }}</span></div>
+                                <div class="flex justify-between font-bold border-t-2 pt-2 mt-2"><span>LABA KOTOR</span> <span>{{ formatCurrency(uiState.laporanBagiHasil.result.labaKotor) }}</span></div>
+                                <div class="flex justify-between mt-3"><span>(-) Biaya Marketplace (Penjualan)</span> <span class="font-medium text-red-600">-{{ formatCurrency(uiState.laporanBagiHasil.result.biayaMarketplacePenjualan) }}</span></div>
+                                <div class="flex justify-between"><span>(-) Biaya Marketplace (dari Retur)</span> <span class="font-medium text-red-600">-{{ formatCurrency(uiState.laporanBagiHasil.result.biayaMarketplaceBatal) }}</span></div>
+                                <div class="flex justify-between font-semibold border-t pt-1"><span>= Total Biaya Marketplace</span> <span class="text-red-600">-{{ formatCurrency(uiState.laporanBagiHasil.result.totalBiayaTransaksi) }}</span></div>
+                                <div class="flex justify-between mt-2">
+                                    <span class="flex items-center gap-2">(-) Biaya Operasional <button @click="showModal('biayaOperasionalHelp')" type="button" class="w-5 h-5 rounded-full flex items-center justify-center bg-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-300">?</button></span> 
+                                    <span class="font-medium text-red-600">-{{ formatCurrency(uiState.laporanBagiHasil.result.totalBiayaOperasional) }}</span>
+                                </div>
+                                <div class="flex justify-between font-bold text-lg text-indigo-700 border-t-2 pt-2 mt-2">
+                                    <div class="flex items-center gap-2"><span>LABA BERSIH</span><button @click="showModal('labaBersihHelp')" type="button" class="w-5 h-5 rounded-full flex items-center justify-center bg-indigo-100 text-indigo-600 font-bold text-sm hover:bg-indigo-200">?</button></div>
+                                    <span>{{ formatCurrency(uiState.laporanBagiHasil.result.labaBersih) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 300ms;">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-slate-800">Riwayat Pembayaran Investor</h3>
+                        <button @click="exportInvestorPayments" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">Export</button>
+                    </div>
+                    <div class="mb-6 p-4 bg-slate-50/50 rounded-xl border shadow-sm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Filter Periode</label>
+                                <select v-model="uiState.investorPaymentFilter" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2.5 capitalize">
+                                    <option value="all_time">Semua</option>
+                                    <option value="by_month_range">Bulan & Tahun</option>
+                                    <option value="by_year_range">Rentang Tahun</option>
+                                </select>
+                            </div>
+                            <div v-if="uiState.investorPaymentFilter === 'by_month_range'" class="lg:col-span-2 grid grid-cols-2 gap-2 items-end">
+                                <div>
+                                    <label class="block text-xs font-medium mb-1">Dari Bulan</label>
+                                    <select v-model.number="uiState.investorPaymentStartMonth" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                                        <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium mb-1">Tahun</label>
+                                    <input type="number" v-model.number="uiState.investorPaymentStartYear" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium mb-1">Sampai Bulan</label>
+                                    <select v-model.number="uiState.investorPaymentEndMonth" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                                        <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium mb-1">Tahun</label>
+                                    <input type="number" v-model.number="uiState.investorPaymentEndYear" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                                </div>
+                            </div>
+                            <div v-if="uiState.investorPaymentFilter === 'by_year_range'" class="lg:col-span-2 grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Dari Tahun</label>
+                                    <input type="number" v-model.number="uiState.investorPaymentStartYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Sampai Tahun</label>
+                                    <input type="number" v-model.number="uiState.investorPaymentEndYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Cari Investor</label>
+                                <input type="text" v-model="uiState.investorPaymentSearch" placeholder="Cari nama investor..." class="w-full p-2 border rounded-md bg-white shadow-sm">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-50/50">
+                                <tr>
+                                    <th class="px-6 py-3">Tanggal</th>
+                                    <th class="px-6 py-3">Investor</th>
+                                    <th class="px-6 py-3">Periode</th>
+                                    <th class="px-6 py-3 text-right">Jumlah Dibayar</th>
+                                    <th class="px-6 py-3">Metode</th>
+                                    <th class="px-6 py-3 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/50">
+                                <tr v-if="filteredInvestorPayments.length === 0">
+                                    <td colspan="6" class="p-10 text-center text-slate-500">Belum ada riwayat pembayaran yang sesuai dengan filter.</td>
+                                </tr>
+                                <tr v-for="p in filteredInvestorPayments" :key="p.id" class="hover:bg-slate-50/50">
+                                    <td class="px-6 py-4">{{ new Date(p.paymentDate).toLocaleDateString('id-ID') }}</td>
+                                    <td class="px-6 py-4 font-semibold">{{ p.investorName }}</td>
+                                    <td class="px-6 py-4">{{ p.period }}</td>
+                                    <td class="px-6 py-4 text-right font-medium text-green-600">{{ formatCurrency(p.totalPayment) }}</td>
+                                    <td class="px-6 py-4 capitalize">{{ p.paymentMethod }}</td>
+                                    <td class="px-6 py-4 text-center space-x-3">
+                                        <button @click="showInvestorPaymentDetail(p)" class="text-xs font-semibold text-indigo-600 hover:underline">Detail</button>
+                                        <button @click="deleteInvestorPayment(p.id)" class="text-xs font-semibold text-red-500 hover:underline">Hapus</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="mt-8 pt-6 border-t">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold text-slate-800">Riwayat Pembayaran Investor</h2>
-                <button @click="exportInvestorPayments" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">Export</button>
-            </div>
-            
-            <div class="mb-6 p-4 bg-white rounded-xl border shadow-sm">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Filter Periode</label>
-                        <select v-model="uiState.investorPaymentFilter" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2.5 capitalize">
-                            <option value="all_time">Semua</option>
-                            <option value="by_month_range">Bulan & Tahun</option>
-                            <option value="by_year_range">Rentang Tahun</option>
-                        </select>
-                    </div>
-                    
-                    <div v-if="uiState.investorPaymentFilter === 'by_month_range'" class="lg:col-span-2 grid grid-cols-2 gap-2 items-end">
-                        <div>
-                            <label class="block text-xs font-medium mb-1">Dari Bulan</label>
-                            <select v-model.number="uiState.investorPaymentStartMonth" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                                <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium mb-1">Tahun</label>
-                            <input type="number" v-model.number="uiState.investorPaymentStartYear" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium mb-1">Sampai Bulan</label>
-                            <select v-model.number="uiState.investorPaymentEndMonth" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                                <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium mb-1">Tahun</label>
-                            <input type="number" v-model.number="uiState.investorPaymentEndYear" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                        </div>
-                    </div>
-                    
-                    <div v-if="uiState.investorPaymentFilter === 'by_year_range'" class="lg:col-span-2 grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Dari Tahun</label>
-                            <input type="number" v-model.number="uiState.investorPaymentStartYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Sampai Tahun</label>
-                            <input type="number" v-model.number="uiState.investorPaymentEndYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Cari Investor</label>
-                        <input type="text" v-model="uiState.investorPaymentSearch" placeholder="Cari nama investor..." class="w-full p-2 border rounded-md bg-white shadow-sm">
-                    </div>
-                </div>
-            </div>
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-                <table class="w-full text-sm text-left text-slate-500">
-                    <thead class="text-xs text-slate-700 uppercase bg-slate-50">
-                        <tr>
-                            <th class="px-6 py-3">Tanggal</th>
-                            <th class="px-6 py-3">Investor</th>
-                            <th class="px-6 py-3">Periode</th>
-                            <th class="px-6 py-3 text-right">Jumlah Dibayar</th>
-                            <th class="px-6 py-3">Metode</th>
-                            <th class="px-6 py-3 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr v-if="filteredInvestorPayments.length === 0">
-                            <td colspan="6" class="p-10 text-center text-slate-500">Belum ada riwayat pembayaran yang sesuai dengan filter.</td>
-                        </tr>
-                        <tr v-for="p in filteredInvestorPayments" :key="p.id" class="hover:bg-slate-50">
-                            <td class="px-6 py-4">{{ new Date(p.paymentDate).toLocaleDateString('id-ID') }}</td>
-                            <td class="px-6 py-4 font-semibold">{{ p.investorName }}</td>
-                            <td class="px-6 py-4">{{ p.period }}</td>
-                            <td class="px-6 py-4 text-right font-medium text-green-600">{{ formatCurrency(p.totalPayment) }}</td>
-                            <td class="px-6 py-4 capitalize">{{ p.paymentMethod }}</td>
-                            <td class="px-6 py-4 text-center space-x-3">
-                                <button @click="showInvestorPaymentDetail(p)" class="text-xs font-semibold text-indigo-600 hover:underline">Detail</button>
-                                <button @click="deleteInvestorPayment(p.id)" class="text-xs font-semibold text-red-500 hover:underline">Hapus</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
     </div>
 </div>
 
