@@ -10,7 +10,7 @@ import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
-
+import JsBarcode from 'jsbarcode';
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
@@ -5085,6 +5085,23 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
         });
     }
 });
+
+watch([barcodeContent, () => labelSettings.width, () => labelSettings.height], () => {
+    if (barcodeContent.value) {
+        nextTick(() => {
+            const canvas = document.getElementById('barcodeCanvas');
+            if (canvas) {
+                JsBarcode(canvas, barcodeContent.value, {
+                    format: "CODE128",
+                    displayValue: true,
+                    fontSize: 18,
+                    width: 2,
+                    height: 50,
+                });
+            }
+        });
+    }
+}, { immediate: true });
 
 watch(() => uiState.bulk_scan_input, async (newValue) => {
     const scannedValue = newValue.trim();
@@ -10536,30 +10553,44 @@ function printPreview() {
     opacity: 0; /* Mulai dari tidak terlihat */
 }
 @media print {
-    /* Sembunyikan semua elemen di body saat mencetak */
-    body > * {
+    body {
+        background: none !important;
+    }
+    #main-content > div:not([id='barcode-page']) {
         display: none !important;
     }
-    /* Kecualikan halaman barcode dan tampilkan isinya */
     #barcode-page, #barcode-page * {
-        display: block !important;
         visibility: visible !important;
+        display: block !important;
     }
-    /* Sembunyikan panel pengaturan di dalam halaman barcode */
-    #barcode-page .lg\:col-span-1 {
+    .min-h-screen.w-full {
+        padding: 0 !important;
+        background: white !important;
+    }
+    .lg\:col-span-1 {
         display: none !important;
     }
-    /* Pastikan area review memenuhi halaman */
-    #barcode-page .lg\:col-span-2 {
+    .lg\:col-span-2 {
         width: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
+    }
+    .bg-white\/70, .shadow-xl, .border {
+        background: none !important;
+        box-shadow: none !important;
+        border: none !important;
     }
     #barcode-preview-area {
         min-height: auto !important;
         background: none !important;
         padding: 0 !important;
-        border: none !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .animate-fade-in-up, .mb-8 {
+        animation: none !important;
+        margin: 0 !important;
     }
 }
 </style>
