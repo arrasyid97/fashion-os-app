@@ -7561,95 +7561,68 @@ const printBarcode = async () => {
     </div>
 </div>
 <div v-if="activePage === 'tentang'">
-    <div class="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm">
-        <h2 class="text-3xl font-bold text-slate-800 border-b pb-4 mb-6">Tentang Aplikasi Fashion OS</h2>
-
-        <div class="space-y-8 text-slate-700 leading-relaxed">
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-4xl mx-auto">
             
-            <section>
-                <h3 class="text-xl font-semibold text-slate-800 mb-2">Kebijakan Privasi dan Keamanan Data</h3>
-                <p class="mb-4">
-                    Data Anda adalah aset berharga, dan kami memahami hal itu. Oleh karena itu, kami merancang Fashion OS dengan privasi sebagai prioritas tertinggi. Berikut adalah komitmen kami untuk memastikan data bisnis Anda tetap aman dan sepenuhnya di bawah kendali Anda:
+            <div class="text-center mb-12 animate-fade-in-up">
+                <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800">
+                    <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Tentang Fashion OS</span>
+                </h2>
+                <p class="text-lg text-slate-600 mt-4 max-w-2xl mx-auto">
+                    Dibangun dengan privasi, keamanan, dan pertumbuhan bisnis Anda sebagai prioritas utama.
                 </p>
-                
-                <ul class="space-y-4">
-                    <li class="p-4 bg-slate-50 rounded-lg">
-                        <h4 class="font-bold text-slate-800">1. Arsitektur Tanpa Perantara</h4>
-                        <p class="mt-1 text-sm">
-                            Aplikasi ini beroperasi tanpa server perantara milik kami. Saat Anda memasukkan data seperti produk, penjualan, dan laporan keuangan, informasi tersebut akan terkirim <strong>langsung dari peramban (browser) Anda ke akun Google Firebase pribadi milik Anda sendiri</strong>. Sebagai pengembang, kami tidak pernah melihat, menyimpan, atau memiliki akses terhadap data operasional Anda.
-                        </p>
-                    </li>
-                    <li class="p-4 bg-slate-50 rounded-lg">
-                        <h4 class="font-bold text-slate-800">2. Kepemilikan Data Sepenuhnya di Tangan Anda</h4>
-                        <p class="mt-1 text-sm">
-                            Semua informasi bisnis Anda tersimpan secara eksklusif dalam proyek Firebase yang sepenuhnya Anda kelola. Keberadaan data ini ibarat **brankas digital pribadi di dalam ekosistem Google**—hanya Anda yang memegang kuncinya.
-                        </p>
-                    </li>
-                    <li class="p-4 bg-slate-50 rounded-lg">
-                        <h4 class="font-bold text-slate-800">3. Standar Keamanan Selevel Perbankan</h4>
-                        <p class="mt-1 text-sm">
-                            Setiap transmisi data antara aplikasi dan database Anda dilindungi oleh enkripsi **HTTPS/TLS**. Ini adalah protokol keamanan canggih yang sama seperti yang digunakan oleh lembaga perbankan dan layanan online terkemuka di seluruh dunia untuk melindungi setiap transaksi.
-                        </p>
-                    </li>
-                </ul>
+            </div>
 
-                <p class="mt-6 text-sm text-slate-500 italic">
-                    Komitmen kami adalah menyediakan alat yang andal untuk mengembangkan bisnis Anda, dengan fondasi privasi dan keamanan yang tak tergoyahkan. Anda bisa fokus pada pertumbuhan brand, sementara kami memastikan integritas data Anda.
-                </p>
-            </section>
-            
-            <section class="mt-8">
-                <h3 class="text-xl font-semibold text-slate-800 mb-2">Memahami Konsep "Kontrol Penuh"</h3>
-                <p class="mb-4 text-sm text-slate-600">
-                    Kami menggunakan analogi sederhana: **Proyek adalah Tanah, dan Kata Sandi adalah Kunci.**
-                </p>
-                
-                <ul class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <li class="flex items-start gap-4 p-4 bg-slate-50 rounded-lg">
-                        <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-xl">🏡</div>
+            <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-slate-200 mb-8 animate-fade-in-up" style="animation-delay: 200ms;">
+                <h3 class="text-2xl font-bold text-slate-800 mb-6 text-center">Komitmen Kami Pada Data Anda</h3>
+                <ul class="space-y-6">
+                    <li class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        </div>
                         <div>
-                            <h4 class="font-bold text-slate-800">Akun Google Anda adalah Tanah Digital</h4>
-                            <p class="mt-1 text-sm">
-                                Seluruh database (Firebase) dibuat di bawah kepemilikan akun Google Anda. Ini menegaskan bahwa Anda adalah satu-satunya pemilik sah dari infrastruktur digital tempat semua data bisnis Anda disimpan.
-                            </p>
+                            <h4 class="font-semibold text-slate-800">Arsitektur Tanpa Perantara</h4>
+                            <p class="text-sm text-slate-600 mt-1">Data Anda terkirim langsung dari browser Anda ke akun Firebase pribadi Anda. Kami, sebagai pengembang, tidak pernah melihat atau menyimpan data operasional bisnis Anda.</p>
                         </div>
                     </li>
-                    <li class="flex items-start gap-4 p-4 bg-slate-50 rounded-lg">
-                        <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-xl">🔑</div>
+                    <li class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        </div>
                         <div>
-                            <h4 class="font-bold text-slate-800">Kata Sandi Anda adalah Kunci Utama</h4>
-                            <p class="mt-1 text-sm">
-                                Aplikasi Fashion OS hanyalah "alat" atau "bangunan" yang beroperasi di atas tanah digital Anda. Kata sandi Akun Google Anda berfungsi sebagai kunci utama untuk mengaksesnya. Tanpa kunci ini, tidak ada yang bisa masuk, termasuk kami sebagai pengembang.
-                            </p>
+                            <h4 class="font-semibold text-slate-800">Kepemilikan Data Sepenuhnya</h4>
+                            <p class="text-sm text-slate-600 mt-1">Semua informasi tersimpan eksklusif dalam proyek Firebase yang Anda kelola sepenuhnya. Ini adalah brankas digital pribadi Anda di dalam ekosistem Google.</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-slate-800">Standar Keamanan Tinggi</h4>
+                            <p class="text-sm text-slate-600 mt-1">Setiap transmisi data dilindungi oleh enkripsi HTTPS/TLS, protokol keamanan canggih yang sama seperti yang digunakan oleh lembaga perbankan global.</p>
                         </div>
                     </li>
                 </ul>
-            </section>
-
-            <section>
-    <h3 class="text-xl font-semibold text-slate-800 mb-2">Informasi Aplikasi</h3>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-        <div class="bg-slate-50 p-4 rounded-lg">
-            <p class="font-semibold text-slate-600">Dikembangkan oleh</p>
-            <p>Arrasyid</p>
-        </div>
-        <div class="bg-slate-50 p-4 rounded-lg">
-            <p class="font-semibold text-slate-600">Informasi Kontak</p>
-            <p>Email: <a href="mailto:fashion234oss@gmail.com" class="text-blue-600 hover:underline">fashion234oss@gmail.com</a></p>
-        </div>
-        <div class="bg-slate-50 p-4 rounded-lg">
-            <p class="font-semibold text-slate-600">Versi Aplikasi</p>
-            <p>1.0.0 (Build 20250903)</p>
-            <p class="font-semibold text-slate-600 mt-2">Tanggal Rilis</p>
-            <p>03 September 2025</p>
-        </div>
-    </div>
-</section>
-
-            <section>
-                <h3 class="text-xl font-semibold text-slate-800 mb-2">Hak Cipta</h3>
-                <p class="text-sm">Hak Cipta © 2025 Arrasyid. Seluruh hak cipta dilindungi undang-undang. Dilarang keras untuk mereproduksi, mendistribusikan, atau menyalin sebagian maupun seluruh konten aplikasi ini dalam bentuk apa pun tanpa izin tertulis dari pemilik hak cipta.</p>
-            </section>
+            </div>
+            
+            <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 300ms;">
+                 <h3 class="text-2xl font-bold text-slate-800 mb-6 text-center">Informasi Aplikasi</h3>
+                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <p class="font-semibold text-slate-600">Dikembangkan oleh</p>
+                        <p class="text-slate-800">Arrasyid</p>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <p class="font-semibold text-slate-600">Informasi Kontak</p>
+                        <p><a href="mailto:fashion234oss@gmail.com" class="text-blue-600 hover:underline">fashion234oss@gmail.com</a></p>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <p class="font-semibold text-slate-600">Versi Aplikasi</p>
+                        <p class="text-slate-800">1.0.0 (Build 20250903)</p>
+                    </div>
+                </div>
+            </div>
 
         </div>
     </div>
