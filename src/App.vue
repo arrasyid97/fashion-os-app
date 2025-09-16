@@ -2454,15 +2454,17 @@ async function saveData() {
         };
         batch.set(promotionsRef, JSON.parse(JSON.stringify(promotionsData)));
 
-        // --- [KODE BARU DITAMBAHKAN] ---
-        // Menyimpan data komisi per model
-        const commissionsRef = doc(db, "commissions", userId);
-        const commissionsData = {
-            perModel: state.commissions.perModel || {},
-            userId: userId
-        };
-        batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)));
-        // --- [AKHIR KODE BARU] ---
+        // ▼▼▼ PERUBAHAN KUNCI ADA DI SINI ▼▼▼
+        // HANYA jalankan penyimpanan konfigurasi komisi JIKA pengguna adalah Admin
+        if (isAdmin.value) {
+            const commissionsRef = doc(db, "commissions", userId);
+            const commissionsData = {
+                perModel: state.commissions.perModel || {},
+                userId: userId
+            };
+            batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)));
+        }
+        // ▲▲▲ AKHIR DARI PERUBAHAN ▲▲▲
 
         // Simpan HPP & Harga Jual
         for (const product of state.produk) {
@@ -2483,7 +2485,8 @@ async function saveData() {
         }
         await batch.commit();
         
-        await loadAllDataFromFirebase();
+        // Memuat ulang data setelah berhasil disimpan tidak diperlukan di sini
+        // karena state lokal sudah diperbarui. Cukup tampilkan notifikasi.
         
         console.log('Perubahan berhasil disimpan ke Database!');
         alert('Semua perubahan berhasil disimpan!');
