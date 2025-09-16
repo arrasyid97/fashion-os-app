@@ -5327,10 +5327,7 @@ watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
-// --- STATE MANAGEMENT BARU UNTUK BARCODE ---
-const isConnecting = ref(false);
-const bluetoothDevice = ref(null);
-const connectionError = ref('');
+
 
 // State untuk pengaturan label yang dikirim ke printer
 const labelSettings = reactive({
@@ -5346,47 +5343,9 @@ const labelSettings = reactive({
 const barcodeContent = ref('1234567890');
 const printCount = ref(1);
 
-// --- FUNGSI BARU UNTUK KONEKSI BLUETOOTH ---
-const connectBluetooth = async () => {
-  if (!navigator.bluetooth) {
-    alert('Browser Anda tidak mendukung Web Bluetooth. Silakan gunakan Chrome atau Edge dan pastikan fitur ini aktif.');
-    return;
-  }
-  
-  isConnecting.value = true;
-  connectionError.value = '';
-  bluetoothDevice.value = null;
-
-  try {
-    // Perintah untuk mencari perangkat Bluetooth
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }] // Ini adalah UUID layanan untuk printer thermal
-    });
-    bluetoothDevice.value = device;
-    alert(`Berhasil terhubung ke: ${device.name}`);
-  } catch (error) {
-    console.error("Kesalahan koneksi Bluetooth:", error);
-    connectionError.value = 'Gagal terhubung. Pastikan printer menyala dan Bluetooth aktif.';
-  } finally {
-    isConnecting.value = false;
-  }
-};
-
-const printBarcode = async () => {
-  if (!bluetoothDevice.value || !barcodeContent.value) {
-    alert('Harap hubungkan ke printer dan masukkan konten barcode.');
-    return;
-  }
-  try {
-    // Di sini Anda perlu menambahkan logika untuk mengirim data cetak
-    // ke printer thermal dalam format yang benar (misalnya, bahasa ZPL atau TSPL)
-    
-    alert('Perintah cetak berhasil dikirim! (Simulasi)');
-  } catch (error) {
-    console.error("Gagal mencetak:", error);
-    alert('Gagal mengirim perintah cetak. Coba lagi.');
-  }
-};
+function printPreview() {
+    window.print();
+}
 
 </script>
 
@@ -6939,122 +6898,86 @@ const printBarcode = async () => {
     </div>
 </div>
 
-<div v-if="activePage === 'barcode-generator'" class="p-8">
-  <div class="flex items-center gap-4 mb-6">
-    <h2 class="text-3xl font-bold">Cetak Barcode Nirkabel</h2>
-  </div>
+<div v-if="activePage === 'barcode-generator'">
+    <div id="barcode-page" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
 
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+             <div class="mb-8 animate-fade-in-up">
+                <h2 class="text-3xl font-bold text-slate-800">Cetak Barcode</h2>
+                <p class="text-slate-500 mt-1">Atur, review, dan cetak label barcode Anda dengan mudah.</p>
+            </div>
 
-    <!-- Kolom Pengaturan -->
-    <div class="lg:col-span-1 bg-white rounded-xl shadow-lg p-6 space-y-6">
-      <h3 class="text-lg font-semibold text-slate-800">1. Pengaturan Koneksi & Cetak</h3>
-      
-      <!-- Koneksi Bluetooth -->
-      <div class="p-4 bg-slate-50 border rounded-lg">
-        <label class="block text-sm font-medium text-slate-700">Hubungkan ke Printer</label>
-        <button @click="connectBluetooth" :disabled="isConnecting"
-          class="w-full mt-2 bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400">
-          <span v-if="isConnecting">Mencari...</span>
-          <span v-else>Cari Perangkat Bluetooth</span>
-        </button>
-        <p v-if="bluetoothDevice" class="text-sm text-green-600 mt-2">Terhubung ke: <span class="font-semibold">{{ bluetoothDevice.name }}</span></p>
-        <p v-else-if="connectionError" class="text-sm text-red-600 mt-2">Gagal terhubung: {{ connectionError }}</p>
-        <p v-else class="text-sm text-slate-500 mt-2">Belum ada perangkat terhubung.</p>
-      </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1">
+                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">1. Pengaturan Label</h3>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Lebar Label (mm)</label>
+                                    <input type="number" v-model.number="labelSettings.width" class="mt-1 w-full p-2 border rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Tinggi Label (mm)</label>
+                                    <input type="number" v-model.number="labelSettings.height" class="mt-1 w-full p-2 border rounded-md">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Jenis Kertas</label>
+                                <select v-model="labelSettings.paperType" class="mt-1 w-full p-2 border rounded-md bg-white">
+                                    <option value="gap">Celah (Gap)</option>
+                                    <option value="black-mark">Tanda Hitam</option>
+                                    <option value="continuous">Terus Menerus</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Kolom</label>
+                                    <input type="number" v-model.number="labelSettings.columns" class="mt-1 w-full p-2 border rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Jarak Label (mm)</label>
+                                    <input type="number" v-model.number="labelSettings.labelGap" class="mt-1 w-full p-2 border rounded-md">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Kepadatan Cetak</label>
+                                    <input type="number" v-model.number="labelSettings.printDensity" min="1" max="15" class="mt-1 w-full p-2 border rounded-md">
+                                </div>
+                            </div>
+                        </div>
 
-      <!-- Pengaturan Label -->
-      <div class="space-y-4">
-    <div class="grid grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Lebar Label (mm)</label>
-        <input type="number" v-model.number="labelSettings.width" class="mt-1 w-full p-2 border rounded-md">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Tinggi Label (mm)</label>
-        <input type="number" v-model.number="labelSettings.height" class="mt-1 w-full p-2 border rounded-md">
-      </div>
-    </div>
+                        <div class="border-t pt-4 mt-4">
+                            <h4 class="font-semibold text-sm mb-2">Opsi Cetak</h4>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Teks Barcode</label>
+                                <input type="text" v-model="barcodeContent" class="mt-1 w-full p-2 border rounded-md">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mt-2">Jumlah Cetakan</label>
+                                <input type="number" v-model.number="printCount" class="mt-1 w-full p-2 border rounded-md">
+                            </div>
+                        </div>
 
-    <div>
-      <label class="block text-sm font-medium text-slate-700">Jenis Kertas</label>
-      <select v-model="labelSettings.paperType" class="mt-1 w-full p-2 border rounded-md bg-white">
-        <option value="gap">Celah (Gap)</option>
-        <option value="black-mark">Tanda Hitam</option>
-        <option value="continuous">Terus Menerus</option>
-      </select>
-    </div>
+                        <button @click="printPreview" :disabled="!barcodeContent || printCount < 1"
+                                class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
+                            Cetak Label via Browser
+                        </button>
+                    </div>
+                </div>
 
-    <div class="grid grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Kolom</label>
-        <input type="number" v-model.number="labelSettings.columns" class="mt-1 w-full p-2 border rounded-md">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Jarak Label (mm)</label>
-        <input type="number" v-model.number="labelSettings.labelGap" class="mt-1 w-full p-2 border rounded-md">
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Kecepatan Cetak</label>
-        <select v-model="labelSettings.printSpeed" class="mt-1 w-full p-2 border rounded-md bg-white">
-          <option value="1">1 ips</option>
-          <option value="2">2 ips</option>
-          <option value="3">3 ips</option>
-          <option value="4">4 ips</option>
-          <option value="5">5 ips</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Kepadatan Cetak</label>
-        <input type="number" v-model.number="labelSettings.printDensity" min="1" max="15" class="mt-1 w-full p-2 border rounded-md">
-      </div>
-    </div>
-</div>
-
-      <!-- Opsi Cetak Lanjutan -->
-      <div class="border-t pt-4">
-        <h4 class="font-semibold text-sm mb-2">Opsi Cetak</h4>
-        <div>
-          <label class="block text-sm font-medium text-slate-700">Teks Barcode</label>
-          <input type="text" v-model="barcodeContent" class="mt-1 w-full p-2 border rounded-md">
+                <div class="lg:col-span-2">
+                     <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">2. Review Barcode</h3>
+                        <div id="barcode-preview-area" class="p-4 rounded-lg bg-slate-200 flex items-center justify-center min-h-[300px]">
+                            <canvas id="barcodeCanvas"></canvas>
+                        </div>
+                    </div>
+                    </div>
+            </div>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mt-2">Jumlah Cetakan</label>
-          <input type="number" v-model.number="printCount" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-      </div>
-
-      <!-- Tombol Cetak -->
-      <button @click="printBarcode" :disabled="!bluetoothDevice || !barcodeContent || printCount < 1"
-        class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 disabled:bg-slate-400">
-        Cetak Barcode Sekarang
-      </button>
     </div>
-
-    <!-- Kolom Pratinjau & Panduan -->
-    <div class="lg:col-span-2 space-y-6">
-      <div class="bg-white rounded-xl shadow-lg p-6">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">2. Pratinjau Label</h3>
-        <div class="preview-area border p-4 rounded-lg bg-slate-50 flex items-center justify-center min-h-[300px]">
-          <canvas id="barcodeCanvas"></canvas>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-xl shadow-lg p-6">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4">3. Panduan Penggunaan</h3>
-        <ul class="list-disc list-inside space-y-2 text-sm text-slate-700">
-          <li>Pastikan printer thermal Anda **menyala** dan **dalam mode Bluetooth**.</li>
-          <li>Klik **Cari Perangkat Bluetooth** untuk menghubungkan perangkat Anda.</li>
-          <li>Sesuaikan **Lebar Label**, **Tinggi Label**, dan **Jumlah Kolom** agar sesuai dengan kertas Anda.</li>
-          <li>Masukkan teks barcode yang ingin Anda cetak dan tentukan jumlahnya.</li>
-          <li>Klik **Cetak Barcode Sekarang** untuk mengirim perintah langsung ke printer.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
 </div>
 
 <div v-if="activePage === 'retur'">
@@ -10611,5 +10534,32 @@ const printBarcode = async () => {
 .animate-fade-in-scale {
     animation: fade-in-scale 0.7s ease-out forwards;
     opacity: 0; /* Mulai dari tidak terlihat */
+}
+@media print {
+    /* Sembunyikan semua elemen di body saat mencetak */
+    body > * {
+        display: none !important;
+    }
+    /* Kecualikan halaman barcode dan tampilkan isinya */
+    #barcode-page, #barcode-page * {
+        display: block !important;
+        visibility: visible !important;
+    }
+    /* Sembunyikan panel pengaturan di dalam halaman barcode */
+    #barcode-page .lg\:col-span-1 {
+        display: none !important;
+    }
+    /* Pastikan area review memenuhi halaman */
+    #barcode-page .lg\:col-span-2 {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    #barcode-preview-area {
+        min-height: auto !important;
+        background: none !important;
+        padding: 0 !important;
+        border: none !important;
+    }
 }
 </style>
