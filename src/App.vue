@@ -6437,7 +6437,7 @@ const printBarcode = async () => {
 
                 <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
                     <div v-if="uiState.isPemasukanLocked" class="flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
-                         <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                        <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                         </div>
                         <h3 class="text-xl font-bold text-slate-800 mb-2">Riwayat Pemasukan Terkunci</h3>
@@ -6517,6 +6517,33 @@ const printBarcode = async () => {
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="uiState.isKeuanganInfoVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fade-in">
+                <div class="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full animate-fade-in-up">
+                    <div class="flex justify-between items-start pb-4 border-b">
+                        <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                            Informasi & Logika
+                        </h3>
+                    </div>
+                    <div class="space-y-4 text-slate-700 py-4">
+                        <p class="text-sm text-slate-600">Halaman ini berfungsi sebagai buku kas digital Anda. Setiap data yang Anda masukkan di sini akan secara langsung memengaruhi metrik di Dashboard Analitik.</p>
+                        <div class="space-y-4">
+                            <div class="p-4 bg-slate-50 rounded-lg">
+                                <p class="font-semibold text-slate-700">Pemasukan & Pengeluaran</p>
+                                <p class="text-sm text-slate-500 mt-1">Data dari tabel ini akan diperhitungkan dalam kalkulasi **Saldo Kas** di dasbor.</p>
+                            </div>
+                            <div class="p-4 bg-slate-50 rounded-lg">
+                                <p class="font-semibold text-slate-700">Kategori Pengeluaran</p>
+                                <p class="text-sm text-slate-500 mt-1">Semua data di sini akan diklasifikasikan sebagai **Biaya Operasional**, yang digunakan untuk menghitung **Laba Bersih** di dasbor.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 pt-4 border-t">
+                        <button @click="hideKeuanganInfoModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
                     </div>
                 </div>
             </div>
