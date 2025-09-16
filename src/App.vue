@@ -7536,25 +7536,40 @@ const printBarcode = async () => {
 </div>
 
 <div v-if="activePage === 'panduan'">
-    <div class="max-w-5xl mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-sm">
-        <div class="border-b pb-6 mb-8">
-            <h2 class="text-4xl font-bold text-slate-800">Pusat Panduan Aplikasi</h2>
-            <p class="text-slate-500 mt-2 text-lg">Panduan komprehensif untuk membantu Anda menguasai setiap fitur dan memaksimalkan potensi bisnis Anda dengan Fashion OS.</p>
-        </div>
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-5xl mx-auto">
+            
+            <div class="text-center mb-12 animate-fade-in-up">
+                <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800">
+                    <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Pusat Panduan Aplikasi</span>
+                </h2>
+                <p class="text-lg text-slate-600 mt-4 max-w-3xl mx-auto">
+                    Panduan komprehensif untuk membantu Anda menguasai setiap fitur dan memaksimalkan potensi bisnis Anda.
+                </p>
+            </div>
 
-        <div class="space-y-4">
-            <div v-for="panduan in panduanData" :key="panduan.title" class="border rounded-lg transition-all duration-300" :class="panduanAccordion === panduan.title ? 'bg-slate-50' : 'bg-white'">
-                <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" class="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 rounded-lg">
-                    <div class="text-3xl flex-shrink-0">{{ panduan.icon }}</div>
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-slate-800">{{ panduan.title }}</h3>
-                        <p class="text-sm text-slate-500">{{ panduan.subtitle }}</p>
+            <div class="space-y-4">
+                <div v-for="(panduan, index) in panduanData" :key="panduan.title" 
+                     class="bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl animate-fade-in-up"
+                     :style="{ animationDelay: `${200 + index * 100}ms` }">
+                    
+                    <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" 
+                         class="flex items-center gap-4 p-5 cursor-pointer">
+                        <div class="text-3xl flex-shrink-0">{{ panduan.icon }}</div>
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-slate-800">{{ panduan.title }}</h3>
+                            <p class="text-sm text-slate-500">{{ panduan.subtitle }}</p>
+                        </div>
+                        <svg class="w-6 h-6 text-slate-400 flex-shrink-0 transition-transform duration-300" 
+                             :class="{ 'rotate-180': panduanAccordion === panduan.title }" 
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
                     </div>
-                    <svg class="w-6 h-6 text-slate-400 flex-shrink-0 transition-transform duration-300" :class="{ 'rotate-180': panduanAccordion === panduan.title }" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
 
-                <div class="accordion-content" :class="{ 'open': panduanAccordion === panduan.title }">
-                    <div class="panduan-content p-4 pt-0 pl-14 text-slate-600 leading-relaxed" v-html="panduan.content"></div>
+                    <div class="accordion-content" :class="{ 'open': panduanAccordion === panduan.title }">
+                        <div class="panduan-content p-5 pt-0 pl-16 text-slate-600 leading-relaxed prose prose-sm max-w-none" v-html="panduan.content"></div>
+                    </div>
                 </div>
             </div>
         </div>
