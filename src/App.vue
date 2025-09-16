@@ -5550,7 +5550,7 @@ function printPreview() {
 </aside>
 
       <!-- Main Content -->
-      <main id="main-content" class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
     
     <div v-if="isLoading" class="flex items-center justify-center h-full">
         <div class="text-center">
