@@ -5380,9 +5380,45 @@ watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
-
 function printPreview() {
+  const printContainer = document.getElementById('print-area-container');
+  if (!printContainer) return;
+
+  // 1. Kosongkan area cetak dari sisa cetakan sebelumnya
+  printContainer.innerHTML = '';
+
+  // 2. Atur tata letak grid berdasarkan jumlah kolom yang dipilih
+  printContainer.style.gridTemplateColumns = `repeat(${labelSettings.columns}, 1fr)`;
+
+  // 3. Ambil barcode asli yang sudah digambar di area review
+  const originalCanvas = document.getElementById('barcodeCanvas');
+  if (!originalCanvas || originalCanvas.width === 0) {
+    alert("Gagal memuat gambar barcode untuk dicetak.");
+    return;
+  }
+
+  // 4. Salin gambar barcode sebanyak jumlah yang diinginkan ke area cetak
+  for (let i = 0; i < printCount.value; i++) {
+    const newCanvas = document.createElement('canvas');
+    newCanvas.width = originalCanvas.width;
+    newCanvas.height = originalCanvas.height;
+    const ctx = newCanvas.getContext('2d');
+    ctx.drawImage(originalCanvas, 0, 0);
+
+    // Buat div pembungkus untuk setiap label
+    const labelBox = document.createElement('div');
+    labelBox.className = 'print-label-box'; // Gunakan class dari CSS
+    labelBox.style.width = `${labelSettings.width}mm`;
+    labelBox.style.height = `${labelSettings.height}mm`;
+
+    labelBox.appendChild(newCanvas);
+    printContainer.appendChild(labelBox);
+  }
+
+  // 5. Panggil fungsi cetak browser
+  nextTick(() => {
     window.print();
+  });
 }
 
 </script>
@@ -10369,7 +10405,8 @@ function printPreview() {
             </form>
         </div>
     </div>
-
+<div id="print-area-container">
+    </div>
 </template>
 
 <style scoped>
@@ -10574,32 +10611,42 @@ function printPreview() {
     opacity: 0; /* Mulai dari tidak terlihat */
 }
 @media print {
-  /* 1. Sembunyikan SEMUA elemen di halaman secara default */
-  body * {
-    visibility: hidden;
+  /* 1. Sembunyikan semua elemen di halaman secara default */
+  body > * {
+    display: none !important;
   }
 
-  /* 2. Tampilkan HANYA area cetak dan semua isinya */
-  #print-section, #print-section * {
-    visibility: visible;
-  }
-
-  /* 3. Posisikan area cetak di pojok kiri atas halaman cetak */
-  #print-section {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    padding: 0;
-    margin: 0;
-    border: none;
-    box-shadow: none;
-  }
-
-  /* Pastikan canvas juga terlihat */
-  #barcodeCanvas {
+  /* 2. Tampilkan HANYA area cetak khusus kita dan semua isinya */
+  #print-area-container, #print-area-container * {
     display: block !important;
-    margin: 0 auto; /* Pusatkan barcode jika perlu */
+    visibility: visible !important;
+  }
+
+  /* 3. Atur tata letak untuk kertas cetak */
+  #print-area-container {
+    display: grid !important; /* Gunakan grid untuk tata letak kolom */
+    gap: 2mm; /* Jarak antar label */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  /* Styling untuk setiap label di dalam area cetak */
+  .print-label-box {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .print-label-box canvas {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
   }
 }
 </style>
