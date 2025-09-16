@@ -6357,246 +6357,172 @@ const printBarcode = async () => {
     </div>
 </div>
 <div v-if="activePage === 'keuangan'">
-    <div class="flex items-center justify-between gap-4 mb-6">
-        <h2 class="text-3xl font-bold">Manajemen Keuangan</h2>
-        <button @click="uiState.isKeuanganInfoVisible = true" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
-            Informasi
-        </button>
-    </div>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col">
-            <div class="p-4 border-b bg-slate-50 rounded-t-xl">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-lg font-semibold text-slate-800">Riwayat Pengeluaran</h3>
-                    <button @click="showModal('addBiaya', { tanggal: new Date().toISOString().split('T')[0], kategori: '', jumlah: null, catatan: '', paymentMethod: 'transfer', selectedBankAccountId: null, adminFee: 0 })" class="bg-rose-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-rose-600 text-sm">Tambah Baru</button>
-                </div>
-            </div>
-            <div class="p-4 border-b">
-                <div class="flex items-start gap-2">
-                    <div class="flex-grow">
-                        <select v-model="uiState.keuanganPengeluaranFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                            <option value="today">hari ini</option>
-                            <option value="last_7_days">1 minggu terakhir</option>
-                            <option value="last_30_days">1 bulan terakhir</option>
-                            <option value="this_year">1 tahun terakhir</option>
-                            <option value="by_date_range">rentang tanggal</option>
-                            <option value="by_month_range">rentang bulan</option>
-                            <option value="by_year_range">rentang tahun</option>
-                            <option value="all_time">semua</option>
-                        </select>
-                        <div v-if="uiState.keuanganPengeluaranFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
-                            <input type="date" v-model="uiState.keuanganPengeluaranStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                            <span class="text-slate-500">s/d</span>
-                            <input type="date" v-model="uiState.keuanganPengeluaranEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                        </div>
-                        <div v-if="uiState.keuanganPengeluaranFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
-                            <select v-model.number="uiState.keuanganPengeluaranStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                            <input type="number" v-model.number="uiState.keuanganPengeluaranStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-                            <span class="mx-2">s/d</span>
-                            <select v-model.number="uiState.keuanganPengeluaranEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                            <input type="number" v-model.number="uiState.keuanganPengeluaranEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-                        </div>
-                        <div v-if="uiState.keuanganPengeluaranFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
-                            <input type="number" v-model.number="uiState.keuanganPengeluaranStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-                            <span class="text-slate-500">s/d</span>
-                            <input type="number" v-model.number="uiState.keuanganPengeluaranEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-                        </div>
-                    </div>
-                    <button @click="exportKeuangan('pengeluaran')" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px]">Export</button>
-                </div>
-            </div>
-            <div class="relative max-h-[60vh] overflow-y-auto">
-                <table class="w-full text-sm text-left text-slate-500">
-                    <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
-                        <tr><th class="px-4 py-3">Detail</th><th class="px-4 py-3">Catatan</th><th class="px-4 py-3">Jumlah</th><th class="px-4 py-3 text-center">Aksi</th></tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr v-if="filteredPengeluaran.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
-                        <tr v-for="item in filteredPengeluaran" :key="item.id">
-                            <td class="px-4 py-3">
-                                <p class="font-semibold">{{ item.kategori }}</p>
-                                <p class="text-xs text-slate-500">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
-                            </td>
-                            <td class="px-4 py-3 text-sm text-slate-600">
-                                <span v-if="!item.catatan">-</span>
-                                <span v-else>{{ item.catatan }}</span>
-                            </td>
-                            <td class="px-4 py-3 font-medium text-red-600">{{ formatCurrency(item.jumlah) }}</td>
-                            <td class="px-4 py-3 text-center">
-                                <button @click="deleteBiaya(item.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
 
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col">
-            <div v-if="uiState.isPemasukanLocked" class="flex flex-col items-center justify-center h-full p-8 min-h-[400px]">
-                <h3 class="text-xl font-bold text-slate-800 mb-4">Riwayat Pemasukan Terkunci</h3>
-                <p class="text-sm text-slate-600 mb-4">Masukkan PIN untuk melihat data pemasukan.</p>
-                <form @submit.prevent="unlockPemasukan" class="max-w-xs w-full">
-                    <input 
-                        type="password" 
-                        v-model="uiState.pemasukanPinInput" 
-                        placeholder="Masukkan PIN" 
-                        class="w-full p-2 border rounded-md text-center text-lg mb-2"
-                    >
-                    <p v-if="uiState.pemasukanPinError" class="text-red-500 text-xs mb-2">{{ uiState.pemasukanPinError }}</p>
-                    <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700">
-                        Buka
+            <div class="mb-8 animate-fade-in-up">
+                <div class="flex items-center gap-4">
+                    <h2 class="text-3xl font-bold text-slate-800">Manajemen Keuangan</h2>
+                    <button @click="uiState.isKeuanganInfoVisible = true" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                        Informasi
                     </button>
-                </form>
+                </div>
+                <p class="text-slate-500 mt-1">Catat dan lacak semua arus kas operasional bisnis Anda di luar transaksi penjualan.</p>
             </div>
-        
-            <div v-else class="animate-fade-in">
-                <div class="p-4 border-b bg-slate-50 rounded-t-xl">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-semibold text-slate-800">Riwayat Pemasukan</h3>
-                        <div class="flex gap-2">
-                             <button @click="showModal('addPemasukan', { tanggal: new Date().toISOString().split('T')[0], kategori: 'Modal Masuk', jumlah: null, catatan: '' })" class="bg-sky-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-sky-600 text-sm">Tambah Baru</button>
-                            <button @click="showNestedModal('manageInflowCategories')" class="bg-slate-100 p-1 text-slate-600 rounded-md hover:bg-slate-200" title="Kelola Kategori">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.82 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.82 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.82-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.82-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                </svg>
-                            </button>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+                    <div class="flex justify-between items-center mb-4 pb-4 border-b border-slate-200">
+                        <h3 class="text-xl font-semibold text-slate-800">Riwayat Pengeluaran</h3>
+                        <button @click="showModal('addBiaya', { tanggal: new Date().toISOString().split('T')[0], kategori: '', jumlah: null, catatan: '', paymentMethod: 'transfer', selectedBankAccountId: null, adminFee: 0 })" class="bg-rose-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-rose-600 text-sm shadow">Tambah Baru</button>
+                    </div>
+                    <div class="p-4 border-b">
+                        <div class="flex items-start gap-2">
+                            <div class="flex-grow">
+                                <select v-model="uiState.keuanganPengeluaranFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                                     <option value="today">hari ini</option>
+                                    <option value="last_7_days">1 minggu terakhir</option>
+                                    <option value="last_30_days">1 bulan terakhir</option>
+                                    <option value="this_year">1 tahun terakhir</option>
+                                    <option value="by_date_range">rentang tanggal</option>
+                                    <option value="by_month_range">rentang bulan</option>
+                                    <option value="by_year_range">rentang tahun</option>
+                                    <option value="all_time">semua</option>
+                                </select>
+                                <div v-if="uiState.keuanganPengeluaranFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
+                                    <input type="date" v-model="uiState.keuanganPengeluaranStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                                    <span class="text-slate-500">s/d</span>
+                                    <input type="date" v-model="uiState.keuanganPengeluaranEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                                </div>
+                                <div v-if="uiState.keuanganPengeluaranFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
+                                    <select v-model.number="uiState.keuanganPengeluaranStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                                    <input type="number" v-model.number="uiState.keuanganPengeluaranStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+                                    <span class="mx-2">s/d</span>
+                                    <select v-model.number="uiState.keuanganPengeluaranEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                                    <input type="number" v-model.number="uiState.keuanganPengeluaranEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+                                </div>
+                                <div v-if="uiState.keuanganPengeluaranFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
+                                    <input type="number" v-model.number="uiState.keuanganPengeluaranStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                                    <span class="text-slate-500">s/d</span>
+                                    <input type="number" v-model.number="uiState.keuanganPengeluaranEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                                </div>
+                            </div>
+                            <button @click="exportKeuangan('pengeluaran')" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px] shadow-sm">Export</button>
+                        </div>
+                    </div>
+                    <div class="overflow-y-auto max-h-[60vh]">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                                <tr><th class="px-4 py-3">Detail</th><th class="px-4 py-3">Catatan</th><th class="px-4 py-3 text-right">Jumlah</th><th class="px-4 py-3 text-center">Aksi</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/50">
+                                <tr v-if="filteredPengeluaran.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
+                                <tr v-for="item in filteredPengeluaran" :key="item.id" class="hover:bg-slate-50/50">
+                                    <td class="px-4 py-3 align-top">
+                                        <p class="font-semibold text-slate-800">{{ item.kategori }}</p>
+                                        <p class="text-xs">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
+                                    </td>
+                                    <td class="px-4 py-3 text-xs align-top">{{ item.catatan || '-' }}</td>
+                                    <td class="px-4 py-3 font-semibold text-red-600 text-right align-top">{{ formatCurrency(item.jumlah) }}</td>
+                                    <td class="px-4 py-3 text-center align-top">
+                                        <button @click="deleteBiaya(item.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    <div v-if="uiState.isPemasukanLocked" class="flex flex-col items-center justify-center min-h-[400px] animate-fade-in">
+                        <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">Riwayat Pemasukan Terkunci</h3>
+                        <p class="text-sm text-slate-600 mb-4">Masukkan PIN untuk melihat data.</p>
+                        <form @submit.prevent="unlockPemasukan" class="max-w-xs w-full">
+                            <input type="password" v-model="uiState.pemasukanPinInput" placeholder="••••" class="w-full p-2 border rounded-md text-center text-lg mb-2">
+                            <p v-if="uiState.pemasukanPinError" class="text-red-500 text-xs mb-2">{{ uiState.pemasukanPinError }}</p>
+                            <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700">Buka</button>
+                        </form>
+                    </div>
+                    
+                    <div v-else class="animate-fade-in">
+                        <div class="p-4 border-b bg-slate-50 rounded-t-xl">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-lg font-semibold text-slate-800">Riwayat Pemasukan</h3>
+                                <div class="flex gap-2">
+                                    <button @click="showModal('addPemasukan', { tanggal: new Date().toISOString().split('T')[0], kategori: 'Modal Masuk', jumlah: null, catatan: '' })" class="bg-sky-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-sky-600 text-sm">Tambah Baru</button>
+                                    <button @click="showNestedModal('manageInflowCategories')" class="bg-slate-100 p-1 text-slate-600 rounded-md hover:bg-slate-200" title="Kelola Kategori">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.82 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.82 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.82-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.82-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-4 border-b">
+                            <div class="flex items-start gap-2">
+                                <div class="flex-grow">
+                                    <select v-model="uiState.keuanganPemasukanFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                                        <option value="today">hari ini</option>
+                                        <option value="last_7_days">1 minggu terakhir</option>
+                                        <option value="last_30_days">1 bulan terakhir</option>
+                                        <option value="this_year">1 tahun terakhir</option>
+                                        <option value="by_date_range">rentang tanggal</option>
+                                        <option value="by_month_range">rentang bulan</option>
+                                        <option value="by_year_range">rentang tahun</option>
+                                        <option value="all_time">semua</option>
+                                    </select>
+                                    <div v-if="uiState.keuanganPemasukanFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
+                                        <input type="date" v-model="uiState.keuanganPemasukanStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                                        <span class="text-slate-500">s/d</span>
+                                        <input type="date" v-model="uiState.keuanganPemasukanEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                                    </div>
+                                    <div v-if="uiState.keuanganPemasukanFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
+                                        <select v-model.number="uiState.keuanganPemasukanStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                                        <input type="number" v-model.number="uiState.keuanganPemasukanStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+                                        <span class="mx-2">s/d</span>
+                                        <select v-model.number="uiState.keuanganPemasukanEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                                        <input type="number" v-model.number="uiState.keuanganPemasukanEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+                                    </div>
+                                    <div v-if="uiState.keuanganPemasukanFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
+                                        <input type="number" v-model.number="uiState.keuanganPemasukanStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                                        <span class="text-slate-500">s/d</span>
+                                        <input type="number" v-model.number="uiState.keuanganPemasukanEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                                    </div>
+                                </div>
+                                <button @click="exportKeuangan('pemasukan')" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px]">Export</button>
+                            </div>
+                        </div>
+                        <div class="overflow-y-auto max-h-[60vh]">
+                            <table class="w-full text-sm text-left text-slate-500">
+                                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                                    <tr><th class="px-4 py-3">Detail</th><th class="px-4 py-3">Catatan</th><th class="px-4 py-3 text-right">Jumlah</th><th class="px-4 py-3 text-center">Aksi</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200/50">
+                                    <tr v-if="filteredPemasukan.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
+                                    <tr v-for="item in filteredPemasukan" :key="item.id" class="hover:bg-slate-50/50">
+                                        <td class="px-4 py-3 align-top">
+                                            <p class="font-semibold text-slate-800">{{ item.kategori }}</p>
+                                            <p class="text-xs">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
+                                        </td>
+                                        <td class="px-4 py-3 text-xs align-top">{{ item.catatan || '-' }}</td>
+                                        <td class="px-4 py-3 font-semibold text-green-600 text-right align-top">{{ formatCurrency(item.jumlah) }}</td>
+                                        <td class="px-4 py-3 text-center align-top">
+                                            <button @click="deletePemasukan(item.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
-                <div class="p-4 border-b">
-                    <div class="flex items-start gap-2">
-                        <div class="flex-grow">
-                            <select v-model="uiState.keuanganPemasukanFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                                <option value="today">hari ini</option>
-                                <option value="last_7_days">1 minggu terakhir</option>
-                                <option value="last_30_days">1 bulan terakhir</option>
-                                <option value="this_year">1 tahun terakhir</option>
-                                <option value="by_date_range">rentang tanggal</option>
-                                <option value="by_month_range">rentang bulan</option>
-                                <option value="by_year_range">rentang tahun</option>
-                                <option value="all_time">semua</option>
-                            </select>
-                            
-                            <div v-if="uiState.keuanganPemasukanFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
-                                <input type="date" v-model="uiState.keuanganPemasukanStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                                <span class="text-slate-500">s/d</span>
-                                <input type="date" v-model="uiState.keuanganPemasukanEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                            </div>
-                            
-                            <div v-if="uiState.keuanganPemasukanFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
-                                <select v-model.number="uiState.keuanganPemasukanStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                                <input type="number" v-model.number="uiState.keuanganPemasukanStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-                                <span class="mx-2">s/d</span>
-                                <select v-model.number="uiState.keuanganPemasukanEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                                <input type="number" v-model.number="uiState.keuanganPemasukanEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-                            </div>
-                            
-                            <div v-if="uiState.keuanganPemasukanFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
-                                <input type="number" v-model.number="uiState.keuanganPemasukanStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-                                <span class="text-slate-500">s/d</span>
-                                <input type="number" v-model.number="uiState.keuanganPemasukanEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-                            </div>
-                        </div>
-                        <button @click="exportKeuangan('pemasukan')" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px]">Export</button>
-                    </div>
-                </div>
-                <div class="relative max-h-[60vh] overflow-y-auto">
-                    <table class="w-full text-sm text-left text-slate-500">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
-                            <tr><th class="px-4 py-3">Detail</th><th class="px-4 py-3">Catatan</th><th class="px-4 py-3">Jumlah</th><th class="px-4 py-3 text-center">Aksi</th></tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <tr v-if="filteredPemasukan.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
-                            <tr v-for="item in filteredPemasukan" :key="item.id">
-                                <td class="px-4 py-3">
-                                    <p class="font-semibold">{{ item.kategori }}</p>
-                                    <p class="text-xs text-slate-500">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
-                                </td>
-                                <td class="px-4 py-3 text-sm text-slate-600">
-                                    <span v-if="!item.catatan">-</span>
-                                    <span v-else>{{ item.catatan }}</span>
-                                </td>
-                                <td class="px-4 py-3 font-medium" :class="item.kategori === 'Ambilan Pribadi' ? 'text-orange-600' : 'text-green-600'">{{ formatCurrency(item.jumlah) }}</td>
-                                <td class="px-4 py-3 text-center">
-                                    <button @click="deletePemasukan(item.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
             </div>
         </div>
-    </div>
-
-    <div v-if="uiState.isKeuanganInfoVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full">
-            <div class="flex justify-between items-start pb-4 border-b">
-                <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
-                    Informasi & Logika
-                </h3>
-            </div>
-            <div class="space-y-4 text-slate-700 py-4">
-                <p class="text-sm text-slate-600">Halaman ini berfungsi sebagai buku kas digital Anda. Setiap data yang Anda masukkan di sini akan secara langsung memengaruhi metrik di Dashboard Analitik.</p>
-                <div class="space-y-4">
-                    <div class="p-4 bg-slate-50 rounded-lg">
-                        <p class="font-semibold text-slate-700">Pemasukan & Pengeluaran</p>
-                        <p class="text-sm text-slate-500 mt-1">Data dari tabel ini akan diperhitungkan dalam kalkulasi **Saldo Kas** di dasbor.</p>
-                    </div>
-                    <div class="p-4 bg-slate-50 rounded-lg">
-                        <p class="font-semibold text-slate-700">Kategori Pengeluaran</p>
-                        <p class="text-sm text-slate-500 mt-1">Semua data di sini akan diklasifikasikan sebagai **Biaya Operasional**, yang digunakan untuk menghitung **Laba Bersih** di dasbor.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="flex justify-end gap-3 pt-4 border-t">
-                <button @click="hideKeuanganInfoModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div v-if="uiState.modalType === 'addPemasukan' || uiState.modalType === 'editPemasukan'" class="fixed inset-0 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[90vh] flex flex-col">
-        <h3 class="text-xl font-bold mb-4">{{ uiState.modalType === 'addPemasukan' ? 'Tambah Pemasukan Baru' : 'Edit Pemasukan' }}</h3>
-        <form @submit.prevent="submitPemasukan" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium">Tanggal</label>
-                    <input type="date" v-model="uiState.modalData.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium">Kategori Pemasukan</label>
-                    <div class="flex items-center gap-2 mt-1">
-                        <select v-model="uiState.modalData.kategori" class="w-full p-2 border rounded-md" required>
-                            <option value="" disabled>-- Pilih Kategori --</option>
-                            <option v-for="cat in state.settings.inflowCategories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
-                        </select>
-                        <button type="button" @click="showNestedModal('manageInflowCategories')" class="bg-slate-100 p-2 text-slate-600 rounded-md hover:bg-slate-200" title="Kelola Kategori">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.82 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.82 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.82-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.82-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium">Jumlah (Rp)</label>
-                <input type="number" v-model.number="uiState.modalData.jumlah" placeholder="Contoh: 10000000" class="mt-1 w-full p-2 border rounded-md" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium">Catatan (Opsional)</label>
-                <textarea v-model="uiState.modalData.catatan" rows="3" class="mt-1 w-full p-2 border rounded-md"></textarea>
-            </div>
-            <div class="flex justify-end gap-3 pt-4 border-t">
-                <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
-            </div>
-        </form>
     </div>
 </div>
 
