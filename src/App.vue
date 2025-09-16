@@ -5294,7 +5294,7 @@ const printBarcode = async () => {
         Browser Anda tidak mendukung tag video.
     </video>
 
-    <div class="relative z-10 p-8 sm:p-10 bg-white/30 backdrop-blur-xl rounded-3xl shadow-lg border border-white/20 w-full max-w-md text-center animate-fade-in-up">
+    <div class="relative z-10 p-8 sm:p-10 bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl w-full max-w-md text-center animate-fade-in-up">
         <h2 class="text-3xl font-bold text-gray-800 mb-2">Selamat Datang di</h2>
         <p class="text-indigo-600 text-xl font-semibold mb-8">{{ state.settings.brandName }}</p>
 
