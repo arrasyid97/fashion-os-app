@@ -5164,13 +5164,7 @@ onMounted(() => {
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                    console.log('--- Pemeriksaan Status Langganan ---');
-                    console.log('Waktu Sekarang (Browser):', now);
-                    console.log('Status Langganan dari DB:', userData.subscriptionStatus);
-                    console.log('Tanggal Kedaluwarsa dari DB:', endDate);
-                    console.log('Apakah langganan dianggap valid?:', isSubscriptionValid);
-                    console.log('--- Selesai ---');
-                    // ▲▲▲ AKHIR DARI KODE DEBUGGING ▲▲▲
+                    
 
                     if (isSubscriptionValid) {
                         await loadAllDataFromFirebase();
