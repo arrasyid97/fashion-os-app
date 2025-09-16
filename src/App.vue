@@ -5290,7 +5290,7 @@ const printBarcode = async () => {
     <div v-if="!currentUser && !isLoading" class="relative min-h-screen flex items-center justify-center bg-slate-900 overflow-hidden">
     
     <video autoplay muted loop playsinline class="absolute inset-0 w-full h-full object-cover z-0 opacity-40">
-        <source src="/wallpaper.mp4" type="video/mp4">
+        <source src="/wallpaper.mp4?v=2" type="video/mp4"> 
         Browser Anda tidak mendukung tag video.
     </video>
 
