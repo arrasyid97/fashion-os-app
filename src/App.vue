@@ -6292,70 +6292,86 @@ const printBarcode = async () => {
 </div>
 
 <div v-if="activePage === 'gudang-kain'">
-    <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <div>
-            <h2 class="text-3xl font-bold text-slate-800">Stok Kain</h2>
-            <p class="text-slate-500 mt-1">Manajemen stok bahan baku kain Anda.</p>
-        </div>
-        <button @click="showModal('addKain', { tanggalBeli: new Date().toISOString().split('T')[0] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow">
-            + Tambah Stok Kain Baru
-        </button>
-    </div>
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
 
-    <div class="mb-6 p-4 bg-white rounded-xl border">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium mb-1">Cari (Nama Kain, Warna, Toko)</label>
-                <input type="text" v-model="uiState.gudangKainSearch" placeholder="Ketik untuk mencari..." class="w-full p-2 border rounded-md">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Urutkan Berdasarkan</label>
-                <select v-model="uiState.gudangKainSort" class="w-full p-2 border rounded-md">
-                    <option value="tanggal-desc">Tanggal Beli (Terbaru)</option>
-                    <option value="tanggal-asc">Tanggal Beli (Terlama)</option>
-                    <option value="nama-asc">Nama Kain (A-Z)</option>
-                    <option value="nama-desc">Nama Kain (Z-A)</option>
-                    <option value="stok-desc">Sisa Yard (Terbanyak)</option>
-                    <option value="stok-asc">Sisa Yard (Tersedikit)</option>
-                </select>
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
+                
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Gudang Kain</h2>
+                        <p class="text-slate-500 mt-1">Kelola semua aset bahan baku kain untuk produksi Anda.</p>
+                    </div>
+                    <button @click="showModal('addKain', { tanggalBeli: new Date().toISOString().split('T')[0] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
+                        + Tambah Stok Kain Baru
+                    </button>
+                </div>
+
+                <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Cari (Nama Kain, Warna, Toko)</label>
+                        <input type="text" v-model="uiState.gudangKainSearch" placeholder="Ketik untuk mencari..." class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Urutkan Berdasarkan</label>
+                        <select v-model="uiState.gudangKainSort" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                            <option value="tanggal-desc">Tanggal Beli (Terbaru)</option>
+                            <option value="tanggal-asc">Tanggal Beli (Terlama)</option>
+                            <option value="nama-asc">Nama Kain (A-Z)</option>
+                            <option value="nama-desc">Nama Kain (Z-A)</option>
+                            <option value="stok-desc">Sisa Yard (Terbanyak)</option>
+                            <option value="stok-asc">Sisa Yard (Tersedikit)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-500">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                            <tr>
+                                <th class="px-6 py-3">Tanggal Beli</th>
+                                <th class="px-6 py-3">Nama Kain</th>
+                                <th class="px-6 py-3">Toko</th>
+                                <th class="px-6 py-3 text-center">Sisa Stok</th>
+                                <th class="px-6 py-3 text-right">Harga/Yard</th>
+                                <th class="px-6 py-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200/50">
+                            <tr v-if="filteredGudangKain.length === 0">
+                                <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data kain yang cocok dengan filter.</td>
+                            </tr>
+                            <tr v-for="kain in filteredGudangKain" :key="kain.id" class="hover:bg-slate-50/50">
+                                <td class="px-6 py-4 whitespace-nowrap">{{ new Date(kain.tanggalBeli).toLocaleDateString('id-ID') }}</td>
+                                <td class="px-6 py-4">
+                                    <p class="font-semibold text-slate-800">{{ kain.namaKain }}</p>
+                                    <p class="text-xs text-slate-500">{{ kain.warna }}</p>
+                                </td>
+                                <td class="px-6 py-4">{{ kain.toko || '-' }}</td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="text-xs font-bold px-3 py-1 rounded-full"
+                                          :class="{
+                                            'bg-green-100 text-green-800': kain.sisaYard >= 50,
+                                            'bg-yellow-100 text-yellow-800': kain.sisaYard < 50 && kain.sisaYard > 10,
+                                            'bg-red-100 text-red-800': kain.sisaYard <= 10
+                                          }">
+                                        {{ kain.sisaYard }} Yard
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right font-medium text-green-600">{{ formatCurrency(kain.hargaBeliPerYard) }}</td>
+                                <td class="px-6 py-4 text-center space-x-3">
+                                    <button @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
+                                    <button @click="deleteKain(kain.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
-
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-        <table class="w-full text-sm text-left text-slate-500">
-            <thead class="text-xs text-slate-700 uppercase bg-slate-50">
-                <tr>
-                    <th class="px-6 py-3">Tanggal Beli</th>
-                    <th class="px-6 py-3">Nama Kain</th>
-                    <th class="px-6 py-3">Toko</th>
-                    <th class="px-6 py-3 text-center">Sisa Stok</th>
-                    <th class="px-6 py-3 text-right">Harga/Yard</th>
-                    <th class="px-6 py-3 text-center">Aksi</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-                <tr v-if="filteredGudangKain.length === 0">
-                    <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data kain yang cocok dengan filter.</td>
-                </tr>
-                <tr v-for="kain in filteredGudangKain" :key="kain.id" class="hover:bg-slate-50">
-                    <td class="px-6 py-4 whitespace-nowrap">{{ new Date(kain.tanggalBeli).toLocaleDateString('id-ID') }}</td>
-                    <td class="px-6 py-4">
-                        <p class="font-semibold text-slate-800">{{ kain.namaKain }}</p>
-                        <p class="text-xs text-slate-500">{{ kain.warna }}</p>
-                    </td>
-                    <td class="px-6 py-4">{{ kain.toko || '-' }}</td>
-                    <td class="px-6 py-4 font-medium text-center">{{ kain.sisaYard }} Yard</td>
-                    <td class="px-6 py-4 text-right font-medium text-green-600">{{ formatCurrency(kain.hargaBeliPerYard) }}</td>
-                    <td class="px-6 py-4 text-center space-x-3">
-                        <button @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
-                        <button @click="deleteKain(kain.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
     </div>
 </div>
+
 <div v-if="activePage === 'keuangan'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
