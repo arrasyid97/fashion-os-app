@@ -5702,12 +5702,12 @@ const printBarcode = async () => {
                         <p class="text-slate-500 mt-1">Scan atau ketik produk, lalu scan atau ketik ID Resi untuk menyelesaikan transaksi.</p>
                     </div>
 
-                    <div class="bg-white/70 backdrop-blur-sm p-4 rounded-xl border shadow-lg animate-fade-in-up" style="animation-delay: 100ms;">
+                    <div class="relative z-20 bg-white/70 backdrop-blur-sm p-4 rounded-xl border shadow-lg animate-fade-in-up" style="animation-delay: 100ms;">
                         <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Cari di Sini</label>
                         <div class="relative flex items-center gap-2">
                             <form @submit.prevent="handlePosSubmit" class="flex-grow">
                                 <input type="text" v-model="uiState.pos_scan_input" @input="handlePosSearch" :disabled="!uiState.activeCartChannel || !!uiState.pos_order_id" :placeholder="uiState.activeCartChannel ? 'Scan/Ketik Produk atau Resi...' : 'Pilih channel dulu...'" :class="{'bg-slate-100 cursor-not-allowed': !!uiState.pos_order_id}" class="w-full p-4 text-lg border-2 border-slate-300 rounded-lg shadow-inner" autocomplete="off">
-                                <div v-if="uiState.posSearchRecommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg z-10">
+                                <div v-if="uiState.posSearchRecommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg">
                                     <div v-for="p in uiState.posSearchRecommendations" :key="p.sku" @click="selectPosRecommendation(p)" class="p-3 hover:bg-slate-100 cursor-pointer border-b">
                                         <p class="font-semibold">{{ p.nama }} - {{ p.varian }}</p>
                                         <p class="text-xs text-slate-500">SKU: {{ p.sku }}</p>
