@@ -592,6 +592,47 @@ function exportInvestorPayments() {
     XLSX.writeFile(workbook, `Riwayat_Pembayaran_Investor_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
+function printPreview() {
+  const printContainer = document.getElementById('print-area-container');
+  if (!printContainer) return;
+
+  // 1. Kosongkan area cetak dari sisa cetakan sebelumnya
+  printContainer.innerHTML = '';
+
+  // 2. Atur tata letak grid berdasarkan jumlah kolom yang dipilih
+  printContainer.style.gridTemplateColumns = `repeat(${labelSettings.columns}, 1fr)`;
+
+  // 3. Ambil barcode asli yang sudah digambar di area review
+  const originalCanvas = document.getElementById('barcodeCanvas');
+  if (!originalCanvas || originalCanvas.width === 0) {
+    alert("Gagal memuat gambar barcode untuk dicetak.");
+    return;
+  }
+
+  // 4. Salin gambar barcode sebanyak jumlah yang diinginkan ke area cetak
+  for (let i = 0; i < printCount.value; i++) {
+    const newCanvas = document.createElement('canvas');
+    newCanvas.width = originalCanvas.width;
+    newCanvas.height = originalCanvas.height;
+    const ctx = newCanvas.getContext('2d');
+    ctx.drawImage(originalCanvas, 0, 0);
+
+    // Buat div pembungkus untuk setiap label
+    const labelBox = document.createElement('div');
+    labelBox.className = 'print-label-box'; // Gunakan class dari CSS
+    labelBox.style.width = `${labelSettings.width}mm`;
+    labelBox.style.height = `${labelSettings.height}mm`;
+
+    labelBox.appendChild(newCanvas);
+    printContainer.appendChild(labelBox);
+  }
+
+  // 5. Panggil fungsi cetak browser
+  nextTick(() => {
+    window.print();
+  });
+}
+
 async function submitInvestorForm(isEditing) {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.modalData;
@@ -5380,46 +5421,6 @@ watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
-function printPreview() {
-  const printContainer = document.getElementById('print-area-container');
-  if (!printContainer) return;
-
-  // 1. Kosongkan area cetak dari sisa cetakan sebelumnya
-  printContainer.innerHTML = '';
-
-  // 2. Atur tata letak grid berdasarkan jumlah kolom yang dipilih
-  printContainer.style.gridTemplateColumns = `repeat(${labelSettings.columns}, 1fr)`;
-
-  // 3. Ambil barcode asli yang sudah digambar di area review
-  const originalCanvas = document.getElementById('barcodeCanvas');
-  if (!originalCanvas || originalCanvas.width === 0) {
-    alert("Gagal memuat gambar barcode untuk dicetak.");
-    return;
-  }
-
-  // 4. Salin gambar barcode sebanyak jumlah yang diinginkan ke area cetak
-  for (let i = 0; i < printCount.value; i++) {
-    const newCanvas = document.createElement('canvas');
-    newCanvas.width = originalCanvas.width;
-    newCanvas.height = originalCanvas.height;
-    const ctx = newCanvas.getContext('2d');
-    ctx.drawImage(originalCanvas, 0, 0);
-
-    // Buat div pembungkus untuk setiap label
-    const labelBox = document.createElement('div');
-    labelBox.className = 'print-label-box'; // Gunakan class dari CSS
-    labelBox.style.width = `${labelSettings.width}mm`;
-    labelBox.style.height = `${labelSettings.height}mm`;
-
-    labelBox.appendChild(newCanvas);
-    printContainer.appendChild(labelBox);
-  }
-
-  // 5. Panggil fungsi cetak browser
-  nextTick(() => {
-    window.print();
-  });
-}
 
 </script>
 
