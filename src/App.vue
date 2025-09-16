@@ -7199,341 +7199,360 @@ const printBarcode = async () => {
     </div>
 </div>
 
-<div v-if="activePage === 'pengaturan'" class="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-    
-    <div class="md:col-span-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 md:sticky md:top-4">
-        <h3 class="text-xl font-bold text-slate-800 mb-4">Pengaturan</h3>
-        <ul class="space-y-1 text-base font-medium">
-            <li>
-                <button @click="uiState.pengaturanTab = 'umum'" class="w-full text-left p-3 rounded-lg transition-colors" :class="{'bg-indigo-600 text-white': uiState.pengaturanTab === 'umum', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'umum'}">
-                    Pengaturan Umum
-                </button>
-            </li>
-            <li>
-                <button @click="uiState.pengaturanTab = 'marketplace'" class="w-full text-left p-3 rounded-lg transition-colors" :class="{'bg-indigo-600 text-white': uiState.pengaturanTab === 'marketplace', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'marketplace'}">
-                    Aturan Marketplace
-                </button>
-            </li>
-            <li>
-                <button @click="uiState.pengaturanTab = 'modelproduk'" class="w-full text-left p-3 rounded-lg transition-colors" :class="{'bg-indigo-600 text-white': uiState.pengaturanTab === 'modelproduk', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'modelproduk'}">
-                    Model Produk
-                </button>
-            </li>
-            <li>
-                <button @click="uiState.pengaturanTab = 'rekening'" class="w-full text-left p-3 rounded-lg transition-colors" :class="{'bg-indigo-600 text-white': uiState.pengaturanTab === 'rekening', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'rekening'}">
-                    Rekening Bank
-                </button>
-            </li>
-            <li v-if="isAdmin">
-                <button @click="uiState.pengaturanTab = 'admin'" class="w-full text-left p-3 rounded-lg transition-colors" :class="{'bg-indigo-600 text-white': uiState.pengaturanTab === 'admin', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'admin'}">
-                    Admin
-                </button>
-            </li>
-        </ul>
-    </div>
-
-    <div class="md:col-span-3 space-y-6">
-
-        <div v-if="uiState.pengaturanTab === 'umum'" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h3 class="text-lg font-semibold text-slate-800 mb-4">Informasi Dasar & Keamanan</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Nama Brand Anda</label>
-                    <input type="text" v-model="state.settings.brandName" class="w-full p-2 border border-slate-300 rounded-md">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Batas Stok Minimum Peringatan</label>
-                    <input type="number" v-model.number="state.settings.minStok" class="w-full p-2 border border-slate-300 rounded-md">
-                </div>
-            </div>
-            <div class="border-t pt-4 mt-4">
-                <h4 class="font-semibold text-slate-700 mb-2">Aktifkan Kunci PIN</h4>
-                <p class="text-xs text-slate-500 mb-4">Pilih bagian mana saja yang ingin Anda amankan menggunakan PIN.</p>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                        <span class="font-medium text-sm text-slate-800">Kunci Halaman Dashboard</span>
-                        <button @click="requestPinForToggle('dashboard')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.dashboard ? 'bg-indigo-600' : 'bg-slate-300'">
-                            <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.dashboard }"></span>
-                        </button>
-                    </div>
-                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                        <span class="font-medium text-sm text-slate-800">Kunci Tabel Riwayat Pemasukan</span>
-                        <button @click="requestPinForToggle('incomeHistory')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.incomeHistory ? 'bg-indigo-600' : 'bg-slate-300'">
-                            <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.incomeHistory }"></span>
-                        </button>
-                    </div>
-                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                        <span class="font-medium text-sm text-slate-800">Kunci Halaman Investasi</span>
-                        <button @click="requestPinForToggle('investmentPage')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.investmentPage ? 'bg-indigo-600' : 'bg-slate-300'">
-                            <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.investmentPage }"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="border-t pt-4 mt-4">
-                <h4 class="font-semibold text-slate-700 mb-2">
-                    <span v-if="state.settings.dashboardPin">Ubah PIN Dasbor</span>
-                    <span v-else>Buat PIN Dasbor Baru</span>
-                </h4>
-                <div class="space-y-2">
-                    <div v-if="state.settings.dashboardPin">
-                        <label class="block text-sm font-medium text-slate-700">PIN Lama</label>
-                        <input type="password" v-model="uiState.oldPin" placeholder="Masukkan PIN lama" class="w-full p-2 border border-slate-300 rounded-md">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700">PIN Baru</label>
-                        <input type="password" v-model="uiState.newPin" placeholder="Masukkan PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700">Konfirmasi PIN Baru</label>
-                        <input type="password" v-model="uiState.confirmNewPin" placeholder="Ketik ulang PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
-                    </div>
-                    <p v-if="uiState.pinError" class="text-sm text-red-500">{{ uiState.pinError }}</p>
-                </div>
-            </div>
-            <div class="flex justify-end pt-4 border-t mt-6">
-                <button @click="saveGeneralSettings" :disabled="isSavingSettings" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">
-                    <span v-if="isSavingSettings">Menyimpan...</span>
-                    <span v-else>Simpan Perubahan</span>
-                </button>
-            </div>
-        </div>
-
-        <div v-if="uiState.pengaturanTab === 'marketplace'" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-slate-800">Daftar Marketplace</h3>
-                <button @click="addMarketplace" class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm">Tambah</button>
-            </div>
-            <div class="mb-4">
-                <input type="text" v-model="uiState.pengaturanMarketplaceSearch" placeholder="Cari nama marketplace..." class="w-full p-2 border border-slate-300 rounded-md">
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="text-left text-slate-500">
-                        <tr>
-                            <th class="p-2 font-medium">NAMA</th>
-                            <th class="p-2 font-medium">ADMIN</th>
-                            <th class="p-2 font-medium">KOMISI</th>
-                            <th class="p-2 font-medium">LAYANAN</th>
-                            <th class="p-2 font-medium">PER PESANAN</th>
-                            <th class="p-2 font-medium text-right">AKSI</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        <tr v-if="filteredMarketplaces.length === 0">
-                            <td colspan="6" class="p-4 text-center text-slate-500">Tidak ada marketplace yang cocok.</td>
-                        </tr>
-                        <tr v-for="mp in (filteredMarketplaces || [])" :key="mp.id">
-                            <td class="p-3 font-semibold text-slate-700">{{ mp.name }}</td>
-                            <td class="p-3">{{ mp.adm }}%</td>
-                            <td class="p-3">{{ mp.komisi }}%</td>
-                            <td class="p-3">{{ mp.layanan }}%</td>
-                            <td class="p-3">{{ formatCurrency(mp.perPesanan) }}</td>
-                            <td class="p-3 text-right space-x-4">
-                                <button @click="showModal('editMarketplace', JSON.parse(JSON.stringify(mp)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                                <button @click="removeMarketplace(mp.id)" class="text-red-500 hover:text-red-700">
-                                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="flex justify-end pt-4 border-t mt-6">
-                <button @click="saveSettingsData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
-                    <span v-if="isSaving">Menyimpan...</span>
-                    <span v-else>Simpan Perubahan</span>
-                </button>
-            </div>
-        </div>
+<div v-if="activePage === 'pengaturan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto">
         
-        <div v-if="uiState.pengaturanTab === 'modelproduk'" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-slate-800">Daftar Model Produk</h3>
-                <button @click="addModelProduk" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">+ Tambah Model</button>
-            </div>
-            <div class="mb-4">
-                <input type="text" v-model="uiState.pengaturanModelProdukSearch" placeholder="Cari nama model..." class="w-full p-2 border border-slate-300 rounded-md">
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="text-left text-slate-500">
-                        <tr>
-                            <th class="p-2 font-medium">NAMA MODEL</th>
-                            <th class="p-2 font-medium">YARD/MODEL</th>
-                            <th class="p-2 font-medium">HARGA MAKLUN</th>
-                            <th class="p-2 font-medium">HARGA JAHIT</th>
-                            <th class="p-2 font-medium text-right">AKSI</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        <tr v-if="filteredModelProduk.length === 0">
-                            <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada model yang cocok.</td>
-                        </tr>
-                        <tr v-for="model in filteredModelProduk" :key="model.id">
-                            <td class="p-3 font-semibold text-slate-700">{{ model.namaModel }}</td>
-                            <td class="p-3">{{ model.yardPerModel || 0 }} m</td>
-                            <td class="p-3">{{ formatCurrency(model.hargaMaklun || 0) }}</td>
-                            <td class="p-3">{{ formatCurrency(model.hargaJahit || 0) }}</td>
-                            <td class="p-3 text-right space-x-4">
-                                <button @click="showModal('editModelProduk', JSON.parse(JSON.stringify(model)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                                <button @click="removeModelProduk(model.id)" class="text-red-500 hover:text-red-700">
-                                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="flex justify-end pt-4 border-t mt-6">
-                <button @click="saveSettingsData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
-                    <span v-if="isSaving">Menyimpan...</span>
-                    <span v-else>Simpan Perubahan</span>
-                </button>
-            </div>
-        </div>
-        
-        <div v-if="uiState.pengaturanTab === 'rekening'" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-slate-800">Daftar Rekening Bank</h3>
-                <button @click="showModal('addBankAccount', { bankName: '', accountNumber: '', accountName: '' })" class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm">Tambah</button>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="text-left text-slate-500">
-                        <tr>
-                            <th class="p-2 font-medium">NAMA BANK</th>
-                            <th class="p-2 font-medium">NO. REKENING</th>
-                            <th class="p-2 font-medium">ATAS NAMA</th>
-                            <th class="p-2 font-medium text-right">AKSI</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        <tr v-if="state.bankAccounts.length === 0">
-                            <td colspan="4" class="p-4 text-center text-slate-500">Belum ada rekening tersimpan.</td>
-                        </tr>
-                        <tr v-for="acc in (state.bankAccounts || [])" :key="acc.id">
-                            <td class="p-3 font-semibold text-slate-700">{{ acc.bankName }}</td>
-                            <td class="p-3">{{ acc.accountNumber }}</td>
-                            <td class="p-3">{{ acc.accountName }}</td>
-                            <td class="p-3 text-right space-x-4">
-                                <button @click="showModal('editBankAccount', acc)" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                                <button @click="deleteBankAccount(acc.id)" class="text-red-500 hover:text-red-700 font-semibold">Hapus</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+        <div class="mb-8 animate-fade-in-up">
+            <h2 class="text-3xl font-bold text-slate-800">Pengaturan Aplikasi</h2>
+            <p class="text-slate-500 mt-1">Kelola semua konfigurasi inti untuk bisnis Anda di sini.</p>
         </div>
 
-        <div v-if="uiState.pengaturanTab === 'admin' && isAdmin" class="space-y-6">
-            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Akun Mitra</h3>
-                <p class="text-sm text-slate-500 mb-4">
-                    Pilih pengguna di bawah ini untuk menjadikannya mitra. Kode rujukan unik akan dibuat otomatis.
-                </p>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="text-left text-slate-500">
-                                <th class="p-2 font-medium">Email Pengguna</th>
-                                <th class="p-2 font-medium text-center">Status Mitra</th>
-                                <th class="p-2 font-medium text-center">Kode Rujukan</th>
-                                <th class="p-2 font-medium text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200">
-                            <tr v-if="uiState.allUsers.length === 0">
-                                <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada pengguna terdaftar.</td>
-                            </tr>
-                            <tr v-for="user in uiState.allUsers" :key="user.uid" class="hover:bg-slate-50">
-                                <td class="p-3">{{ user.email }}</td>
-                                <td class="p-3 text-center">
-                                    <span v-if="user.isPartner" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">Ya</span>
-                                    <span v-else class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800">Tidak</span>
-                                </td>
-                                <td class="p-3 text-center font-mono text-sm">
-                                    {{ user.referralCode || '-' }}
-                                </td>
-                                <td class="p-3 text-right space-x-2">
-    <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
-        Jadikan Mitra
-    </button>
-    <div v-else class="inline-flex items-center gap-2">
-        <button @click="showModal('editReferralCode', { user: user, newReferralCode: user.referralCode })" class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-md hover:bg-blue-200 text-xs">
-            Edit
-        </button>
-        <button @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
-            Lihat Kode
-        </button>
-    </div>
-</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4">Export Data Pelanggan</h3>
-                <p class="text-sm text-slate-500 mb-4">Pilih pelanggan dan rentang waktu untuk mengunduh semua data mereka.</p>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700">Pilih Pelanggan</label>
-                        <select v-model="uiState.selectedUserForExport" class="mt-1 w-full p-2 border rounded-md">
-                            <option :value="null" disabled>-- Daftar Pelanggan --</option>
-                            <option v-for="user in uiState.allUsers" :key="user.uid" :value="user">
-                                {{ user.email }}
-                            </option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
-                        <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
-                            <option value="all_time">Semua</option>
-                            <option value="last_30_days">1 Bulan Terakhir</option>
-                            <option value="this_year">1 Tahun Terakhir</option>
-                        </select>
-                    </div>
-                    <button @click="exportAllDataForUser(uiState.selectedUserForExport?.uid, uiState.selectedUserForExport?.email, uiState.exportFilter)" :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
-                        <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
-                        <span v-else>Export Data Pelanggan</span>
-                    </button>
-                </div>
-            </div>
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
-            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4">Riwayat Pengajuan Pencairan Komisi (Semua Mitra)</h3>
-                <div class="overflow-x-auto max-h-96">
-                    <table class="w-full text-sm">
-                        <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
-                            <tr>
-                                <th class="p-3 font-medium">TANGGAL</th>
-                                <th class="p-3 font-medium">DETAIL PENCAIRAN</th>
-                                <th class="p-3 font-medium text-right">JUMLAH</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200">
-                            <tr v-if="commissionPayouts.length === 0">
-                                <td colspan="3" class="p-4 text-center text-slate-500">Belum ada riwayat pencairan.</td>
-                            </tr>
-                            <tr v-for="payout in commissionPayouts" :key="payout.id">
-                                <td class="p-3 whitespace-nowrap">{{ new Date(payout.tanggal.seconds * 1000).toLocaleDateString('id-ID') }}</td>
-                                <td class="p-3">
-                                    <p class="font-semibold text-slate-700">{{ payout.catatan }}</p>
-                                </td>
-                                <td class="p-3 text-right font-bold text-green-600">
-                                    {{ formatCurrency(payout.jumlah) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-lg border border-slate-200 lg:sticky lg:top-8 animate-fade-in-up" style="animation-delay: 100ms;">
+                <h3 class="text-xl font-bold text-slate-800 mb-4 px-3">Pengaturan</h3>
+                <ul class="space-y-1 text-base font-medium">
+                    <li>
+                        <button @click="uiState.pengaturanTab = 'umum'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'umum', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'umum'}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" /></svg>
+                            Pengaturan Umum
+                        </button>
+                    </li>
+                    <li>
+                        <button @click="uiState.pengaturanTab = 'marketplace'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'marketplace', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'marketplace'}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /></svg>
+                            Aturan Marketplace
+                        </button>
+                    </li>
+                    <li>
+                        <button @click="uiState.pengaturanTab = 'modelproduk'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'modelproduk', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'modelproduk'}">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
+                            Model Produk
+                        </button>
+                    </li>
+                    <li>
+                        <button @click="uiState.pengaturanTab = 'rekening'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'rekening', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'rekening'}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13h1v2H4v-2z" clip-rule="evenodd" /></svg>
+                            Rekening Bank
+                        </button>
+                    </li>
+                    <li v-if="isAdmin">
+                        <button @click="uiState.pengaturanTab = 'admin'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'admin', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'admin'}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.545 2.917A5.996 5.996 0 0010 18a5.996 5.996 0 004.545-2.083A5 5 0 0012 11z" clip-rule="evenodd" /></svg>
+                            Admin
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="lg:col-span-3">
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    
+                    <div v-if="uiState.pengaturanTab === 'umum'" class="animate-fade-in">
+                        <h3 class="text-xl font-bold text-slate-800 mb-6">Informasi Dasar & Keamanan</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nama Brand Anda</label>
+                                <input type="text" v-model="state.settings.brandName" class="w-full p-2 border border-slate-300 rounded-md">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Batas Stok Minimum Peringatan</label>
+                                <input type="number" v-model.number="state.settings.minStok" class="w-full p-2 border border-slate-300 rounded-md">
+                            </div>
+                        </div>
+                        <div class="border-t pt-4 mt-6">
+                            <h4 class="font-semibold text-slate-700 mb-2">Aktifkan Kunci PIN</h4>
+                            <p class="text-xs text-slate-500 mb-4">Pilih bagian mana saja yang ingin Anda amankan menggunakan PIN.</p>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+                                    <span class="font-medium text-sm text-slate-800">Kunci Halaman Dashboard</span>
+                                    <button @click="requestPinForToggle('dashboard')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.dashboard ? 'bg-indigo-600' : 'bg-slate-300'">
+                                        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.dashboard }"></span>
+                                    </button>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+                                    <span class="font-medium text-sm text-slate-800">Kunci Tabel Riwayat Pemasukan</span>
+                                    <button @click="requestPinForToggle('incomeHistory')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.incomeHistory ? 'bg-indigo-600' : 'bg-slate-300'">
+                                        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.incomeHistory }"></span>
+                                    </button>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+                                    <span class="font-medium text-sm text-slate-800">Kunci Halaman Investasi</span>
+                                    <button @click="requestPinForToggle('investmentPage')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.investmentPage ? 'bg-indigo-600' : 'bg-slate-300'">
+                                        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.investmentPage }"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border-t pt-4 mt-6">
+                            <h4 class="font-semibold text-slate-700 mb-2">
+                                <span v-if="state.settings.dashboardPin">Ubah PIN Dasbor</span>
+                                <span v-else>Buat PIN Dasbor Baru</span>
+                            </h4>
+                            <div class="space-y-2">
+                                <div v-if="state.settings.dashboardPin">
+                                    <label class="block text-sm font-medium text-slate-700">PIN Lama</label>
+                                    <input type="password" v-model="uiState.oldPin" placeholder="Masukkan PIN lama" class="w-full p-2 border border-slate-300 rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">PIN Baru</label>
+                                    <input type="password" v-model="uiState.newPin" placeholder="Masukkan PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Konfirmasi PIN Baru</label>
+                                    <input type="password" v-model="uiState.confirmNewPin" placeholder="Ketik ulang PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
+                                </div>
+                                <p v-if="uiState.pinError" class="text-sm text-red-500">{{ uiState.pinError }}</p>
+                            </div>
+                        </div>
+                        <div class="flex justify-end pt-4 border-t mt-6">
+                            <button @click="saveGeneralSettings" :disabled="isSavingSettings" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">
+                                <span v-if="isSavingSettings">Menyimpan...</span>
+                                <span v-else>Simpan Perubahan</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div v-if="uiState.pengaturanTab === 'marketplace'" class="animate-fade-in">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-slate-800">Daftar Marketplace</h3>
+                            <button @click="addMarketplace" class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm">Tambah</button>
+                        </div>
+                        <div class="mb-4">
+                            <input type="text" v-model="uiState.pengaturanMarketplaceSearch" placeholder="Cari nama marketplace..." class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="text-left text-slate-500">
+                                    <tr>
+                                        <th class="p-2 font-medium">NAMA</th>
+                                        <th class="p-2 font-medium">ADMIN</th>
+                                        <th class="p-2 font-medium">KOMISI</th>
+                                        <th class="p-2 font-medium">LAYANAN</th>
+                                        <th class="p-2 font-medium">PER PESANAN</th>
+                                        <th class="p-2 font-medium text-right">AKSI</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr v-if="filteredMarketplaces.length === 0">
+                                        <td colspan="6" class="p-4 text-center text-slate-500">Tidak ada marketplace yang cocok.</td>
+                                    </tr>
+                                    <tr v-for="mp in (filteredMarketplaces || [])" :key="mp.id">
+                                        <td class="p-3 font-semibold text-slate-700">{{ mp.name }}</td>
+                                        <td class="p-3">{{ mp.adm }}%</td>
+                                        <td class="p-3">{{ mp.komisi }}%</td>
+                                        <td class="p-3">{{ mp.layanan }}%</td>
+                                        <td class="p-3">{{ formatCurrency(mp.perPesanan) }}</td>
+                                        <td class="p-3 text-right space-x-4">
+                                            <button @click="showModal('editMarketplace', JSON.parse(JSON.stringify(mp)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+                                            <button @click="removeMarketplace(mp.id)" class="text-red-500 hover:text-red-700">
+                                                <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="flex justify-end pt-4 border-t mt-6">
+                            <button @click="saveSettingsData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
+                                <span v-if="isSaving">Menyimpan...</span>
+                                <span v-else>Simpan Perubahan</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div v-if="uiState.pengaturanTab === 'modelproduk'" class="animate-fade-in">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-slate-800">Daftar Model Produk</h3>
+                            <button @click="addModelProduk" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">+ Tambah Model</button>
+                        </div>
+                        <div class="mb-4">
+                            <input type="text" v-model="uiState.pengaturanModelProdukSearch" placeholder="Cari nama model..." class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="text-left text-slate-500">
+                                    <tr>
+                                        <th class="p-2 font-medium">NAMA MODEL</th>
+                                        <th class="p-2 font-medium">YARD/MODEL</th>
+                                        <th class="p-2 font-medium">HARGA MAKLUN</th>
+                                        <th class="p-2 font-medium">HARGA JAHIT</th>
+                                        <th class="p-2 font-medium text-right">AKSI</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr v-if="filteredModelProduk.length === 0">
+                                        <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada model yang cocok.</td>
+                                    </tr>
+                                    <tr v-for="model in filteredModelProduk" :key="model.id">
+                                        <td class="p-3 font-semibold text-slate-700">{{ model.namaModel }}</td>
+                                        <td class="p-3">{{ model.yardPerModel || 0 }} m</td>
+                                        <td class="p-3">{{ formatCurrency(model.hargaMaklun || 0) }}</td>
+                                        <td class="p-3">{{ formatCurrency(model.hargaJahit || 0) }}</td>
+                                        <td class="p-3 text-right space-x-4">
+                                            <button @click="showModal('editModelProduk', JSON.parse(JSON.stringify(model)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+                                            <button @click="removeModelProduk(model.id)" class="text-red-500 hover:text-red-700">
+                                                <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="flex justify-end pt-4 border-t mt-6">
+                            <button @click="saveSettingsData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
+                                <span v-if="isSaving">Menyimpan...</span>
+                                <span v-else>Simpan Perubahan</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div v-if="uiState.pengaturanTab === 'rekening'" class="animate-fade-in">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-slate-800">Daftar Rekening Bank</h3>
+                            <button @click="showModal('addBankAccount', { bankName: '', accountNumber: '', accountName: '' })" class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm">Tambah</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="text-left text-slate-500">
+                                    <tr>
+                                        <th class="p-2 font-medium">NAMA BANK</th>
+                                        <th class="p-2 font-medium">NO. REKENING</th>
+                                        <th class="p-2 font-medium">ATAS NAMA</th>
+                                        <th class="p-2 font-medium text-right">AKSI</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr v-if="state.bankAccounts.length === 0">
+                                        <td colspan="4" class="p-4 text-center text-slate-500">Belum ada rekening tersimpan.</td>
+                                    </tr>
+                                    <tr v-for="acc in (state.bankAccounts || [])" :key="acc.id">
+                                        <td class="p-3 font-semibold text-slate-700">{{ acc.bankName }}</td>
+                                        <td class="p-3">{{ acc.accountNumber }}</td>
+                                        <td class="p-3">{{ acc.accountName }}</td>
+                                        <td class="p-3 text-right space-x-4">
+                                            <button @click="showModal('editBankAccount', acc)" class="font-semibold text-blue-500 hover:underline">Edit</button>
+                                            <button @click="deleteBankAccount(acc.id)" class="text-red-500 hover:text-red-700 font-semibold">Hapus</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div v-if="uiState.pengaturanTab === 'admin' && isAdmin" class="animate-fade-in">
+                        <div class="space-y-6">
+                            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Akun Mitra</h3>
+                                <p class="text-sm text-slate-500 mb-4">
+                                    Pilih pengguna di bawah ini untuk menjadikannya mitra. Kode rujukan unik akan dibuat otomatis.
+                                </p>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead>
+                                            <tr class="text-left text-slate-500">
+                                                <th class="p-2 font-medium">Email Pengguna</th>
+                                                <th class="p-2 font-medium text-center">Status Mitra</th>
+                                                <th class="p-2 font-medium text-center">Kode Rujukan</th>
+                                                <th class="p-2 font-medium text-right">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-200">
+                                            <tr v-if="uiState.allUsers.length === 0">
+                                                <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada pengguna terdaftar.</td>
+                                            </tr>
+                                            <tr v-for="user in uiState.allUsers" :key="user.uid" class="hover:bg-slate-50">
+                                                <td class="p-3">{{ user.email }}</td>
+                                                <td class="p-3 text-center">
+                                                    <span v-if="user.isPartner" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">Ya</span>
+                                                    <span v-else class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800">Tidak</span>
+                                                </td>
+                                                <td class="p-3 text-center font-mono text-sm">
+                                                    {{ user.referralCode || '-' }}
+                                                </td>
+                                                <td class="p-3 text-right space-x-2">
+                                                    <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
+                                                        Jadikan Mitra
+                                                    </button>
+                                                    <div v-else class="inline-flex items-center gap-2">
+                                                        <button @click="showModal('editReferralCode', { user: user, newReferralCode: user.referralCode })" class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-md hover:bg-blue-200 text-xs">
+                                                            Edit
+                                                        </button>
+                                                        <button @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
+                                                            Lihat Kode
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-4">Export Data Pelanggan</h3>
+                                <p class="text-sm text-slate-500 mb-4">Pilih pelanggan dan rentang waktu untuk mengunduh semua data mereka.</p>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700">Pilih Pelanggan</label>
+                                        <select v-model="uiState.selectedUserForExport" class="mt-1 w-full p-2 border rounded-md">
+                                            <option :value="null" disabled>-- Daftar Pelanggan --</option>
+                                            <option v-for="user in uiState.allUsers" :key="user.uid" :value="user">
+                                                {{ user.email }}
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
+                                        <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
+                                            <option value="all_time">Semua</option>
+                                            <option value="last_30_days">1 Bulan Terakhir</option>
+                                            <option value="this_year">1 Tahun Terakhir</option>
+                                        </select>
+                                    </div>
+                                    <button @click="exportAllDataForUser(uiState.selectedUserForExport?.uid, uiState.selectedUserForExport?.email, uiState.exportFilter)" :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
+                                        <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
+                                        <span v-else>Export Data Pelanggan</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-4">Riwayat Pengajuan Pencairan Komisi (Semua Mitra)</h3>
+                                <div class="overflow-x-auto max-h-96">
+                                    <table class="w-full text-sm">
+                                        <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
+                                            <tr>
+                                                <th class="p-3 font-medium">TANGGAL</th>
+                                                <th class="p-3 font-medium">DETAIL PENCAIRAN</th>
+                                                <th class="p-3 font-medium text-right">JUMLAH</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-200">
+                                            <tr v-if="commissionPayouts.length === 0">
+                                                <td colspan="3" class="p-4 text-center text-slate-500">Belum ada riwayat pencairan.</td>
+                                            </tr>
+                                            <tr v-for="payout in commissionPayouts" :key="payout.id">
+                                                <td class="p-3 whitespace-nowrap">{{ new Date(payout.tanggal.seconds * 1000).toLocaleDateString('id-ID') }}</td>
+                                                <td class="p-3">
+                                                    <p class="font-semibold text-slate-700">{{ payout.catatan }}</p>
+                                                </td>
+                                                <td class="p-3 text-right font-bold text-green-600">
+                                                    {{ formatCurrency(payout.jumlah) }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
     </div>
-</div>
+
 
 <div v-if="activePage === 'panduan'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
@@ -10411,5 +10430,12 @@ const printBarcode = async () => {
 .animate-fade-in-up {
     animation: fade-in-up 0.6s ease-out forwards;
     opacity: 0; /* Mulai dari tidak terlihat */
+}
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.animate-fade-in {
+    animation: fade-in 0.5s ease-in-out;
 }
 </style>
