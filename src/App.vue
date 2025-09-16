@@ -5828,7 +5828,7 @@ function printPreview() {
                         </div>
                     </div>
 
-                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    <div id="print-section" class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
                         <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                             <h3 class="text-xl font-semibold text-slate-800">Riwayat Transaksi</h3>
                             <div class="flex items-start gap-2">
@@ -10574,44 +10574,32 @@ function printPreview() {
     opacity: 0; /* Mulai dari tidak terlihat */
 }
 @media print {
-    body {
-        background: none !important;
-    }
-    #main-content > div:not([id='barcode-page']) {
-        display: none !important;
-    }
-    #barcode-page, #barcode-page * {
-        visibility: visible !important;
-        display: block !important;
-    }
-    .min-h-screen.w-full {
-        padding: 0 !important;
-        background: white !important;
-    }
-    .lg\:col-span-1 {
-        display: none !important;
-    }
-    .lg\:col-span-2 {
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-    .bg-white\/70, .shadow-xl, .border {
-        background: none !important;
-        box-shadow: none !important;
-        border: none !important;
-    }
-    #barcode-preview-area {
-        min-height: auto !important;
-        background: none !important;
-        padding: 0 !important;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    .animate-fade-in-up, .mb-8 {
-        animation: none !important;
-        margin: 0 !important;
-    }
+  /* 1. Sembunyikan SEMUA elemen di halaman secara default */
+  body * {
+    visibility: hidden;
+  }
+
+  /* 2. Tampilkan HANYA area cetak dan semua isinya */
+  #print-section, #print-section * {
+    visibility: visible;
+  }
+
+  /* 3. Posisikan area cetak di pojok kiri atas halaman cetak */
+  #print-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  /* Pastikan canvas juga terlihat */
+  #barcodeCanvas {
+    display: block !important;
+    margin: 0 auto; /* Pusatkan barcode jika perlu */
+  }
 }
 </style>
