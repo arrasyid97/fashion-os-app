@@ -7694,7 +7694,7 @@ const printBarcode = async () => {
                     <input type="text" v-model="uiState.referralCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400" placeholder="Contoh: PARTNER-ABCDE">
                     <button @click.prevent="applyReferralCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">Terapkan</button>
                 </div>
-                <p v-if="uiState.referralCodeMessage" class="mt-2 text-xs font-medium" :class="uiState.referralCodeApplied ? 'text-green-600' : 'text-red-500'">
+                <p v-if="uiState.referralCodeMessage" class="mt-2 text-xs font-medium" :class="uiState.referralCodeApplied ? 'text-green-600' : 'text-red-600'">
                     {{ uiState.referralCodeMessage }}
                 </p>
                 <p v-if="currentUser?.userData?.referredBy" class="text-sm text-green-600 font-medium">
@@ -7705,7 +7705,12 @@ const printBarcode = async () => {
             <div class="flex flex-col md:flex-row items-center justify-center gap-8">
                 <div class="bg-white p-8 rounded-2xl shadow-lg border w-full md:w-96 transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 animate-fade-in-up" style="animation-delay: 300ms;">
                     <h3 class="text-xl font-semibold text-slate-800">Paket Bulanan</h3>
-                    <p class="text-4xl font-bold my-4 text-slate-900">
+                    
+                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                        <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(monthlyPrice) }}</p>
+                        <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedMonthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span></p>
+                    </div>
+                    <p v-else class="text-4xl font-bold my-4 text-slate-900">
                         {{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span>
                     </p>
                     <ul class="text-left space-y-3 text-slate-600 mt-6">
@@ -7723,7 +7728,12 @@ const printBarcode = async () => {
                     <div class="absolute top-0 right-6 -mt-3 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Paling Hemat</div>
                     
                     <h3 class="text-xl font-semibold text-slate-800">Paket Tahunan</h3>
-                    <p class="text-4xl font-bold my-4 text-slate-900">
+                    
+                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                        <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(yearlyPrice) }}</p>
+                        <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedYearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span></p>
+                    </div>
+                    <p v-else class="text-4xl font-bold my-4 text-slate-900">
                         {{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span>
                     </p>
                     <ul class="text-left space-y-3 text-slate-600 mt-6">
