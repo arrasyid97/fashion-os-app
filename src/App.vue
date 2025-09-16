@@ -7671,6 +7671,26 @@ const printBarcode = async () => {
             </div>
         </div>
         
+        <div v-else-if="currentUser?.userData?.subscriptionStatus === 'trial' && new Date(currentUser.userData.trialEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
+            <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-blue-200 flex flex-col items-center">
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Masa Uji Coba Gratis Anda Aktif!</h2>
+                <p class="text-slate-600 mb-6 max-w-xl text-center">
+                    Nikmati semua fitur premium selama masa uji coba. Untuk melanjutkan setelahnya, silakan pilih paket langganan.
+                </p>
+                <div class="bg-blue-50 text-blue-800 px-6 py-4 rounded-lg w-full text-center border border-blue-200">
+                    <p class="text-lg font-semibold">Status: Uji Coba (Trial)</p>
+                    <p v-if="currentUser?.userData?.trialEndDate" class="text-sm mt-1">
+                        Berakhir pada: {{ new Date(currentUser.userData.trialEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        
         <div v-else class="max-w-5xl mx-auto text-center">
             <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800 animate-fade-in-up">
                 <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Mulai Langganan Anda</span>
@@ -7699,7 +7719,6 @@ const printBarcode = async () => {
             <div class="flex flex-col md:flex-row items-center justify-center gap-8">
                 <div class="bg-white p-8 rounded-2xl shadow-lg border w-full md:w-96 transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 animate-fade-in-up" style="animation-delay: 300ms;">
                     <h3 class="text-xl font-semibold text-slate-800">Paket Bulanan</h3>
-                    
                     <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(monthlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedMonthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span></p>
@@ -7720,9 +7739,7 @@ const printBarcode = async () => {
 
                 <div class="relative bg-white p-8 rounded-2xl shadow-2xl border-2 border-indigo-500 w-full md:w-96 transform hover:-translate-y-2 hover:shadow-indigo-200 transition-all duration-300 animate-fade-in-up" style="animation-delay: 400ms;">
                     <div class="absolute top-0 right-6 -mt-3 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Paling Hemat</div>
-                    
                     <h3 class="text-xl font-semibold text-slate-800">Paket Tahunan</h3>
-                    
                     <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(yearlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedYearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span></p>
