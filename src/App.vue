@@ -5462,222 +5462,222 @@ const printBarcode = async () => {
     <div v-else>
 
 <div v-if="activePage === 'dashboard'">
-    <div v-if="state.settings.dashboardPin && isDashboardLocked" class="flex items-center justify-center h-screen p-4">
-        <div class="bg-white rounded-xl shadow-lg p-8 max-w-sm w-full text-center">
-            <h3 class="text-xl font-bold text-slate-800 mb-4">Dasbor Terkunci</h3>
-            <p class="text-sm text-slate-600 mb-4">Masukkan PIN untuk melihat data dasbor.</p>
-            <form @submit.prevent="unlockDashboard">
-                <input type="password" v-model="dashboardPinInput" placeholder="Masukkan PIN" class="w-full p-2 border rounded-md text-center text-lg mb-2">
-                <p v-if="dashboardPinError" class="text-red-500 text-xs mb-2">{{ dashboardPinError }}</p>
-                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg">Buka Dasbor</button>
-            </form>
-        </div>
-    </div>
-    
-    <div v-else>
-        <div class="flex flex-wrap justify-between items-center mb-8 gap-4">
-            <div class="flex items-center gap-4">
-                <h2 class="text-3xl font-bold text-slate-800">Dashboard Analitik</h2>
-                <button @click="showModal('dashboardKpiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                    Informasi
-                </button>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 p-3 bg-white rounded-lg border shadow-sm">
-                <select v-model="uiState.dashboardDateFilter" class="w-full sm:w-auto bg-white border-slate-300 text-sm rounded-lg p-2.5 capitalize">
-                    <option value="today">hari ini</option>
-                    <option value="last_7_days">7 hari terakhir</option>
-                    <option value="last_30_days">30 hari terakhir</option>
-                    <option value="this_year">tahun ini</option>
-                    <option value="by_date_range">rentang tanggal</option>
-                    <option value="by_month_range">rentang bulan</option>
-                    <option value="by_year_range">rentang tahun</option>
-                    <option value="all_time">semua</option>
-                </select>
-                <div v-if="uiState.dashboardDateFilter === 'by_date_range'" class="flex items-center gap-2">
-                    <input type="date" v-model="uiState.dashboardStartDate" class="border-slate-300 text-sm rounded-lg p-2">
-                    <span>s/d</span>
-                    <input type="date" v-model="uiState.dashboardEndDate" class="border-slate-300 text-sm rounded-lg p-2">
-                </div>
-                <div v-if="uiState.dashboardDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
-                    <select v-model.number="uiState.dashboardStartMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                    <input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
-                    <span class="mx-2">s/d</span>
-                    <select v-model.number="uiState.dashboardEndMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                    <input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
-                </div>
-                <div v-if="uiState.dashboardDateFilter === 'by_year_range'" class="flex items-center gap-2">
-                    <input type="number" v-model.number="uiState.dashboardStartYear" placeholder="Dari Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
-                    <span>s/d</span>
-                    <input type="number" v-model.number="uiState.dashboardEndYear" placeholder="Sampai Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
-                </div>
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+
+        <div v-if="state.settings.dashboardPin && isDashboardLocked" class="flex items-center justify-center h-full animate-fade-in">
+            <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
+                 <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                 </div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">Dashboard Terkunci</h3>
+                <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan Anda untuk melihat data dashboard.</p>
+                <form @submit.prevent="unlockDashboard" class="w-full">
+                    <input type="password" v-model="dashboardPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2">
+                    <p v-if="dashboardPinError" class="text-red-500 text-xs mb-2">{{ dashboardPinError }}</p>
+                    <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka Dashboard</button>
+                </form>
             </div>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+        <div v-else class="max-w-7xl mx-auto">
+            <div class="flex flex-wrap justify-between items-center mb-8 gap-4 animate-fade-in-up">
+                <div class="flex items-center gap-4">
+                    <h2 class="text-3xl font-bold text-slate-800">Dashboard Analitik</h2>
+                    <button @click="showModal('dashboardKpiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                        Informasi
+                    </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 p-3 bg-white/70 backdrop-blur-sm rounded-lg border shadow-sm">
+                    <select v-model="uiState.dashboardDateFilter" class="w-full sm:w-auto bg-white border-slate-300 text-sm rounded-lg p-2.5 capitalize">
+                        <option value="today">hari ini</option>
+                        <option value="last_7_days">7 hari terakhir</option>
+                        <option value="last_30_days">30 hari terakhir</option>
+                        <option value="this_year">tahun ini</option>
+                        <option value="by_date_range">rentang tanggal</option>
+                        <option value="by_month_range">rentang bulan</option>
+                        <option value="by_year_range">rentang tahun</option>
+                        <option value="all_time">semua</option>
+                    </select>
+                    <div v-if="uiState.dashboardDateFilter === 'by_date_range'" class="flex items-center gap-2">
+                        <input type="date" v-model="uiState.dashboardStartDate" class="border-slate-300 text-sm rounded-lg p-2">
+                        <span>s/d</span>
+                        <input type="date" v-model="uiState.dashboardEndDate" class="border-slate-300 text-sm rounded-lg p-2">
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Saldo Kas Saat Ini</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
+                    <div v-if="uiState.dashboardDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
+                        <select v-model.number="uiState.dashboardStartMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                        <input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                        <span class="mx-2">s/d</span>
+                        <select v-model.number="uiState.dashboardEndMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                        <input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                    </div>
+                    <div v-if="uiState.dashboardDateFilter === 'by_year_range'" class="flex items-center gap-2">
+                        <input type="number" v-model.number="uiState.dashboardStartYear" placeholder="Dari Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
+                        <span>s/d</span>
+                        <input type="number" v-model.number="uiState.dashboardEndYear" placeholder="Sampai Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
                     </div>
                 </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="help-icon-button">?</button>
             </div>
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 100ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Saldo Kas Saat Ini</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
+                        </div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Omset Bersih</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-green-600">{{ formatCurrency(dashboardKpis.omsetBersih) }}</p>
-                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="help-icon-button">?</button>
                 </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['omset-bersih'])" class="help-icon-button">?</button>
-            </div>
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-emerald-100 text-emerald-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 200ms;">
+                     <div class="flex items-start gap-4">
+                        <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Omset Bersih</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-green-600">{{ formatCurrency(dashboardKpis.omsetBersih) }}</p>
+                        </div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Laba Kotor</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-emerald-600">{{ formatCurrency(dashboardKpis.labaKotor) }}</p>
-                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['omset-bersih'])" class="help-icon-button">?</button>
                 </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['laba-kotor'])" class="help-icon-button">?</button>
-            </div>
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 300ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-emerald-100 text-emerald-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Laba Kotor</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-emerald-600">{{ formatCurrency(dashboardKpis.labaKotor) }}</p>
+                        </div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Laba Bersih</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(dashboardKpis.labaBersihOperasional) }}</p>
-                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['laba-kotor'])" class="help-icon-button">?</button>
                 </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['laba-bersih-operasional'])" class="help-icon-button">?</button>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 400ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Laba Bersih</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(dashboardKpis.labaBersihOperasional) }}</p>
+                        </div>
+                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['laba-bersih-operasional'])" class="help-icon-button">?</button>
+                </div>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 500ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Omset Kotor</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.totalOmsetKotor) }}</p>
+                        </div>
+                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['omset-kotor'])" class="help-icon-button">?</button>
+                </div>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 600ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Diskon</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-red-600">-{{ formatCurrency(dashboardKpis.totalDiskon) }}</p>
+                        </div>
+                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['diskon'])" class="help-icon-button">?</button>
+                </div>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 700ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12H5m0 0l4-4m-4 4l4 4m6-10h4m0 0l-4-4m4 4l-4 4" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Total HPP Terjual</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">-{{ formatCurrency(dashboardKpis.totalHppTerjual) }}</p>
+                        </div>
+                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['hpp-terjual'])" class="help-icon-button">?</button>
+                </div>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 800ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-purple-100 text-purple-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-purple-600">-{{ formatCurrency(dashboardKpis.totalBiayaTransaksi) }}</p>
+                        </div>
+                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['biaya-transaksi'])" class="help-icon-button">?</button>
+                </div>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 900ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-orange-100 text-orange-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Biaya Operasional</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-orange-600">-{{ formatCurrency(dashboardKpis.totalBiayaOperasional) }}</p>
+                        </div>
+                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['biaya-operasional'])" class="help-icon-button">?</button>
+                </div>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 1000ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-cyan-100 text-cyan-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Total Unit Stok</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-cyan-600">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p>
+                        </div>
+                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['total-unit-stok'])" class="help-icon-button">?</button>
+                </div>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 1100ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-amber-100 text-amber-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Total Nilai Stok (HPP)</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-amber-600">{{ formatCurrency(dashboardKpis.totalNilaiStokHPP) }}</p>
+                        </div>
+                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['nilai-stok'])" class="help-icon-button">?</button>
+                </div>
+                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 1200ms;">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2" /></svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-500">Total Nilai Retur</h3>
+                            <p class="kpi-value text-2xl font-bold mt-1 text-red-600">-{{ formatCurrency(dashboardKpis.totalNilaiRetur) }}</p>
+                        </div>
+                    </div>
+                    <button @click="showModal('kpiHelp', kpiExplanations['nilai-retur'])" class="help-icon-button">?</button>
+                </div>
             </div>
-        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Omset Kotor</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.totalOmsetKotor) }}</p>
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                <div class="lg:col-span-3 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 1300ms;">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">Laba Kotor vs Biaya Operasional</h3>
+                    <div class="chart-container">
+                        <canvas id="profitExpenseChart"></canvas>
                     </div>
                 </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['omset-kotor'])" class="help-icon-button">?</button>
-            </div>
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div class="lg:col-span-2 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 1400ms;">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">Penjualan per Channel</h3>
+                    <div class="chart-container">
+                        <canvas id="salesChannelChart"></canvas>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Diskon</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-red-600">{{ formatCurrency(dashboardKpis.totalDiskon) }}</p>
-                    </div>
-                </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['diskon'])" class="help-icon-button">?</button>
-            </div>
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12H5m0 0l4-4m-4 4l4 4m6-10h4m0 0l-4-4m4 4l-4 4" /></svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Total HPP Terjual</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">{{ formatCurrency(dashboardKpis.totalHppTerjual) }}</p>
-                    </div>
-                </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['hpp-terjual'])" class="help-icon-button">?</button>
-            </div>
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-purple-100 text-purple-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi Marketplace</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-purple-600">{{ formatCurrency(dashboardKpis.totalBiayaTransaksi) }}</p>
-                    </div>
-                </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['biaya-transaksi'])" class="help-icon-button">?</button>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-orange-100 text-orange-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Biaya Operasional</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-orange-600">{{ formatCurrency(dashboardKpis.totalBiayaOperasional) }}</p>
-                    </div>
-                </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['biaya-operasional'])" class="help-icon-button">?</button>
-            </div>
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-cyan-100 text-cyan-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Total Unit Stok</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-cyan-600">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p>
-                    </div>
-                </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['total-unit-stok'])" class="help-icon-button">?</button>
-            </div>
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-amber-100 text-amber-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Total Nilai Stok (HPP)</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-amber-600">{{ formatCurrency(dashboardKpis.totalNilaiStokHPP) }}</p>
-                    </div>
-                </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['nilai-stok'])" class="help-icon-button">?</button>
-            </div>
-            <div class="kpi-card bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
-                <div class="flex items-start gap-4">
-                    <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2" /></svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-500">Total Nilai Retur</h3>
-                        <p class="kpi-value text-2xl font-bold mt-1 text-red-600">{{ formatCurrency(dashboardKpis.totalNilaiRetur) }}</p>
-                    </div>
-                </div>
-                <button @click="showModal('kpiHelp', kpiExplanations['nilai-retur'])" class="help-icon-button">?</button>
-            </div>
-        </div>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            <div class="lg:col-span-3 bg-white p-6 rounded-xl border">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4">Laba Kotor vs Biaya Operasional</h3>
-                <div class="chart-container">
-                    <canvas id="profitExpenseChart"></canvas>
-                </div>
-            </div>
-            <div class="lg:col-span-2 bg-white p-6 rounded-xl border">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4">Penjualan per Channel</h3>
-                <div class="chart-container">
-                    <canvas id="salesChannelChart"></canvas>
                 </div>
             </div>
         </div>
