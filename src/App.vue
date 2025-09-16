@@ -6969,124 +6969,132 @@ const printBarcode = async () => {
 </div>
 
 <div v-if="activePage === 'retur'">
-    <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <div class="flex items-center gap-4">
-            <h2 class="text-3xl font-bold text-slate-800">Manajemen Retur</h2>
-            <button @click="showModal('panduanRetur')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                Informasi
-            </button>
-        </div>
-        <button @click="showModal('addRetur', { tanggal: new Date().toISOString().split('T')[0], transactionIdSearch: '', foundTransaction: null, items: [] })" class="bg-orange-500 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-orange-600 shadow transition-colors">
-            Tambah Retur
-        </button>
-    </div>
-
-    <div class="mb-6 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-            <div class="relative">
-                <label for="retur-search" class="block text-sm font-medium text-slate-700 mb-1">Cari (ID Retur, SKU, Nama, Alasan)</label>
-                <input 
-                    v-model="uiState.returPageSearchQuery"
-                    @input="handleReturPageSearch"
-                    type="text" 
-                    id="retur-search" 
-                    placeholder="Ketik untuk mencari data retur..." 
-                    class="w-full p-2 border border-slate-300 rounded-md shadow-sm"
-                    autocomplete="off"
-                >
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
+            
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
                 
-                <div v-if="uiState.returPageSearchRecommendations.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    <div 
-                        v-for="(rec, index) in uiState.returPageSearchRecommendations" 
-                        :key="index" 
-                        @click="selectReturPageRecommendation(rec)" 
-                        class="p-2 px-3 hover:bg-slate-100 cursor-pointer text-sm"
-                    >
-                        {{ rec }}
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Retur</h2>
+                        <p class="text-slate-500 mt-1">Lacak dan kelola semua pengembalian produk dari pelanggan.</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                         <button @click="showModal('panduanRetur')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                            Informasi
+                        </button>
+                        <button @click="showModal('addRetur', { tanggal: new Date().toISOString().split('T')[0], transactionIdSearch: '', foundTransaction: null, items: [] })" class="bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 shadow transition-colors">
+                            + Tambah Retur
+                        </button>
                     </div>
                 </div>
-            </div>
-            <div>
-                <label for="retur-date-filter" class="block text-sm font-medium text-slate-700 mb-1">Filter Berdasarkan Tanggal</label>
-                <div class="flex items-center gap-2">
-                    <select v-model="uiState.returPageDateFilter" id="retur-date-filter" class="w-full p-2 border border-slate-300 rounded-md shadow-sm capitalize">
-                        <option value="today">hari ini</option>
-                        <option value="last_7_days">1 minggu terakhir</option>
-                        <option value="last_30_days">1 bulan terakhir</option>
-                        <option value="this_year">1 tahun terakhir</option>
-                        <option value="by_date_range">rentang tanggal</option>
-                        <option value="by_month_range">rentang bulan</option>
-                        <option value="by_year_range">rentang tahun</option>
-                        <option value="all_time">semua</option>
-                    </select>
-                    <button @click="exportReturToExcel" id="export-retur-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 h-10 flex-shrink-0">Export</button>
+
+                <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                    <div class="relative">
+                        <label for="retur-search" class="block text-sm font-medium text-slate-700 mb-1">Cari (ID Retur, SKU, Nama, Alasan)</label>
+                        <input 
+                            v-model="uiState.returPageSearchQuery"
+                            @input="handleReturPageSearch"
+                            type="text" 
+                            id="retur-search" 
+                            placeholder="Ketik untuk mencari data retur..." 
+                            class="w-full p-2 border border-slate-300 rounded-md shadow-sm"
+                            autocomplete="off"
+                        >
+                        <div v-if="uiState.returPageSearchRecommendations.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            <div 
+                                v-for="(rec, index) in uiState.returPageSearchRecommendations" 
+                                :key="index" 
+                                @click="selectReturPageRecommendation(rec)" 
+                                class="p-2 px-3 hover:bg-slate-100 cursor-pointer text-sm"
+                            >
+                                {{ rec }}
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="retur-date-filter" class="block text-sm font-medium text-slate-700 mb-1">Filter Berdasarkan Tanggal</label>
+                        <div class="flex items-center gap-2">
+                            <select v-model="uiState.returPageDateFilter" id="retur-date-filter" class="w-full p-2 border border-slate-300 rounded-md shadow-sm capitalize">
+                                <option value="today">hari ini</option>
+                                <option value="last_7_days">1 minggu terakhir</option>
+                                <option value="last_30_days">1 bulan terakhir</option>
+                                <option value="this_year">1 tahun terakhir</option>
+                                <option value="by_date_range">rentang tanggal</option>
+                                <option value="by_month_range">rentang bulan</option>
+                                <option value="by_year_range">rentang tahun</option>
+                                <option value="all_time">semua</option>
+                            </select>
+                            <button @click="exportReturToExcel" id="export-retur-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 h-10 flex-shrink-0">Export</button>
+                        </div>
+                        <div v-if="uiState.returPageDateFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
+                            <input type="date" v-model="uiState.returPageStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                            <span>s/d</span>
+                            <input type="date" v-model="uiState.returPageEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                        </div>
+                        <div v-if="uiState.returPageDateFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
+                            <select v-model.number="uiState.returPageStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                            <input type="number" v-model.number="uiState.returPageStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+                            <span class="mx-2">s/d</span>
+                            <select v-model.number="uiState.returPageEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                            <input type="number" v-model.number="uiState.returPageEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+                        </div>
+                        <div v-if="uiState.returPageDateFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
+                            <input type="number" v-model.number="uiState.returPageStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                            <span class="text-slate-500">s/d</span>
+                            <input type="number" v-model.number="uiState.returPageEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                        </div>
+                    </div>
                 </div>
-                <div v-if="uiState.returPageDateFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
-                    <input type="date" v-model="uiState.returPageStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                    <span>s/d</span>
-                    <input type="date" v-model="uiState.returPageEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                </div>
-                <div v-if="uiState.returPageDateFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
-                    <select v-model.number="uiState.returPageStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                    <input type="number" v-model.number="uiState.returPageStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-                    <span class="mx-2">s/d</span>
-                    <select v-model.number="uiState.returPageEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                    <input type="number" v-model.number="uiState.returPageEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-                </div>
-                <div v-if="uiState.returPageDateFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
-                    <input type="number" v-model.number="uiState.returPageStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-                    <span class="text-slate-500">s/d</span>
-                    <input type="number" v-model.number="uiState.returPageEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-500">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                            <tr>
+                                <th class="px-6 py-3">Tanggal</th>
+                                <th class="px-6 py-3">Asal Toko</th>
+                                <th class="px-6 py-3">Produk</th>
+                                <th class="px-6 py-3 text-center">Qty</th>
+                                <th class="px-6 py-3">Alasan</th>
+                                <th class="px-6 py-3">Tindak Lanjut</th>
+                                <th class="px-6 py-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200/50">
+                            <tr v-if="filteredRetur.length === 0">
+                                <td colspan="7" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
+                            </tr>
+                            <tr v-for="(item, index) in filteredRetur" :key="`${item.returnDocId}-${item.sku}-${index}`" class="hover:bg-slate-50/50">
+                                <td class="px-6 py-4 whitespace-nowrap">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
+                                <td class="px-6 py-4">{{ getMarketplaceById(item.channelId)?.name || 'N/A' }}</td>
+                                <td class="px-6 py-4">
+                                    <p class="font-semibold text-slate-800">{{ getProductBySku(item.sku)?.nama || 'Produk tidak ditemukan' }}</p>
+                                    <p class="font-mono text-xs text-slate-500">{{ item.sku }}</p>
+                                </td>
+                                <td class="px-6 py-4 font-medium text-center">{{ item.qty }}</td>
+                                <td class="px-6 py-4">{{ item.alasan }}</td>
+                                <td class="px-6 py-4">
+                                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                                          :class="{
+                                              'bg-yellow-100 text-yellow-800': item.tindakLanjut === 'Refund',
+                                              'bg-green-100 text-green-800': item.tindakLanjut === 'Ganti Baru',
+                                              'bg-blue-100 text-blue-800': item.tindakLanjut === 'Tukar Ukuran',
+                                              'bg-cyan-100 text-cyan-800': item.tindakLanjut === 'Tukar Warna',
+                                              'bg-purple-100 text-purple-800': item.tindakLanjut === 'Perbaiki',
+                                          }">
+                                        {{ item.tindakLanjut }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-center space-x-2">
+                                    <button @click="deleteReturnItem(item)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-        <table class="w-full text-sm text-left text-slate-500">
-            <thead class="text-xs text-slate-700 uppercase bg-slate-50">
-                <tr>
-                    <th class="px-6 py-3">Tanggal</th>
-                    <th class="px-6 py-3">Asal Toko</th>
-                    <th class="px-6 py-3">Produk</th>
-                    <th class="px-6 py-3 text-center">Qty</th>
-                    <th class="px-6 py-3">Alasan</th>
-                    <th class="px-6 py-3">Tindak Lanjut</th>
-                    <th class="px-6 py-3 text-center">Aksi</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-                <tr v-if="filteredRetur.length === 0">
-                    <td colspan="7" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
-                </tr>
-                <tr v-for="(item, index) in filteredRetur" :key="`${item.returnDocId}-${item.sku}-${index}`" class="hover:bg-slate-50">
-                    <td class="px-6 py-4 whitespace-nowrap">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
-                    <td class="px-6 py-4">{{ getMarketplaceById(item.channelId)?.name || 'N/A' }}</td>
-                    <td class="px-6 py-4">
-                        <p class="font-semibold">{{ getProductBySku(item.sku)?.nama || 'Produk tidak ditemukan' }}</p>
-                        <p class="font-mono text-xs text-slate-500">{{ item.sku }}</p>
-                    </td>
-                    <td class="px-6 py-4 font-medium text-center">{{ item.qty }}</td>
-                    <td class="px-6 py-4">{{ item.alasan }}</td>
-                    <td class="px-6 py-4">
-                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                                :class="{
-                                    'bg-blue-100 text-blue-800': item.tindakLanjut === 'Tukar Ukuran',
-                                    'bg-cyan-100 text-cyan-800': item.tindakLanjut === 'Tukar Warna',
-                                    'bg-green-100 text-green-800': item.tindakLanjut === 'Ganti Baru',
-                                    'bg-yellow-100 text-yellow-800': item.tindakLanjut === 'Refund',
-                                    'bg-purple-100 text-purple-800': item.tindakLanjut === 'Perbaiki',
-                                }">
-                            {{ item.tindakLanjut }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 text-center space-x-2">
-                        <button @click="deleteReturnItem(item)" class="text-xs text-red-500 hover:underline">Hapus</button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
     </div>
 </div>
 
