@@ -39,6 +39,245 @@ const commissionPayouts = ref([]);
 const commissions = ref([]);
 const activationCodes = ref([]);
 const newActivationCode = ref('');
+const state = reactive({
+    settings: { 
+        brandName: 'FASHION OS', 
+        minStok: 10,
+        marketplaces: [],
+        modelProduk: [],
+        categories: [],
+        inflowCategories: [ // <-- TAMBAHKAN INI
+          { id: 'INFLOW-1', name: 'Modal Masuk', description: 'Tambahan modal dari pemilik atau investor.' },
+          { id: 'INFLOW-2', name: 'Pendapatan Lain', description: 'Pendapatan di luar penjualan produk.' },
+        ],
+    },
+    produk: [],
+    transaksi: [],
+    keuangan: [],
+    retur: [
+    { id: 'RET-001', tanggal: '2025-07-21', sku: 'FSH-TSH-BL-M', qty: 1, alasan: 'Ukuran tidak sesuai', tindakLanjut: 'Tukar Ukuran', channelId: 'shopee-a' },
+    { id: 'RET-002', tanggal: '2025-07-22', sku: 'FSH-KJM-NV-L', qty: 1, alasan: 'Cacat produksi', tindakLanjut: 'Refund', channelId: 'tiktok-shop' },
+],
+    carts: {},
+    promotions: { perChannel: {}, perModel: {} },
+    commissions: { perModel: {} },
+    specialPrices: {},
+    produksi: [],    // --- START: KODE BARU UNTUK STOK KAIN ---
+    gudangKain: [],
+    investor: [],
+    bankAccounts: [],
+    // --- END: KODE BARU UNTUK STOK KAIN ---
+    transactionCounter: 0,
+    pinProtection: {
+            dashboard: true,
+            profitDetails: true,
+            incomeHistory: true,
+            investmentPage: true,
+        }
+});
+
+const uiState = reactive({
+    activeAccordion: null,
+    activeCartChannel: null,
+    analisisModelLimit: 10,
+    dashboardDateFilter: 'today',
+    dashboardStartDate: '',
+    dashboardEndDate: '',
+    dashboardStartMonth: new Date().getMonth() + 1,
+    dashboardEndMonth: new Date().getMonth() + 1,
+    dashboardStartYear: new Date().getFullYear(),
+    dashboardEndYear: new Date().getFullYear(),
+    gudangKainSearch: '',
+    gudangKainSort: 'tanggal-desc',
+    editProduksiBatch: {
+        produksiType: '',
+        namastatus: '',
+        kainBahan: []
+    },
+    hargaHppSelectedProduct: '',
+    inventoryFilterStock: 'all',
+    inventorySearch: '',
+    inventorySort: 'nama-asc',
+    isModalVisible: false,
+    keuanganPemasukanBulan: new Date().getMonth() + 1,
+    keuanganPemasukanEndDate: '',
+    keuanganPemasukanFilter: 'today',
+    keuanganPemasukanStartDate: '',
+    keuanganPemasukanTahun: new Date().getFullYear(),
+    keuanganPengeluaranBulan: new Date().getMonth() + 1,
+    keuanganPengeluaranEndDate: '',
+    keuanganPengeluaranFilter: 'today',
+    keuanganPengeluaranStartDate: '',
+    keuanganPengeluaranTahun: new Date().getFullYear(),
+    laporanData: { ringkasan: [], laporanPerStatus: [], statusTerpilih: '' },
+    laporanStatusSelected: 'all',
+    laporanSemuaFilter: 'this_month',
+    laporanSemuaStartDate: '',
+    laporanSemuaEndDate: '',
+    laporanSemuaBulan: new Date().getMonth() + 1,
+    laporanSemuaTahun: new Date().getFullYear(),
+    laporanSemuaStartMonth: new Date().getMonth() + 1,
+    laporanSemuaEndMonth: new Date().getMonth() + 1,
+    laporanSemuaStartYear: new Date().getFullYear(),
+    laporanSemuaEndYear: new Date().getFullYear(),
+    laporanSemuaCurrentPage: 1,
+    laporanSemuaItemsPerPage: 5,
+    analisisModelFilter: 'none',
+    analisisModelSelectedModel: '',
+    analisisModelSelectedType: 'aktualJadi',
+    produksiFilterType: 'all',
+    modalData: {},
+    modalType: '',
+    produksiWarnaRecommendations: [],
+    produksiUkuranRecommendations: [],
+    newProduksiBatch: {
+        tanggal: new Date().toISOString().split('T')[0],
+        produksiType: 'pemaklun', // Menambah properti ini
+        namastatus: '', // Menambah properti ini
+        statusProses: 'Dalam Proses',
+        kainBahan: [{
+            idUnik: '',
+            modelProdukId: '',
+            namaKain: '',
+            tokoKain: '',
+            warnaKain: '',
+            ukuran: '',
+            totalYard: null,
+            hargaKainPerYard: null,
+            yardPermodel: null,
+            aktualJadi: null,
+            aktualJadiLabelType: 'Aktual Jadi',
+            hargaMaklunPerPcs: null,
+            biayaAlat: null,
+            aktualJadiKombinasi: null,
+        }],
+        statusPembayaran: 'Belum Dibayar',
+        jumlahPembayaran: null,
+        tanggalPembayaran: '',
+        catatan: '',
+        orangMemproses: '',
+    },
+
+    exportFilter: 'all_time',
+    exportStartDate: '',
+    exportEndDate: '',
+    exportStartMonth: new Date().getMonth() + 1,
+    exportEndMonth: new Date().getMonth() + 1,
+    exportStartYear: new Date().getFullYear(),
+    exportEndYear: new Date().getFullYear(),
+    
+    pengaturanMarketplaceSearch: '',
+    pengaturanModelProdukSearch: '',
+    pos_scan_input: '', // Untuk input scan di halaman POS
+    pos_order_id: '',   // Untuk menyimpan ID pesanan yang di-scan   
+    posDateFilter: 'today',
+    posStartDate: '',
+    posEndDate: '',
+    posBulan: new Date().getMonth() + 1,
+    posTahun: new Date().getFullYear(),
+    posStartMonth: new Date().getMonth() + 1,
+    posEndMonth: new Date().getMonth() + 1,
+    posStartYear: new Date().getFullYear(),
+    posEndYear: new Date().getFullYear(),
+    posSearchQuery: '',
+    posSearchRecommendations: [],
+    specialPriceChannel: null,
+    specialPriceSearch: '',
+    specialPriceRecommendations: [],
+    selectedProductForSpecialPrice: null,
+    specialPriceInput: null,
+    produksiFilterStatus: 'all',
+    produksiSearch: '',
+    promosiSelectedModel: '',
+    returPageBulan: new Date().getMonth() + 1,
+    returPageDateFilter: 'all_time',
+    returPageEndDate: '',
+    returPageSearchQuery: '',
+    returPageSearchRecommendations: [],
+    returPageStartDate: '',
+    returPageTahun: new Date().getFullYear(),
+    returSearchQuery: '',
+    returSearchRecommendations: [],
+    ringkasanStatusSelected: 'Selesai',
+    selectedPlan: null,
+    oldPin: '',
+    newPin: '',
+    confirmNewPin: '',
+    pinError: '',
+
+    isPemasukanLocked: true,       // Status terkunci untuk tabel pemasukan
+    pemasukanPinInput: '',         // Untuk input PIN di halaman keuangan
+    pemasukanPinError: '',         // Pesan error jika PIN salah
+
+    isInvestasiLocked: true,     // Status terkunci untuk halaman investasi
+    investasiPinInput: '',       // Untuk input PIN di halaman investasi
+    investasiPinError: '',       // Pesan error jika PIN salah
+
+    referralCodeInput: '',
+    referralCodeApplied: false,
+    referralCodeMessage: '',
+
+    pengaturanTab: 'umum',
+    isKeuanganInfoVisible: false,
+    priceCalculator: {
+    hpp: null,
+    targetMargin: 0,
+    selectedMarketplace: null,
+    selectedModelName: null,
+    result: null,
+    paymentMethod: 'cash', 
+      selectedBankAccountId: null,
+      adminFee: 0
+},
+    allUsers: [],
+    selectedUserForExport: null,
+    isExportingUserData: false,
+    newActivationCode: '',
+    
+    stockInSearchRecommendations: [],
+    bulk_manual_input: '',       // Untuk kolom input manual
+    bulk_scan_input: '',         // Untuk kolom input scanner otomatis
+    bulk_recommendations: [],    // Rekomendasi untuk input manual
+    last_processed_orders: [],
+    bulk_order_queue: [],
+    is_processing_scan: false,   // Mencegah scan ganda
+    investorStatusFilter: 'aktif',
+    investorPaymentFilter: 'all_time',
+    investorPaymentStartMonth: new Date().getMonth() + 1,
+    investorPaymentEndMonth: new Date().getMonth() + 1,
+    investorPaymentStartYear: new Date().getFullYear(),
+    investorPaymentEndYear: new Date().getFullYear(),
+    investorPaymentSearch: '',
+
+    isPinConfirmModalVisible: false,
+    pinConfirmInput: '',
+    pinConfirmError: '',
+    pinActionToConfirm: null,
+    posChannelFilter: 'all',
+
+     laporanBagiHasil: {
+        
+        selectedInvestorId: null,
+        month: new Date().getMonth() + 1, // Default bulan ini
+        year: new Date().getFullYear(),   // Default tahun ini
+        result: null // Untuk menyimpan hasil kalkulasi
+    }
+
+});
+
+// State untuk pengaturan label yang dikirim ke printer
+const labelSettings = reactive({
+  width: 33,
+  height: 15,
+  columns: 3,
+  labelGap: 2,
+  paperType: 'gap', // 'gap', 'black-mark', 'continuous'
+  printSpeed: 2, // 1-5 ips (inches per second)
+  printDensity: 8, // 1-15 tingkat
+});
+
+const barcodeContent = ref('1234567890');
+const printCount = ref(1);
 
 const totalUnpaidCommission = computed(() => {
     return commissions.value.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + c.commissionAmount, 0);
@@ -591,42 +830,6 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
     }
 }
 
-const state = reactive({
-    settings: { 
-        brandName: 'FASHION OS', 
-        minStok: 10,
-        marketplaces: [],
-        modelProduk: [],
-        categories: [],
-        inflowCategories: [ // <-- TAMBAHKAN INI
-          { id: 'INFLOW-1', name: 'Modal Masuk', description: 'Tambahan modal dari pemilik atau investor.' },
-          { id: 'INFLOW-2', name: 'Pendapatan Lain', description: 'Pendapatan di luar penjualan produk.' },
-        ],
-    },
-    produk: [],
-    transaksi: [],
-    keuangan: [],
-    retur: [
-    { id: 'RET-001', tanggal: '2025-07-21', sku: 'FSH-TSH-BL-M', qty: 1, alasan: 'Ukuran tidak sesuai', tindakLanjut: 'Tukar Ukuran', channelId: 'shopee-a' },
-    { id: 'RET-002', tanggal: '2025-07-22', sku: 'FSH-KJM-NV-L', qty: 1, alasan: 'Cacat produksi', tindakLanjut: 'Refund', channelId: 'tiktok-shop' },
-],
-    carts: {},
-    promotions: { perChannel: {}, perModel: {} },
-    commissions: { perModel: {} },
-    specialPrices: {},
-    produksi: [],    // --- START: KODE BARU UNTUK STOK KAIN ---
-    gudangKain: [],
-    investor: [],
-    bankAccounts: [],
-    // --- END: KODE BARU UNTUK STOK KAIN ---
-    transactionCounter: 0,
-    pinProtection: {
-            dashboard: true,
-            profitDetails: true,
-            incomeHistory: true,
-            investmentPage: true,
-        }
-});
 
 const monthlyPrice = ref(350000);
 const yearlyPrice = ref(4200000);
@@ -1535,194 +1738,7 @@ async function submitStockAdjustment() {
     }
 }
 
-const uiState = reactive({
-    activeAccordion: null,
-    activeCartChannel: null,
-    analisisModelLimit: 10,
-    dashboardDateFilter: 'today',
-    dashboardStartDate: '',
-    dashboardEndDate: '',
-    dashboardStartMonth: new Date().getMonth() + 1,
-    dashboardEndMonth: new Date().getMonth() + 1,
-    dashboardStartYear: new Date().getFullYear(),
-    dashboardEndYear: new Date().getFullYear(),
-    gudangKainSearch: '',
-    gudangKainSort: 'tanggal-desc',
-    editProduksiBatch: {
-        produksiType: '',
-        namastatus: '',
-        kainBahan: []
-    },
-    hargaHppSelectedProduct: '',
-    inventoryFilterStock: 'all',
-    inventorySearch: '',
-    inventorySort: 'nama-asc',
-    isModalVisible: false,
-    keuanganPemasukanBulan: new Date().getMonth() + 1,
-    keuanganPemasukanEndDate: '',
-    keuanganPemasukanFilter: 'today',
-    keuanganPemasukanStartDate: '',
-    keuanganPemasukanTahun: new Date().getFullYear(),
-    keuanganPengeluaranBulan: new Date().getMonth() + 1,
-    keuanganPengeluaranEndDate: '',
-    keuanganPengeluaranFilter: 'today',
-    keuanganPengeluaranStartDate: '',
-    keuanganPengeluaranTahun: new Date().getFullYear(),
-    laporanData: { ringkasan: [], laporanPerStatus: [], statusTerpilih: '' },
-    laporanStatusSelected: 'all',
-    laporanSemuaFilter: 'this_month',
-    laporanSemuaStartDate: '',
-    laporanSemuaEndDate: '',
-    laporanSemuaBulan: new Date().getMonth() + 1,
-    laporanSemuaTahun: new Date().getFullYear(),
-    laporanSemuaStartMonth: new Date().getMonth() + 1,
-    laporanSemuaEndMonth: new Date().getMonth() + 1,
-    laporanSemuaStartYear: new Date().getFullYear(),
-    laporanSemuaEndYear: new Date().getFullYear(),
-    laporanSemuaCurrentPage: 1,
-    laporanSemuaItemsPerPage: 5,
-    analisisModelFilter: 'none',
-    analisisModelSelectedModel: '',
-    analisisModelSelectedType: 'aktualJadi',
-    produksiFilterType: 'all',
-    modalData: {},
-    modalType: '',
-    produksiWarnaRecommendations: [],
-    produksiUkuranRecommendations: [],
-    newProduksiBatch: {
-        tanggal: new Date().toISOString().split('T')[0],
-        produksiType: 'pemaklun', // Menambah properti ini
-        namastatus: '', // Menambah properti ini
-        statusProses: 'Dalam Proses',
-        kainBahan: [{
-            idUnik: '',
-            modelProdukId: '',
-            namaKain: '',
-            tokoKain: '',
-            warnaKain: '',
-            ukuran: '',
-            totalYard: null,
-            hargaKainPerYard: null,
-            yardPermodel: null,
-            aktualJadi: null,
-            aktualJadiLabelType: 'Aktual Jadi',
-            hargaMaklunPerPcs: null,
-            biayaAlat: null,
-            aktualJadiKombinasi: null,
-        }],
-        statusPembayaran: 'Belum Dibayar',
-        jumlahPembayaran: null,
-        tanggalPembayaran: '',
-        catatan: '',
-        orangMemproses: '',
-    },
 
-    exportFilter: 'all_time',
-    exportStartDate: '',
-    exportEndDate: '',
-    exportStartMonth: new Date().getMonth() + 1,
-    exportEndMonth: new Date().getMonth() + 1,
-    exportStartYear: new Date().getFullYear(),
-    exportEndYear: new Date().getFullYear(),
-    
-    pengaturanMarketplaceSearch: '',
-    pengaturanModelProdukSearch: '',
-    pos_scan_input: '', // Untuk input scan di halaman POS
-    pos_order_id: '',   // Untuk menyimpan ID pesanan yang di-scan   
-    posDateFilter: 'today',
-    posStartDate: '',
-    posEndDate: '',
-    posBulan: new Date().getMonth() + 1,
-    posTahun: new Date().getFullYear(),
-    posStartMonth: new Date().getMonth() + 1,
-    posEndMonth: new Date().getMonth() + 1,
-    posStartYear: new Date().getFullYear(),
-    posEndYear: new Date().getFullYear(),
-    posSearchQuery: '',
-    posSearchRecommendations: [],
-    specialPriceChannel: null,
-    specialPriceSearch: '',
-    specialPriceRecommendations: [],
-    selectedProductForSpecialPrice: null,
-    specialPriceInput: null,
-    produksiFilterStatus: 'all',
-    produksiSearch: '',
-    promosiSelectedModel: '',
-    returPageBulan: new Date().getMonth() + 1,
-    returPageDateFilter: 'all_time',
-    returPageEndDate: '',
-    returPageSearchQuery: '',
-    returPageSearchRecommendations: [],
-    returPageStartDate: '',
-    returPageTahun: new Date().getFullYear(),
-    returSearchQuery: '',
-    returSearchRecommendations: [],
-    ringkasanStatusSelected: 'Selesai',
-    selectedPlan: null,
-    oldPin: '',
-    newPin: '',
-    confirmNewPin: '',
-    pinError: '',
-
-    isPemasukanLocked: true,       // Status terkunci untuk tabel pemasukan
-    pemasukanPinInput: '',         // Untuk input PIN di halaman keuangan
-    pemasukanPinError: '',         // Pesan error jika PIN salah
-
-    isInvestasiLocked: true,     // Status terkunci untuk halaman investasi
-    investasiPinInput: '',       // Untuk input PIN di halaman investasi
-    investasiPinError: '',       // Pesan error jika PIN salah
-
-    referralCodeInput: '',
-    referralCodeApplied: false,
-    referralCodeMessage: '',
-
-    pengaturanTab: 'umum',
-    isKeuanganInfoVisible: false,
-    priceCalculator: {
-    hpp: null,
-    targetMargin: 0,
-    selectedMarketplace: null,
-    selectedModelName: null,
-    result: null,
-    paymentMethod: 'cash', 
-      selectedBankAccountId: null,
-      adminFee: 0
-},
-    allUsers: [],
-    selectedUserForExport: null,
-    isExportingUserData: false,
-    newActivationCode: '',
-    
-    stockInSearchRecommendations: [],
-    bulk_manual_input: '',       // Untuk kolom input manual
-    bulk_scan_input: '',         // Untuk kolom input scanner otomatis
-    bulk_recommendations: [],    // Rekomendasi untuk input manual
-    last_processed_orders: [],
-    bulk_order_queue: [],
-    is_processing_scan: false,   // Mencegah scan ganda
-    investorStatusFilter: 'aktif',
-    investorPaymentFilter: 'all_time',
-    investorPaymentStartMonth: new Date().getMonth() + 1,
-    investorPaymentEndMonth: new Date().getMonth() + 1,
-    investorPaymentStartYear: new Date().getFullYear(),
-    investorPaymentEndYear: new Date().getFullYear(),
-    investorPaymentSearch: '',
-
-    isPinConfirmModalVisible: false,
-    pinConfirmInput: '',
-    pinConfirmError: '',
-    pinActionToConfirm: null,
-    posChannelFilter: 'all',
-
-     laporanBagiHasil: {
-        
-        selectedInvestorId: null,
-        month: new Date().getMonth() + 1, // Default bulan ini
-        year: new Date().getFullYear(),   // Default tahun ini
-        result: null // Untuk menyimpan hasil kalkulasi
-    }
-
-});
 
 
 
@@ -5364,21 +5380,6 @@ watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
-
-
-// State untuk pengaturan label yang dikirim ke printer
-const labelSettings = reactive({
-  width: 33,
-  height: 15,
-  columns: 3,
-  labelGap: 2,
-  paperType: 'gap', // 'gap', 'black-mark', 'continuous'
-  printSpeed: 2, // 1-5 ips (inches per second)
-  printDensity: 8, // 1-15 tingkat
-});
-
-const barcodeContent = ref('1234567890');
-const printCount = ref(1);
 
 function printPreview() {
     window.print();
