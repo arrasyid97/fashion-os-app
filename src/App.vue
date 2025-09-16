@@ -37,6 +37,8 @@ const activationCodeInput = ref('');
 const activationCodeMessage = ref('');
 const commissionPayouts = ref([]);
 const commissions = ref([]);
+const activationCodes = ref([]);
+const newActivationCode = ref('');
 
 const totalUnpaidCommission = computed(() => {
     return commissions.value.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + c.commissionAmount, 0);
@@ -178,6 +180,55 @@ async function makeUserPartner(userId) {
     } catch (error) {
         console.error("Gagal menjadikan pengguna mitra:", error);
         alert("Gagal menjadikan pengguna mitra. Silakan coba lagi.");
+    }
+}
+
+async function fetchActivationCodes() {
+    if (!isAdmin.value) return;
+    try {
+        const codesCollection = collection(db, 'activation_codes');
+        const snapshot = await getDocs(codesCollection);
+        activationCodes.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            .sort((a, b) => (a.status === 'unused' ? -1 : 1) - (b.status === 'unused' ? -1 : 1)); // Urutkan yang 'unused' di atas
+    } catch (error) {
+        console.error("Gagal mengambil kode aktivasi:", error);
+    }
+}
+
+// Fungsi untuk membuat kode aktivasi baru
+async function createActivationCode() {
+    if (!isAdmin.value) return;
+    
+    let codeToCreate = newActivationCode.value.trim();
+    if (!codeToCreate) {
+        // Jika input kosong, buat kode acak
+        codeToCreate = `FOS-${Date.now().toString().slice(-6)}`;
+    }
+
+    try {
+        isSaving.value = true;
+        const codeRef = doc(db, "activation_codes", codeToCreate);
+        const codeDoc = await getDoc(codeRef);
+
+        if (codeDoc.exists()) {
+            throw new Error("Kode ini sudah ada. Silakan gunakan kode lain.");
+        }
+
+        await setDoc(codeRef, {
+            status: 'unused',
+            createdAt: new Date()
+        });
+        
+        // Tambahkan ke daftar lokal untuk update UI instan
+        activationCodes.value.unshift({ id: codeToCreate, status: 'unused', createdAt: new Date() });
+        newActivationCode.value = ''; // Kosongkan input
+        alert(`Kode aktivasi "${codeToCreate}" berhasil dibuat!`);
+
+    } catch (error) {
+        console.error("Gagal membuat kode aktivasi:", error);
+        alert(`Gagal: ${error.message}`);
+    } finally {
+        isSaving.value = false;
     }
 }
 
@@ -5075,6 +5126,7 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 
         // Selalu Update: Panggil data komisi setiap kali tab dibuka agar data selalu baru.
         fetchCommissionPayouts();
+        fetchActivationCodes();
     }
 });
 
@@ -7475,112 +7527,152 @@ const printBarcode = async () => {
                     </div>
 
                     <div v-if="uiState.pengaturanTab === 'admin' && isAdmin" class="animate-fade-in">
-                        <div class="space-y-6">
-                            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                                <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Akun Mitra</h3>
-                                <p class="text-sm text-slate-500 mb-4">
-                                    Pilih pengguna di bawah ini untuk menjadikannya mitra. Kode rujukan unik akan dibuat otomatis.
-                                </p>
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-sm">
-                                        <thead>
-                                            <tr class="text-left text-slate-500">
-                                                <th class="p-2 font-medium">Email Pengguna</th>
-                                                <th class="p-2 font-medium text-center">Status Mitra</th>
-                                                <th class="p-2 font-medium text-center">Kode Rujukan</th>
-                                                <th class="p-2 font-medium text-right">Aksi</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-slate-200">
-                                            <tr v-if="uiState.allUsers.length === 0">
-                                                <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada pengguna terdaftar.</td>
-                                            </tr>
-                                            <tr v-for="user in uiState.allUsers" :key="user.uid" class="hover:bg-slate-50">
-                                                <td class="p-3">{{ user.email }}</td>
-                                                <td class="p-3 text-center">
-                                                    <span v-if="user.isPartner" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">Ya</span>
-                                                    <span v-else class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800">Tidak</span>
-                                                </td>
-                                                <td class="p-3 text-center font-mono text-sm">
-                                                    {{ user.referralCode || '-' }}
-                                                </td>
-                                                <td class="p-3 text-right space-x-2">
-                                                    <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
-                                                        Jadikan Mitra
-                                                    </button>
-                                                    <div v-else class="inline-flex items-center gap-2">
-                                                        <button @click="showModal('editReferralCode', { user: user, newReferralCode: user.referralCode })" class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-md hover:bg-blue-200 text-xs">
-                                                            Edit
-                                                        </button>
-                                                        <button @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
-                                                            Lihat Kode
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                                <h3 class="text-lg font-semibold text-slate-800 mb-4">Export Data Pelanggan</h3>
-                                <p class="text-sm text-slate-500 mb-4">Pilih pelanggan dan rentang waktu untuk mengunduh semua data mereka.</p>
-                                <div class="space-y-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700">Pilih Pelanggan</label>
-                                        <select v-model="uiState.selectedUserForExport" class="mt-1 w-full p-2 border rounded-md">
-                                            <option :value="null" disabled>-- Daftar Pelanggan --</option>
-                                            <option v-for="user in uiState.allUsers" :key="user.uid" :value="user">
-                                                {{ user.email }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
-                                        <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
-                                            <option value="all_time">Semua</option>
-                                            <option value="last_30_days">1 Bulan Terakhir</option>
-                                            <option value="this_year">1 Tahun Terakhir</option>
-                                        </select>
-                                    </div>
-                                    <button @click="exportAllDataForUser(uiState.selectedUserForExport?.uid, uiState.selectedUserForExport?.email, uiState.exportFilter)" :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
-                                        <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
-                                        <span v-else>Export Data Pelanggan</span>
+    <div class="space-y-6">
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Akun Mitra</h3>
+            <p class="text-sm text-slate-500 mb-4">
+                Pilih pengguna di bawah ini untuk menjadikannya mitra. Kode rujukan unik akan dibuat otomatis.
+            </p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-slate-500">
+                            <th class="p-2 font-medium">Email Pengguna</th>
+                            <th class="p-2 font-medium text-center">Status Mitra</th>
+                            <th class="p-2 font-medium text-center">Kode Rujukan</th>
+                            <th class="p-2 font-medium text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        <tr v-if="uiState.allUsers.length === 0">
+                            <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada pengguna terdaftar.</td>
+                        </tr>
+                        <tr v-for="user in uiState.allUsers" :key="user.uid" class="hover:bg-slate-50">
+                            <td class="p-3">{{ user.email }}</td>
+                            <td class="p-3 text-center">
+                                <span v-if="user.isPartner" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">Ya</span>
+                                <span v-else class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800">Tidak</span>
+                            </td>
+                            <td class="p-3 text-center font-mono text-sm">
+                                {{ user.referralCode || '-' }}
+                            </td>
+                            <td class="p-3 text-right space-x-2">
+                                <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
+                                    Jadikan Mitra
+                                </button>
+                                <div v-else class="inline-flex items-center gap-2">
+                                    <button @click="showModal('editReferralCode', { user: user, newReferralCode: user.referralCode })" class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-md hover:bg-blue-200 text-xs">
+                                        Edit
+                                    </button>
+                                    <button @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
+                                        Lihat Kode
                                     </button>
                                 </div>
-                            </div>
-                            
-                            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                                <h3 class="text-lg font-semibold text-slate-800 mb-4">Riwayat Pengajuan Pencairan Komisi (Semua Mitra)</h3>
-                                <div class="overflow-x-auto max-h-96">
-                                    <table class="w-full text-sm">
-                                        <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
-                                            <tr>
-                                                <th class="p-3 font-medium">TANGGAL</th>
-                                                <th class="p-3 font-medium">DETAIL PENCAIRAN</th>
-                                                <th class="p-3 font-medium text-right">JUMLAH</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-slate-200">
-                                            <tr v-if="commissionPayouts.length === 0">
-                                                <td colspan="3" class="p-4 text-center text-slate-500">Belum ada riwayat pencairan.</td>
-                                            </tr>
-                                            <tr v-for="payout in commissionPayouts" :key="payout.id">
-                                                <td class="p-3 whitespace-nowrap">{{ new Date(payout.tanggal.seconds * 1000).toLocaleDateString('id-ID') }}</td>
-                                                <td class="p-3">
-                                                    <p class="font-semibold text-slate-700">{{ payout.catatan }}</p>
-                                                </td>
-                                                <td class="p-3 text-right font-bold text-green-600">
-                                                    {{ formatCurrency(payout.jumlah) }}
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                </div>
-                            </div>
-                        </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Export Data Pelanggan</h3>
+            <p class="text-sm text-slate-500 mb-4">Pilih pelanggan dan rentang waktu untuk mengunduh semua data mereka.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Pilih Pelanggan</label>
+                    <select v-model="uiState.selectedUserForExport" class="mt-1 w-full p-2 border rounded-md">
+                        <option :value="null" disabled>-- Daftar Pelanggan --</option>
+                        <option v-for="user in uiState.allUsers" :key="user.uid" :value="user">
+                            {{ user.email }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
+                    <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
+                        <option value="all_time">Semua</option>
+                        <option value="last_30_days">1 Bulan Terakhir</option>
+                        <option value="this_year">1 Tahun Terakhir</option>
+                    </select>
+                </div>
+                <button @click="exportAllDataForUser(uiState.selectedUserForExport?.uid, uiState.selectedUserForExport?.email, uiState.exportFilter)" :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
+                    <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
+                    <span v-else>Export Data Pelanggan</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Riwayat Pengajuan Pencairan Komisi (Semua Mitra)</h3>
+            <div class="overflow-x-auto max-h-96">
+                <table class="w-full text-sm">
+                    <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
+                        <tr>
+                            <th class="p-3 font-medium">TANGGAL</th>
+                            <th class="p-3 font-medium">DETAIL PENCAIRAN</th>
+                            <th class="p-3 font-medium text-right">JUMLAH</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        <tr v-if="commissionPayouts.length === 0">
+                            <td colspan="3" class="p-4 text-center text-slate-500">Belum ada riwayat pencairan.</td>
+                        </tr>
+                        <tr v-for="payout in commissionPayouts" :key="payout.id">
+                            <td class="p-3 whitespace-nowrap">{{ new Date(payout.tanggal.seconds * 1000).toLocaleDateString('id-ID') }}</td>
+                            <td class="p-3">
+                                <p class="font-semibold text-slate-700">{{ payout.catatan }}</p>
+                            </td>
+                            <td class="p-3 text-right font-bold text-green-600">
+                                {{ formatCurrency(payout.jumlah) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Kode Aktivasi</h3>
+            <p class="text-sm text-slate-500 mb-4">
+                Buat kode sekali pakai untuk pengguna yang membeli di luar aplikasi (misalnya Shopee).
+            </p>
+            <div class="flex gap-2 mb-6">
+                <input type="text" v-model="newActivationCode" placeholder="Ketik kode kustom (opsional)" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                <button @click="createActivationCode" :disabled="isSaving" class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">
+                     <span v-if="isSaving">...</span>
+                     <span v-else>Buat Kode</span>
+                </button>
+            </div>
+            <div class="overflow-x-auto max-h-96">
+                <table class="w-full text-sm">
+                    <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
+                        <tr>
+                            <th class="p-3 font-medium">KODE AKTIVASI</th>
+                            <th class="p-3 font-medium text-center">STATUS</th>
+                            <th class="p-3 font-medium">DIGUNAKAN OLEH</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        <tr v-if="activationCodes.length === 0">
+                            <td colspan="3" class="p-4 text-center text-slate-500">Belum ada kode aktivasi yang dibuat.</td>
+                        </tr>
+                        <tr v-for="code in activationCodes" :key="code.id">
+                            <td class="p-3 font-mono text-indigo-600">{{ code.id }}</td>
+                            <td class="p-3 text-center">
+                                 <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                                      :class="code.status === 'unused' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'">
+                                    {{ code.status }}
+                                </span>
+                            </td>
+                            <td class="p-3 text-slate-500">{{ code.usedByEmail || '-' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
                     </div>
                 </div>
             </div>
