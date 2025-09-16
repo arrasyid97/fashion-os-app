@@ -10,6 +10,7 @@ const firebaseConfig = {
   messagingSenderId: "498193441506",
   appId: "1:498193441506:web:4b6f4914f1fbda8bf9f4bb"
 };
+console.log("Firebase Config yang Digunakan oleh Aplikasi:", firebaseConfig);
 
 // Inisialisasi Firebase
 const app = initializeApp(firebaseConfig);
