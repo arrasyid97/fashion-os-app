@@ -5685,146 +5685,138 @@ const printBarcode = async () => {
 </div>
 
     <div v-if="activePage === 'transaksi'">
-    <div class="flex items-center gap-4">
-    <h2 class="text-3xl font-bold">Kasir (Point of Sale)</h2>
-    <button @click="showModal('panduanPOS')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-        Panduan
-    </button>
-</div>
-    <p class="text-slate-600 mb-6">Scan atau ketik produk (lalu Enter/klik), lalu scan atau ketik ID Resi (lalu Enter/klik tombol).</p>
-    
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2 space-y-8">
-            
-            <div class="bg-white p-4 rounded-xl border shadow-sm sticky top-4 z-20">
-                <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Cari di Sini</label>
-                <div class="relative flex items-center gap-2">
-                    <form @submit.prevent="handlePosSubmit" class="flex-grow">
-                        <input type="text" 
-                               v-model="uiState.pos_scan_input"
-                               @input="handlePosSearch"
-                               :disabled="!uiState.activeCartChannel || !!uiState.pos_order_id"
-                               :placeholder="uiState.activeCartChannel ? 'Scan/Ketik Produk atau Resi...' : 'Pilih channel dulu...'"
-                               :class="{'bg-slate-100 cursor-not-allowed': !!uiState.pos_order_id}"
-                               class="w-full p-4 text-lg border-2 border-slate-300 rounded-lg shadow-inner" 
-                               autocomplete="off">
-                        
-                        <div v-if="uiState.posSearchRecommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg z-10">
-                            <div v-for="p in uiState.posSearchRecommendations" :key="p.sku" @click="selectPosRecommendation(p)" class="p-3 hover:bg-slate-100 cursor-pointer border-b">
-                                <p class="font-semibold">{{ p.nama }} - {{ p.varian }}</p>
-                                <p class="text-xs text-slate-500">SKU: {{ p.sku }}</p>
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                
+                <div class="lg:col-span-2 space-y-8">
+                    <div class="animate-fade-in-up">
+                        <div class="flex items-center gap-4">
+                            <h2 class="text-3xl font-bold text-slate-800">Kasir (Point of Sale)</h2>
+                            <button @click="showModal('panduanPOS')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                                Panduan
+                            </button>
+                        </div>
+                        <p class="text-slate-500 mt-1">Scan atau ketik produk, lalu scan atau ketik ID Resi untuk menyelesaikan transaksi.</p>
+                    </div>
+
+                    <div class="bg-white/70 backdrop-blur-sm p-4 rounded-xl border shadow-lg animate-fade-in-up" style="animation-delay: 100ms;">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Cari di Sini</label>
+                        <div class="relative flex items-center gap-2">
+                            <form @submit.prevent="handlePosSubmit" class="flex-grow">
+                                <input type="text" v-model="uiState.pos_scan_input" @input="handlePosSearch" :disabled="!uiState.activeCartChannel || !!uiState.pos_order_id" :placeholder="uiState.activeCartChannel ? 'Scan/Ketik Produk atau Resi...' : 'Pilih channel dulu...'" :class="{'bg-slate-100 cursor-not-allowed': !!uiState.pos_order_id}" class="w-full p-4 text-lg border-2 border-slate-300 rounded-lg shadow-inner" autocomplete="off">
+                                <div v-if="uiState.posSearchRecommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg z-10">
+                                    <div v-for="p in uiState.posSearchRecommendations" :key="p.sku" @click="selectPosRecommendation(p)" class="p-3 hover:bg-slate-100 cursor-pointer border-b">
+                                        <p class="font-semibold">{{ p.nama }} - {{ p.varian }}</p>
+                                        <p class="text-xs text-slate-500">SKU: {{ p.sku }}</p>
+                                    </div>
+                                </div>
+                            </form>
+                            <button @click="handlePosSubmit" :disabled="activeCart.length === 0 || !uiState.pos_scan_input || !!uiState.pos_order_id" class="bg-indigo-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
+                                Jadikan ID Pesanan
+                            </button>
+                        </div>
+                        <div v-if="uiState.pos_order_id" class="mt-3 p-2 bg-green-50 text-green-800 rounded-md border border-green-200">
+                            <span class="text-sm font-semibold">ID Pesanan Tercatat:</span>
+                            <span class="font-mono ml-2">{{ uiState.pos_order_id }}</span>
+                            <span class="text-xs italic ml-2">(Keranjang terkunci)</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                            <h3 class="text-xl font-semibold text-slate-800">Riwayat Transaksi</h3>
+                            <div class="flex items-start gap-2">
+                                <select v-model="uiState.posDateFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                                    <option value="today">hari ini</option>
+                                    <option value="last_7_days">1 minggu terakhir</option>
+                                    <option value="all_time">semua</option>
+                                </select>
+                                <select v-model="uiState.posChannelFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                                    <option value="all">Semua Channel</option>
+                                    <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
+                                </select>
+                                <button @click="exportTransactionsToExcel" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px] flex-shrink-0">Export</button>
                             </div>
                         </div>
-                    </form>
+                        <div class="overflow-x-auto max-h-96">
+                            <table class="w-full text-sm text-left text-slate-500">
+                                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                                    <tr>
+                                        <th class="px-6 py-3">ID Pesanan</th>
+                                        <th class="px-6 py-3">Tanggal</th>
+                                        <th class="px-6 py-3">Channel</th>
+                                        <th class="px-6 py-3">Total</th>
+                                        <th class="px-6 py-3">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200/50">
+                                    <tr v-if="filteredTransaksi.length === 0">
+                                        <td colspan="5" class="text-center py-4">Belum ada transaksi pada periode ini.</td>
+                                    </tr>
+                                    <tr v-for="trx in filteredTransaksi" :key="trx.id" class="hover:bg-slate-50/50">
+                                        <td class="px-6 py-4 font-mono text-xs">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</td>
+                                        <td class="px-6 py-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
+                                        <td class="px-6 py-4">{{ trx.channel }}</td>
+                                        <td class="px-6 py-4 font-semibold">{{ formatCurrency(trx.total) }}</td>
+                                        <td class="px-6 py-4 space-x-3">
+                                            <button @click="showModal('transactionDetail', trx)" class="font-semibold text-indigo-600 hover:underline">Detail</button>
+                                            <button @click="deleteTransaction(trx.id)" class="font-semibold text-red-500 hover:underline">Hapus</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 lg:sticky lg:top-8 animate-fade-in-up" style="animation-delay: 300ms;">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Channel Penjualan</label>
+                        <select v-model="uiState.activeCartChannel" @change="uiState.pos_order_id = ''; state.carts[uiState.activeCartChannel] = []" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                            <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
+                        </select>
+                    </div>
+
+                    <div class="text-center mb-4 pb-4 border-b border-slate-200/80">
+                        <p class="font-semibold text-slate-700">{{ getMarketplaceById(uiState.activeCartChannel)?.name || 'Pilih Channel' }}</p>
+                        <h2 class="text-2xl font-bold text-slate-800">{{ state.settings.brandName }}</h2>
+                        <p class="text-sm text-slate-500">{{ new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}</p>
+                    </div>
+
+                    <h3 class="text-lg font-bold mb-2 text-slate-800">Keranjang</h3>
+                    <div class="mb-4 max-h-60 overflow-y-auto pr-2">
+                        <p v-if="activeCart.length === 0" class="text-center py-8 text-slate-500">Keranjang kosong</p>
+                        <div v-for="item in activeCart" :key="item.sku" class="flex justify-between items-center py-3 border-b border-slate-200/50 animate-fade-in">
+                            <div>
+                                <p class="font-medium text-sm">{{ item.nama }} ({{ item.varian }})</p>
+                                <p class="text-sm text-slate-500">{{ formatCurrency(item.hargaJualAktual) }} &times; {{item.qty}}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button @click="updateCartItemQty(item.sku, -1)" class="w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">-</button>
+                                <span class="font-bold w-6 text-center">{{ item.qty }}</span>
+                                <button @click="updateCartItemQty(item.sku, 1)" class="w-6 h-6 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center">+</button>
+                                <button @click="removeFromCart(item.sku)" class="ml-2 text-slate-400 hover:text-red-600 font-bold text-xl">&times;</button>
+                            </div>
+                        </div>
+                    </div>
                     
-                    <button @click="handlePosSubmit" 
-                            :disabled="activeCart.length === 0 || !uiState.pos_scan_input || !!uiState.pos_order_id" 
-                            class="bg-indigo-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
-                        Jadikan ID Pesanan
+                    <div class="border-t border-slate-200/80 pt-4 space-y-2 text-sm">
+                        <div class="flex justify-between"><span>Subtotal</span><span>{{ formatCurrency(cartSummary.subtotal) }}</span></div>
+                        <div v-if="cartSummary.discount.totalDiscount > 0" class="flex justify-between text-green-600">
+                            <span>{{ cartSummary.discount.description }}</span>
+                            <span>-{{ formatCurrency(cartSummary.discount.totalDiscount) }}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-lg pt-2 mt-2"><span>Total Akhir</span><span>{{ formatCurrency(cartSummary.finalTotal) }}</span></div>
+                        <div class="flex justify-between text-xs text-slate-500"><span>Jumlah Barang</span><span>{{ cartSummary.itemCount }}</span></div>
+                    </div>
+                    
+                    <button @click="confirmCompleteTransaction" :disabled="activeCart.length === 0" class="mt-6 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-slate-400 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">
+                        Selesaikan Transaksi
                     </button>
                 </div>
-                
-                <div v-if="uiState.pos_order_id" class="mt-3 p-2 bg-green-50 text-green-800 rounded-md border border-green-200">
-                    <span class="text-sm font-semibold">ID Pesanan Tercatat:</span>
-                    <span class="font-mono ml-2">{{ uiState.pos_order_id }}</span>
-                    <span class="text-xs italic ml-2">(Keranjang terkunci. Selesaikan transaksi untuk memulai yang baru)</span>
-                </div>
-            </div>
-
-            <div>
-                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-    <h3 class="text-xl font-semibold">Riwayat Transaksi</h3>
-    <div class="flex items-start gap-2">
-        <select v-model="uiState.posDateFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-            <option value="today">hari ini</option>
-            <option value="last_7_days">1 minggu terakhir</option>
-            <option value="last_30_days">1 bulan terakhir</option>
-            <option value="this_year">1 tahun terakhir</option>
-            <option value="by_date_range">rentang tanggal</option>
-            <option value="by_month_range">rentang bulan</option>
-            <option value="by_year_range">rentang tahun</option>
-            <option value="all_time">semua</option>
-        </select>
-        <select v-model="uiState.posChannelFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-            <option value="all">Semua Channel</option>
-            <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
-        </select>
-        <button @click="exportTransactionsToExcel" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px]">Export</button>
-    </div>
-</div>
-                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-h-96">
-                    <table class="w-full text-sm text-left text-slate-500">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
-                            <tr>
-                                <th class="px-6 py-3">ID Pesanan</th>
-                                <th class="px-6 py-3">Tanggal</th>
-                                <th class="px-6 py-3">Channel</th>
-                                <th class="px-6 py-3">Total</th>
-                                <th class="px-6 py-3">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="filteredTransaksi.length === 0">
-                                <td colspan="5" class="text-center py-4">Belum ada transaksi pada periode ini.</td>
-                            </tr>
-                            <tr v-for="trx in filteredTransaksi" :key="trx.id" class="border-b hover:bg-slate-50">
-                                <td class="px-6 py-4 font-mono text-xs">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</td>
-                                <td class="px-6 py-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
-                                <td class="px-6 py-4">{{ trx.channel }}</td>
-                                <td class="px-6 py-4 font-semibold">{{ formatCurrency(trx.total) }}</td>
-                                <td class="px-6 py-4 space-x-3">
-                                    <button @click="showModal('transactionDetail', trx)" class="font-semibold text-indigo-600 hover:underline">Detail</button>
-                                    <button @click="deleteTransaction(trx.id)" class="font-semibold text-red-500 hover:underline">Hapus</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="lg:col-span-1 space-y-6">
-             <div class="bg-white p-4 rounded-xl border">
-                <label class="block text-sm font-medium text-slate-600 mb-1">Pilih Channel Penjualan</label>
-                <select v-model="uiState.activeCartChannel" @change="uiState.pos_order_id = ''; state.carts[uiState.activeCartChannel] = []" class="w-full p-2 border rounded-md">
-                    <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
-                </select>
-            </div>
-            <div class="bg-white p-6 rounded-xl border sticky top-6">
-                <div class="text-center mb-4 pb-4 border-b">
-                    <p class="font-semibold text-slate-700">{{ getMarketplaceById(uiState.activeCartChannel)?.name || 'Pilih Channel' }}</p>
-                    <h2 class="text-2xl font-bold text-slate-800">{{ state.settings.brandName }}</h2>
-                    <p class="text-sm text-slate-500">{{ new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }}</p>
-                </div>
-                <h3 class="text-lg font-bold mb-2 text-slate-800">Keranjang</h3>
-                <div class="mb-4 max-h-60 overflow-y-auto pr-2">
-                    <p v-if="activeCart.length === 0" class="text-center py-8 text-slate-500">Keranjang kosong</p>
-                    <div v-for="item in activeCart" :key="item.sku" class="flex justify-between items-center py-3 border-b border-slate-100">
-                        <div>
-                            <p class="font-medium text-sm">{{ item.nama }} ({{ item.varian }})</p>
-                            <p class="text-sm text-slate-500">{{ formatCurrency(item.hargaJualAktual) }} &times; {{item.qty}}</p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button @click="updateCartItemQty(item.sku, -1)" class="w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">-</button>
-                            <span class="font-bold w-6 text-center">{{ item.qty }}</span>
-                            <button @click="updateCartItemQty(item.sku, 1)" class="w-6 h-6 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center">+</button>
-                            <button @click="removeFromCart(item.sku)" class="ml-2 text-slate-400 hover:text-red-600 font-bold text-xl">&times;</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="border-t border-slate-200 pt-4 space-y-2 text-sm">
-                    <div class="flex justify-between"><span>Subtotal</span><span>{{ formatCurrency(cartSummary.subtotal) }}</span></div>
-                    <div v-if="cartSummary.discount.totalDiscount > 0" class="flex justify-between text-green-600">
-                        <span>{{ cartSummary.discount.description }}</span>
-                        <span>-{{ formatCurrency(cartSummary.discount.totalDiscount) }}</span>
-                    </div>
-                    <div class="flex justify-between font-bold text-lg pt-2 mt-2"><span>Total Akhir</span><span>{{ formatCurrency(cartSummary.finalTotal) }}</span></div>
-                    <div class="flex justify-between text-xs text-slate-500"><span>Jumlah Barang</span><span>{{ cartSummary.itemCount }}</span></div>
-                </div>
-                <button @click="confirmCompleteTransaction" :disabled="activeCart.length === 0" class="mt-6 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-slate-400 hover:bg-indigo-700 transition-colors">
-                    Selesaikan Transaksi
-                </button>
             </div>
         </div>
     </div>
