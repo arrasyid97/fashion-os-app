@@ -7583,7 +7583,7 @@ const printBarcode = async () => {
                         <div>
                             <h4 class="font-semibold text-slate-800">Arsitektur Data Langsung</h4>
                             <p class="text-sm text-slate-600 mt-1">
-                                Aplikasi ini dirancang agar data operasional Anda (penjualan, produk, keuangan) dikirim **langsung dari browser Anda ke database**. Pengembang aplikasi **tidak memiliki server perantara** yang menyimpan atau melihat data sensitif Anda.
+                                Aplikasi ini dirancang agar data operasional Anda (penjualan, produk, keuangan) dikirim **langsung dari browser Anda ke database**.Untuk Pihak Pengembang aplikasi tidak memiliki server perantara yang menyimpan atau melihat data sensitif Anda.
                             </p>
                         </div>
                     </li>
