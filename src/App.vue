@@ -6199,93 +6199,104 @@ const printBarcode = async () => {
 </div>
 
 <div v-if="activePage === 'produksi'">
-    <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <div>
-            <h2 class="text-3xl font-bold">Manajemen Produksi</h2>
-            <p class="text-slate-600">Lacak semua batch produksi maklun.</p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-            <button @click="showModal('analisisModel')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">Analisis Model</button>
-            <button @click="showModal('ringkasanJadi')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">Ringkasan Jadi</button>
-            <button @click="showModal('laporanStatus')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">Laporan per Status</button>
-            <button @click="showModal('laporanSemuanya')" class="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700">Laporan Semuanya</button>
-            <button @click="showModal('addProduksi')" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 shadow">Buat Batch Produksi</button>
-        </div>
-    </div>
-    <div class="mb-6 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label for="produksi-search" class="block text-sm font-medium text-slate-700 mb-1">Cari (ID Batch / Nama Status)</label>
-                <input v-model="uiState.produksiSearch" type="text" id="produksi-search" placeholder="Ketik untuk mencari..." class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
-            </div>
-            <div>
-                <label for="produksi-filter-type" class="block text-sm font-medium text-slate-700 mb-1">Jenis Status</label>
-                <select v-model="uiState.produksiFilterType" id="produksi-filter-type" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
-                    <option value="all">Semua Jenis</option>
-                    <option value="pemaklun">Pemaklun</option>
-                    <option value="penjahit">Penjahit</option>
-                </select>
-            </div>
-            <div>
-                <label for="produksi-filter-status" class="block text-sm font-medium text-slate-700 mb-1">Filter Status Proses</label>
-                <select v-model="uiState.produksiFilterStatus" id="produksi-filter-status" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
-                    <option value="all">Semua Status</option>
-                    <option value="Dalam Proses">Dalam Proses</option>
-                    <option value="Selesai">Selesai</option>
-                    <option value="Revisi">Revisi</option>
-                    <option value="Ditunda">Ditunda</option>
-                </select>
-            </div>
-        </div>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <p v-if="filteredProduksiBatches.length === 0" class="md:col-span-2 lg:col-span-3 text-center py-12 text-slate-500">
-            Batch produksi tidak ditemukan.
-        </p>
-        <div v-for="batch in filteredProduksiBatches" :key="batch.id" class="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col">
-            <div class="p-5 flex-grow">
-                <div class="flex justify-between items-start">
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
+
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
+                
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
                     <div>
-                        <p class="font-bold text-lg text-slate-800">
-                            {{ batch.produksiType === 'penjahit' ? 'Penjahit' : 'Pemaklun' }}: {{ batch.namaStatus }}
-                        </p>
-                        <p class="text-sm font-mono text-slate-500">{{ batch.id }}</p>
+                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Produksi</h2>
+                        <p class="text-slate-500 mt-1">Lacak semua batch produksi, mulai dari bahan baku hingga produk jadi.</p>
                     </div>
-                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
-                          :class="{
-                            'bg-green-100 text-green-800': batch.statusProses === 'Selesai',
-                            'bg-blue-100 text-blue-800': batch.statusProses === 'Dalam Proses',
-                            'bg-yellow-100 text-yellow-800': batch.statusProses === 'Revisi',
-                            'bg-gray-100 text-gray-800': batch.statusProses === 'Ditunda',
-                          }">
-                        {{ batch.statusProses }}
-                    </span>
+                    <button @click="showModal('addProduksi')" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
+                        + Buat Batch Produksi
+                    </button>
                 </div>
-                <div class="mt-4 pt-4 border-t space-y-2 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-slate-500">Tgl. Produksi:</span>
-                        <span class="font-medium">{{ new Date(batch.tanggal).toLocaleDateString('id-ID') }}</span>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-slate-50/50 p-4 rounded-xl border">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Laporan & Analisis</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="showModal('analisisModel')" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Analisis Model</button>
+                            <button @click="showModal('ringkasanJadi')" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Ringkasan Jadi</button>
+                            <button @click="showModal('laporanStatus')" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Laporan per Status</button>
+                            <button @click="showModal('laporanSemuanya')" class="flex-1 text-sm bg-emerald-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-emerald-700">Laporan Semuanya</button>
+                        </div>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-500">Total Kuantitas Jadi:</span>
-                        <span class="font-medium">{{ batch.totalQty }} pcs</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-500">Total Biaya Material:</span>
-                        <span class="font-medium">{{ formatCurrency(batch.totalBiayaMaterial) }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-500">Total Biaya {{ batch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
-                        <span class="font-medium text-indigo-600">{{ formatCurrency(
-                            (batch.kainBahan || []).reduce((sum, item) => sum + (item.aktualJadi || 0) * (batch.produksiType === 'penjahit' ? (item.hargaJahitPerPcs || 0) : (item.hargaMaklunPerPcs || 0)), 0)
-                        ) }}</span>
+                    <div class="bg-slate-50/50 p-4 rounded-xl border">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Filter & Pencarian</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <input v-model="uiState.produksiSearch" type="text" placeholder="Cari..." class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                            <select v-model="uiState.produksiFilterType" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                                <option value="all">Semua Jenis</option>
+                                <option value="pemaklun">Pemaklun</option>
+                                <option value="penjahit">Penjahit</option>
+                            </select>
+                            <select v-model="uiState.produksiFilterStatus" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                                <option value="all">Semua Status</option>
+                                <option value="Dalam Proses">Dalam Proses</option>
+                                <option value="Selesai">Selesai</option>
+                                <option value="Revisi">Revisi</option>
+                                <option value="Ditunda">Ditunda</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="p-3 bg-slate-50 border-t rounded-b-xl flex gap-2">
-                <button @click="showModal('produksiDetail', batch)" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Detail</button>
-                <button @click="showModal('editProduksi', batch)" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Edit</button>
-                <button @click="deleteProduksiBatch(batch.id)" class="flex-1 text-sm bg-red-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-red-600">Hapus</button>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <p v-if="filteredProduksiBatches.length === 0" class="md:col-span-2 lg:col-span-3 text-center py-16 text-slate-500">
+                        Batch produksi tidak ditemukan.
+                    </p>
+                    <div v-for="(batch, index) in filteredProduksiBatches" :key="batch.id" 
+                         class="bg-white/80 border border-slate-200 rounded-2xl shadow-lg flex flex-col transform hover:-translate-y-1 transition-all duration-300 animate-fade-in-up"
+                         :style="{ animationDelay: `${index * 50}ms` }">
+                        <div class="p-5 flex-grow">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-bold text-lg text-slate-800">
+                                        {{ batch.produksiType === 'penjahit' ? 'Penjahit' : 'Pemaklun' }}: {{ batch.namaStatus }}
+                                    </p>
+                                    <p class="text-sm font-mono text-slate-500">{{ batch.id }}</p>
+                                </div>
+                                <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
+                                      :class="{
+                                        'bg-green-100 text-green-800': batch.statusProses === 'Selesai',
+                                        'bg-blue-100 text-blue-800': batch.statusProses === 'Dalam Proses',
+                                        'bg-yellow-100 text-yellow-800': batch.statusProses === 'Revisi',
+                                        'bg-gray-100 text-gray-800': batch.statusProses === 'Ditunda',
+                                      }">
+                                    {{ batch.statusProses }}
+                                </span>
+                            </div>
+                            <div class="mt-4 pt-4 border-t border-slate-200/80 space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Tgl. Produksi:</span>
+                                    <span class="font-medium">{{ new Date(batch.tanggal).toLocaleDateString('id-ID') }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Total Kuantitas Jadi:</span>
+                                    <span class="font-medium">{{ batch.totalQty || 0 }} pcs</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Total Biaya Material:</span>
+                                    <span class="font-medium">{{ formatCurrency(batch.totalBiayaMaterial) }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Total Biaya Jasa:</span>
+                                    <span class="font-medium text-indigo-600">{{ formatCurrency(
+                                        (batch.kainBahan || []).reduce((sum, item) => sum + (item.aktualJadi || 0) * (batch.produksiType === 'penjahit' ? (item.hargaJahitPerPcs || 0) : (item.hargaMaklunPerPcs || 0)), 0)
+                                    ) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-slate-50/50 border-t border-slate-200/80 rounded-b-2xl flex gap-2">
+                            <button @click="showModal('produksiDetail', batch)" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Detail</button>
+                            <button @click="showModal('editProduksi', batch)" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Edit</button>
+                            <button @click="deleteProduksiBatch(batch.id)" class="flex-1 text-sm bg-red-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-red-600">Hapus</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
