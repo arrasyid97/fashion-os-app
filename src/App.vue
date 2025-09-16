@@ -5353,9 +5353,10 @@ const printBarcode = async () => {
     <div class="h-16 flex items-center justify-center px-4 border-b border-gray-700/50">
         <h1 class="text-xl font-bold text-white tracking-wider">{{ state.settings.brandName }}</h1>
     </div>
-    <div class="p-4 text-center text-cyan-400 font-bold text-sm">
-    {{ currentTime }}
-</div>
+    <div class="p-4 text-center text-cyan-400 font-bold text-sm border-b border-gray-700/50">
+        {{ currentTime }}
+    </div>
+    
     <div class="flex-1 flex flex-col overflow-y-auto">
         <nav class="flex-1 px-2 py-4 space-y-1">
             <a href="#" @click.prevent="changePage('dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'dashboard' }">
@@ -5367,11 +5368,11 @@ const printBarcode = async () => {
                 Kasir (POS)
             </a>
             <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">
-    <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-    </svg>
-    Proses Massal
-</a>
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Proses Massal
+            </a>
             <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7s0 4 8 4 8-4 8-4"/></svg>
                 Inventaris
@@ -5401,23 +5402,23 @@ const printBarcode = async () => {
                 Manajemen Retur
             </a>
             <a href="#" @click.prevent="changePage('investasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'investasi' }">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M17 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM17 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM5 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM5 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM11 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM11 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2z"/>
-    </svg>
-    Investasi
-</a>
-<a href="#" @click.prevent="changePage('barcode-generator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'barcode-generator' }">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM17 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM5 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM5 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM11 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM11 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2z"/>
+                </svg>
+                Investasi
+            </a>
+            <a href="#" @click.prevent="changePage('barcode-generator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'barcode-generator' }">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m-4-12h8M7 16h10" />
                 </svg>
                 Cetak Barcode
             </a>
-<a v-if="currentUser.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-    </svg>
-    Dashboard Mitra
-</a>
+            <a v-if="currentUser.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Dashboard Mitra
+            </a>
             <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'pengaturan' }">
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.82 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.82 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.82-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.82-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 Pengaturan
@@ -10256,7 +10257,7 @@ const printBarcode = async () => {
   transform: scale(1.1);
 }
 
-/* Gaya Sidebar Baru yang Profesional */
+/* ▼▼▼ GAYA SIDEBAR BARU YANG PROFESIONAL ▼▼▼ */
 .sidebar-link {
     display: flex;
     align-items: center;
@@ -10278,6 +10279,7 @@ const printBarcode = async () => {
     font-weight: 600;
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
+/* ▲▲▲ AKHIR DARI GAYA SIDEBAR BARU ▲▲▲ */
 
 /* Style dasar untuk komponen lain */
 .chart-container {
@@ -10396,7 +10398,6 @@ const printBarcode = async () => {
     min-height: 10px;
 }
 
-/* ▼▼▼ KEYFRAMES DAN KELAS ANIMASI BARU DITAMBAHKAN DI SINI ▼▼▼ */
 @keyframes fade-in-up {
     from {
         opacity: 0;
