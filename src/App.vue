@@ -5287,62 +5287,63 @@ const printBarcode = async () => {
 </script>
 
 <template>
-    <div v-if="!currentUser && !isLoading" class="flex items-center justify-center h-screen bg-slate-100 p-4">
-    <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8 sm:p-12 space-y-8 animate-fade-in">
-        <div class="text-center">
-            <h2 class="text-4xl font-extrabold text-slate-800">Selamat Datang di</h2>
-            <p class="mt-2 text-2xl font-bold text-indigo-600">{{ state.settings.brandName }}</p>
+    <div v-if="!currentUser && !isLoading" class="relative min-h-screen flex items-center justify-center bg-slate-900 overflow-hidden">
+    
+    <video autoplay muted loop playsinline class="absolute inset-0 w-full h-full object-cover z-0 opacity-40">
+        <source src="/wallpaper.mp4" type="video/mp4">
+        Browser Anda tidak mendukung tag video.
+    </video>
+
+    <div class="relative z-10 p-8 sm:p-10 bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl w-full max-w-md text-center animate-fade-in-up">
+        <h2 class="text-3xl font-bold text-gray-800 mb-2">Selamat Datang di</h2>
+        <p class="text-indigo-600 text-xl font-semibold mb-8">{{ state.settings.brandName }}</p>
+
+        <button @click="signInWithGoogle" class="w-full flex items-center justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-3 px-4 rounded-xl shadow-sm transition-all duration-300 transform hover:scale-105 mb-6">
+            <img src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="Google logo" class="w-6 h-6 mr-3">
+            Login dengan Google
+        </button>
+
+        <div class="flex items-center my-6">
+            <hr class="flex-grow border-gray-300">
+            <span class="px-4 text-gray-500 text-sm">Atau</span>
+            <hr class="flex-grow border-gray-300">
         </div>
 
-        <div class="space-y-4">
-            <button type="button" @click="signInWithGoogle" class="w-full flex items-center justify-center py-3.5 px-4 rounded-xl shadow-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
-                <img src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="Google" class="w-6 h-6 mr-3">
-                Login dengan Google
-            </button>
-        </div>
-
-        <div class="relative py-4">
-            <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-slate-300"></div>
-            </div>
-            <div class="relative flex justify-center text-sm text-slate-500">
-                <span class="bg-white px-2">Atau</span>
-            </div>
-        </div>
-
-        <form @submit.prevent="activePage === 'login' ? handleLogin() : handleRegister()" class="space-y-6">
+        <form @submit.prevent="activePage === 'login' ? handleLogin() : handleRegister()" class="space-y-5">
             <div>
-                <label for="email" class="block text-sm font-medium text-slate-700">Alamat Email</label>
-                <input type="email" v-model="authForm.email" id="email" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                <label for="email" class="sr-only">Alamat Email</label>
+                <input type="email" id="email" v-model="authForm.email" placeholder="Alamat Email" required
+                       class="w-full p-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 text-gray-800 shadow-sm transition-all duration-200">
             </div>
             <div>
-                <label for="password" class="block text-sm font-medium text-slate-700 mt-4">Password</label>
-                <input type="password" v-model="authForm.password" id="password" required class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                <label for="password" class="sr-only">Password</label>
+                <input type="password" id="password" v-model="authForm.password" placeholder="Password" required
+                       class="w-full p-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 text-gray-800 shadow-sm transition-all duration-200">
             </div>
             
             <div v-if="activePage === 'register'">
-    <label for="activation-code" class="block text-sm font-medium text-slate-700 mt-4">Kode Aktivasi (Opsional)</label>
-    <input type="text" v-model="authForm.activationCode" id="activation-code" class="mt-1 block w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
-    <p class="mt-2 text-xs text-slate-500">Masukkan kode aktivasi untuk mendapatkan langganan premium.</p>
-</div>
-            <div v-if="authForm.error" class="p-3 mt-4 text-sm text-red-700 bg-red-100 rounded-md border border-red-300">
-                {{ authForm.error }}
+                <label for="activation-code" class="sr-only">Kode Aktivasi (Opsional)</label>
+                <input type="text" v-model="authForm.activationCode" id="activation-code" class="w-full p-3 border border-gray-300 rounded-xl" placeholder="Kode Aktivasi (Opsional)">
             </div>
-            <div id="recaptcha-container"></div>
-            
-            <div class="mt-6 space-y-3">
-                <button type="submit" class="w-full py-3.5 rounded-xl shadow-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 transition-colors">
-                    <span v-if="activePage === 'login'">Login</span>
-                    <span v-else>Daftar Akun Baru</span>
-                </button>
-                <p class="text-center text-sm text-slate-600">
-                    <button type="button" @click="changePage(activePage === 'login' ? 'register' : 'login')" class="text-indigo-600 hover:underline transition-colors">
-                        <span v-if="activePage === 'login'">Belum Punya Akun? Daftar</span>
-                        <span v-else>Sudah Punya Akun? Login</span>
-                    </button>
-                </p>
-            </div>
+
+            <p v-if="authForm.error" class="text-red-600 text-sm pt-1">{{ authForm.error }}</p>
+
+            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors duration-300 transform hover:scale-105 shadow-lg shadow-indigo-600/30">
+                <span v-if="activePage === 'login'">Login</span>
+                <span v-else>Daftar Akun Baru</span>
+            </button>
         </form>
+
+        <div class="mt-6 text-sm">
+            <p class="mt-3 text-gray-600">
+                <span v-if="activePage === 'login'">Belum Punya Akun?</span>
+                <span v-else>Sudah Punya Akun?</span>
+                <button @click.prevent="changePage(activePage === 'login' ? 'register' : 'login')" class="text-indigo-600 hover:text-indigo-800 font-semibold transition-colors duration-200">
+                    <span v-if="activePage === 'login'">Daftar Sekarang</span>
+                    <span v-else>Login</span>
+                </button>
+            </p>
+        </div>
     </div>
 </div>
         
@@ -10418,5 +10419,19 @@ const printBarcode = async () => {
 }
 .animate-fade-in {
     animation: fade-in 0.5s ease-in-out;
+}
+@keyframes fade-in-scale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+.animate-fade-in-scale {
+    animation: fade-in-scale 0.7s ease-out forwards;
+    opacity: 0; /* Mulai dari tidak terlihat */
 }
 </style>
