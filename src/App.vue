@@ -5355,11 +5355,6 @@ onMounted(() => {
     });
 });
 
-onMounted(() => {
-    updateTime(); // Perbarui waktu saat komponen dimuat
-    intervalId = setInterval(updateTime, 1000); // Perbarui setiap detik
-});
-
 onUnmounted(() => { // <-- PINDAHKAN KE SINI
     clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
 });
