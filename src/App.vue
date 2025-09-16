@@ -7574,24 +7574,28 @@ const printBarcode = async () => {
             </div>
 
             <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-slate-200 mb-8 animate-fade-in-up" style="animation-delay: 200ms;">
-                <h3 class="text-2xl font-bold text-slate-800 mb-6 text-center">Komitmen Kami Pada Data Anda</h3>
+                <h3 class="text-2xl font-bold text-slate-800 mb-6 text-center">Privasi & Keamanan Data Anda</h3>
                 <ul class="space-y-6">
+                    <li class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" /></svg>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-slate-800">Arsitektur Data Langsung</h4>
+                            <p class="text-sm text-slate-600 mt-1">
+                                Aplikasi ini dirancang agar data operasional Anda (penjualan, produk, keuangan) dikirim **langsung dari browser Anda ke database**. Pengembang aplikasi **tidak memiliki server perantara** yang menyimpan atau melihat data sensitif Anda.
+                            </p>
+                        </div>
+                    </li>
                     <li class="flex items-start gap-4">
                         <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                         </div>
                         <div>
-                            <h4 class="font-semibold text-slate-800">Arsitektur Tanpa Perantara</h4>
-                            <p class="text-sm text-slate-600 mt-1">Data Anda terkirim langsung dari browser Anda ke akun Firebase pribadi Anda. Kami, sebagai pengembang, tidak pernah melihat atau menyimpan data operasional bisnis Anda.</p>
-                        </div>
-                    </li>
-                    <li class="flex items-start gap-4">
-                        <div class="flex-shrink-0 w-12 h-12 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                        </div>
-                        <div>
-                            <h4 class="font-semibold text-slate-800">Kepemilikan Data Sepenuhnya</h4>
-                            <p class="text-sm text-slate-600 mt-1">Semua informasi tersimpan eksklusif dalam proyek Firebase yang Anda kelola sepenuhnya. Ini adalah brankas digital pribadi Anda di dalam ekosistem Google.</p>
+                            <h4 class="font-semibold text-slate-800">Kontrol Penuh di Tangan Anda</h4>
+                            <p class="text-sm text-slate-600 mt-1">
+                                Akun Anda terhubung ke database terpusat yang dikelola oleh kami, namun setiap data **selalu ditandai dengan ID unik milik Anda**. Sistem keamanan kami memastikan bahwa Anda hanya bisa mengakses data Anda sendiri, dan kami sebagai pengembang **tidak memiliki akses untuk melihat isi data pribadi setiap pengguna.**
+                            </p>
                         </div>
                     </li>
                     <li class="flex items-start gap-4">
@@ -7600,12 +7604,13 @@ const printBarcode = async () => {
                         </div>
                         <div>
                             <h4 class="font-semibold text-slate-800">Standar Keamanan Tinggi</h4>
-                            <p class="text-sm text-slate-600 mt-1">Setiap transmisi data dilindungi oleh enkripsi HTTPS/TLS, protokol keamanan canggih yang sama seperti yang digunakan oleh lembaga perbankan global.</p>
+                            <p class="text-sm text-slate-600 mt-1">
+                                Setiap transmisi data dilindungi oleh enkripsi HTTPS/TLS, protokol keamanan canggih yang sama seperti yang digunakan oleh lembaga perbankan global.
+                            </p>
                         </div>
                     </li>
                 </ul>
             </div>
-            
             <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 300ms;">
                  <h3 class="text-2xl font-bold text-slate-800 mb-6 text-center">Informasi Aplikasi</h3>
                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
