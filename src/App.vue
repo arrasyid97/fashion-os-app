@@ -5086,28 +5086,6 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
     }
 });
 
-watch([barcodeContent, () => labelSettings.width, () => labelSettings.height], () => {
-    // Perbaikan: Hanya jalankan kode ini jika sedang di halaman 'barcode-generator'
-    if (activePage.value === 'barcode-generator' && barcodeContent.value) {
-        nextTick(() => {
-            const canvas = document.getElementById('barcodeCanvas');
-            if (canvas) {
-                try { // Tambahkan try...catch untuk keamanan ekstra
-                    JsBarcode(canvas, barcodeContent.value, {
-                        format: "CODE128",
-                        displayValue: true,
-                        fontSize: 18,
-                        width: 2,
-                        height: 50,
-                    });
-                } catch (e) {
-                    console.error("JsBarcode error:", e);
-                }
-            }
-        });
-    }
-}, { immediate: true });
-
 watch(() => uiState.bulk_scan_input, async (newValue) => {
     const scannedValue = newValue.trim();
     if (!scannedValue || !uiState.activeCartChannel) {
@@ -5261,6 +5239,48 @@ async function loadAllDataFromFirebase() {
         isLoading.value = false;
     }
 }
+
+watch([barcodeContent, () => labelSettings.width, () => labelSettings.height], () => {
+
+    // Perbaikan: Hanya jalankan kode ini jika sedang di halaman 'barcode-generator'
+
+    if (activePage.value === 'barcode-generator' && barcodeContent.value) {
+
+        nextTick(() => {
+
+            const canvas = document.getElementById('barcodeCanvas');
+
+            if (canvas) {
+
+                try { // Tambahkan try...catch untuk keamanan ekstra
+
+                    JsBarcode(canvas, barcodeContent.value, {
+
+                        format: "CODE128",
+
+                        displayValue: true,
+
+                        fontSize: 18,
+
+                        width: 2,
+
+                        height: 50,
+
+                    });
+
+                } catch (e) {
+
+                    console.error("JsBarcode error:", e);
+
+                }
+
+            }
+
+        });
+
+    }
+
+}, { immediate: true });
 
 onMounted(() => {
     updateTime();
