@@ -1,5 +1,4 @@
 <script setup>
-/* global qz */
 import qz from 'qz-tray';
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
@@ -5384,8 +5383,6 @@ watch(activePage, (newPage) => {
 
 
 function connectToQZ() {
-  // Tidak perlu lagi memeriksa `window.qz`
-  // Karena kita sudah mengimpornya.
   if (qz.websocket.isActive()) {
     console.log("Koneksi QZ Tray sudah aktif.");
     return Promise.resolve(true);
@@ -5402,6 +5399,47 @@ function connectToQZ() {
         reject(err);
       });
   });
+}
+
+function generateZplCode() {
+  const barcode = barcodeContent.value || '1234567890';
+  const labelWidth = labelSettings.width;
+  const labelHeight = labelSettings.height;
+  const labelGap = labelSettings.labelGap;
+  const columns = labelSettings.columns;
+  const count = printCount.value;
+
+  const dotsPerMm = 8;
+  const labelWidthDots = labelWidth * dotsPerMm;
+  const labelHeightDots = labelHeight * dotsPerMm;
+  const labelGapDots = labelGap * dotsPerMm;
+
+  let zpl = `^XA
+^PW${labelWidthDots}
+^LL${labelHeightDots}
+^FX Set parameter printer
+^MMT
+^LH0,0
+^MN${labelSettings.paperType === 'gap' ? 'g' : 'n'}
+^LS0
+`;
+
+  let xPos = 0;
+  let yPos = 0;
+
+  for (let i = 0; i < count; i++) {
+    const currentColumn = i % columns;
+    const currentRow = Math.floor(i / columns);
+    
+    xPos = currentColumn * (labelWidthDots + labelGapDots);
+    yPos = currentRow * (labelHeightDots + labelGapDots);
+    
+    zpl += `^FO${xPos},${yPos}^BY3^BCN,100,Y,N,N^FD${barcode}^FS`;
+  }
+
+  zpl += `^XZ`;
+  
+  return zpl;
 }
 
 async function printLabels() {
@@ -5429,53 +5467,6 @@ async function printLabels() {
     console.error("Gagal mencetak:", error);
     alert("Gagal mencetak: " + error.message);
   }
-}
-
-function generateZplCode() {
-  const barcode = barcodeContent.value || '1234567890';
-  const labelWidth = labelSettings.width; // Lebar label dalam mm
-  const labelHeight = labelSettings.height; // Tinggi label dalam mm
-  const labelGap = labelSettings.labelGap; // Jarak antar label dalam mm
-  const columns = labelSettings.columns;
-  const count = printCount.value;
-
-  // Asumsi 8 dots per mm (dpi 203)
-  const dotsPerMm = 8;
-  const labelWidthDots = labelWidth * dotsPerMm;
-  const labelHeightDots = labelHeight * dotsPerMm;
-  const labelGapDots = labelGap * dotsPerMm;
-
-  let zpl = `^XA
-^PW${labelWidthDots}
-^LL${labelHeightDots}
-^FX Set parameter printer
-^MMT
-^LH0,0
-^MN${labelSettings.paperType === 'gap' ? 'g' : 'n'}
-^LS0
-`;
-
-  let xPos = 0;
-  let yPos = 0;
-
-  for (let i = 0; i < count; i++) {
-    // Menghitung posisi Y untuk setiap barcode di kolom
-    const currentColumn = i % columns;
-    const currentRow = Math.floor(i / columns);
-    
-    // Sesuaikan posisi X dan Y dengan ukuran label dan celah
-    xPos = currentColumn * (labelWidthDots + labelGapDots);
-    yPos = currentRow * (labelHeightDots + labelGapDots);
-    
-    zpl += `
-^FO${xPos},${yPos}^BY3^BCN,100,Y,N,N^FD${barcode}^FS
-`;
-  }
-
-  zpl += `^XZ
-`;
-  
-  return zpl;
 }
 
 
