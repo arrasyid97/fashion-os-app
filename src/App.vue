@@ -5257,24 +5257,57 @@ async function loadAllDataFromFirebase() {
     }
 }
 
-watch([barcodeContent, labelSettings], () => {
-    // Perbaikan: Hanya jalankan kode ini jika sedang di halaman 'barcode-generator'
+watch([barcodeContent, () => labelSettings.width, () => labelSettings.height, () => labelSettings.columns, () => printCount.value], () => {
     if (activePage.value === 'barcode-generator' && barcodeContent.value) {
         nextTick(() => {
-            const canvas = document.getElementById('barcodeCanvas');
-            if (canvas) {
-                try {
-                    JsBarcode(canvas, barcodeContent.value, {
-                        format: "CODE128",
-                        displayValue: true,
-                        fontSize: 18,
-                        width: 2,
-                        height: 50,
-                    });
-                } catch (e) {
-                    console.error("JsBarcode error:", e);
-                }
+            const previewArea = document.getElementById('barcode-preview-area');
+            if (!previewArea) return;
+
+            // Kosongkan area pratinjau
+            previewArea.innerHTML = '';
+
+            // Ambil nilai pengaturan dari state
+            const { width, height, columns, labelGap } = labelSettings;
+            const count = printCount.value;
+
+            // Buat container yang merepresentasikan satu lembar kertas
+            const sheet = document.createElement('div');
+            sheet.style.display = 'grid';
+            sheet.style.gridTemplateColumns = `repeat(${columns}, ${width}mm)`;
+            sheet.style.gap = `${labelGap}mm`;
+            sheet.style.padding = `1mm`; // Padding kecil agar tidak menempel di tepi
+            sheet.style.backgroundColor = 'white';
+            sheet.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)';
+
+            // Buat dan tambahkan setiap label barcode
+            for (let i = 0; i < count; i++) {
+                const labelBox = document.createElement('div');
+                labelBox.style.width = `${width}mm`;
+                labelBox.style.height = `${height}mm`;
+                labelBox.style.display = 'flex';
+                labelBox.style.alignItems = 'center';
+                labelBox.style.justifyContent = 'center';
+                labelBox.style.overflow = 'hidden';
+                labelBox.style.border = '1px dashed #e2e8f0';
+                labelBox.style.boxSizing = 'border-box';
+
+                const canvas = document.createElement('canvas');
+                canvas.id = `barcodeCanvas-${i}`;
+                labelBox.appendChild(canvas);
+
+                sheet.appendChild(labelBox);
+
+                JsBarcode(canvas, barcodeContent.value, {
+                    format: "CODE128",
+                    displayValue: true,
+                    fontSize: 12,
+                    width: 1.5,
+                    height: 30,
+                });
             }
+
+            // Masukkan lembar kertas ke area pratinjau
+            previewArea.appendChild(sheet);
         });
     }
 }, { immediate: true });
