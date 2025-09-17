@@ -279,6 +279,45 @@ const labelSettings = reactive({
 const barcodeContent = ref('1234567890');
 const printCount = ref(1);
 
+function generateZplCode() {
+  const labelWidthInDots = Math.round(labelSettings.width / 25.4 * 203);
+  const labelHeightInDots = Math.round(labelSettings.height / 25.4 * 203);
+
+  let zpl = `^XA`;
+  zpl += `^PW${labelWidthInDots}`;
+  zpl += `^LL${labelHeightInDots}`;
+
+  for (let i = 0; i < printCount.value; i++) {
+    const barcodeX = 5;
+    const barcodeY = 5;
+
+    zpl += `^FO${barcodeX},${barcodeY}^BY2`;
+    zpl += `^BCN,50,Y,N,N`;
+    zpl += `^FD${barcodeContent.value}^FS`;
+
+    const textY = barcodeY + 60;
+    zpl += `^FO${barcodeX},${textY}^A0N,20,20^FD${barcodeContent.value}^FS`;
+
+    zpl += `^XZ`;
+
+    if (i < printCount.value - 1) {
+      zpl += `^XA`;
+      zpl += `^PW${labelWidthInDots}`;
+      zpl += `^LL${labelHeightInDots}`;
+    }
+  }
+
+  return zpl;
+}
+
+function printViaRawBT() {
+  const zplData = generateZplCode();
+  const encodedZpl = encodeURIComponent(zplData);
+  const intentUrl = `intent:#Intent;action=ru.a402d.rawbtprinter.action.PRINT;S.ru.a402d.rawbtprinter.extra.DATA=${encodedZpl};S.ru.a402d.rawbtprinter.extra.FORMAT=TEXT;end`;
+
+  window.location.href = intentUrl;
+}
+
 const totalUnpaidCommission = computed(() => {
     return commissions.value.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + c.commissionAmount, 0);
 });
@@ -5257,45 +5296,25 @@ async function loadAllDataFromFirebase() {
 }
 
 watch([barcodeContent, () => labelSettings.width, () => labelSettings.height], () => {
-
-    // Perbaikan: Hanya jalankan kode ini jika sedang di halaman 'barcode-generator'
-
-    if (activePage.value === 'barcode-generator' && barcodeContent.value) {
-
-        nextTick(() => {
-
-            const canvas = document.getElementById('barcodeCanvas');
-
-            if (canvas) {
-
-                try { // Tambahkan try...catch untuk keamanan ekstra
-
-                    JsBarcode(canvas, barcodeContent.value, {
-
-                        format: "CODE128",
-
-                        displayValue: true,
-
-                        fontSize: 18,
-
-                        width: 2,
-
-                        height: 50,
-
-                    });
-
-                } catch (e) {
-
-                    console.error("JsBarcode error:", e);
-
-                }
-
-            }
-
-        });
-
-    }
-
+  // Pastikan kode ini hanya berjalan di halaman cetak barcode
+  if (activePage.value === 'barcode-generator' && barcodeContent.value) {
+    nextTick(() => {
+      const canvas = document.getElementById('barcodeCanvas');
+      if (canvas) {
+        try {
+          JsBarcode(canvas, barcodeContent.value, {
+            format: "CODE128",
+            displayValue: true,
+            fontSize: 18,
+            width: 2,
+            height: 50,
+          });
+        } catch (e) {
+          console.error("JsBarcode error:", e);
+        }
+      }
+    });
+  }
 }, { immediate: true });
 
 onMounted(() => {
@@ -5380,47 +5399,6 @@ watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
-function generateZplCode() {
-    const labelWidthInDots = Math.round(labelSettings.width / 25.4 * 203); // Asumsi 203 DPI
-    const labelHeightInDots = Math.round(labelSettings.height / 25.4 * 203);
-
-    let zpl = `^XA`; // Memulai format ZPL
-    zpl += `^PW${labelWidthInDots}`; // Lebar cetak
-    zpl += `^LL${labelHeightInDots}`; // Panjang label
-
-    // Looping untuk mencetak beberapa label
-    for (let i = 0; i < printCount.value; i++) {
-        const barcodeX = 5; // Posisi X barcode dari tepi kiri
-        const barcodeY = 5; // Posisi Y barcode dari tepi atas
-
-        zpl += `^FO${barcodeX},${barcodeY}^BY2`; // Posisi dan ukuran barcode
-        zpl += `^BCN,50,Y,N,N`; // Tipe barcode (Code 128), tinggi, dll.
-        zpl += `^FD${barcodeContent.value}^FS`; // Data barcode
-
-        // Tambahkan teks di bawah barcode
-        const textY = barcodeY + 60; // Posisikan teks di bawah barcode
-        zpl += `^FO${barcodeX},${textY}^A0N,20,20^FD${barcodeContent.value}^FS`;
-
-        zpl += `^XZ`; // Mengakhiri format ZPL
-
-        // Jika ada lebih dari satu label, tambahkan perintah untuk label baru
-        if (i < printCount.value - 1) {
-            zpl += `^XA`;
-            zpl += `^PW${labelWidthInDots}`;
-            zpl += `^LL${labelHeightInDots}`;
-        }
-    }
-
-    return zpl;
-}
-
-function printViaRawBT() {
-    const zplData = generateZplCode();
-    const encodedZpl = encodeURIComponent(zplData);
-    const intentUrl = `intent:#Intent;action=ru.a402d.rawbtprinter.action.PRINT;S.ru.a402d.rawbtprinter.extra.DATA=${encodedZpl};S.ru.a402d.rawbtprinter.extra.FORMAT=TEXT;end`;
-
-    window.location.href = intentUrl;
-}
 
 </script>
 
@@ -7036,8 +7014,8 @@ function printViaRawBT() {
                         </div>
 
                         <button @click="printViaRawBT" :disabled="!barcodeContent || printCount < 1"
-    class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
-    Cetak ke Printer (via RawBT)
+  class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
+  Cetak ke Printer (via RawBT)
 </button>
                     </div>
                 </div>
