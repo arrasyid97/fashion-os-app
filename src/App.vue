@@ -5383,40 +5383,47 @@ function connectToQZ() {
 
 function generateZplCode() {
   const barcode = barcodeContent.value || '1234567890';
+  const count = printCount.value || 1;
+  
+  // Ambil semua pengaturan label secara langsung
   const labelWidth = labelSettings.width;
   const labelHeight = labelSettings.height;
-  const labelGap = labelSettings.labelGap;
-  const columns = labelSettings.columns;
-  const count = printCount.value;
+  const columns = labelSettings.columns || 1;
+  const labelGap = labelSettings.labelGap || 0;
 
+  // Konversi dari mm ke dots (asumsi 203 dpi = 8 dots/mm)
   const dotsPerMm = 8;
   const labelWidthDots = labelWidth * dotsPerMm;
   const labelHeightDots = labelHeight * dotsPerMm;
-  const labelGapDots = labelGap * dotsPerMm;
-
+  const totalWidthDots = (labelWidthDots * columns) + (labelGap * dotsPerMm * (columns - 1));
+  
+  // Perintah ZPL untuk memulai cetak
   let zpl = `^XA
-^PW${labelWidthDots}
+^PW${totalWidthDots}
 ^LL${labelHeightDots}
-^FX Set parameter printer
-^MMT
-^LH0,0
+^FX Set media type to label with a gap. This is crucial for printer calibration.
 ^MN${labelSettings.paperType === 'gap' ? 'g' : 'n'}
-^LS0
+^MTT
+^LH0,0
 `;
 
+  // Hitung posisi untuk setiap barcode
   let xPos = 0;
   let yPos = 0;
 
   for (let i = 0; i < count; i++) {
+    // Menghitung posisi X dan Y berdasarkan kolom dan baris
     const currentColumn = i % columns;
     const currentRow = Math.floor(i / columns);
     
-    xPos = currentColumn * (labelWidthDots + labelGapDots);
-    yPos = currentRow * (labelHeightDots + labelGapDots);
+    xPos = currentColumn * (labelWidthDots + (labelGap * dotsPerMm));
+    yPos = currentRow * (labelHeightDots + (labelGap * dotsPerMm));
     
-    zpl += `^FO${xPos},${yPos}^BY3^BCN,100,Y,N,N^FD${barcode}^FS`;
+    // Tambahkan perintah barcode ke string ZPL
+    zpl += `^FO${xPos},${yPos}^BY3^BCN,100,Y,N,N^FD${barcode}^FS\n`;
   }
 
+  // Perintah ZPL untuk mengakhiri cetak
   zpl += `^XZ`;
   
   return zpl;
