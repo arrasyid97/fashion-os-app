@@ -5382,7 +5382,47 @@ watch(activePage, (newPage) => {
 
 
 function printPreview() {
-    window.print();
+    const printWindow = window.open('', '_blank');
+    const content = document.getElementById('barcode-preview-area').innerHTML;
+    
+    // HTML yang akan dicetak
+    const htmlContent = `
+        <html>
+            <head>
+                <title>Cetak Barcode</title>
+                <style>
+                    body { margin: 0; padding: 0; }
+                    .print-container {
+                        display: grid;
+                        grid-template-columns: repeat(${labelSettings.columns}, 1fr);
+                        gap: ${labelSettings.labelGap}mm;
+                        padding: 10mm;
+                    }
+                    .label-box {
+                        width: ${labelSettings.width}mm;
+                        height: ${labelSettings.height}mm;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        border: none; /* Hilangkan border pada saat cetak */
+                        box-sizing: border-box;
+                        overflow: hidden;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-container">
+                    ${Array(printCount.value).fill(content).join('')}
+                </div>
+            </body>
+        </html>
+    `;
+    
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.print();
 }
 
 </script>
@@ -7006,13 +7046,13 @@ function printPreview() {
                 </div>
 
                 <div class="lg:col-span-2">
-                     <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">2. Review Barcode</h3>
-                        <div id="barcode-preview-area" class="p-4 rounded-lg bg-slate-200 flex items-center justify-center min-h-[300px]">
-                            <canvas id="barcodeCanvas"></canvas>
-                        </div>
-                    </div>
-                    </div>
+    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">2. Review Barcode</h3>
+        <div id="barcode-preview-area" class="p-4 rounded-lg bg-slate-200 flex items-center justify-center min-h-[300px]">
+            <canvas id="barcodeCanvas"></canvas>
+        </div>
+    </div>
+</div>
             </div>
         </div>
     </div>
@@ -10553,26 +10593,4 @@ function printPreview() {
     opacity: 0; /* Mulai dari tidak terlihat */
 }
 
-/* KODE PERBAIKAN UNTUK CETAK BARCODE DIMULAI DI SINI */
-@media print {
-    body * {
-        visibility: hidden;
-    }
-    #barcode-preview-area, #barcode-preview-area * {
-        visibility: visible;
-    }
-    #barcode-preview-area {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: auto;
-        padding: 1cm;
-        box-shadow: none;
-        background: white;
-    }
-    .no-print {
-        display: none !important;
-    }
-}
 </style>
