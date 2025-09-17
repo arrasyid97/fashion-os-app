@@ -10374,30 +10374,27 @@ function printPreview() {
 
 <style scoped>
 .help-icon-button {
-  position: absolute;
-  top: 0.5rem; /* 8px */
-  right: 0.5rem; /* 8px */
-  width: 1.25rem; /* 20px */
-  height: 1.25rem; /* 20px */
-  border-radius: 9999px; /* rounded-full */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f1f5f9; /* slate-100 */
-  color: #64748b; /* slate-500 */
-  font-weight: bold;
-  font-size: 0.875rem; /* text-sm */
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
+    position: absolute;
+    top: 0.5rem; /* 8px */
+    right: 0.5rem; /* 8px */
+    width: 1.25rem; /* 20px */
+    height: 1.25rem; /* 20px */
+    border-radius: 9999px; /* rounded-full */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f1f5f9; /* slate-100 */
+    color: #64748b; /* slate-500 */
+    font-weight: bold;
+    font-size: 0.875rem; /* text-sm */
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
 }
-
 .help-icon-button:hover {
-  background-color: #6366f1; /* indigo-500 */
-  color: white;
-  transform: scale(1.1);
+    background-color: #6366f1; /* indigo-500 */
+    color: white;
+    transform: scale(1.1);
 }
-
-/* ▼▼▼ GAYA SIDEBAR BARU YANG PROFESIONAL ▼▼▼ */
 .sidebar-link {
     display: flex;
     align-items: center;
@@ -10407,37 +10404,29 @@ function printPreview() {
     color: #9ca3af; /* gray-400 */
     transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
 }
-
 .sidebar-link:hover {
     background-color: #374151; /* gray-700 */
     color: #ffffff;
 }
-
 .sidebar-link-active {
     background-image: linear-gradient(to right, #4f46e5, #6d28d9); /* gradasi indigo -> violet */
     color: #ffffff;
     font-weight: 600;
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
-/* ▲▲▲ AKHIR DARI GAYA SIDEBAR BARU ▲▲▲ */
-
-/* Style dasar untuk komponen lain */
 .chart-container {
     position: relative;
     width: 100%;
     height: 320px;
 }
-
 .kpi-card {
     transition: transform 0.2s, box-shadow 0.2s;
     border-color: #e2e8f0;
 }
-
 .kpi-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
-
 .stock-badge {
     display: inline-block;
     padding: 0.2rem 0.6rem;
@@ -10446,23 +10435,18 @@ function printPreview() {
     font-size: 0.8rem;
     line-height: 1;
 }
-
 .stock-safe {
     background-color: #dcfce7; /* green-100 */
     color: #166534; /* green-800 */
 }
-
 .stock-low {
     background-color: #fef3c7; /* yellow-100 */
     color: #92400e; /* yellow-800 */
 }
-
 .stock-empty {
     background-color: #fee2e2; /* red-100 */
     color: #991b1b; /* red-800 */
 }
-
-
 .accordion-content {
     max-height: 0;
     overflow: hidden;
@@ -10471,8 +10455,6 @@ function printPreview() {
 .accordion-content.open {
     max-height: 1000px; /* Cukup besar untuk menampung konten */
 }
-
-/* Styling untuk konten di dalam v-html */
 .panduan-content ul {
     list-style-position: outside;
     padding-left: 1.5rem;
@@ -10480,7 +10462,6 @@ function printPreview() {
 .panduan-content li {
     margin-bottom: 0.5rem;
 }
-
 .barcode-page-grid {
     display: grid;
     grid-template-columns: 400px 1fr;
@@ -10505,7 +10486,6 @@ function printPreview() {
     justify-content: center;
     align-items: flex-start;
 }
-
 .preview-sheet {
     background: white;
     display: grid;
@@ -10537,7 +10517,6 @@ function printPreview() {
     width: 100%;
     min-height: 10px;
 }
-
 @keyframes fade-in-up {
     from {
         opacity: 0;
@@ -10573,45 +10552,27 @@ function printPreview() {
     animation: fade-in-scale 0.7s ease-out forwards;
     opacity: 0; /* Mulai dari tidak terlihat */
 }
+
+/* KODE PERBAIKAN UNTUK CETAK BARCODE DIMULAI DI SINI */
 @media print {
-    body {
-        background: none !important;
+    body * {
+        visibility: hidden;
     }
-    #main-content > div:not([id='barcode-page']) {
-        display: none !important;
-    }
-    #barcode-page, #barcode-page * {
-        visibility: visible !important;
-        display: block !important;
-    }
-    .min-h-screen.w-full {
-        padding: 0 !important;
-        background: white !important;
-    }
-    .lg\:col-span-1 {
-        display: none !important;
-    }
-    .lg\:col-span-2 {
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-    .bg-white\/70, .shadow-xl, .border {
-        background: none !important;
-        box-shadow: none !important;
-        border: none !important;
+    #barcode-preview-area, #barcode-preview-area * {
+        visibility: visible;
     }
     #barcode-preview-area {
-        min-height: auto !important;
-        background: none !important;
-        padding: 0 !important;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+        padding: 1cm;
+        box-shadow: none;
+        background: white;
     }
-    .animate-fade-in-up, .mb-8 {
-        animation: none !important;
-        margin: 0 !important;
+    .no-print {
+        display: none !important;
     }
 }
 </style>
