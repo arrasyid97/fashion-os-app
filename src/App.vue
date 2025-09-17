@@ -5405,32 +5405,47 @@ function connectToQZ() {
 
 function generateZplCode() {
   const barcode = barcodeContent.value || '1234567890';
-  const labelWidth = labelSettings.width * 8; // Konversi mm ke dots (asumsi 203 dpi)
-  const labelHeight = labelSettings.height * 8;
-  const gap = labelSettings.labelGap * 8;
+  const labelWidth = labelSettings.width; // Lebar label dalam mm
+  const labelHeight = labelSettings.height; // Tinggi label dalam mm
+  const labelGap = labelSettings.labelGap; // Jarak antar label dalam mm
   const columns = labelSettings.columns;
   const count = printCount.value;
 
-  // Kode ZPL ini adalah contoh sederhana, Anda bisa memodifikasinya
+  // Asumsi 8 dots per mm (dpi 203)
+  const dotsPerMm = 8;
+  const labelWidthDots = labelWidth * dotsPerMm;
+  const labelHeightDots = labelHeight * dotsPerMm;
+  const labelGapDots = labelGap * dotsPerMm;
+
   let zpl = `^XA
-^PW${labelWidth}
-^LL${labelHeight}
-^MNN
-^PON
+^PW${labelWidthDots}
+^LL${labelHeightDots}
+^FX Set parameter printer
+^MMT
 ^LH0,0
-^MN${labelSettings.paperType === 'gap' ? 'G' : 'D'}
+^MN${labelSettings.paperType === 'gap' ? 'g' : 'n'}
+^LS0
 `;
+
+  let xPos = 0;
+  let yPos = 0;
 
   for (let i = 0; i < count; i++) {
-    // Offset untuk barcode agar terlihat di tengah label
-    const barcodeX = (labelWidth - 200) / 2; // Asumsi lebar barcode 200 dots
-    const barcodeY = (labelHeight - 100) / 2; // Asumsi tinggi barcode 100 dots
-
+    // Menghitung posisi Y untuk setiap barcode di kolom
+    const currentColumn = i % columns;
+    const currentRow = Math.floor(i / columns);
+    
+    // Sesuaikan posisi X dan Y dengan ukuran label dan celah
+    xPos = currentColumn * (labelWidthDots + labelGapDots);
+    yPos = currentRow * (labelHeightDots + labelGapDots);
+    
     zpl += `
-^FO${barcodeX},${barcodeY}^BY3^BCN,100,Y,N,N^FD${barcode}^FS
-^XZ
+^FO${xPos},${yPos}^BY3^BCN,100,Y,N,N^FD${barcode}^FS
 `;
   }
+
+  zpl += `^XZ
+`;
   
   return zpl;
 }
