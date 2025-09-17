@@ -5257,25 +5257,26 @@ async function loadAllDataFromFirebase() {
     }
 }
 
-watch([barcodeContent, () => labelSettings.width, () => labelSettings.height, () => labelSettings.columns, () => printCount.value], () => {
+watch([barcodeContent, labelSettings], () => {
+    // Hanya jalankan kode ini jika sedang di halaman 'barcode-generator' dan ada teks barcode
     if (activePage.value === 'barcode-generator' && barcodeContent.value) {
         nextTick(() => {
             const previewArea = document.getElementById('barcode-preview-area');
             if (!previewArea) return;
 
-            // Kosongkan area pratinjau
+            // Kosongkan area pratinjau untuk menggambar ulang
             previewArea.innerHTML = '';
-
-            // Ambil nilai pengaturan dari state
+            
             const { width, height, columns, labelGap } = labelSettings;
             const count = printCount.value;
 
-            // Buat container yang merepresentasikan satu lembar kertas
+            // Container utama yang akan memuat semua label
             const sheet = document.createElement('div');
             sheet.style.display = 'grid';
             sheet.style.gridTemplateColumns = `repeat(${columns}, ${width}mm)`;
             sheet.style.gap = `${labelGap}mm`;
-            sheet.style.padding = `1mm`; // Padding kecil agar tidak menempel di tepi
+            sheet.style.padding = `10mm`; // Menambahkan padding di sekeliling
+            sheet.style.width = `calc(${width * columns}mm + ${labelGap * (columns - 1)}mm + 20mm)`;
             sheet.style.backgroundColor = 'white';
             sheet.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)';
 
@@ -5297,6 +5298,7 @@ watch([barcodeContent, () => labelSettings.width, () => labelSettings.height, ()
 
                 sheet.appendChild(labelBox);
 
+                // Menggambar barcode ke setiap kanvas
                 JsBarcode(canvas, barcodeContent.value, {
                     format: "CODE128",
                     displayValue: true,
@@ -5415,51 +5417,48 @@ function connectToQZ() {
 }
 
 function generateZplCode() {
-  const barcode = barcodeContent.value || '1234567890';
-  const count = printCount.value || 1;
-  
-  // Ambil semua pengaturan label secara langsung
-  const labelWidth = labelSettings.width;
-  const labelHeight = labelSettings.height;
-  const columns = labelSettings.columns || 1;
-  const labelGap = labelSettings.labelGap || 0;
+    const barcode = barcodeContent.value || '1234567890';
+    const count = printCount.value || 1;
+    
+    // Ambil semua pengaturan label secara dinamis
+    const { width, height, columns, labelGap, printDensity, paperType } = labelSettings;
 
-  // Konversi dari mm ke dots (asumsi 203 dpi = 8 dots/mm)
-  const dotsPerMm = 8;
-  const labelWidthDots = labelWidth * dotsPerMm;
-  const labelHeightDots = labelHeight * dotsPerMm;
-  const totalWidthDots = (labelWidthDots * columns) + (labelGap * dotsPerMm * (columns - 1));
-  
-  // Perintah ZPL untuk memulai cetak
-  let zpl = `^XA
+    // Konversi dari mm ke dots (asumsi 203 dpi = 8 dots/mm)
+    const dotsPerMm = 8;
+    const labelWidthDots = width * dotsPerMm;
+    const labelHeightDots = height * dotsPerMm;
+    const totalWidthDots = (labelWidthDots * columns) + (labelGap * dotsPerMm * (columns - 1));
+    const labelGapDots = labelGap * dotsPerMm;
+    
+    // Perintah ZPL untuk memulai cetak
+    let zpl = `^XA
 ^PW${totalWidthDots}
 ^LL${labelHeightDots}
-^FX Set media type to label with a gap. This is crucial for printer calibration.
-^MN${labelSettings.paperType === 'gap' ? 'g' : 'n'}
-^MTT
+^FX Mengatur jenis media dan kepadatan cetak sesuai input pengguna
+^MN${paperType === 'gap' ? 'g' : 'n'}
+^MD${printDensity}
 ^LH0,0
 `;
-
-  // Hitung posisi untuk setiap barcode
-  let xPos = 0;
-  let yPos = 0;
-
-  for (let i = 0; i < count; i++) {
-    // Menghitung posisi X dan Y berdasarkan kolom dan baris
-    const currentColumn = i % columns;
-    const currentRow = Math.floor(i / columns);
     
-    xPos = currentColumn * (labelWidthDots + (labelGap * dotsPerMm));
-    yPos = currentRow * (labelHeightDots + (labelGap * dotsPerMm));
+    // Hitung posisi untuk setiap barcode
+    let xPos = 0;
+    let yPos = 0;
     
-    // Tambahkan perintah barcode ke string ZPL
-    zpl += `^FO${xPos},${yPos}^BY3^BCN,100,Y,N,N^FD${barcode}^FS\n`;
-  }
+    for (let i = 0; i < count; i++) {
+        const currentColumn = i % columns;
+        const currentRow = Math.floor(i / columns);
+        
+        xPos = currentColumn * (labelWidthDots + labelGapDots);
+        yPos = currentRow * (labelHeightDots + labelGapDots);
+        
+        // Tambahkan perintah barcode ke string ZPL
+        zpl += `^FO${xPos},${yPos}^BY3^BCN,100,Y,N,N^FD${barcode}^FS\n`;
+    }
 
-  // Perintah ZPL untuk mengakhiri cetak
-  zpl += `^XZ`;
-  
-  return zpl;
+    // Perintah ZPL untuk mengakhiri cetak
+    zpl += `^XZ`;
+    
+    return zpl;
 }
 
 let selectedPrinterName = null;
