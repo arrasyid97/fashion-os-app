@@ -5274,8 +5274,8 @@ watch([barcodeContent, labelSettings], () => {
             const sheet = document.createElement('div');
             sheet.style.display = 'grid';
             sheet.style.gridTemplateColumns = `repeat(${columns}, ${width}mm)`;
-            sheet.style.gap = `${labelGap}mm`;
-            sheet.style.padding = `10mm`; // Menambahkan padding di sekeliling
+            sheet.style.gap = `${labelGap}mm`; // Ini yang akan memvisualisasikan jarak label
+            sheet.style.padding = `10mm`;
             sheet.style.width = `calc(${width * columns}mm + ${labelGap * (columns - 1)}mm + 20mm)`;
             sheet.style.backgroundColor = 'white';
             sheet.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)';
@@ -5312,7 +5312,7 @@ watch([barcodeContent, labelSettings], () => {
             previewArea.appendChild(sheet);
         });
     }
-}, { immediate: true });
+}, { immediate: true, deep: true });
 
 onMounted(() => {
     updateTime();
@@ -5420,17 +5420,14 @@ function generateZplCode() {
     const barcode = barcodeContent.value || '1234567890';
     const count = printCount.value || 1;
     
-    // Ambil semua pengaturan label secara dinamis
     const { width, height, columns, labelGap, printDensity, paperType } = labelSettings;
 
-    // Konversi dari mm ke dots (asumsi 203 dpi = 8 dots/mm)
     const dotsPerMm = 8;
     const labelWidthDots = width * dotsPerMm;
     const labelHeightDots = height * dotsPerMm;
     const totalWidthDots = (labelWidthDots * columns) + (labelGap * dotsPerMm * (columns - 1));
     const labelGapDots = labelGap * dotsPerMm;
     
-    // Perintah ZPL untuk memulai cetak
     let zpl = `^XA
 ^PW${totalWidthDots}
 ^LL${labelHeightDots}
@@ -5440,7 +5437,6 @@ function generateZplCode() {
 ^LH0,0
 `;
     
-    // Hitung posisi untuk setiap barcode
     let xPos = 0;
     let yPos = 0;
     
@@ -5451,11 +5447,9 @@ function generateZplCode() {
         xPos = currentColumn * (labelWidthDots + labelGapDots);
         yPos = currentRow * (labelHeightDots + labelGapDots);
         
-        // Tambahkan perintah barcode ke string ZPL
         zpl += `^FO${xPos},${yPos}^BY3^BCN,100,Y,N,N^FD${barcode}^FS\n`;
     }
 
-    // Perintah ZPL untuk mengakhiri cetak
     zpl += `^XZ`;
     
     return zpl;
