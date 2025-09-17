@@ -5444,9 +5444,29 @@ function generateZplCode() {
 
 async function printLabels() {
   try {
+    // Pastikan koneksi ke QZ Tray sudah berhasil
     await connectToQZ();
 
-    const printerName = 'ZDesigner ZD220-203dpi';
+    // Dapatkan daftar printer yang tersedia di komputer
+    const printers = await qz.printers.find();
+
+    if (printers.length === 0) {
+      alert('Tidak ada printer yang ditemukan. Pastikan printer terinstal.');
+      return;
+    }
+
+    // Biarkan pengguna memilih printer dari daftar
+    const printerName = prompt(
+      "Pilih printer Anda dari daftar di bawah (ketik nama yang sama persis):" +
+      "\n\n" + printers.join('\n')
+    );
+
+    if (!printerName) {
+      alert("Proses dibatalkan.");
+      return;
+    }
+    
+    // ... (sisa kode Anda tetap sama)
     const zplCode = generateZplCode();
     const copies = 1;
 
@@ -5468,8 +5488,6 @@ async function printLabels() {
     alert("Gagal mencetak: " + error.message);
   }
 }
-
-
 </script>
 
 <template>
