@@ -5388,57 +5388,72 @@ function printPreview() {
         return;
     }
 
-    const barcodeImage = canvas.toDataURL("image/png"); // Ambil gambar barcode dari canvas
-    const content = `
+    const barcodeImage = canvas.toDataURL("image/png");
+    const barcodeLabelHtml = `
         <div class="label-box">
-            <img src="${barcodeImage}" style="max-width: 100%; height: auto;">
+            <img src="${barcodeImage}" class="barcode-image">
         </div>
     `;
 
     const printWindow = window.open('', '_blank');
-    
-    // HTML yang akan dicetak
     const htmlContent = `
+        <!DOCTYPE html>
         <html>
-            <head>
-                <title>Cetak Barcode</title>
-                <style>
-                    @page {
-                        size: auto;
-                        margin: 0;
-                    }
-                    body { margin: 0; }
-                    .print-container {
-                        display: grid;
-                        grid-template-columns: repeat(${labelSettings.columns}, 1fr);
-                        gap: ${labelSettings.labelGap}mm;
-                        padding: 10mm;
-                    }
-                    .label-box {
-                        width: ${labelSettings.width}mm;
-                        height: ${labelSettings.height}mm;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        border: none;
-                        box-sizing: border-box;
-                        overflow: hidden;
-                        page-break-inside: avoid;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="print-container">
-                    ${Array(printCount.value).fill(content).join('')}
-                </div>
-            </body>
+        <head>
+            <title>Cetak Barcode</title>
+            <style>
+                @page {
+                    size: auto;
+                    margin: 0;
+                }
+                body {
+                    margin: 0;
+                    padding: 0;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                .print-container {
+                    display: grid;
+                    grid-template-columns: repeat(${labelSettings.columns}, ${labelSettings.width}mm);
+                    gap: ${labelSettings.labelGap}mm;
+                    padding: 10mm;
+                }
+                .label-box {
+                    width: ${labelSettings.width}mm;
+                    height: ${labelSettings.height}mm;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    overflow: hidden;
+                    border: none;
+                    box-sizing: border-box;
+                    page-break-after: avoid;
+                    page-break-inside: avoid;
+                }
+                .barcode-image {
+                    max-width: 100%;
+                    max-height: 100%;
+                    object-fit: contain;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-container">
+                ${Array(printCount.value * labelSettings.columns).fill(barcodeLabelHtml).join('')}
+            </div>
+        </body>
         </html>
     `;
-    
+
     printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
-    printWindow.print();
+
+    // Tunggu sebentar untuk memastikan gambar termuat sebelum mencetak
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 500);
 }
 
 </script>
@@ -7065,7 +7080,7 @@ function printPreview() {
     <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
         <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">2. Review Barcode</h3>
         <div id="barcode-preview-area" class="p-4 rounded-lg bg-slate-200 flex items-center justify-center min-h-[300px]">
-            <canvas id="barcodeCanvas"></canvas>
+            <canvas id="barcodeCanvas" class="barcode-image"></canvas>
         </div>
     </div>
 </div>
