@@ -5382,21 +5382,18 @@ watch(activePage, (newPage) => {
 });
 
 
-let qz;
-
 function connectToQZ() {
   if (window.qz && window.qz.websocket && window.qz.websocket.isActive()) {
     console.log("Koneksi QZ Tray sudah aktif.");
     return Promise.resolve(true);
   }
   return new Promise((resolve, reject) => {
-    // QZ Tray SDK didefinisikan secara global sebagai 'qz', tidak perlu diinstansiasi ulang
+    // QZ Tray SDK didefinisikan secara global, kita bisa langsung menggunakannya.
     if (!window.qz) {
       return reject(new Error("QZ Tray SDK tidak terdeteksi. Pastikan script sudah dimuat di index.html."));
     }
     
-    qz = window.qz;
-    qz.websocket.connect()
+    window.qz.websocket.connect()
       .then(() => {
         console.log("Terhubung ke QZ Tray!");
         resolve(true);
