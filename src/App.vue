@@ -1,4 +1,5 @@
 <script setup>
+/* global qz */
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
