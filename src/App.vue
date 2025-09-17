@@ -5380,80 +5380,46 @@ watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
 
+function generateZplCode() {
+    const labelWidthInDots = Math.round(labelSettings.width / 25.4 * 203); // Asumsi 203 DPI
+    const labelHeightInDots = Math.round(labelSettings.height / 25.4 * 203);
 
-function printPreview() {
-    const canvas = document.getElementById('barcodeCanvas');
-    if (!canvas) {
-        alert("Canvas barcode tidak ditemukan.");
-        return;
+    let zpl = `^XA`; // Memulai format ZPL
+    zpl += `^PW${labelWidthInDots}`; // Lebar cetak
+    zpl += `^LL${labelHeightInDots}`; // Panjang label
+
+    // Looping untuk mencetak beberapa label
+    for (let i = 0; i < printCount.value; i++) {
+        const barcodeX = 5; // Posisi X barcode dari tepi kiri
+        const barcodeY = 5; // Posisi Y barcode dari tepi atas
+
+        zpl += `^FO${barcodeX},${barcodeY}^BY2`; // Posisi dan ukuran barcode
+        zpl += `^BCN,50,Y,N,N`; // Tipe barcode (Code 128), tinggi, dll.
+        zpl += `^FD${barcodeContent.value}^FS`; // Data barcode
+
+        // Tambahkan teks di bawah barcode
+        const textY = barcodeY + 60; // Posisikan teks di bawah barcode
+        zpl += `^FO${barcodeX},${textY}^A0N,20,20^FD${barcodeContent.value}^FS`;
+
+        zpl += `^XZ`; // Mengakhiri format ZPL
+
+        // Jika ada lebih dari satu label, tambahkan perintah untuk label baru
+        if (i < printCount.value - 1) {
+            zpl += `^XA`;
+            zpl += `^PW${labelWidthInDots}`;
+            zpl += `^LL${labelHeightInDots}`;
+        }
     }
 
-    const barcodeImage = canvas.toDataURL("image/png");
-    const barcodeLabelHtml = `
-        <div class="label-box">
-            <img src="${barcodeImage}" class="barcode-image">
-        </div>
-    `;
+    return zpl;
+}
 
-    const printWindow = window.open('', '_blank');
-    const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Cetak Barcode</title>
-            <style>
-                @page {
-                    size: auto;
-                    margin: 0;
-                }
-                body {
-                    margin: 0;
-                    padding: 0;
-                    -webkit-print-color-adjust: exact;
-                    print-color-adjust: exact;
-                }
-                .print-container {
-                    display: grid;
-                    grid-template-columns: repeat(${labelSettings.columns}, ${labelSettings.width}mm);
-                    gap: ${labelSettings.labelGap}mm;
-                    padding: 10mm;
-                }
-                .label-box {
-                    width: ${labelSettings.width}mm;
-                    height: ${labelSettings.height}mm;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    overflow: hidden;
-                    border: none;
-                    box-sizing: border-box;
-                    page-break-after: avoid;
-                    page-break-inside: avoid;
-                }
-                .barcode-image {
-                    max-width: 100%;
-                    max-height: 100%;
-                    object-fit: contain;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="print-container">
-                ${Array(printCount.value * labelSettings.columns).fill(barcodeLabelHtml).join('')}
-            </div>
-        </body>
-        </html>
-    `;
+function printViaRawBT() {
+    const zplData = generateZplCode();
+    const encodedZpl = encodeURIComponent(zplData);
+    const intentUrl = `intent:#Intent;action=ru.a402d.rawbtprinter.action.PRINT;S.ru.a402d.rawbtprinter.extra.DATA=${encodedZpl};S.ru.a402d.rawbtprinter.extra.FORMAT=TEXT;end`;
 
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-
-    // Tunggu sebentar untuk memastikan gambar termuat sebelum mencetak
-    setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-    }, 500);
+    window.location.href = intentUrl;
 }
 
 </script>
@@ -7069,10 +7035,10 @@ function printPreview() {
                             </div>
                         </div>
 
-                        <button @click="printPreview" :disabled="!barcodeContent || printCount < 1"
-                                class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
-                            Cetak Label via Browser
-                        </button>
+                        <button @click="printViaRawBT" :disabled="!barcodeContent || printCount < 1"
+    class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
+    Cetak ke Printer (via RawBT)
+</button>
                     </div>
                 </div>
 
