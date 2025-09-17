@@ -5381,79 +5381,90 @@ watch(activePage, (newPage) => {
 });
 
 
-function printPreview() {
-    const canvas = document.getElementById('barcodeCanvas');
-    if (!canvas) {
-        alert("Canvas barcode tidak ditemukan.");
-        return;
+let qz;
+
+function connectToQZ() {
+  if (qz && qz.websocket && qz.websocket.isActive()) {
+    console.log("Koneksi QZ Tray sudah aktif.");
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve, reject) => {
+    qz = new QZTray(); // Pastikan Anda mengimpor QZTray jika perlu
+    qz.websocket.connect()
+      .then(() => {
+        console.log("Terhubung ke QZ Tray!");
+        resolve(true);
+      })
+      .catch(err => {
+        console.error("Gagal terhubung ke QZ Tray:", err);
+        alert("Gagal terhubung ke QZ Tray. Pastikan aplikasi sudah berjalan. Silakan cek konsol browser untuk detail.");
+        reject(err);
+      });
+  });
+}
+
+function generateZplCode() {
+  const barcode = barcodeContent.value || '1234567890';
+  const labelWidth = labelSettings.width * 8; // Konversi mm ke dots (asumsi 203 dpi)
+  const labelHeight = labelSettings.height * 8;
+  const gap = labelSettings.labelGap * 8;
+  const columns = labelSettings.columns;
+  const count = printCount.value;
+
+  // Kode ZPL ini adalah contoh sederhana, Anda bisa memodifikasinya
+  let zpl = `^XA
+^PW${labelWidth}
+^LL${labelHeight}
+^MNN
+^PON
+^LH0,0
+^MN${labelSettings.paperType === 'gap' ? 'G' : 'D'}
+`;
+
+  for (let i = 0; i < count; i++) {
+    // Offset untuk barcode agar terlihat di tengah label
+    const barcodeX = (labelWidth - 200) / 2; // Asumsi lebar barcode 200 dots
+    const barcodeY = (labelHeight - 100) / 2; // Asumsi tinggi barcode 100 dots
+
+    zpl += `
+^FO${barcodeX},${barcodeY}^BY3^BCN,100,Y,N,N^FD${barcode}^FS
+^XZ
+`;
+  }
+  
+  return zpl;
+}
+
+async function printLabels() {
+  try {
+    await connectToQZ();
+
+    const printerName = 'ZDesigner ZD220-203dpi'; // Ganti dengan nama printer default Anda
+    const zplCode = generateZplCode();
+    const copies = 1;
+
+    // Pastikan `qz` sudah terhubung dan siap
+    if (qz && qz.websocket.isActive()) {
+      qz.printers.find(printerName).then(function(found) {
+        if (!found) {
+          throw new Error(`Printer '${printerName}' tidak ditemukan.`);
+        }
+        var config = qz.configs.create(found, { copies: copies });
+        var data = [zplCode];
+        return qz.print(config, data);
+      }).then(() => {
+        alert('Perintah cetak berhasil dikirim!');
+      }).catch(err => {
+        console.error("Kesalahan saat mencetak:", err);
+        alert("Gagal mencetak: " + err.message);
+      });
+    } else {
+      throw new Error("Koneksi QZ Tray tidak aktif. Silakan hubungkan kembali.");
     }
-
-    const barcodeImage = canvas.toDataURL("image/png");
-    const barcodeLabelHtml = `
-        <div class="label-box">
-            <img src="${barcodeImage}" class="barcode-image">
-        </div>
-    `;
-
-    const printWindow = window.open('', '_blank');
-    const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Cetak Barcode</title>
-            <style>
-                @page {
-                    size: auto;
-                    margin: 0;
-                }
-                body {
-                    margin: 0;
-                    padding: 0;
-                    -webkit-print-color-adjust: exact;
-                    print-color-adjust: exact;
-                }
-                .print-container {
-                    display: grid;
-                    grid-template-columns: repeat(${labelSettings.columns}, ${labelSettings.width}mm);
-                    gap: ${labelSettings.labelGap}mm;
-                    padding: 10mm;
-                }
-                .label-box {
-                    width: ${labelSettings.width}mm;
-                    height: ${labelSettings.height}mm;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    overflow: hidden;
-                    border: none;
-                    box-sizing: border-box;
-                    page-break-after: avoid;
-                    page-break-inside: avoid;
-                }
-                .barcode-image {
-                    max-width: 100%;
-                    max-height: 100%;
-                    object-fit: contain;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="print-container">
-                ${Array(printCount.value * labelSettings.columns).fill(barcodeLabelHtml).join('')}
-            </div>
-        </body>
-        </html>
-    `;
-
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-
-    // Tunggu sebentar untuk memastikan gambar termuat sebelum mencetak
-    setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-    }, 500);
+  } catch (error) {
+    console.error("Gagal mencetak:", error);
+    alert("Gagal mencetak: " + error.message);
+  }
 }
 
 </script>
@@ -7069,10 +7080,10 @@ function printPreview() {
                             </div>
                         </div>
 
-                        <button @click="printPreview" :disabled="!barcodeContent || printCount < 1"
-                                class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
-                            Cetak Label via Browser
-                        </button>
+                        <button @click="printLabels" :disabled="!barcodeContent || printCount < 1"
+    class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
+    Cetak Label
+</button>
                     </div>
                 </div>
 
@@ -10446,23 +10457,23 @@ function printPreview() {
 <style scoped>
 .help-icon-button {
     position: absolute;
-    top: 0.5rem; /* 8px */
-    right: 0.5rem; /* 8px */
-    width: 1.25rem; /* 20px */
-    height: 1.25rem; /* 20px */
-    border-radius: 9999px; /* rounded-full */
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 9999px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #f1f5f9; /* slate-100 */
-    color: #64748b; /* slate-500 */
+    background-color: #f1f5f9;
+    color: #64748b;
     font-weight: bold;
-    font-size: 0.875rem; /* text-sm */
+    font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
 }
 .help-icon-button:hover {
-    background-color: #6366f1; /* indigo-500 */
+    background-color: #6366f1;
     color: white;
     transform: scale(1.1);
 }
@@ -10472,15 +10483,15 @@ function printPreview() {
     padding: 0.75rem 1rem;
     border-radius: 0.5rem;
     font-weight: 500;
-    color: #9ca3af; /* gray-400 */
+    color: #9ca3af;
     transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
 }
 .sidebar-link:hover {
-    background-color: #374151; /* gray-700 */
+    background-color: #374151;
     color: #ffffff;
 }
 .sidebar-link-active {
-    background-image: linear-gradient(to right, #4f46e5, #6d28d9); /* gradasi indigo -> violet */
+    background-image: linear-gradient(to right, #4f46e5, #6d28d9);
     color: #ffffff;
     font-weight: 600;
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -10507,16 +10518,16 @@ function printPreview() {
     line-height: 1;
 }
 .stock-safe {
-    background-color: #dcfce7; /* green-100 */
-    color: #166534; /* green-800 */
+    background-color: #dcfce7;
+    color: #166534;
 }
 .stock-low {
-    background-color: #fef3c7; /* yellow-100 */
-    color: #92400e; /* yellow-800 */
+    background-color: #fef3c7;
+    color: #92400e;
 }
 .stock-empty {
-    background-color: #fee2e2; /* red-100 */
-    color: #991b1b; /* red-800 */
+    background-color: #fee2e2;
+    color: #991b1b;
 }
 .accordion-content {
     max-height: 0;
@@ -10524,7 +10535,7 @@ function printPreview() {
     transition: max-height 0.5s ease-in-out;
 }
 .accordion-content.open {
-    max-height: 1000px; /* Cukup besar untuk menampung konten */
+    max-height: 1000px;
 }
 .panduan-content ul {
     list-style-position: outside;
@@ -10600,7 +10611,7 @@ function printPreview() {
 }
 .animate-fade-in-up {
     animation: fade-in-up 0.6s ease-out forwards;
-    opacity: 0; /* Mulai dari tidak terlihat */
+    opacity: 0;
 }
 @keyframes fade-in {
     from { opacity: 0; }
@@ -10621,7 +10632,9 @@ function printPreview() {
 }
 .animate-fade-in-scale {
     animation: fade-in-scale 0.7s ease-out forwards;
-    opacity: 0; /* Mulai dari tidak terlihat */
+    opacity: 0;
 }
+
+/* --- Kode Cetak yang Diperbaiki --- */
 
 </style>
