@@ -1,5 +1,6 @@
 <script setup>
 /* global qz */
+import qz from 'qz-tray';
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
@@ -5383,27 +5384,51 @@ watch(activePage, (newPage) => {
 
 
 function connectToQZ() {
-  if (window.qz && window.qz.websocket && window.qz.websocket.isActive()) {
+  // Tidak perlu lagi memeriksa `window.qz`
+  // Karena kita sudah mengimpornya.
+  if (qz.websocket.isActive()) {
     console.log("Koneksi QZ Tray sudah aktif.");
     return Promise.resolve(true);
   }
   return new Promise((resolve, reject) => {
-    // QZ Tray SDK didefinisikan secara global, kita bisa langsung menggunakannya.
-    if (!window.qz) {
-      return reject(new Error("QZ Tray SDK tidak terdeteksi. Pastikan script sudah dimuat di index.html."));
-    }
-    
-    window.qz.websocket.connect()
+    qz.websocket.connect()
       .then(() => {
         console.log("Terhubung ke QZ Tray!");
         resolve(true);
       })
       .catch(err => {
         console.error("Gagal terhubung ke QZ Tray:", err);
-        alert("Gagal terhubung ke QZ Tray. Pastikan aplikasi sudah berjalan. Silakan cek konsol browser untuk detail.");
+        alert("Gagal terhubung ke QZ Tray. Pastikan aplikasi sudah berjalan dan terhubung.");
         reject(err);
       });
   });
+}
+
+async function printLabels() {
+  try {
+    await connectToQZ();
+
+    const printerName = 'ZDesigner ZD220-203dpi';
+    const zplCode = generateZplCode();
+    const copies = 1;
+
+    qz.printers.find(printerName).then(function(found) {
+      if (!found) {
+        throw new Error(`Printer '${printerName}' tidak ditemukan.`);
+      }
+      var config = qz.configs.create(found, { copies: copies });
+      var data = [zplCode];
+      return qz.print(config, data);
+    }).then(() => {
+      alert('Perintah cetak berhasil dikirim!');
+    }).catch(err => {
+      console.error("Kesalahan saat mencetak:", err);
+      alert("Gagal mencetak: " + err.message);
+    });
+  } catch (error) {
+    console.error("Gagal mencetak:", error);
+    alert("Gagal mencetak: " + error.message);
+  }
 }
 
 function generateZplCode() {
@@ -5453,37 +5478,6 @@ function generateZplCode() {
   return zpl;
 }
 
-async function printLabels() {
-  try {
-    await connectToQZ();
-
-    const printerName = 'ZDesigner ZD220-203dpi'; // Ganti dengan nama printer default Anda
-    const zplCode = generateZplCode();
-    const copies = 1;
-
-    // Pastikan `qz` sudah terhubung dan siap
-    if (qz && qz.websocket.isActive()) {
-      qz.printers.find(printerName).then(function(found) {
-        if (!found) {
-          throw new Error(`Printer '${printerName}' tidak ditemukan.`);
-        }
-        var config = qz.configs.create(found, { copies: copies });
-        var data = [zplCode];
-        return qz.print(config, data);
-      }).then(() => {
-        alert('Perintah cetak berhasil dikirim!');
-      }).catch(err => {
-        console.error("Kesalahan saat mencetak:", err);
-        alert("Gagal mencetak: " + err.message);
-      });
-    } else {
-      throw new Error("Koneksi QZ Tray tidak aktif. Silakan hubungkan kembali.");
-    }
-  } catch (error) {
-    console.error("Gagal mencetak:", error);
-    alert("Gagal mencetak: " + error.message);
-  }
-}
 
 </script>
 

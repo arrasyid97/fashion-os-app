@@ -21,6 +21,7 @@
     "https-proxy-agent": "^7.0.5",
     "jsbarcode": "^3.12.1",
     "jspdf": "^3.0.2",
+    "qz-tray": "^2.2.5",
     "vue": "^3.2.13",
     "vue-loader": "^17.4.2",
     "vue-router": "^4.3.3",
