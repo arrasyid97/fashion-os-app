@@ -5382,8 +5382,20 @@ watch(activePage, (newPage) => {
 
 
 function printPreview() {
+    const canvas = document.getElementById('barcodeCanvas');
+    if (!canvas) {
+        alert("Canvas barcode tidak ditemukan.");
+        return;
+    }
+
+    const barcodeImage = canvas.toDataURL("image/png"); // Ambil gambar barcode dari canvas
+    const content = `
+        <div class="label-box">
+            <img src="${barcodeImage}" style="max-width: 100%; height: auto;">
+        </div>
+    `;
+
     const printWindow = window.open('', '_blank');
-    const content = document.getElementById('barcode-preview-area').innerHTML;
     
     // HTML yang akan dicetak
     const htmlContent = `
@@ -5391,7 +5403,11 @@ function printPreview() {
             <head>
                 <title>Cetak Barcode</title>
                 <style>
-                    body { margin: 0; padding: 0; }
+                    @page {
+                        size: auto;
+                        margin: 0;
+                    }
+                    body { margin: 0; }
                     .print-container {
                         display: grid;
                         grid-template-columns: repeat(${labelSettings.columns}, 1fr);
@@ -5402,12 +5418,12 @@ function printPreview() {
                         width: ${labelSettings.width}mm;
                         height: ${labelSettings.height}mm;
                         display: flex;
-                        flex-direction: column;
                         align-items: center;
                         justify-content: center;
-                        border: none; /* Hilangkan border pada saat cetak */
+                        border: none;
                         box-sizing: border-box;
                         overflow: hidden;
+                        page-break-inside: avoid;
                     }
                 </style>
             </head>
