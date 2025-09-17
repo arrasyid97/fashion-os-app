@@ -5442,37 +5442,39 @@ function generateZplCode() {
   return zpl;
 }
 
+let selectedPrinterName = null;
+
 async function printLabels() {
   try {
-    // Pastikan koneksi ke QZ Tray sudah berhasil
     await connectToQZ();
 
-    // Dapatkan daftar printer yang tersedia di komputer
-    const printers = await qz.printers.find();
+    if (!selectedPrinterName) {
+      const printers = await qz.printers.find();
 
-    if (printers.length === 0) {
-      alert('Tidak ada printer yang ditemukan. Pastikan printer terinstal.');
-      return;
+      if (printers.length === 0) {
+        alert('Tidak ada printer yang ditemukan. Pastikan printer terinstal.');
+        return;
+      }
+
+      selectedPrinterName = prompt(
+        "Pilih printer Anda dari daftar di bawah (ketik nama yang sama persis):" +
+        "\n\n" + printers.join('\n')
+      );
+
+      if (!selectedPrinterName) {
+        alert("Proses dibatalkan.");
+        return;
+      }
     }
 
-    // Biarkan pengguna memilih printer dari daftar
-    const printerName = prompt(
-      "Pilih printer Anda dari daftar di bawah (ketik nama yang sama persis):" +
-      "\n\n" + printers.join('\n')
-    );
-
-    if (!printerName) {
-      alert("Proses dibatalkan.");
-      return;
-    }
-    
-    // ... (sisa kode Anda tetap sama)
     const zplCode = generateZplCode();
     const copies = 1;
 
-    qz.printers.find(printerName).then(function(found) {
+    qz.printers.find(selectedPrinterName).then(function(found) {
       if (!found) {
-        throw new Error(`Printer '${printerName}' tidak ditemukan.`);
+        // Jika printer yang disimpan tidak ditemukan, reset dan minta ulang
+        selectedPrinterName = null; 
+        throw new Error(`Printer '${selectedPrinterName}' tidak ditemukan. Silakan coba lagi.`);
       }
       var config = qz.configs.create(found, { copies: copies });
       var data = [zplCode];
