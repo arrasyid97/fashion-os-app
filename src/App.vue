@@ -3672,80 +3672,66 @@ async function submitEditProduksiBatch() {
     }
 }
 async function updateProductionInventoryStatus(batchId, itemIndex) {
-    if (!currentUser.value) {
-        alert("Anda harus login untuk mengelola inventaris.");
-        return;
-    }
-    if (!confirm("Anda yakin ingin menandai item ini sebagai sudah masuk inventaris? Stok master akan bertambah.")) {
-        return;
-    }
-    
-    // Temukan batch dan item yang akan diperbarui di state lokal
-    const originalBatch = uiState.laporanData.laporanPerStatus.find(b => b.id === batchId);
-    if (!originalBatch) {
-        alert("Batch tidak ditemukan.");
-        return;
-    }
-    const itemToUpdate = originalBatch.kainBahan[itemIndex];
-    
-    try {
-        const batch = writeBatch(db);
-        const batchRef = doc(db, "production_batches", batchId);
+    if (!currentUser.value) {
+        alert("Anda harus login untuk mengelola inventaris.");
+        return;
+    }
+    if (!confirm("Anda yakin ingin menandai item ini sebagai sudah masuk inventaris? Stok master akan bertambah.")) {
+        return;
+    }
+    
+    const originalBatch = uiState.laporanData.laporanPerStatus.find(b => b.id === batchId);
+    if (!originalBatch) {
+        alert("Batch tidak ditemukan.");
+        return;
+    }
+    const itemToUpdate = originalBatch.kainBahan[itemIndex];
+    
+    try {
+        const batch = writeBatch(db);
+        const batchRef = doc(db, "production_batches", batchId);
+        
+        // Di sini kita menggunakan getProductBySku untuk mendapatkan data lengkap produk dari state
+        const matchingProduct = getProductBySku(itemToUpdate.sku);
 
-        const matchingProduct = getProductBySku(itemToUpdate.sku);
+        if (matchingProduct) {
+            // PERBAIKAN: Gunakan `matchingProduct.docId` bukan `matchingProduct.sku`
+            const productRef = doc(db, "products", matchingProduct.docId);
+            const allocationRef = doc(db, "stock_allocations", matchingProduct.docId);
+            
+            const newStock = (matchingProduct.stokFisik || 0) + (itemToUpdate.aktualJadi || 0);
 
-        if (matchingProduct) {
-            const productRef = doc(db, "products", matchingProduct.sku);
-            const newStock = (matchingProduct.stokFisik || 0) + (itemToUpdate.aktualJadi || 0);
-            
-            const totalAlokasi = Object.values(matchingProduct.stokAlokasi || {}).reduce((sum, val) => sum + val, 0);
-            const sisaStokFisik = newStock - totalAlokasi;
-            if (sisaStokFisik < 0) {
-                alert(`Stok master akan minus jika ditambahkan. Jumlah aktual jadi (${itemToUpdate.aktualJadi}) lebih kecil dari total alokasi yang sudah ada (${totalAlokasi})`);
-                return;
-            }
-            
-            // Perbarui dokumen batch di Firestore
-            const newKainBahan = JSON.parse(JSON.stringify(originalBatch.kainBahan));
-            newKainBahan[itemIndex].isInventoried = true;
-            batch.update(batchRef, { kainBahan: newKainBahan });
+            // Update dokumen batch produksi untuk menandai sudah masuk inventaris
+            const newKainBahan = JSON.parse(JSON.stringify(originalBatch.kainBahan));
+            newKainBahan[itemIndex].isInventoried = true;
+            batch.update(batchRef, { kainBahan: newKainBahan });
 
-            // Perbarui stok fisik di Firestore
-            batch.update(productRef, { physical_stock: newStock });
+            // Update stok fisik di dokumen produk
+            batch.update(productRef, { physical_stock: newStock });
+            
+            // Update (atau buat jika belum ada) dokumen alokasi stok
+            const newAlokasi = {};
+            state.settings.marketplaces.forEach(mp => {
+                newAlokasi[mp.id] = (matchingProduct.stokAlokasi[mp.id] || 0);
+            });
+            batch.set(allocationRef, newAlokasi, { merge: true });
 
-            // Perbarui stok alokasi di Firestore
-            const allocationsCollection = collection(db, "stock_allocations");
-            const allocationRef = doc(allocationsCollection, matchingProduct.sku);
-            const newAlokasi = {};
-            state.settings.marketplaces.forEach(mp => {
-                newAlokasi[mp.id] = (matchingProduct.stokAlokasi[mp.id] || 0);
-            });
-            batch.set(allocationRef, newAlokasi, { merge: true });
+            await batch.commit();
 
-            await batch.commit();
+            itemToUpdate.isInventoried = true;
+            if (matchingProduct) {
+                matchingProduct.stokFisik = newStock;
+            }
 
-            // --- BARIS PENTING: PERBARUI STATE LOKAL SECARA LANGSUNG ---
-            // Setelah operasi batch berhasil, update status isInventoried di state
-            itemToUpdate.isInventoried = true;
-
-            // Jika produk master juga butuh diperbarui, lakukan di sini
-            if (matchingProduct) {
-                matchingProduct.stokFisik = newStock;
-            }
-
-            alert("Stok berhasil ditambahkan ke inventaris!");
-            
-            // Tidak perlu memanggil loadAllDataFromFirebase() karena state sudah diperbarui
-            // Jika Anda ingin memuat ulang data di seluruh aplikasi, panggil saja
-            // await loadAllDataFromFirebase();
-            
-        } else {
-            throw new Error("Produk yang cocok tidak ditemukan di Inventaris. Harap tambahkan produk ini secara manual di halaman Manajemen Inventaris terlebih dahulu.");
-        }
-    } catch (error) {
-        console.error("Error saat memperbarui status inventaris:", error);
-        alert(`Gagal memperbarui status inventaris. Detail: ${error.message}`);
-    }
+            alert("Stok berhasil ditambahkan ke inventaris!");
+            
+        } else {
+            throw new Error("Produk yang cocok tidak ditemukan di Inventaris. Harap tambahkan produk ini secara manual di halaman Manajemen Inventaris terlebih dahulu.");
+        }
+    } catch (error) {
+        console.error("Error saat memperbarui status inventaris:", error);
+        alert(`Gagal memperbarui status inventaris. Detail: ${error.message}`);
+    }
 }
 
 function calculateRowSummary(item, batchType) {
