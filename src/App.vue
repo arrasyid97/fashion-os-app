@@ -34,7 +34,6 @@ const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengatura
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
-const userProfile = ref(null);
 const activationCodeInput = ref('');
 const activationCodeMessage = ref('');
 const commissionPayouts = ref([]);
@@ -5305,30 +5304,26 @@ watch([barcodeContent, labelSettings], () => {
 }, { immediate: true, deep: true });
 
 onMounted(() => {
-    updateTime();
-    intervalId = setInterval(updateTime, 1000);
+    updateTime();
+    intervalId = setInterval(updateTime, 1000);
 
-    onAuthStateChanged(auth, async (user) => {
-        isLoading.value = true;
-        if (onSnapshotListener) onSnapshotListener();
-        if (commissionsListener) commissionsListener();
+    onAuthStateChanged(auth, async (user) => {
+        isLoading.value = true;
+        if (onSnapshotListener) onSnapshotListener();
+        if (commissionsListener) commissionsListener();
 
-        if (user) {
-            currentUser.value = user;
+        if (user) {
+            currentUser.value = user;
 
-            // LISTENER REAL-TIME UNTUK DATA PENGGUNA
-            onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
+            onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
-                    userProfile.value = userData; // <-- PERUBAHAN KUNCI: Gunakan state reaktif baru yang terpisah
-
-                    // Tetap update info penting lainnya
+                    currentUser.value.userData = userData;
                     state.settings.dashboardPin = userData.dashboardPin || '';
-                    if (currentUser.value) {
-                        currentUser.value.isPartner = userData.isPartner || false;
-                        currentUser.value.referralCode = userData.referralCode || null;
-                    }
+                    currentUser.value.isPartner = userData.isPartner || false;
+                    currentUser.value.referralCode = userData.referralCode || null;
 
+                    // ▼▼▼ KODE DEBUGGING DIMULAI DII SINI ▼▼▼
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
@@ -5336,28 +5331,32 @@ onMounted(() => {
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
+                    
+
                     if (isSubscriptionValid) {
-                        // Hanya redirect jika kita sedang di halaman langganan/login, untuk menghindari redirect yang tidak perlu
-                        if (activePage.value === 'langganan' || activePage.value === 'login') {
-                            await loadAllDataFromFirebase();
-                            changePage('dashboard');
+                        await loadAllDataFromFirebase();
+
+                        if (currentUser.value.isPartner) {
+                            const commissionsQuery = query(
+                                collection(db, 'commissions'),
+                                where('partnerId', '==', currentUser.value.uid)
+                            );
+                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                const fetchedCommissions = [];
+                                snapshot.forEach(doc => {
+                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
+                                });
+                                commissions.value = fetchedCommissions;
+                            });
                         }
+                        
+                        const storedPage = localStorage.getItem('lastActivePage');
+                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                        changePage(pageToLoad);
+
                     } else {
                         activePage.value = 'langganan';
                     }
-
-                    // Jalankan listener komisi jika pengguna adalah mitra
-                    if (userData.isPartner && currentUser.value) {
-                        if (commissionsListener) commissionsListener(); // Hentikan listener lama jika ada
-                        const commissionsQuery = query(
-                            collection(db, 'commissions'),
-                            where('partnerId', '==', currentUser.value.uid)
-                        );
-                        commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                            commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        });
-                    }
-
                 } else {
                     console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                     handleLogout();
@@ -5369,14 +5368,12 @@ onMounted(() => {
                 isLoading.value = false;
                 handleLogout();
             });
-
-        } else {
-            currentUser.value = null;
-            userProfile.value = null; // Pastikan userProfile juga di-reset
-            activePage.value = 'login';
-            isLoading.value = false;
-        }
-    });
+        } else {
+            currentUser.value = null;
+            activePage.value = 'login';
+            isLoading.value = false;
+        }
+    });
 });
 
 onUnmounted(() => { // <-- PINDAHKAN KE SINI
@@ -7870,136 +7867,138 @@ async function printLabels() {
     </div>
 </div>
 <div v-if="activePage === 'langganan'">
-    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8 flex items-center justify-center">
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8 flex items-center justify-center">
 
-                <div v-if="userProfile?.subscriptionStatus === 'active' && new Date(userProfile.subscriptionEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
-            <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-green-200 flex flex-col items-center">
-                <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
-                <h2 class="text-3xl font-bold text-slate-800 mb-2">Langganan Anda Aktif! 🎉</h2>
-                <p class="text-slate-600 mb-6 max-w-xl text-center">
-                    Selamat, Anda memiliki akses penuh ke semua fitur premium kami.
-                </p>
-                <div class="bg-green-50 text-green-800 px-6 py-4 rounded-lg w-full text-center border border-green-200">
-                    <p class="text-lg font-semibold">Status Langganan: Aktif</p>
-                    <p v-if="userProfile?.subscriptionEndDate" class="text-sm mt-1">
-                        Berakhir pada: {{ new Date(userProfile.subscriptionEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-                <div v-else-if="userProfile?.subscriptionStatus === 'trial' && new Date(userProfile.trialEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
-            <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-blue-200 flex flex-col items-center">
-                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
-                <h2 class="text-3xl font-bold text-slate-800 mb-2">Masa Uji Coba Gratis Anda Aktif!</h2>
-                <p class="text-slate-600 mb-6 max-w-xl text-center">
-                    Nikmati semua fitur premium selama masa uji coba. Untuk melanjutkan setelahnya, silakan pilih paket langganan.
-                </p>
-                <div class="bg-blue-50 text-blue-800 px-6 py-4 rounded-lg w-full text-center border border-blue-200">
-                    <p class="text-lg font-semibold">Status: Uji Coba (Trial)</p>
-                    <p v-if="userProfile?.trialEndDate" class="text-sm mt-1">
-                        Berakhir pada: {{ new Date(userProfile.trialEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-                <div v-else class="max-w-5xl mx-auto text-center">
-            <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800 animate-fade-in-up">
-                <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Mulai Langganan Anda</span>
-            </h2>
-            <p class="text-lg text-slate-600 mt-4 mb-10 max-w-2xl mx-auto animate-fade-in-up" style="animation-delay: 100ms;">
-                Pilih paket di bawah ini atau masukkan kode aktivasi jika Anda sudah melakukan pembayaran di luar aplikasi.
-            </p>
+        <div v-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
+            <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-green-200 flex flex-col items-center">
+                <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Langganan Anda Aktif! 🎉</h2>
+                <p class="text-slate-600 mb-6 max-w-xl text-center">
+                    Selamat, Anda memiliki akses penuh ke semua fitur premium kami.
+                </p>
+                <div class="bg-green-50 text-green-800 px-6 py-4 rounded-lg w-full text-center border border-green-200">
+                    <p class="text-lg font-semibold">Status Langganan: Aktif</p>
+                    <p v-if="currentUser?.userData?.subscriptionEndDate" class="text-sm mt-1">
+                        Berakhir pada: {{ new Date(currentUser.userData.subscriptionEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div v-else-if="currentUser?.userData?.subscriptionStatus === 'trial' && new Date(currentUser.userData.trialEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
+            <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-blue-200 flex flex-col items-center">
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Masa Uji Coba Gratis Anda Aktif!</h2>
+                <p class="text-slate-600 mb-6 max-w-xl text-center">
+                    Nikmati semua fitur premium selama masa uji coba. Untuk melanjutkan setelahnya, silakan pilih paket langganan.
+                </p>
+                <div class="bg-blue-50 text-blue-800 px-6 py-4 rounded-lg w-full text-center border border-blue-200">
+                    <p class="text-lg font-semibold">Status: Uji Coba (Trial)</p>
+                    <p v-if="currentUser?.userData?.trialEndDate" class="text-sm mt-1">
+                        Berakhir pada: {{ new Date(currentUser.userData.trialEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div v-else class="max-w-5xl mx-auto text-center">
+            <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800 animate-fade-in-up">
+                <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Mulai Langganan Anda</span>
+            </h2>
+            <p class="text-lg text-slate-600 mt-4 mb-10 max-w-2xl mx-auto animate-fade-in-up" style="animation-delay: 100ms;">
+                Pilih paket di bawah ini atau masukkan kode aktivasi jika Anda sudah melakukan pembayaran di luar aplikasi.
+            </p>
 
-            <div class="max-w-xl mx-auto mb-8 p-6 rounded-xl border-2 border-dashed border-green-400 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 200ms;">
-                <h3 class="text-lg font-semibold text-green-700">Punya Kode Aktivasi? (Dari Shopee, dll.)</h3>
-                <p class="text-sm text-slate-600 mb-2">
-                    Jika Anda sudah membayar, masukkan kode aktivasi yang Anda terima di sini untuk mengaktifkan langganan Anda.
-                </p>
-                <div class="flex gap-2">
-                    <input type="text" v-model="activationCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400" placeholder="Masukkan Kode Aktivasi...">
-                    <button @click.prevent="handleActivation" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
-                        <span v-if="isSaving && activationCodeMessage">...</span>
-                        <span v-else>Aktifkan</span>
-                    </button>
-                </div>
-                <p v-if="activationCodeMessage" class="mt-2 text-xs font-medium text-red-600">
-                    {{ activationCodeMessage }}
-                </p>
-            </div>
-            
-            <div class="max-w-xl mx-auto mb-12 p-6 rounded-xl border border-dashed border-indigo-300 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 300ms;">
-                <h3 class="text-lg font-semibold text-indigo-700">Punya Kode Rujukan? (Untuk Diskon)</h3>
-                <p v-if="!userProfile?.referredBy" class="text-sm text-slate-600 mb-2">
-                    Masukkan kode dari mitra kami untuk mendapatkan diskon khusus.
-                </p>
-                <div v-if="!userProfile?.referredBy" class="flex gap-2">
-                    <input type="text" v-model="uiState.referralCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400" placeholder="Contoh: PARTNER-ABCDE">
-                    <button @click.prevent="applyReferralCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">Terapkan</button>
-                </div>
-                <p v-if="uiState.referralCodeMessage" class="mt-2 text-xs font-medium" :class="uiState.referralCodeApplied ? 'text-green-600' : 'text-red-500'">
-                    {{ uiState.referralCodeMessage }}
-                </p>
-                <p v-if="userProfile?.referredBy" class="text-sm text-green-600 font-medium">
-                    Selamat! Diskon rujukan sudah berlaku selamanya untuk akun Anda.
-                </p>
-            </div>
-            
-            <div class="flex flex-col md:flex-row items-center justify-center gap-8">
-                <div class="bg-white p-8 rounded-2xl shadow-lg border w-full md:w-96 transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 animate-fade-in-up" style="animation-delay: 400ms;">
-                    <h3 class="text-xl font-semibold text-slate-800">Paket Bulanan</h3>
-                    <div v-if="uiState.referralCodeApplied || userProfile?.referredBy" class="my-4">
-                        <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(monthlyPrice) }}</p>
-                        <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedMonthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span></p>
-                    </div>
-                    <p v-else class="text-4xl font-bold my-4 text-slate-900">
-                        {{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span>
-                    </p>
-                    <ul class="text-left space-y-3 text-slate-600 mt-6">
-                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Akses semua fitur</li>
-                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Dukungan prioritas</li>
-                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Update berkala</li>
-                    </ul>
-                    <button @click="handleSubscriptionMayar('bulanan')" :disabled="isSubscribingMonthly" class="mt-8 w-full border border-indigo-600 text-indigo-600 font-bold py-3 px-8 rounded-lg hover:bg-indigo-50 transition-colors disabled:bg-slate-200 disabled:text-slate-500 disabled:border-slate-200">
-                        <span v-if="isSubscribingMonthly">Memproses...</span>
-                        <span v-else>Pilih Paket Bulanan</span>
-                    </button>
-                </div>
+            <div class="max-w-xl mx-auto mb-8 p-6 rounded-xl border-2 border-dashed border-green-400 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 200ms;">
+                <h3 class="text-lg font-semibold text-green-700">Punya Kode Aktivasi? (Dari Shopee, dll.)</h3>
+                <p class="text-sm text-slate-600 mb-2">
+                    Jika Anda sudah membayar, masukkan kode aktivasi yang Anda terima di sini untuk mengaktifkan langganan Anda.
+                </p>
+                <div class="flex gap-2">
+                    <input type="text" v-model="activationCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400" placeholder="Masukkan Kode Aktivasi...">
+                    <button @click.prevent="handleActivation" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
+                        <span v-if="isSaving && activationCodeMessage">...</span>
+                        <span v-else>Aktifkan</span>
+                    </button>
+                </div>
+                <p v-if="activationCodeMessage" class="mt-2 text-xs font-medium text-red-600">
+                    {{ activationCodeMessage }}
+                </p>
+            </div>
+            
+            <div class="max-w-xl mx-auto mb-12 p-6 rounded-xl border border-dashed border-indigo-300 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 300ms;">
+                <h3 class="text-lg font-semibold text-indigo-700">Punya Kode Rujukan? (Untuk Diskon)</h3>
+                <p v-if="!currentUser?.userData?.referredBy" class="text-sm text-slate-600 mb-2">
+                    Masukkan kode dari mitra kami untuk mendapatkan diskon khusus.
+                </p>
+                <div v-if="!currentUser?.userData?.referredBy" class="flex gap-2">
+                    <input type="text" v-model="uiState.referralCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400" placeholder="Contoh: PARTNER-ABCDE">
+                    <button @click.prevent="applyReferralCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">Terapkan</button>
+                </div>
+                <p v-if="uiState.referralCodeMessage" class="mt-2 text-xs font-medium" :class="uiState.referralCodeApplied ? 'text-green-600' : 'text-red-500'">
+                    {{ uiState.referralCodeMessage }}
+                </p>
+                <p v-if="currentUser?.userData?.referredBy" class="text-sm text-green-600 font-medium">
+                    Selamat! Diskon rujukan sudah berlaku selamanya untuk akun Anda.
+                </p>
+            </div>
+            
+            <div class="flex flex-col md:flex-row items-center justify-center gap-8">
+                <div class="bg-white p-8 rounded-2xl shadow-lg border w-full md:w-96 transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 animate-fade-in-up" style="animation-delay: 400ms;">
+                    <h3 class="text-xl font-semibold text-slate-800">Paket Bulanan</h3>
+                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                        <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(monthlyPrice) }}</p>
+                        <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedMonthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span></p>
+                    </div>
+                    <p v-else class="text-4xl font-bold my-4 text-slate-900">
+                        {{ formatCurrency(monthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span>
+                    </p>
+                    <ul class="text-left space-y-3 text-slate-600 mt-6">
+                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Akses semua fitur</li>
+                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Dukungan prioritas</li>
+                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Update berkala</li>
+                    </ul>
+                    <button @click="handleSubscriptionMayar('bulanan')" :disabled="isSubscribingMonthly" class="mt-8 w-full border border-indigo-600 text-indigo-600 font-bold py-3 px-8 rounded-lg hover:bg-indigo-50 transition-colors disabled:bg-slate-200 disabled:text-slate-500 disabled:border-slate-200">
+                        <span v-if="isSubscribingMonthly">Memproses...</span>
+                        <span v-else>Pilih Paket Bulanan</span>
+                    </button>
+                </div>
 
-                <div class="relative bg-white p-8 rounded-2xl shadow-2xl border-2 border-indigo-500 w-full md:w-96 transform hover:-translate-y-2 hover:shadow-indigo-200 transition-all duration-300 animate-fade-in-up" style="animation-delay: 500ms;">
-                    <div class="absolute top-0 right-6 -mt-3 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Paling Hemat</div>
-                    <h3 class="text-xl font-semibold text-slate-800">Paket Tahunan</h3>
-                    <div v-if="uiState.referralCodeApplied || userProfile?.referredBy" class="my-4">
-                        <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(yearlyPrice) }}</p>
-                        <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedYearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span></p>
-                    </div>
-                    <p v-else class="text-4xl font-bold my-4 text-slate-900">
-                        {{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span>
-                    </p>
-                    <ul class="text-left space-y-3 text-slate-600 mt-6">
-                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Akses semua fitur</li>
-                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Dukungan prioritas</li>
-                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Update berkala</li>
-                        <li class="flex items-center gap-3 font-semibold text-green-600"><svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Diskon setara 2 bulan!</li>
-                    </ul>
-                    <button @click="handleSubscriptionMayar('tahunan')" :disabled="isSubscribingYearly" class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:bg-slate-400 disabled:shadow-none">
-                         <span v-if="isSubscribingYearly">Memproses...</span>
-                        <span v-else>Pilih Paket Tahunan</span>
-                    </button>
-                </div>
-            </div>
-        </div>
+                <div class="relative bg-white p-8 rounded-2xl shadow-2xl border-2 border-indigo-500 w-full md:w-96 transform hover:-translate-y-2 hover:shadow-indigo-200 transition-all duration-300 animate-fade-in-up" style="animation-delay: 500ms;">
+                    <div class="absolute top-0 right-6 -mt-3 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Paling Hemat</div>
+                    <h3 class="text-xl font-semibold text-slate-800">Paket Tahunan</h3>
+                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                        <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(yearlyPrice) }}</p>
+                        <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedYearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span></p>
+                    </div>
+                    <p v-else class="text-4xl font-bold my-4 text-slate-900">
+                        {{ formatCurrency(yearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span>
+                    </p>
+                    <ul class="text-left space-y-3 text-slate-600 mt-6">
+                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Akses semua fitur</li>
+                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Dukungan prioritas</li>
+                        <li class="flex items-center gap-3"><svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>Update berkala</li>
+                        <li class="flex items-center gap-3 font-semibold text-green-600"><svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Diskon setara 2 bulan!</li>
+                    </ul>
+                    <button @click="handleSubscriptionMayar('tahunan')" :disabled="isSubscribingYearly" class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:bg-slate-400 disabled:shadow-none">
+                         <span v-if="isSubscribingYearly">Memproses...</span>
+                        <span v-else>Pilih Paket Tahunan</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
 </div>
-    </div>
+
 </div>
 </main>
     </div>
