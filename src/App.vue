@@ -5307,38 +5307,24 @@ onMounted(() => {
     updateTime();
     intervalId = setInterval(updateTime, 1000);
 
-    onAuthStateChanged(auth, async (user) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromPayment = urlParams.get('status') === 'success';
+
+    // Jika terdeteksi baru kembali dari pembayaran, tampilkan loading screen
+    if (fromPayment) {
         isLoading.value = true;
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!fromPayment) {
+            isLoading.value = true;
+        }
         if (onSnapshotListener) onSnapshotListener();
         if (commissionsListener) commissionsListener();
 
         if (user) {
             currentUser.value = user;
-            const userDocRef = doc(db, "users", user.uid);
-
-            // --- PERBAIKAN UTAMA DI SINI ---
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('status') === 'success') {
-                // Jika baru kembali dari pembayaran, paksa ambil data dari server
-                console.log("Terdeteksi kembali dari pembayaran, memaksa ambil data server...");
-                try {
-                    const userDocSnap = await getDoc(userDocRef, { source: 'server' });
-                    if (userDocSnap.exists() && userDocSnap.data().subscriptionStatus === 'active') {
-                        // Jika sudah aktif, langsung arahkan ke dashboard
-                        console.log("Langganan sudah aktif dari server, mengarahkan ke dashboard.");
-                        await loadAllDataFromFirebase();
-                        changePage('dashboard');
-                        // Hapus parameter status dari URL agar tidak dijalankan lagi saat refresh
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                    }
-                } catch (e) {
-                    console.error("Gagal memaksa ambil data dari server:", e);
-                }
-            }
-            // --- AKHIR PERBAIKAN ---
-
-            // Tetap jalankan onSnapshot untuk update real-time selanjutnya
-            onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
+            onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
@@ -5354,13 +5340,29 @@ onMounted(() => {
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
                     if (isSubscriptionValid) {
-                        if (activePage.value === 'langganan' || activePage.value === 'login'){
-                            await loadAllDataFromFirebase();
+                        await loadAllDataFromFirebase();
+                        
+                        if (currentUser.value.isPartner) {
+                            const commissionsQuery = query(collection(db, 'commissions'), where('partnerId', '==', currentUser.value.uid));
+                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            });
+                        }
+
+                        // LOGIKA BARU YANG LEBIH BAIK
+                        if (fromPayment) {
+                            // Jika baru bayar, selalu paksa ke dashboard
+                            changePage('dashboard');
+                            // Hapus parameter URL agar tidak dijalankan lagi saat refresh
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        } else {
+                            // Jika login biasa, kembalikan ke halaman terakhir
                             const storedPage = localStorage.getItem('lastActivePage');
                             const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                             changePage(pageToLoad);
                         }
                     } else {
+                        // Jika tidak valid, selalu paksa ke halaman langganan
                         activePage.value = 'langganan';
                     }
                 } else {
