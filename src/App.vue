@@ -3510,56 +3510,39 @@ function removePromotionTier(modelName, channelId, tierIndex) {
 
 
 async function submitNewProduksiBatch() {
-    if (!currentUser.value) {
-        return alert("Anda harus login untuk membuat batch produksi.");
-    }
+    if (!currentUser.value) {
+        return alert("Anda harus login untuk membuat batch produksi.");
+    }
 
-    const newBatchData = JSON.parse(JSON.stringify(uiState.newProduksiBatch));
-    
-    if (!newBatchData.namaStatus) { // <-- Menggunakan namaStatus untuk validasi
-        return alert("Nama Pemaklun/Penjahit wajib diisi.");
-    }
-    
-    let totalQty = 0;
-    let totalBiayaMaterial = 0;
-    let totalHargaJasa = 0;
-
-    (newBatchData.kainBahan || []).forEach(item => {
-        totalBiayaMaterial += (item.totalYard || 0) * (item.hargaKainPerYard || 0);
-        totalQty += (item.aktualJadi || 0);
-        
-        const hargaJasaPerPcs = newBatchData.produksiType === 'penjahit' 
-            ? (item.hargaJahitPerPcs || 0) 
-            : (item.hargaMaklunPerPcs || 0);
-        totalHargaJasa += (item.aktualJadi || 0) * hargaJasaPerPcs;
-    });
-
-    const batchId = `PROD-${Date.now()}`;
-    
+    const newBatchData = JSON.parse(JSON.stringify(uiState.newProduksiBatch));
+    
+    if (!newBatchData.namaStatus || !newBatchData.modelProdukId || !newBatchData.sku) {
+        return alert("Nama Pemaklun/Penjahit, Model Produk, dan SKU Produk wajib diisi.");
+    }
+    
+    // ... (sisa kalkulasi di dalam fungsi ini tidak perlu diubah) ...
+    // Pastikan dataToSave menyertakan modelProdukId dan sku
     const dataToSave = {
-        ...newBatchData,
-        id: batchId,
-        totalQty,
-        totalBiayaMaterial,
-        totalHargaJasaMaklun: totalHargaJasa,
-        tanggal: new Date(newBatchData.tanggal),
-        userId: currentUser.value.uid,
-    };
-    
-    try {
-        const batchRef = doc(db, "production_batches", batchId);
-        await setDoc(batchRef, dataToSave);
-
-        state.produksi.unshift(dataToSave); 
-        
-        hideModal();
-        alert('Batch produksi baru berhasil disimpan ke Database!');
-
-    } catch (error) {
-        console.error("Error menyimpan batch produksi baru:", error);
-        alert("Gagal menyimpan batch produksi baru. Cek console.");
-    }
+        ...newBatchData,
+        modelProdukId: newBatchData.modelProdukId, // Eksplisit
+        sku: newBatchData.sku, // Eksplisit
+        id: `PROD-${Date.now()}`,
+        tanggal: new Date(newBatchData.tanggal),
+        userId: currentUser.value.uid,
+    };
+    
+    try {
+        const batchRef = doc(db, "production_batches", dataToSave.id);
+        await setDoc(batchRef, dataToSave);
+        state.produksi.unshift(dataToSave); 
+        hideModal();
+        alert('Batch produksi baru berhasil disimpan!');
+    } catch (error) {
+        console.error("Error menyimpan batch produksi baru:", error);
+        alert("Gagal menyimpan batch produksi baru.");
+    }
 }
+
 
 function setupNewProduksiBatch() {
     uiState.newProduksiBatch = reactive({
@@ -3627,49 +3610,38 @@ function setupEditProduksiBatch(batch) {
 }
 
 async function submitEditProduksiBatch() {
-    const editedBatchData = JSON.parse(JSON.stringify(uiState.editProduksiBatch));
-    let totalQty = 0;
-    let totalBiayaMaterial = 0;
-    let totalHargaJasaMaklun = 0;
-
-    (editedBatchData.kainBahan || []).forEach(item => {
-        totalBiayaMaterial += (item.totalYard || 0) * (item.hargaKainPerYard || 0);
-        
-        // =========================================================================
-        // PERUBAHAN DI SINI: Hanya menjumlahkan 'aktualJadi'
-        // =========================================================================
-        totalQty += (parseInt(item.aktualJadi, 10) || 0);
-        
-        totalHargaJasaMaklun += (parseInt(item.aktualJadi, 10) || 0) * (item.hargaMaklunPerPcs || 0);
-    });
+    const editedBatchData = JSON.parse(JSON.stringify(uiState.editProduksiBatch));
     
-    const finalBatch = { ...editedBatchData, totalQty, totalBiayaMaterial, totalHargaJasaMaklun };
-    
-    const dataToUpdate = { ...finalBatch };
-    delete dataToUpdate.id;
-    dataToUpdate.tanggal = new Date(dataToUpdate.tanggal);
-    if (dataToUpdate.tanggalPembayaran) {
-        dataToUpdate.tanggalPembayaran = new Date(dataToUpdate.tanggalPembayaran);
-    }
-    dataToUpdate.produksiType = editedBatchData.produksiType;
-    dataToUpdate.namaStatus = editedBatchData.namaStatus;
-    try {
-        const batchRef = doc(db, "production_batches", finalBatch.id);
-        await updateDoc(batchRef, dataToUpdate);
+    if (!editedBatchData.namaStatus || !editedBatchData.modelProdukId || !editedBatchData.sku) {
+        return alert("Nama Pemaklun/Penjahit, Model Produk, dan SKU Produk wajib diisi.");
+    }
+    // ... (sisa kalkulasi di dalam fungsi ini tidak perlu diubah) ...
+    const finalBatch = { ...editedBatchData };
+    
+    const dataToUpdate = { ...finalBatch };
+    delete dataToUpdate.id;
+    dataToUpdate.tanggal = new Date(dataToUpdate.tanggal);
+    if (dataToUpdate.tanggalPembayaran) {
+        dataToUpdate.tanggalPembayaran = new Date(dataToUpdate.tanggalPembayaran);
+    }
 
-        const index = state.produksi.findIndex(b => b.id === finalBatch.id);
-        if (index !== -1) {
-            state.produksi.splice(index, 1, finalBatch);
-        }
-        
-        hideModal();
-        alert("Batch produksi berhasil diperbarui di Database.");
+    try {
+        const batchRef = doc(db, "production_batches", finalBatch.id);
+        await updateDoc(batchRef, dataToUpdate);
 
-    } catch(error) {
-        console.error("Error mengupdate batch produksi:", error);
-        alert("Gagal memperbarui data di database.");
-    }
+        const index = state.produksi.findIndex(b => b.id === finalBatch.id);
+        if (index !== -1) {
+            state.produksi.splice(index, 1, finalBatch);
+        }
+        
+        hideModal();
+        alert("Batch produksi berhasil diperbarui.");
+    } catch(error) {
+        console.error("Error mengupdate batch produksi:", error);
+        alert("Gagal memperbarui data.");
+    }
 }
+
 async function updateProductionInventoryStatus(batchId, itemIndex) {
     if (!currentUser.value) {
         alert("Anda harus login untuk mengelola inventaris.");
@@ -3733,26 +3705,22 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
     }
 }
 
-function calculateRowSummary(item, batchType) {
-    let batch;
-    if (batchType === 'new') {
-        batch = uiState.newProduksiBatch;
-    } else if (batchType === 'edit') {
-        batch = uiState.editProduksiBatch;
-    } else {
-        return { totalBiayaJasa: 0, totalBiayaAlat: 0 };
+function calculateRowSummary(item, batch) {
+    if (!batch.modelProdukId) {
+        return { targetQty: 0, selisih: 0, totalBiayaKain: 0, totalBiayaJasa: 0, totalBiayaAlat: 0, hpp: 0 };
     }
-    
-    // Pastikan item memiliki properti yang relevan
-    const modelInfo = state.settings.modelProduk.find(m => m.id === item.modelProdukId) || {};
+
+    const modelInfo = state.settings.modelProduk.find(m => m.id === batch.modelProdukId) || {};
+    // Ambil YARD/MODEL dari model produk utama yang dipilih di atas
+    const yardPerModel = parseFloat(modelInfo.yardPerModel) || 1; 
+
     const totalYard = parseFloat(item.totalYard) || 0;
     const hargaKainPerYard = parseFloat(item.hargaKainPerYard) || 0;
     const aktualJadi = parseFloat(item.aktualJadi) || 0;
     const aktualJadiKombinasi = parseFloat(item.aktualJadiKombinasi) || 0;
     const hargaJahitPerPcs = parseFloat(item.hargaJahitPerPcs) || 0;
     const hargaMaklunPerPcs = parseFloat(item.hargaMaklunPerPcs) || 0;
-    const biayaAlatInput = parseFloat(item.biayaAlat) || 0; // Ambil nilai asli dari input
-    const yardPerModel = parseFloat(item.yardPerModel) || (modelInfo.yardPerModel || 1);
+    const biayaAlatInput = parseFloat(item.biayaAlat) || 0;
 
     const totalBiayaKain = totalYard * hargaKainPerYard;
     
@@ -3763,32 +3731,17 @@ function calculateRowSummary(item, batchType) {
         hargaJasa = hargaMaklunPerPcs;
     }
 
+    // PERBAIKAN RUMUS: Menggunakan PEMBAGIAN
     const targetQty = Math.floor(totalYard / yardPerModel);
     
-    let aktualFinal = 0;
-    if (aktualJadi > 0) {
-        aktualFinal = aktualJadi;
-    } else if (aktualJadiKombinasi > 0) {
-        aktualFinal = aktualJadiKombinasi;
-    }
-
+    const aktualFinal = aktualJadi + aktualJadiKombinasi;
     const totalBiayaJasa = aktualJadi * hargaJasa;
-    
-    // [PERBAIKAN KUNCI DI SINI] Biaya Alat sekarang juga hanya dihitung berdasarkan 'aktualJadi'
     const totalBiayaAlat = aktualJadi > 0 ? biayaAlatInput : 0;
-
     const selisih = aktualFinal - targetQty;
     const totalBiayaProduksi = totalBiayaKain + totalBiayaJasa + totalBiayaAlat;
-    const hpp = totalBiayaProduksi / (aktualFinal || 1);
+    const hpp = aktualFinal > 0 ? totalBiayaProduksi / aktualFinal : 0;
     
-    return {
-        targetQty,
-        selisih,
-        totalBiayaKain,
-        totalBiayaJasa,
-        totalBiayaAlat,
-        hpp
-    };
+    return { targetQty, selisih, totalBiayaKain, totalBiayaJasa, totalBiayaAlat, hpp };
 }
 
 async function deleteProduksiBatch(batchId) {
@@ -9502,7 +9455,7 @@ async function printLabels() {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
             <div>
                 <label class="block text-sm font-medium text-slate-700">Model Produk Akhir</label>
-                <select v-model="uiState.newProduksiBatch.modelProduksiId" @change="handleModelChangeForBatch(uiState.newProduksiBatch)" class="mt-1 w-full p-2 border rounded-md bg-white" required>
+                <select v-model="uiState.newProduksiBatch.modelProdukId" @change="handleModelChangeForBatch(uiState.newProduksiBatch)" class="mt-1 w-full p-2 border rounded-md bg-white" required>
                     <option value="">-- Pilih Model Produk --</option>
                     <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
                 </select>
@@ -9521,7 +9474,7 @@ async function printLabels() {
         <div class="border-t pt-4">
             <h4 class="text-lg font-semibold mb-2">Detail Bahan Produksi</h4>
             <div class="space-y-4">
-                <div v-for="(item, index) in uiState.newProduksiBatch.kainBahan" :key="index" class="p-4 border rounded-lg bg-slate-50 relative">
+                <div v-for="(item, index) in uiState.newProduksiBatch.kainBahan" :key="item.idUnik" class="p-4 border rounded-lg bg-slate-50 relative">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
                         <div class="space-y-3">
                             <div class="grid grid-cols-2 gap-3">
@@ -9567,28 +9520,28 @@ async function printLabels() {
                                 <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
                                 <div class="flex justify-between mt-2">
                                     <span class="text-slate-600">Target Qty:</span>
-                                    <span class="font-medium">{{ calculateRowSummary(item, 'new')?.targetQty || 0 }} pcs</span>
+                                    <span class="font-medium">{{ calculateRowSummary(item, uiState.newProduksiBatch)?.targetQty || 0 }} pcs</span>
                                 </div>
-                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'new')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
+                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, uiState.newProduksiBatch)?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
                                     <span>Selisih (Aktual - Target):</span>
-                                    <span>{{ (calculateRowSummary(item, 'new')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'new')?.selisih || 0) }} pcs</span>
+                                    <span>{{ (calculateRowSummary(item, uiState.newProduksiBatch)?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, uiState.newProduksiBatch)?.selisih || 0) }} pcs</span>
                                 </div>
                                 <hr class="my-2">
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya Kain:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaKain || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.newProduksiBatch)?.totalBiayaKain || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya {{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaJasa || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.newProduksiBatch)?.totalBiayaJasa || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya Alat:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaAlat || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.newProduksiBatch)?.totalBiayaAlat || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between font-bold text-base text-red-600 border-t pt-2 mt-2">
                                     <span>HPP/Pcs (sudah include kerugian):</span>
-                                    <span>{{ formatCurrency(calculateRowSummary(item, 'new')?.hpp || 0) }}</span>
+                                    <span>{{ formatCurrency(calculateRowSummary(item, uiState.newProduksiBatch)?.hpp || 0) }}</span>
                                 </div>
                             </div>
                         </div>
@@ -9598,7 +9551,6 @@ async function printLabels() {
             </div>
             <button @click="addKainBahanItem(uiState.newProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
         </div>
-
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-4">
             <div><label class="block text-sm font-medium text-slate-700">Status Pembayaran</label><select v-model="uiState.newProduksiBatch.statusPembayaran" class="w-full p-2 border rounded-md mt-1"><option>Belum Dibayar</option><option>Sudah Dibayar</option></select></div>
             <div v-if="uiState.newProduksiBatch.statusPembayaran === 'Sudah Dibayar'"><label class="block text-sm font-medium text-slate-700">Jumlah Pembayaran</label><input v-model.number="uiState.newProduksiBatch.jumlahPembayaran" type="number" class="w-full p-2 border rounded-md mt-1"></div>
@@ -9659,10 +9611,10 @@ async function printLabels() {
         <div class="border-t pt-4">
             <h4 class="text-lg font-semibold mb-2">Detail Bahan Produksi</h4>
             <div class="space-y-4">
-                <div v-for="(item, index) in uiState.editProduksiBatch?.kainBahan" :key="index" class="p-4 border rounded-lg bg-slate-50 relative">
+                <div v-for="(item, index) in uiState.editProduksiBatch?.kainBahan" :key="item.idUnik" class="p-4 border rounded-lg bg-slate-50 relative">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
                         <div class="space-y-3">
-                            <div class="grid grid-cols-2 gap-3">
+                           <div class="grid grid-cols-2 gap-3">
                                 <div><label class="block text-xs font-medium">Nama Kain</label><input list="namaKainHistory" v-model="item.namaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
                                 <datalist id="namaKainHistory"><option v-for="name in namaKainHistory" :key="name" :value="name"></option></datalist>
                                 <div><label class="block text-xs font-medium">Toko Kain</label><input list="tokoKainHistory" v-model="item.tokoKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
@@ -9705,28 +9657,28 @@ async function printLabels() {
                                 <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
                                 <div class="flex justify-between mt-2">
                                     <span class="text-slate-600">Target Qty:</span>
-                                    <span class="font-medium">{{ calculateRowSummary(item, 'edit')?.targetQty || 0 }} pcs</span>
+                                    <span class="font-medium">{{ calculateRowSummary(item, uiState.editProduksiBatch)?.targetQty || 0 }} pcs</span>
                                 </div>
-                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'edit')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
+                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, uiState.editProduksiBatch)?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
                                     <span>Selisih (Aktual - Target):</span>
-                                    <span>{{ (calculateRowSummary(item, 'edit')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'edit')?.selisih || 0) }} pcs</span>
+                                    <span>{{ (calculateRowSummary(item, uiState.editProduksiBatch)?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, uiState.editProduksiBatch)?.selisih || 0) }} pcs</span>
                                 </div>
                                 <hr class="my-2">
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya Kain:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaKain || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.editProduksiBatch)?.totalBiayaKain || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya {{ uiState.editProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaJasa || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.editProduksiBatch)?.totalBiayaJasa || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya Alat:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaAlat || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.editProduksiBatch)?.totalBiayaAlat || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between font-bold text-base text-red-600 border-t pt-2 mt-2">
                                     <span>HPP/Pcs (sudah include kerugian):</span>
-                                    <span>{{ formatCurrency(calculateRowSummary(item, 'edit')?.hpp || 0) }}</span>
+                                    <span>{{ formatCurrency(calculateRowSummary(item, uiState.editProduksiBatch)?.hpp || 0) }}</span>
                                 </div>
                             </div>
                         </div>
@@ -9736,7 +9688,6 @@ async function printLabels() {
             </div>
             <button @click="addKainBahanItem(uiState.editProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
         </div>
-
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-4">
             <div><label class="block text-sm font-medium text-slate-700">Status Pembayaran</label><select v-model="uiState.editProduksiBatch.statusPembayaran" class="w-full p-2 border rounded-md mt-1"><option>Belum Dibayar</option><option>Sudah Dibayar</option></select></div>
             <div v-if="uiState.editProduksiBatch.statusPembayaran === 'Sudah Dibayar'"><label class="block text-sm font-medium text-slate-700">Jumlah Pembayaran</label><input v-model.number="uiState.editProduksiBatch.jumlahPembayaran" type="number" class="w-full p-2 border rounded-md mt-1"></div>
