@@ -5323,17 +5323,25 @@ onMounted(() => {
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
-                    // ▼▼▼ KODE DEBUGGING DIMULAI DII SINI ▼▼▼
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
                     
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-
                     
-
                     if (isSubscriptionValid) {
+                        // --- LOGIKA BARU UNTUK MEMASTIKAN DATA REFRESH ---
+                        // Memaksa data untuk dimuat ulang jika ada parameter sukses di URL
+                        const urlParams = new URLSearchParams(window.location.search);
+                        if (urlParams.get('status') === 'success') {
+                            await loadAllDataFromFirebase();
+                            // Hapus parameter dari URL agar tidak memuat ulang terus menerus
+                            history.replaceState({}, document.title, window.location.pathname);
+                        }
+                        // --- AKHIR LOGIKA BARU ---
+
+                        // ... (sisa kode Anda di sini) ...
                         await loadAllDataFromFirebase();
 
                         if (currentUser.value.isPartner) {
