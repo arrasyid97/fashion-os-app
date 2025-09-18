@@ -5313,8 +5313,6 @@ onMounted(() => {
         if (commissionsListener) commissionsListener();
 
         if (user) {
-            // Jika Anda sudah menambahkan fungsi resetState, aktifkan baris di bawah ini
-            // resetState(); 
             currentUser.value = user;
 
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
@@ -5325,21 +5323,29 @@ onMounted(() => {
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
+                    // --- CATATAN DEBUGGING DIMULAI DI SINI ---
+                    console.log("--- MEMERIKSA STATUS LANGGANAN ---");
+                    console.log("1. Data Pengguna dari Firestore:", userData);
+
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
                     
+                    console.log("2. Tanggal Berakhir Langganan:", endDate);
+                    console.log("3. Tanggal Sekarang:", now);
+
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
+                    console.log("4. Hasil Pengecekan (isSubscriptionValid):", isSubscriptionValid);
+                    // --- CATATAN DEBUGGING SELESAI ---
+
                     if (isSubscriptionValid) {
+                        console.log("5. KESIMPULAN: Langganan Valid, memuat data utama.");
                         await loadAllDataFromFirebase();
 
                         if (currentUser.value.isPartner) {
-                            const commissionsQuery = query(
-                                collection(db, 'commissions'),
-                                where('partnerId', '==', currentUser.value.uid)
-                            );
+                            const commissionsQuery = query(collection(db, 'commissions'), where('partnerId', '==', currentUser.value.uid));
                             commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
                                 commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                             });
@@ -5350,6 +5356,7 @@ onMounted(() => {
                         changePage(pageToLoad);
 
                     } else {
+                        console.log("5. KESIMPULAN: Langganan TIDAK Valid, menampilkan halaman langganan.");
                         activePage.value = 'langganan';
                     }
                 } else {
@@ -5365,8 +5372,6 @@ onMounted(() => {
             });
         } else {
             currentUser.value = null;
-            // Jika Anda sudah menambahkan fungsi resetState, aktifkan baris di bawah ini
-            // resetState();
             activePage.value = 'login';
             isLoading.value = false;
         }
