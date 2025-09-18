@@ -5313,6 +5313,8 @@ onMounted(() => {
         if (commissionsListener) commissionsListener();
 
         if (user) {
+            // Jika Anda sudah menambahkan fungsi resetState, aktifkan baris di bawah ini
+            // resetState(); 
             currentUser.value = user;
 
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
@@ -5323,15 +5325,12 @@ onMounted(() => {
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
-                    // ▼▼▼ KODE DEBUGGING DIMULAI DII SINI ▼▼▼
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
                     
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-
-                    
 
                     if (isSubscriptionValid) {
                         await loadAllDataFromFirebase();
@@ -5342,11 +5341,7 @@ onMounted(() => {
                                 where('partnerId', '==', currentUser.value.uid)
                             );
                             commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                const fetchedCommissions = [];
-                                snapshot.forEach(doc => {
-                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
-                                });
-                                commissions.value = fetchedCommissions;
+                                commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                             });
                         }
                         
@@ -5370,6 +5365,8 @@ onMounted(() => {
             });
         } else {
             currentUser.value = null;
+            // Jika Anda sudah menambahkan fungsi resetState, aktifkan baris di bawah ini
+            // resetState();
             activePage.value = 'login';
             isLoading.value = false;
         }
@@ -7995,10 +7992,8 @@ async function printLabels() {
                 </div>
             </div>
         </div>
-
+     </div>
     </div>
-</div>
-
 </div>
 </main>
     </div>
