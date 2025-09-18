@@ -34,7 +34,7 @@ export default async function handler(request, response) {
 
     const { customerEmail, amount, id: mayarTransactionId } = data;
 
-    // Harga yang sudah Anda definisikan (diskon dan normal)
+    // Definisikan semua harga yang mungkin ada di aplikasi Anda
     const prices = {
         monthly: { normal: 350000, discounted: 250000 },
         yearly: { normal: 4200000, discounted: 2500000 },
@@ -53,7 +53,7 @@ export default async function handler(request, response) {
             
             if (userSnapshot.empty) {
                 console.error(`FATAL ERROR: Pengguna dengan email ${customerEmail} tidak ditemukan.`);
-                throw new Error(`User with email ${customerEmail} not found.`); // Hentikan transaksi
+                throw new Error(`User with email ${customerEmail} not found.`);
             }
             
             const userDoc = userSnapshot.docs[0];
@@ -62,14 +62,29 @@ export default async function handler(request, response) {
 
             // --- Langkah B: Proses Pendaftaran Mitra jika jumlahnya Rp 50.000 ---
             if (amount === prices.partnerRegistration) {
-                transaction.update(userDocRef, { isPartner: true });
-                console.log(`✅ BERHASIL: Pengguna ${customerEmail} berhasil menjadi Mitra.`);
+                // Tambahkan kode rujukan unik untuk mitra baru
+                const generatePartnerCode = () => {
+                    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                    let result = 'PARTNER-';
+                    for (let i = 0; i < 5; i++) {
+                        result += characters.charAt(Math.floor(Math.random() * characters.length));
+                    }
+                    return result;
+                };
+
+                const newReferralCode = generatePartnerCode();
+
+                transaction.update(userDocRef, { 
+                    isPartner: true,
+                    referralCode: newReferralCode
+                });
+                console.log(`✅ BERHASIL: Pengguna ${customerEmail} berhasil menjadi Mitra dengan kode ${newReferralCode}.`);
                 return; // Berhenti di sini, tidak perlu memproses langganan
             }
 
             // --- Langkah C: Tentukan Detail Langganan & Komisi Berdasarkan Jumlah Pembayaran ---
             const now = new Date();
-            let plan = 'bulanan';
+            let plan;
             let commissionAmount = 0;
             let subscriptionEndDate;
 
@@ -83,7 +98,7 @@ export default async function handler(request, response) {
                 subscriptionEndDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
             } else {
                 console.error(`PERINGATAN: Pembayaran dengan jumlah tidak dikenal: ${amount}. Tidak ada tindakan.`);
-                return;
+                return; // Keluar dari transaksi jika jumlah tidak valid
             }
 
             // --- Langkah D: Cek Kode Rujukan & Temukan Mitra jika pembayaran adalah harga diskon ---
@@ -96,6 +111,10 @@ export default async function handler(request, response) {
                 if (!partnerSnapshot.empty) {
                     partnerDoc = partnerSnapshot.docs[0];
                 }
+
+                // Hapus data rujukan yang sudah diproses agar tidak digunakan lagi
+                transaction.delete(pendingCommissionRef);
+                console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
             }
 
             // --- Langkah E: Update Dokumen Pengguna dengan Status Langganan Baru ---
@@ -103,7 +122,6 @@ export default async function handler(request, response) {
                 subscriptionStatus: 'active',
                 subscriptionEndDate: subscriptionEndDate,
                 plan: plan,
-                // Pastikan untuk menghapus trialEndDate jika ada
                 trialEndDate: admin.firestore.FieldValue.delete(),
                 lastPayment: { date: now, amount: amount, invoiceId: mayarTransactionId }
             }, { merge: true });
@@ -125,14 +143,6 @@ export default async function handler(request, response) {
                     mayarInvoiceId: mayarTransactionId
                 });
                 console.log(`✅ BERHASIL: Komisi sebesar ${commissionAmount} untuk mitra ${partnerId} dicatat.`);
-
-                // Hapus data rujukan yang sudah diproses
-                transaction.delete(pendingCommissionRef);
-                console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
-            } else if (pendingCommissionDoc.exists) {
-                // Hapus data pending meskipun tidak ada mitra yang ditemukan, untuk menghindari pemrosesan ganda.
-                transaction.delete(pendingCommissionRef);
-                console.log(`INFO: Data pending untuk ${customerEmail} dihapus karena tidak ada mitra yang valid atau bukan pembayaran diskon.`);
             }
         });
 

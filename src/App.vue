@@ -7954,7 +7954,7 @@ async function printLabels() {
             <div class="flex flex-col md:flex-row items-center justify-center gap-8">
                 <div class="bg-white p-8 rounded-2xl shadow-lg border w-full md:w-96 transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 animate-fade-in-up" style="animation-delay: 400ms;">
                     <h3 class="text-xl font-semibold text-slate-800">Paket Bulanan</h3>
-                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                    <div v-if="currentUser?.userData?.referredBy" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(monthlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedMonthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span></p>
                     </div>
@@ -7975,7 +7975,7 @@ async function printLabels() {
                 <div class="relative bg-white p-8 rounded-2xl shadow-2xl border-2 border-indigo-500 w-full md:w-96 transform hover:-translate-y-2 hover:shadow-indigo-200 transition-all duration-300 animate-fade-in-up" style="animation-delay: 500ms;">
                     <div class="absolute top-0 right-6 -mt-3 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Paling Hemat</div>
                     <h3 class="text-xl font-semibold text-slate-800">Paket Tahunan</h3>
-                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                    <div v-if="currentUser?.userData?.referredBy" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(yearlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedYearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span></p>
                     </div>
@@ -7989,13 +7989,12 @@ async function printLabels() {
                         <li class="flex items-center gap-3 font-semibold text-green-600"><svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Diskon setara 2 bulan!</li>
                     </ul>
                     <button @click="handleSubscriptionMayar('tahunan')" :disabled="isSubscribingYearly" class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:bg-slate-400 disabled:shadow-none">
-                         <span v-if="isSubscribingYearly">Memproses...</span>
+                        <span v-if="isSubscribingYearly">Memproses...</span>
                         <span v-else>Pilih Paket Tahunan</span>
                     </button>
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
