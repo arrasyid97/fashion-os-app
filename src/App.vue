@@ -9773,46 +9773,42 @@ async function printLabels() {
 <div v-if="uiState.nestedModalType === 'panduanProduksi'" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-4/5 max-h-[90vh] flex flex-col">
         <div class="flex-shrink-0 pb-4 border-b">
-            <h3 class="text-2xl font-bold text-slate-800">Panduan Penggunaan: Aktual Jadi vs. Aktual Jadi Kombinasi</h3>
-            <p class="text-slate-500">Dokumen ini menjelaskan perbedaan fungsional untuk memastikan pencatatan biaya dan kuantitas yang akurat.</p>
+            <h3 class="text-2xl font-bold text-slate-800">Panduan Form Produksi</h3>
+            <p class="text-slate-500">Penjelasan fungsional untuk memastikan pencatatan biaya dan kuantitas yang akurat.</p>
         </div>
 
         <div class="flex-1 overflow-y-auto py-4 pr-2">
-            <div class="space-y-6 text-slate-700 leading-relaxed">
+            <div class="space-y-6 text-slate-700 leading-relaxed prose">
+                
                 <div>
-                    <h4 class="text-xl font-semibold">1. Aktual Jadi</h4>
-                    <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi"</strong> ketika satu produk (contoh: 1 ModelProduk) dibuat sepenuhnya dari satu jenis bahan kain utama.</p>
-                    <p>Kolom ini berfungsi sebagai sumber data utama untuk perhitungan final. Semua biaya krusial dan jumlah total produk jadi akan dihitung berdasarkan input di sini.</p>
-                    <ul class="list-disc list-inside space-y-1 mt-2">
-                        <li><strong>Kapan digunakan:</strong> Produksi standar, seperti kaos yang seluruh bagiannya terbuat dari bahan yang sama dan warna yang sama.</li>
-                        <li><strong>Peran:</strong> Menentukan jumlah akhir produk jadi dan menjadi dasar kalkulasi semua biaya produksi.</li>
+                    <h4 class="text-xl font-semibold">Memahami Kolom SKU</h4>
+                    <p class="mt-2">Form ini memiliki dua jenis kolom SKU untuk menangani produk utama dan produk kombinasi secara terpisah.</p>
+                    <ul class="list-disc list-inside space-y-2 mt-2 text-sm">
+                        <li>
+                            <strong>SKU Produk (Untuk Aktual Jadi):</strong> Gunakan dropdown ini untuk memilih SKU produk akhir yang **sudah terdaftar di Manajemen Inventaris**. Stok dari SKU inilah yang akan bertambah ketika Anda menekan tombol "+ Masukkan ke Inventaris". Wajib diisi untuk bahan utama.
+                        </li>
+                        <li>
+                            <strong>SKU Kombinasi (Tulis Manual):</strong> Gunakan kolom teks ini untuk memberi nama pada bahan komponen atau kombinasi (contoh: "Lengan Merah", "Kerah Putih"). Data ini **tidak terhubung ke inventaris** dan hanya berfungsi untuk pencatatan biaya bahan tambahan pada produk akhir.
+                        </li>
                     </ul>
                 </div>
 
                 <div>
-                    <h4 class="text-xl font-semibold">2. Aktual Jadi Kombinasi</h4>
-                    <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi Kombinasi"</strong> untuk mencatat penggunaan bahan kain sekunder atau tambahan dalam pembuatan satu produk yang sama.</p>
-                    <p><strong>Aturan Penggunaan:</strong></p>
-                    <ul class="list-disc list-inside space-y-1 mt-2">
-                        <li><strong>Bahan Utama/Dominan:</strong> Data untuk bahan yang paling banyak digunakan (misalnya, kain untuk bagian badan ModelProduk) harus dimasukkan ke dalam kolom "Aktual Jadi".</li>
-                        <li><strong>Bahan Sekunder:</strong> Data untuk bahan campuran / bahan yang sama tapi berbeda warna (misalnya, kain untuk bagian lengan) dimasukkan ke dalam kolom "Aktual Jadi Kombinasi".</li>
-                    </ul>
-                    <ul class="list-disc list-inside space-y-1 mt-2">
-                        <li><strong>Kapan digunakan:</strong> Produksi produk dengan variasi bahan, seperti dikategori fashion dengan badan katun dan lengan rayon / bagian badan bahan katun dan tangan bahan bahan katun tapi warna yang membedakanya.</li>
-                        <li><strong>Peran:</strong> Mencatat biaya material tambahan tanpa memengaruhi perhitungan utama untuk biaya jasa dan peralatan.</li>
-                    </ul>
+                    <h4 class="text-xl font-semibold">Aktual Jadi vs. Aktual Jadi Kombinasi</h4>
+                    <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi"</strong> untuk mencatat jumlah produk utama yang berhasil dibuat dari satu baris bahan. Biaya jasa (maklun/jahit) dan biaya alat hanya dihitung dari jumlah ini.</p>
+                    <p class="mt-2">Gunakan kolom <strong>"Aktual Jadi Kombinasi"</strong> untuk mencatat jumlah komponen pelengkap yang dibuat dari satu baris bahan. Kolom ini hanya memengaruhi biaya bahan dan tidak memengaruhi biaya jasa.</p>
                 </div>
 
                 <div>
                     <h4 class="text-xl font-semibold">Peringatan Penting</h4>
                     <ul class="list-none space-y-2 mt-2">
                         <li class="p-3 bg-red-100 text-red-800 border-l-4 border-red-500">
-                            <strong>❌ Jangan menggunakan kedua kolom sekaligus!</strong><br>
-                            Pilih salah satu input ("Aktual Jadi" atau "Aktual Jadi Kombinasi") untuk setiap baris bahan. Jika Anda ingin menambah data aktual jadi / aktual jadi kombinasi , klik <strong>"+ Tambah Kain & Bahan Lain"</strong>.
+                            <strong>❌ Jangan menggunakan kedua kolom ("Aktual Jadi" dan "Aktual Jadi Kombinasi") sekaligus dalam satu baris bahan!</strong><br>
+                            Pilih salah satu. Jika Anda butuh mencatat keduanya untuk satu produk, klik "+ Tambah Kain & Bahan Lain" untuk membuat baris baru.
                         </li>
                         <li class="p-3 bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500">
-                            <strong>ℹ️ Catatan Penting untuk Sisa Kain:</strong><br>
-                            Jika ada sisa kain yang belum terpotong, catat kode unik kain tersebut. Jika nanti sisa kain itu dipotong dan menjadi produk jadi, cari kode uniknya di halaman <strong>Edit Batch Produksi</strong> untuk menambahkan total hasil jadinya. Namun, jika sisa kain diarahkan untuk model lain, jangan jadikan kode uniknya sebagai acuan analisis selisih tertinggi, karena data tersebut tidak relevan untuk analisis batch awal.
+                            <strong>ℹ️ Catatan untuk Sisa Kain:</strong><br>
+                            Jika ada sisa kain yang belum terpotong, catat kode unik kainnya. Jika sisa kain itu nanti digunakan lagi, cari batch produksi ini di halaman utama dan klik "Edit" untuk memperbarui jumlah hasil jadinya.
                         </li>
                     </ul>
                 </div>
