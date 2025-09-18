@@ -5157,113 +5157,107 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 });
 
 async function loadAllDataFromFirebase() {
-    isLoading.value = true;
-    const userId = currentUser.value?.uid;
-    
-    if (!userId) {
-        isLoading.value = false;
-        return;
-    }
-    try {
-        const collectionsToFetch = [
-            getDoc(doc(db, "settings", userId)),
-            getDoc(doc(db, "promotions", userId)),
-            // Baris untuk 'commissions' sudah benar dihapus dari sini
-            getDocs(query(collection(db, "products"), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
-            getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "categories"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId)))
-        ];
+    isLoading.value = true;
+    const userId = currentUser.value?.uid;
+    
+    if (!userId) {
+        isLoading.value = false;
+        return;
+    }
+    try {
+        const collectionsToFetch = [
+            getDoc(doc(db, "settings", userId)),
+            getDoc(doc(db, "promotions", userId)),
+            getDocs(query(collection(db, "products"), where("userId", "==", userId))),
+            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
+            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
+            getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "categories"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId)))
+        ];
 
-        const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
-        
-        // Cek apakah ada error dari salah satu promise
-        const firstError = results.find(res => res instanceof Error);
-        if (firstError) {
-            console.error("Salah satu kueri data gagal:", firstError);
-            throw new Error("Gagal mengambil data. Periksa aturan keamanan Firestore Anda.");
-        }
-        
-        // ▼▼▼ BAGIAN INI TELAH DIPERBAIKI (variabel commissionsSnap dihapus) ▼▼▼
-        const [
-            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
-            transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
-            categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap
-        ] = results;
+        const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
+        
+        const firstError = results.find(res => res instanceof Error);
+        if (firstError) {
+            console.error("Salah satu kueri data gagal:", firstError);
+            throw new Error("Gagal mengambil data. Periksa aturan keamanan Firestore Anda.");
+        }
+        
+        const [
+            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
+            transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
+            categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap
+        ] = results;
 
-        if (settingsSnap.exists()) {
-            Object.assign(state.settings, settingsSnap.data());
-            if (!state.settings.pinProtection) {
-                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true, };
-            }
-        }
-        
-        const userDocRef = doc(db, "users", userId);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            state.settings.inflowCategories = userData.inflowCategories || [];
-        }
-        if (promotionsSnap.exists()) {
-            Object.assign(state.promotions, promotionsSnap.data());
-        }
-        
-        // ▼▼▼ BAGIAN INI TELAH DIPERBAIKI (pengecekan commissionsSnap dihapus) ▼▼▼
-        // Data komisi sudah dimuat oleh listener terpisah, jadi tidak perlu diproses di sini.
+        if (settingsSnap.exists()) {
+            Object.assign(state.settings, settingsSnap.data());
+            if (!state.settings.pinProtection) {
+                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
+            }
+        }
+        
+        const userDocRef = doc(db, "users", userId);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            state.settings.inflowCategories = userData.inflowCategories || [];
+        }
+        if (promotionsSnap.exists()) {
+            Object.assign(state.promotions, promotionsSnap.data());
+        }
 
-        const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
-        
-        state.produk = productsSnap.docs.map(docSnap => {
-            const p = { id: docSnap.id, ...docSnap.data() };
-            const hargaJual = {};
-            const stokAlokasi = {};
-            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
-            (state.settings.marketplaces || []).forEach(mp => {
-                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-            });
-            return {
-                docId: p.id,
-                sku: p.sku,
-                nama: p.product_name,
-                model_id: p.model_id,
-                warna: p.color,
-                varian: p.variant,
-                stokFisik: p.physical_stock,
-                hpp: p.hpp,
-                hargaJual,
-                stokAlokasi,
-                userId: p.userId
-            };
-        });
-        
-        state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
-        state.bankAccounts = bankAccountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.investorPayments = investorPaymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), paymentDate: doc.data().paymentDate?.toDate() }));
-        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
-        state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
+        
+        state.produk = productsSnap.docs.map(docSnap => {
+            const p = { id: docSnap.id, ...docSnap.data() };
+            const hargaJual = {};
+            const stokAlokasi = {};
+            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
+            (state.settings.marketplaces || []).forEach(mp => {
+                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
+                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+            });
+            return {
+                docId: p.id,
+                sku: p.sku,
+                nama: p.product_name,
+                model_id: p.model_id,
+                warna: p.color,
+                varian: p.variant,
+                stokFisik: p.physical_stock,
+                hpp: p.hpp,
+                hargaJual,
+                stokAlokasi,
+                userId: p.userId
+            };
+        });
+        
+        state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
+        state.bankAccounts = bankAccountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        state.investorPayments = investorPaymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), paymentDate: doc.data().paymentDate?.toDate() }));
+        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
+        state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    } catch (error) {
-        console.error("Error besar saat memuat data dari Firebase:", error);
-        alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
-        handleLogout();
-    } finally {
-        isLoading.value = false;
-    }
+    } catch (error) {
+        console.error("Error besar saat memuat data dari Firebase:", error);
+        alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
+        handleLogout();
+    } finally {
+        isLoading.value = false;
+    }
 }
 
 watch([barcodeContent, labelSettings], () => {
