@@ -9700,6 +9700,7 @@ async function printLabels() {
                                         <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
                                     </select>
                                 </div>
+                                
                                 <div v-if="item.modelProdukId">
                                     <label class="block text-xs font-medium">SKU Produk (Untuk Aktual Jadi)</label>
                                     <select v-model="item.sku" @change="handleProductSkuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white">
@@ -9715,7 +9716,40 @@ async function printLabels() {
                                 </div>
                                 <div><label class="block text-xs font-medium">Nama Kain</label><input list="namaKainHistory" v-model="item.namaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
                                 <datalist id="namaKainHistory"><option v-for="name in namaKainHistory" :key="name" :value="name"></option></datalist>
+                                <div><label class="block text-xs font-medium">Toko Kain</label><input list="tokoKainHistory" v-model="item.tokoKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <datalist id="tokoKainHistory"><option v-for="toko in tokoKainHistory" :key="toko" :value="toko"></option></datalist>
+                                <div><label class="block text-xs font-medium">Warna Kain</label><input v-model="item.warnaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <div><label class="block text-xs font-medium">Ukuran</label><input v-model="item.ukuran" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <div><label class="block text-xs font-medium">Total Yard</label><input list="totalYardHistory" v-model.number="item.totalYard" type="number" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <datalist id="totalYardHistory"><option v-for="yard in totalYardHistory" :key="yard" :value="yard"></option></datalist>
+                                <div><label class="block text-xs font-medium">Harga/Yard</label><input list="hargaKainPerYardHistory" v-model.number="item.hargaKainPerYard" type="number" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <datalist id="hargaKainPerYardHistory"><option v-for="harga in hargaKainPerYardHistory" :key="harga" :value="harga"></option></datalist>
+                                <div v-if="uiState.editProduksiBatch.produksiType === 'penjahit'">
+                                    <label class="block text-xs font-medium">Harga Jahit/Pcs</label>
+                                    <input v-model.number="item.hargaJahitPerPcs" type="number" class="mt-1 w-full p-2 text-sm border rounded-md">
                                 </div>
+                                <div v-else>
+                                    <label class="block text-xs font-medium">Harga Maklun/Pcs</label>
+                                    <input v-model.number="item.hargaMaklunPerPcs" type="number" class="mt-1 w-full p-2 text-sm border rounded-md">
+                                </div>
+                                <div class="col-span-2"><label class="block text-xs font-medium">Biaya Alat-Alat (Rp)</label><input v-model.number="item.biayaAlat" type="number" placeholder="Plastik, kancing, dll." class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <div class="col-span-2 space-y-2">
+                                    <div>
+                                        <label class="block text-xs font-medium">Aktual Jadi</label>
+                                        <div class="flex items-center gap-2">
+                                            <span class="bg-indigo-100 text-indigo-800 font-bold px-2 py-1 rounded-md text-xs">{{ item.idUnik }}</span>
+                                            <input v-model.number="item.aktualJadi" type="number" class="w-full p-2 text-sm border rounded-md" placeholder="Jumlah jadi utama">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium">Aktual Jadi Kombinasi (pcs)</label>
+                                        <div class="flex items-center gap-2">
+                                            <span class="bg-purple-100 text-purple-800 font-bold px-2 py-1 rounded-md text-xs">{{ item.idUnik }}</span>
+                                            <input v-model.number="item.aktualJadiKombinasi" type="number" class="w-full p-2 text-sm border rounded-md" placeholder="Jumlah komponen pelengkap">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div>
                            <div class="p-4 bg-white rounded-lg space-y-2 text-sm h-full border sticky top-0">
