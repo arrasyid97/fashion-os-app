@@ -5323,6 +5323,7 @@ onMounted(() => {
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
+                    // ▼▼▼ KODE DEBUGGING DIMULAI DII SINI ▼▼▼
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
@@ -5330,23 +5331,32 @@ onMounted(() => {
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
+                    
+
                     if (isSubscriptionValid) {
                         await loadAllDataFromFirebase();
-                        
-                        // Jika status jadi valid saat di halaman langganan, paksa pindah ke dashboard
-                        if (activePage.value === 'langganan') {
-                            changePage('dashboard');
-                        } else {
-                            // Jika tidak, jalankan logika yang sudah ada untuk kembali ke halaman terakhir
-                            const storedPage = localStorage.getItem('lastActivePage');
-                            const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                            changePage(pageToLoad);
+
+                        if (currentUser.value.isPartner) {
+                            const commissionsQuery = query(
+                                collection(db, 'commissions'),
+                                where('partnerId', '==', currentUser.value.uid)
+                            );
+                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                const fetchedCommissions = [];
+                                snapshot.forEach(doc => {
+                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
+                                });
+                                commissions.value = fetchedCommissions;
+                            });
                         }
+                        
+                        const storedPage = localStorage.getItem('lastActivePage');
+                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                        changePage(pageToLoad);
+
                     } else {
-                        // Jika status tidak valid, pastikan tetap di halaman langganan
                         activePage.value = 'langganan';
                     }
-                    
                 } else {
                     console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                     handleLogout();
@@ -5365,7 +5375,6 @@ onMounted(() => {
         }
     });
 });
-
 
 onUnmounted(() => { // <-- PINDAHKAN KE SINI
     clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
@@ -7986,8 +7995,10 @@ async function printLabels() {
                 </div>
             </div>
         </div>
+
     </div>
 </div>
+
 </div>
 </main>
     </div>
