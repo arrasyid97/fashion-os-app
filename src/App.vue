@@ -34,6 +34,7 @@ const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengatura
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
+const paymentStatus = ref(null);
 const activationCodeInput = ref('');
 const activationCodeMessage = ref('');
 const commissionPayouts = ref([]);
@@ -5307,6 +5308,15 @@ onMounted(() => {
     updateTime();
     intervalId = setInterval(updateTime, 1000);
 
+    // ▼▼▼ 1. DETEKSI REDIRECT DARI MAYAR SETELAH PEMBAYARAN ▼▼▼
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('status') === 'success') {
+        paymentStatus.value = 'processing';
+        // Hapus parameter dari URL agar tidak muncul terus saat refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    // ▲▲▲ AKHIR BAGIAN 1 ▲▲▲
+
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
         if (onSnapshotListener) onSnapshotListener();
@@ -5323,7 +5333,6 @@ onMounted(() => {
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
-                    // ▼▼▼ KODE DEBUGGING DIMULAI DII SINI ▼▼▼
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
@@ -5331,26 +5340,26 @@ onMounted(() => {
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                    
-
+                    // ▼▼▼ 2. LOGIKA BARU YANG LEBIH ANDAL UNTUK MENGATUR HALAMAN ▼▼▼
                     if (isSubscriptionValid) {
-    await loadAllDataFromFirebase();
-    
-    // ...
-    // JIKA KITA SEDANG DI HALAMAN LANGGANAN DAN STATUS JADI AKTIF,
-    // PAKSA PINDAH KE DASHBOARD.
-    if (activePage.value === 'langganan') {
-        changePage('dashboard');
-    } else {
-        // Jika tidak, jalankan logika yang sudah ada
-        const storedPage = localStorage.getItem('lastActivePage');
-        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-        changePage(pageToLoad);
-    }
-
-} else {
-    activePage.value = 'langganan';
-}
+                        paymentStatus.value = null; // Hapus status "processing" jika ada
+                        await loadAllDataFromFirebase();
+                        
+                        // Jika status jadi valid saat di halaman langganan, paksa pindah ke dashboard
+                        if (activePage.value === 'langganan') {
+                            changePage('dashboard');
+                        } else {
+                            // Jika tidak, jalankan logika yang sudah ada untuk kembali ke halaman terakhir
+                            const storedPage = localStorage.getItem('lastActivePage');
+                            const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                            changePage(pageToLoad);
+                        }
+                    } else {
+                        // Jika status tidak valid, pastikan tetap di halaman langganan
+                        activePage.value = 'langganan';
+                    }
+                    // ▲▲▲ AKHIR BAGIAN 2 ▲▲▲
+                    
                 } else {
                     console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                     handleLogout();
@@ -7863,7 +7872,16 @@ async function printLabels() {
 <div v-if="activePage === 'langganan'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8 flex items-center justify-center">
 
-        <div v-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
+        <div v-if="paymentStatus === 'processing'" class="text-center animate-fade-in">
+            <svg class="animate-spin h-12 w-12 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <h2 class="mt-4 text-2xl font-bold text-slate-800">Memproses Pembayaran Anda...</h2>
+            <p class="mt-2 text-slate-600">Mohon tunggu sebentar, kami sedang mengaktifkan langganan Anda.</p>
+        </div>
+
+        <div v-else-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
             <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-green-200 flex flex-col items-center">
                 <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -7989,10 +8007,8 @@ async function printLabels() {
                 </div>
             </div>
         </div>
-
     </div>
 </div>
-
 </div>
 </main>
     </div>
