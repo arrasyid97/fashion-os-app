@@ -1268,36 +1268,31 @@ async function handleSubscriptionMayar(plan) {
     }
     isSubscribingPlan.value = true;
 
-    // Menentukan harga yang benar berdasarkan kode rujukan
-    const priceToPay = (plan === 'bulanan')
-        ? (currentUser.value?.userData?.referredBy ? discountedMonthlyPrice.value : monthlyPrice.value)
-        : (currentUser.value?.userData?.referredBy ? discountedYearlyPrice.value : yearlyPrice.value);
-
-    // Dapatkan kode rujukan dari user data (yang sudah tersimpan saat register/login)
-    const referredByCode = currentUser.value?.userData?.referredBy || null;
+    const referredByCode = uiState.referralCodeApplied ? uiState.referralCodeInput : (currentUser.value?.userData?.referredBy || null);
 
     try {
-        // Jika ada kode rujukan, simpan di 'pending_commissions' sebelum pembayaran
         if (referredByCode) {
+            // --- AWAL PERBAIKAN: Menyimpan data referral di Firestore sebelum pembayaran ---
             const pendingCommissionRef = doc(db, 'pending_commissions', currentUser.value.email);
             await setDoc(pendingCommissionRef, {
                 referredByCode: referredByCode,
                 timestamp: new Date(),
             }, { merge: true });
             console.log(`INFO: Data referral untuk ${currentUser.value.email} disimpan di Firestore.`);
+            // --- AKHIR PERBAIKAN ---
         }
 
         const response = await fetch('/api/create-mayar-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                amount: priceToPay, // Menggunakan harga yang telah disesuaikan
-                item_name: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
-                customer_email: currentUser.value.email,
-                callback_url: 'https://appfashion.id/api/mayar-webhook',
-                redirect_url: `https://appfashion.id/langganan?status=success`,
-                merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
-            }),
+    amount: plan === 'bulanan' ? discountedMonthlyPrice.value : discountedYearlyPrice.value,
+    item_name: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
+    customer_email: currentUser.value.email,
+    callback_url: 'https://appfashion.id/api/mayar-webhook',
+    redirect_url: `https://appfashion.id/langganan?status=success`,
+    merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
+}),
         });
 
         const data = await response.json();
@@ -7941,17 +7936,17 @@ async function printLabels() {
             
             <div class="max-w-xl mx-auto mb-12 p-6 rounded-xl border border-dashed border-indigo-300 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 300ms;">
                 <h3 class="text-lg font-semibold text-indigo-700">Punya Kode Rujukan? (Untuk Diskon)</h3>
-                <p v-if="!currentUser?.userData?.referredBy && !uiState.referralCodeApplied" class="text-sm text-slate-600 mb-2">
+                <p v-if="!currentUser?.userData?.referredBy" class="text-sm text-slate-600 mb-2">
                     Masukkan kode dari mitra kami untuk mendapatkan diskon khusus.
                 </p>
-                <div v-if="!currentUser?.userData?.referredBy && !uiState.referralCodeApplied" class="flex gap-2">
+                <div v-if="!currentUser?.userData?.referredBy" class="flex gap-2">
                     <input type="text" v-model="uiState.referralCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400" placeholder="Contoh: PARTNER-ABCDE">
                     <button @click.prevent="applyReferralCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">Terapkan</button>
                 </div>
                 <p v-if="uiState.referralCodeMessage" class="mt-2 text-xs font-medium" :class="uiState.referralCodeApplied ? 'text-green-600' : 'text-red-500'">
                     {{ uiState.referralCodeMessage }}
                 </p>
-                <p v-if="currentUser?.userData?.referredBy || uiState.referralCodeApplied" class="text-sm text-green-600 font-medium">
+                <p v-if="currentUser?.userData?.referredBy" class="text-sm text-green-600 font-medium">
                     Selamat! Diskon rujukan sudah berlaku selamanya untuk akun Anda.
                 </p>
             </div>
@@ -7959,7 +7954,7 @@ async function printLabels() {
             <div class="flex flex-col md:flex-row items-center justify-center gap-8">
                 <div class="bg-white p-8 rounded-2xl shadow-lg border w-full md:w-96 transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 animate-fade-in-up" style="animation-delay: 400ms;">
                     <h3 class="text-xl font-semibold text-slate-800">Paket Bulanan</h3>
-                    <div v-if="currentUser?.userData?.referredBy || uiState.referralCodeApplied" class="my-4">
+                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(monthlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedMonthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span></p>
                     </div>
@@ -7980,7 +7975,7 @@ async function printLabels() {
                 <div class="relative bg-white p-8 rounded-2xl shadow-2xl border-2 border-indigo-500 w-full md:w-96 transform hover:-translate-y-2 hover:shadow-indigo-200 transition-all duration-300 animate-fade-in-up" style="animation-delay: 500ms;">
                     <div class="absolute top-0 right-6 -mt-3 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Paling Hemat</div>
                     <h3 class="text-xl font-semibold text-slate-800">Paket Tahunan</h3>
-                    <div v-if="currentUser?.userData?.referredBy || uiState.referralCodeApplied" class="my-4">
+                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(yearlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedYearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span></p>
                     </div>
@@ -7994,12 +7989,13 @@ async function printLabels() {
                         <li class="flex items-center gap-3 font-semibold text-green-600"><svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Diskon setara 2 bulan!</li>
                     </ul>
                     <button @click="handleSubscriptionMayar('tahunan')" :disabled="isSubscribingYearly" class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:bg-slate-400 disabled:shadow-none">
-                        <span v-if="isSubscribingYearly">Memproses...</span>
+                         <span v-if="isSubscribingYearly">Memproses...</span>
                         <span v-else>Pilih Paket Tahunan</span>
                     </button>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 
