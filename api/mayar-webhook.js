@@ -32,7 +32,14 @@ export default async function handler(request, response) {
         return response.status(200).json({ message: 'Webhook received, no action needed.' });
     }
 
-    const { customerEmail, amount, merchantRef, id: mayarTransactionId } = data;
+    const { customerEmail, amount, id: mayarTransactionId } = data;
+
+    // Harga yang sudah Anda definisikan (diskon dan normal)
+    const prices = {
+        monthly: { normal: 350000, discounted: 250000 },
+        yearly: { normal: 4200000, discounted: 2500000 },
+        partnerRegistration: 50000
+    };
 
     try {
         // 3. Menjalankan semua operasi database dalam satu transaksi yang aman
@@ -53,12 +60,37 @@ export default async function handler(request, response) {
             const userId = userDoc.id;
             const userDocRef = userDoc.ref;
 
-            // --- Langkah B: Cek Apakah Ada Kode Rujukan & Temukan Mitra ---
-            const pendingCommissionDoc = await transaction.get(pendingCommissionRef);
-            const referredByCode = pendingCommissionDoc.exists ? pendingCommissionDoc.data().referredByCode : null;
-            let partnerDoc = null;
+            // --- Langkah B: Proses Pendaftaran Mitra jika jumlahnya Rp 50.000 ---
+            if (amount === prices.partnerRegistration) {
+                transaction.update(userDocRef, { isPartner: true });
+                console.log(`✅ BERHASIL: Pengguna ${customerEmail} berhasil menjadi Mitra.`);
+                return; // Berhenti di sini, tidak perlu memproses langganan
+            }
 
-            if (referredByCode) {
+            // --- Langkah C: Tentukan Detail Langganan & Komisi Berdasarkan Jumlah Pembayaran ---
+            const now = new Date();
+            let plan = 'bulanan';
+            let commissionAmount = 0;
+            let subscriptionEndDate;
+
+            if (amount === prices.monthly.normal || amount === prices.monthly.discounted) {
+                plan = 'bulanan';
+                commissionAmount = 50000;
+                subscriptionEndDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+            } else if (amount === prices.yearly.normal || amount === prices.yearly.discounted) {
+                plan = 'tahunan';
+                commissionAmount = 500000;
+                subscriptionEndDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+            } else {
+                console.error(`PERINGATAN: Pembayaran dengan jumlah tidak dikenal: ${amount}. Tidak ada tindakan.`);
+                return;
+            }
+
+            // --- Langkah D: Cek Kode Rujukan & Temukan Mitra jika pembayaran adalah harga diskon ---
+            const pendingCommissionDoc = await transaction.get(pendingCommissionRef);
+            let partnerDoc = null;
+            if (pendingCommissionDoc.exists && (amount === prices.monthly.discounted || amount === prices.yearly.discounted)) {
+                const referredByCode = pendingCommissionDoc.data().referredByCode;
                 const partnerQuery = usersRef.where('referralCode', '==', referredByCode).limit(1);
                 const partnerSnapshot = await transaction.get(partnerQuery);
                 if (!partnerSnapshot.empty) {
@@ -66,35 +98,17 @@ export default async function handler(request, response) {
                 }
             }
 
-            // --- Langkah C: Tentukan Detail Langganan & Komisi Berdasarkan Jumlah Pembayaran ---
-            let plan = 'bulanan'; // Default plan
-            let commissionAmount = 0;
-            let subscriptionEndDate;
-            const now = new Date();
-
-            if (amount === 250000 || amount === 350000) {
-                plan = 'bulanan';
-                commissionAmount = 50000;
-                subscriptionEndDate = new Date(new Date().setMonth(now.getMonth() + 1));
-            } else if (amount === 2500000 || amount === 4200000) {
-                plan = 'tahunan';
-                commissionAmount = 500000;
-                subscriptionEndDate = new Date(new Date().setFullYear(now.getFullYear() + 1));
-            } else {
-                // Pengaman jika jumlah tidak cocok, tetap berikan 1 bulan
-                subscriptionEndDate = new Date(new Date().setMonth(now.getMonth() + 1));
-            }
-            
-            // --- Langkah D: Update Dokumen Pengguna dengan Status Langganan Baru ---
+            // --- Langkah E: Update Dokumen Pengguna dengan Status Langganan Baru ---
             transaction.set(userDocRef, {
                 subscriptionStatus: 'active',
                 subscriptionEndDate: subscriptionEndDate,
                 plan: plan,
-                trialEndDate: admin.firestore.FieldValue.delete(), // Hapus masa trial jika ada
+                // Pastikan untuk menghapus trialEndDate jika ada
+                trialEndDate: admin.firestore.FieldValue.delete(),
                 lastPayment: { date: now, amount: amount, invoiceId: mayarTransactionId }
             }, { merge: true });
 
-            // --- Langkah E: Buat Dokumen Komisi untuk Mitra (jika ada) ---
+            // --- Langkah F: Buat Dokumen Komisi untuk Mitra (jika ada) ---
             if (partnerDoc && commissionAmount > 0) {
                 const partnerId = partnerDoc.id;
                 const commissionDocRef = db.collection('commissions').doc();
@@ -115,9 +129,10 @@ export default async function handler(request, response) {
                 // Hapus data rujukan yang sudah diproses
                 transaction.delete(pendingCommissionRef);
                 console.log(`INFO: Data pending untuk ${customerEmail} berhasil dihapus.`);
-            } else if (referredByCode) {
-                console.error(`❌ PERINGATAN: Kode rujukan ${referredByCode} ada, tetapi mitra tidak ditemukan.`);
-                transaction.delete(pendingCommissionRef); // Tetap hapus agar tidak diproses lagi
+            } else if (pendingCommissionDoc.exists) {
+                // Hapus data pending meskipun tidak ada mitra yang ditemukan, untuk menghindari pemrosesan ganda.
+                transaction.delete(pendingCommissionRef);
+                console.log(`INFO: Data pending untuk ${customerEmail} dihapus karena tidak ada mitra yang valid atau bukan pembayaran diskon.`);
             }
         });
 
@@ -128,4 +143,3 @@ export default async function handler(request, response) {
         return response.status(500).json({ message: 'Gagal memproses webhook', error: error.message });
     }
 }
-
