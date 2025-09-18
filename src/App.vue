@@ -6457,7 +6457,7 @@ async function printLabels() {
                         </div>
                     </div>
                     <div class="bg-slate-50/50 p-4 rounded-xl border">
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Filter & Pencarian</label>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Filter & Pencarian batch produksi / kode aktual</label>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                             <input v-model="uiState.produksiSearch" type="text" placeholder="Cari..." class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
                             <select v-model="uiState.produksiFilterType" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
