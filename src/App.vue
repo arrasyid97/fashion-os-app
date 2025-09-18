@@ -3507,216 +3507,267 @@ function removePromotionTier(modelName, channelId, tierIndex) {
         state.promotions.perModel[modelName][channelId].diskonBertingkat.splice(tierIndex, 1);
     }
 }
-
-
-async function submitNewProduksiBatch() {
-    if (!currentUser.value) {
-        return alert("Anda harus login untuk membuat batch produksi.");
-    }
-
-    const newBatchData = JSON.parse(JSON.stringify(uiState.newProduksiBatch));
-    
-    if (!newBatchData.namaStatus || !newBatchData.modelProdukId || !newBatchData.sku) {
-        return alert("Nama Pemaklun/Penjahit, Model Produk, dan SKU Produk wajib diisi.");
-    }
-    
-    // ... (sisa kalkulasi di dalam fungsi ini tidak perlu diubah) ...
-    // Pastikan dataToSave menyertakan modelProdukId dan sku
-    const dataToSave = {
-        ...newBatchData,
-        modelProdukId: newBatchData.modelProdukId, // Eksplisit
-        sku: newBatchData.sku, // Eksplisit
-        id: `PROD-${Date.now()}`,
-        tanggal: new Date(newBatchData.tanggal),
-        userId: currentUser.value.uid,
-    };
-    
-    try {
-        const batchRef = doc(db, "production_batches", dataToSave.id);
-        await setDoc(batchRef, dataToSave);
-        state.produksi.unshift(dataToSave); 
-        hideModal();
-        alert('Batch produksi baru berhasil disimpan!');
-    } catch (error) {
-        console.error("Error menyimpan batch produksi baru:", error);
-        alert("Gagal menyimpan batch produksi baru.");
-    }
+function setupNewProduksiBatch() {
+    uiState.newProduksiBatch = reactive({
+        tanggal: new Date().toISOString().split('T')[0],
+        produksiType: 'pemaklun',
+        namaStatus: '', // <-- DIUBAH KEMBALI KE namaStatus
+        statusProses: 'Dalam Proses',
+        kainBahan: [{
+            idUnik: generateUniqueCode(),
+            modelProdukId: '',
+            namaKain: '',
+            tokoKain: '',
+            warnaKain: '',
+            ukuran: '',
+            totalYard: null,
+            hargaKainPerYard: null,
+            yardPerModel: null,
+            aktualJadi: null,
+            hargaMaklunPerPcs: null,
+            hargaJahitPerPcs: null,
+            biayaAlat: null,
+            aktualJadiKombinasi: null,
+            isInventoried: false,
+        }],
+        statusPembayaran: 'Belum Dibayar',
+        jumlahPembayaran: null,
+        tanggalPembayaran: '',
+        catatan: '',
+        orangMemproses: '',
+    });
 }
 
+async function submitNewProduksiBatch() {
+    if (!currentUser.value) {
+        return alert("Anda harus login untuk membuat batch produksi.");
+    }
 
-function setupNewProduksiBatch() {
-    uiState.newProduksiBatch = reactive({
-        tanggal: new Date().toISOString().split('T')[0],
-        produksiType: 'pemaklun',
-        namaStatus: '',
-        // --- PERUBAHAN DI SINI ---
-        modelProdukId: '', // Dipindahkan ke level atas
-        sku: '',            // Dipindahkan ke level atas
-        // --- AKHIR PERUBAHAN ---
-        statusProses: 'Dalam Proses',
-        kainBahan: [{
-            idUnik: generateUniqueCode(),
-            namaKain: '',
-            tokoKain: '',
-            warnaKain: '',
-            ukuran: '',
-            totalYard: null,
-            hargaKainPerYard: null,
-            yardPerModel: null, // Properti ini mungkin tidak diperlukan lagi, tapi biarkan dulu
-            aktualJadi: null,
-            hargaMaklunPerPcs: null,
-            hargaJahitPerPcs: null,
-            biayaAlat: null,
-            aktualJadiKombinasi: null,
-            isInventoried: false,
-        }],
-        statusPembayaran: 'Belum Dibayar',
-        jumlahPembayaran: null,
-        tanggalPembayaran: '',
-        catatan: '',
-        orangMemproses: '',
-    });
+    const newBatchData = JSON.parse(JSON.stringify(uiState.newProduksiBatch));
+    
+    if (!newBatchData.namaStatus) { // <-- Menggunakan namaStatus untuk validasi
+        return alert("Nama Pemaklun/Penjahit wajib diisi.");
+    }
+    
+    let totalQty = 0;
+    let totalBiayaMaterial = 0;
+    let totalHargaJasa = 0;
+
+    (newBatchData.kainBahan || []).forEach(item => {
+        totalBiayaMaterial += (item.totalYard || 0) * (item.hargaKainPerYard || 0);
+        totalQty += (item.aktualJadi || 0);
+        
+        const hargaJasaPerPcs = newBatchData.produksiType === 'penjahit' 
+            ? (item.hargaJahitPerPcs || 0) 
+            : (item.hargaMaklunPerPcs || 0);
+        totalHargaJasa += (item.aktualJadi || 0) * hargaJasaPerPcs;
+    });
+
+    const batchId = `PROD-${Date.now()}`;
+    
+    const dataToSave = {
+        ...newBatchData,
+        id: batchId,
+        totalQty,
+        totalBiayaMaterial,
+        totalHargaJasaMaklun: totalHargaJasa,
+        tanggal: new Date(newBatchData.tanggal),
+        userId: currentUser.value.uid,
+    };
+    
+    try {
+        const batchRef = doc(db, "production_batches", batchId);
+        await setDoc(batchRef, dataToSave);
+
+        state.produksi.unshift(dataToSave); 
+        
+        hideModal();
+        alert('Batch produksi baru berhasil disimpan ke Database!');
+
+    } catch (error) {
+        console.error("Error menyimpan batch produksi baru:", error);
+        alert("Gagal menyimpan batch produksi baru. Cek console.");
+    }
 }
 
 function setupEditProduksiBatch(batch) {
-    const dataForModal = JSON.parse(JSON.stringify(batch));
-    
-    // --- PERUBAHAN DI SINI ---
-    // Pastikan properti baru ada, meskipun mungkin kosong di data lama
-    dataForModal.modelProdukId = dataForModal.modelProdukId || '';
-    dataForModal.sku = dataForModal.sku || '';
-    // --- AKHIR PERUBAHAN ---
-
-    dataForModal.produksiType = dataForModal.produksiType || 'pemaklun';
-    dataForModal.namaStatus = dataForModal.namaStatus || '';
-
-    if (dataForModal.kainBahan && Array.isArray(dataForModal.kainBahan)) {
-        dataForModal.kainBahan = dataForModal.kainBahan.map(item => {
-            if (!item.idUnik) {
-                item.idUnik = generateUniqueCode();
-            }
-            return { ...item, isInventoried: item.isInventoried || false };
-        });
-    }
-
-    if (dataForModal.tanggal) {
-        dataForModal.tanggal = new Date(dataForModal.tanggal).toISOString().split('T')[0];
-    }
-    if (dataForModal.tanggalPembayaran) {
-        dataForModal.tanggalPembayaran = new Date(dataForModal.tanggalPembayaran).toISOString().split('T')[0];
-    }
-
-    uiState.editProduksiBatch = reactive(dataForModal);
-}
-
-async function submitEditProduksiBatch() {
-    const editedBatchData = JSON.parse(JSON.stringify(uiState.editProduksiBatch));
+    // Buat salinan data batch agar data asli di state tidak ikut berubah sebelum disimpan
+    const dataForModal = JSON.parse(JSON.stringify(batch));
     
-    if (!editedBatchData.namaStatus || !editedBatchData.modelProdukId || !editedBatchData.sku) {
-        return alert("Nama Pemaklun/Penjahit, Model Produk, dan SKU Produk wajib diisi.");
-    }
-    // ... (sisa kalkulasi di dalam fungsi ini tidak perlu diubah) ...
-    const finalBatch = { ...editedBatchData };
-    
-    const dataToUpdate = { ...finalBatch };
-    delete dataToUpdate.id;
-    dataToUpdate.tanggal = new Date(dataToUpdate.tanggal);
-    if (dataToUpdate.tanggalPembayaran) {
-        dataToUpdate.tanggalPembayaran = new Date(dataToUpdate.tanggalPembayaran);
-    }
+    // Pastikan properti dinamis ada, meskipun tidak ada di data database
+    dataForModal.produksiType = dataForModal.produksiType || 'pemaklun';
+    dataForModal.namaStatus = dataForModal.namaStatus || '';
+    dataForModal.totalBiayaMaterial = dataForModal.totalBiayaMaterial || 0;
+    dataForModal.totalHargaJasaMaklun = dataForModal.totalHargaJasaMaklun || 0;
 
-    try {
-        const batchRef = doc(db, "production_batches", finalBatch.id);
-        await updateDoc(batchRef, dataToUpdate);
-
-        const index = state.produksi.findIndex(b => b.id === finalBatch.id);
-        if (index !== -1) {
-            state.produksi.splice(index, 1, finalBatch);
-        }
-        
-        hideModal();
-        alert("Batch produksi berhasil diperbarui.");
-    } catch(error) {
-        console.error("Error mengupdate batch produksi:", error);
-        alert("Gagal memperbarui data.");
-    }
-}
-
-async function updateProductionInventoryStatus(batchId, itemIndex) {
-    if (!currentUser.value) {
-        alert("Anda harus login untuk mengelola inventaris.");
-        return;
-    }
-    if (!confirm("Anda yakin ingin menandai item ini sebagai sudah masuk inventaris? Stok master akan bertambah.")) {
-        return;
-    }
-    
-    const originalBatch = uiState.laporanData.laporanPerStatus.find(b => b.id === batchId);
-    if (!originalBatch) {
-        alert("Batch tidak ditemukan.");
-        return;
-    }
-    const itemToUpdate = originalBatch.kainBahan[itemIndex];
-    
-    try {
-        const batch = writeBatch(db);
-        const batchRef = doc(db, "production_batches", batchId);
-        
-        // PERBAIKAN: Mengambil SKU dari data batch utama (originalBatch.sku), bukan dari item bahan.
-        const matchingProduct = getProductBySku(originalBatch.sku);
-
-        if (matchingProduct) {
-            const productRef = doc(db, "products", matchingProduct.docId);
-            const allocationRef = doc(db, "stock_allocations", matchingProduct.docId);
-            
-            const newStock = (matchingProduct.stokFisik || 0) + (itemToUpdate.aktualJadi || 0);
-
-            const newKainBahan = JSON.parse(JSON.stringify(originalBatch.kainBahan));
-            newKainBahan[itemIndex].isInventoried = true;
-            batch.update(batchRef, { kainBahan: newKainBahan });
-
-            batch.update(productRef, { physical_stock: newStock });
-            
-            const newAlokasi = {};
-            state.settings.marketplaces.forEach(mp => {
-                newAlokasi[mp.id] = (matchingProduct.stokAlokasi[mp.id] || 0);
-            });
-            batch.set(allocationRef, newAlokasi, { merge: true });
-
-            await batch.commit();
-
-            itemToUpdate.isInventoried = true;
-            if (matchingProduct) {
-                matchingProduct.stokFisik = newStock;
-            }
-
-            alert("Stok berhasil ditambahkan ke inventaris!");
-            
-        } else {
-            throw new Error("Produk yang cocok tidak ditemukan di Inventaris. Harap tambahkan produk ini secara manual di halaman Manajemen Inventaris terlebih dahulu.");
-        }
-    } catch (error) {
-        console.error("Error saat memperbarui status inventaris:", error);
-        alert(`Gagal memperbarui status inventaris. Detail: ${error.message}`);
-    }
-}
-
-function calculateRowSummary(item, batch) {
-    if (!batch.modelProdukId) {
-        return { targetQty: 0, selisih: 0, totalBiayaKain: 0, totalBiayaJasa: 0, totalBiayaAlat: 0, hpp: 0 };
+    if (dataForModal.kainBahan && Array.isArray(dataForModal.kainBahan)) {
+        dataForModal.kainBahan = dataForModal.kainBahan.map(item => {
+            if (!item.idUnik) {
+                item.idUnik = generateUniqueCode();
+            }
+            return {
+                ...item,
+                hargaMaklunPerPcs: item.hargaMaklunPerPcs || 0,
+                biayaAlat: item.biayaAlat || 0,
+                isInventoried: item.isInventoried || false,
+            };
+        });
     }
 
-    const modelInfo = state.settings.modelProduk.find(m => m.id === batch.modelProdukId) || {};
-    // Ambil YARD/MODEL dari model produk utama yang dipilih di atas
-    const yardPerModel = parseFloat(modelInfo.yardPerModel) || 1; 
+    // Konversi objek Date ke format string YYYY-MM-DD
+    if (dataForModal.tanggal) {
+        dataForModal.tanggal = new Date(dataForModal.tanggal).toISOString().split('T')[0];
+    }
+    if (dataForModal.tanggalPembayaran) {
+        dataForModal.tanggalPembayaran = new Date(dataForModal.tanggalPembayaran).toISOString().split('T')[0];
+    }
 
+    uiState.editProduksiBatch = reactive(dataForModal);
+}
+
+
+
+async function submitEditProduksiBatch() {
+    const editedBatchData = JSON.parse(JSON.stringify(uiState.editProduksiBatch));
+    let totalQty = 0;
+    let totalBiayaMaterial = 0;
+    let totalHargaJasaMaklun = 0;
+
+    (editedBatchData.kainBahan || []).forEach(item => {
+        totalBiayaMaterial += (item.totalYard || 0) * (item.hargaKainPerYard || 0);
+        
+        // =========================================================================
+        // PERUBAHAN DI SINI: Hanya menjumlahkan 'aktualJadi'
+        // =========================================================================
+        totalQty += (parseInt(item.aktualJadi, 10) || 0);
+        
+        totalHargaJasaMaklun += (parseInt(item.aktualJadi, 10) || 0) * (item.hargaMaklunPerPcs || 0);
+    });
+    
+    const finalBatch = { ...editedBatchData, totalQty, totalBiayaMaterial, totalHargaJasaMaklun };
+    
+    const dataToUpdate = { ...finalBatch };
+    delete dataToUpdate.id;
+    dataToUpdate.tanggal = new Date(dataToUpdate.tanggal);
+    if (dataToUpdate.tanggalPembayaran) {
+        dataToUpdate.tanggalPembayaran = new Date(dataToUpdate.tanggalPembayaran);
+    }
+    dataToUpdate.produksiType = editedBatchData.produksiType;
+    dataToUpdate.namaStatus = editedBatchData.namaStatus;
+    try {
+        const batchRef = doc(db, "production_batches", finalBatch.id);
+        await updateDoc(batchRef, dataToUpdate);
+
+        const index = state.produksi.findIndex(b => b.id === finalBatch.id);
+        if (index !== -1) {
+            state.produksi.splice(index, 1, finalBatch);
+        }
+        
+        hideModal();
+        alert("Batch produksi berhasil diperbarui di Database.");
+
+    } catch(error) {
+        console.error("Error mengupdate batch produksi:", error);
+        alert("Gagal memperbarui data di database.");
+    }
+}
+async function updateProductionInventoryStatus(batchId, itemIndex) {
+    if (!currentUser.value) {
+        alert("Anda harus login untuk mengelola inventaris.");
+        return;
+    }
+    if (!confirm("Anda yakin ingin menandai item ini sebagai sudah masuk inventaris? Stok master akan bertambah.")) {
+        return;
+    }
+    
+    // Temukan batch dan item yang akan diperbarui di state lokal
+    const originalBatch = uiState.laporanData.laporanPerStatus.find(b => b.id === batchId);
+    if (!originalBatch) {
+        alert("Batch tidak ditemukan.");
+        return;
+    }
+    const itemToUpdate = originalBatch.kainBahan[itemIndex];
+    
+    try {
+        const batch = writeBatch(db);
+        const batchRef = doc(db, "production_batches", batchId);
+
+        const matchingProduct = getProductBySku(itemToUpdate.sku);
+
+        if (matchingProduct) {
+            const productRef = doc(db, "products", matchingProduct.sku);
+            const newStock = (matchingProduct.stokFisik || 0) + (itemToUpdate.aktualJadi || 0);
+            
+            const totalAlokasi = Object.values(matchingProduct.stokAlokasi || {}).reduce((sum, val) => sum + val, 0);
+            const sisaStokFisik = newStock - totalAlokasi;
+            if (sisaStokFisik < 0) {
+                alert(`Stok master akan minus jika ditambahkan. Jumlah aktual jadi (${itemToUpdate.aktualJadi}) lebih kecil dari total alokasi yang sudah ada (${totalAlokasi})`);
+                return;
+            }
+            
+            // Perbarui dokumen batch di Firestore
+            const newKainBahan = JSON.parse(JSON.stringify(originalBatch.kainBahan));
+            newKainBahan[itemIndex].isInventoried = true;
+            batch.update(batchRef, { kainBahan: newKainBahan });
+
+            // Perbarui stok fisik di Firestore
+            batch.update(productRef, { physical_stock: newStock });
+
+            // Perbarui stok alokasi di Firestore
+            const allocationsCollection = collection(db, "stock_allocations");
+            const allocationRef = doc(allocationsCollection, matchingProduct.sku);
+            const newAlokasi = {};
+            state.settings.marketplaces.forEach(mp => {
+                newAlokasi[mp.id] = (matchingProduct.stokAlokasi[mp.id] || 0);
+            });
+            batch.set(allocationRef, newAlokasi, { merge: true });
+
+            await batch.commit();
+
+            // --- BARIS PENTING: PERBARUI STATE LOKAL SECARA LANGSUNG ---
+            // Setelah operasi batch berhasil, update status isInventoried di state
+            itemToUpdate.isInventoried = true;
+
+            // Jika produk master juga butuh diperbarui, lakukan di sini
+            if (matchingProduct) {
+                matchingProduct.stokFisik = newStock;
+            }
+
+            alert("Stok berhasil ditambahkan ke inventaris!");
+            
+            // Tidak perlu memanggil loadAllDataFromFirebase() karena state sudah diperbarui
+            // Jika Anda ingin memuat ulang data di seluruh aplikasi, panggil saja
+            // await loadAllDataFromFirebase();
+            
+        } else {
+            throw new Error("Produk yang cocok tidak ditemukan di Inventaris. Harap tambahkan produk ini secara manual di halaman Manajemen Inventaris terlebih dahulu.");
+        }
+    } catch (error) {
+        console.error("Error saat memperbarui status inventaris:", error);
+        alert(`Gagal memperbarui status inventaris. Detail: ${error.message}`);
+    }
+}
+
+function calculateRowSummary(item, batchType) {
+    let batch;
+    if (batchType === 'new') {
+        batch = uiState.newProduksiBatch;
+    } else if (batchType === 'edit') {
+        batch = uiState.editProduksiBatch;
+    } else {
+        return { totalBiayaJasa: 0, totalBiayaAlat: 0 };
+    }
+    
+    // Pastikan item memiliki properti yang relevan
+    const modelInfo = state.settings.modelProduk.find(m => m.id === item.modelProdukId) || {};
     const totalYard = parseFloat(item.totalYard) || 0;
     const hargaKainPerYard = parseFloat(item.hargaKainPerYard) || 0;
     const aktualJadi = parseFloat(item.aktualJadi) || 0;
     const aktualJadiKombinasi = parseFloat(item.aktualJadiKombinasi) || 0;
     const hargaJahitPerPcs = parseFloat(item.hargaJahitPerPcs) || 0;
     const hargaMaklunPerPcs = parseFloat(item.hargaMaklunPerPcs) || 0;
-    const biayaAlatInput = parseFloat(item.biayaAlat) || 0;
+    const biayaAlatInput = parseFloat(item.biayaAlat) || 0; // Ambil nilai asli dari input
+    const yardPerModel = parseFloat(item.yardPerModel) || (modelInfo.yardPerModel || 1);
 
     const totalBiayaKain = totalYard * hargaKainPerYard;
     
@@ -3727,17 +3778,32 @@ function calculateRowSummary(item, batch) {
         hargaJasa = hargaMaklunPerPcs;
     }
 
-    // PERBAIKAN RUMUS: Menggunakan PEMBAGIAN
     const targetQty = Math.floor(totalYard / yardPerModel);
     
-    const aktualFinal = aktualJadi + aktualJadiKombinasi;
+    let aktualFinal = 0;
+    if (aktualJadi > 0) {
+        aktualFinal = aktualJadi;
+    } else if (aktualJadiKombinasi > 0) {
+        aktualFinal = aktualJadiKombinasi;
+    }
+
     const totalBiayaJasa = aktualJadi * hargaJasa;
+    
+    // [PERBAIKAN KUNCI DI SINI] Biaya Alat sekarang juga hanya dihitung berdasarkan 'aktualJadi'
     const totalBiayaAlat = aktualJadi > 0 ? biayaAlatInput : 0;
+
     const selisih = aktualFinal - targetQty;
     const totalBiayaProduksi = totalBiayaKain + totalBiayaJasa + totalBiayaAlat;
-    const hpp = aktualFinal > 0 ? totalBiayaProduksi / aktualFinal : 0;
+    const hpp = totalBiayaProduksi / (aktualFinal || 1);
     
-    return { targetQty, selisih, totalBiayaKain, totalBiayaJasa, totalBiayaAlat, hpp };
+    return {
+        targetQty,
+        selisih,
+        totalBiayaKain,
+        totalBiayaJasa,
+        totalBiayaAlat,
+        hpp
+    };
 }
 
 async function deleteProduksiBatch(batchId) {
@@ -4901,12 +4967,36 @@ async function deleteTransaction(transactionId) {
     }
 }
 
-function handleModelChangeForBatch(batch) {
-    // Saat model utama diubah, reset pilihan SKU
-    batch.sku = ''; 
-    // Anda bisa menambahkan logika lain di sini jika diperlukan
-}
 
+function handleModelProdukChange(item) {
+    const selectedModel = state.settings.modelProduk.find(m => m.id === item.modelProdukId);
+    if (selectedModel) {
+        // BARIS KUNCI: Set properti yang relevan
+        item.yardPerModel = selectedModel.yardPerModel;
+        item.hargaMaklunPerPcs = selectedModel.hargaMaklun;
+        item.hargaJahitPerPcs = selectedModel.hargaJahit;
+        
+        
+        // Kosongkan SKU agar pengguna memilih ulang
+        item.sku = '';
+        item.warnaKain = '';
+        item.ukuran = '';
+    } else {
+        item.yardPerModel = null;
+        item.hargaMaklunPerPcs = null;
+        item.hargaJahitPerPcs = null;
+        
+    }
+}
+function handleProductSkuChange(item) {
+    const selectedProduct = state.produk.find(p => p.sku === item.sku);
+    if (selectedProduct) {
+        
+        item.warnaKain = selectedProduct.warna;
+        item.ukuran = selectedProduct.varian;
+        item.modelProdukId = selectedProduct.model_id;
+    }
+}
 function addKainBahanItem(batch) {
     if (!batch.kainBahan) {
         batch.kainBahan = [];
@@ -9436,7 +9526,7 @@ async function printLabels() {
                 <input type="date" v-model="uiState.newProduksiBatch.tanggal" class="mt-1 block w-full p-2 border rounded-md" required>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700">Jenis Jasa</label>
+                <label class="block text-sm font-medium text-slate-700">Jenis Status</label>
                 <select v-model="uiState.newProduksiBatch.produksiType" class="mt-1 block w-full p-2 border rounded-md" required>
                     <option value="pemaklun">Pemaklun</option>
                     <option value="penjahit">Penjahit</option>
@@ -9444,36 +9534,41 @@ async function printLabels() {
             </div>
         </div>
         <div>
-            <label class="block text-sm font-medium text-slate-700">{{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Nama Penjahit' : 'Nama Pemaklun' }}</label>
-            <input type="text" v-model="uiState.newProduksiBatch.namaStatus" class="mt-1 block w-full p-2 border rounded-md" :placeholder="uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Contoh: Ibu Ranti' : 'Contoh: Jahit Cepat Abadi'" required>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-            <div>
-                <label class="block text-sm font-medium text-slate-700">Model Produk Akhir</label>
-                <select v-model="uiState.newProduksiBatch.modelProdukId" @change="handleModelChangeForBatch(uiState.newProduksiBatch)" class="mt-1 w-full p-2 border rounded-md bg-white" required>
-                    <option value="">-- Pilih Model Produk --</option>
-                    <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
-                </select>
-            </div>
-            <div v-if="uiState.newProduksiBatch.modelProdukId">
-                <label class="block text-sm font-medium text-slate-700">SKU Produk Akhir</label>
-                <select v-model="uiState.newProduksiBatch.sku" class="mt-1 w-full p-2 border rounded-md bg-white" required>
-                    <option value="">-- Pilih SKU --</option>
-                    <option v-for="product in state.produk.filter(p => p.model_id === uiState.newProduksiBatch.modelProdukId)" :key="product.sku" :value="product.sku">
-                        {{ product.sku }} - {{ product.varian }} ({{ product.warna }})
-                    </option>
-                </select>
-            </div>
-        </div>
+    <label class="block text-sm font-medium text-slate-700">{{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Nama Penjahit' : 'Nama Pemaklun' }}</label>
+    <input type="text" v-model="uiState.newProduksiBatch.namaStatus" class="mt-1 block w-full p-2 border rounded-md" :placeholder="uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Contoh: Ibu Ranti' : 'Contoh: Jahit Cepat Abadi'" required>
+</div>
         
         <div class="border-t pt-4">
-            <h4 class="text-lg font-semibold mb-2">Detail Bahan Produksi</h4>
+            <h4 class="text-lg font-semibold mb-2">Detail Produksi</h4>
             <div class="space-y-4">
-                <div v-for="(item, index) in uiState.newProduksiBatch.kainBahan" :key="item.idUnik" class="p-4 border rounded-lg bg-slate-50 relative">
+                <div v-for="(item, index) in uiState.newProduksiBatch.kainBahan" :key="index" class="p-4 border rounded-lg bg-slate-50 relative">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
                         <div class="space-y-3">
                             <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium">Model Produk</label>
+                                    <select v-model="item.modelProdukId" @change="handleModelProdukChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white">
+                                        <option value="">Pilih Model</option>
+                                        <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
+                                    </select>
+                                </div>
+
+                                <div v-if="item.modelProdukId">
+                                    <label class="block text-xs font-medium">SKU Produk</label>
+                                    <select v-if="state.produk.filter(p => p.model_id === item.modelProdukId).length > 0" 
+                                            v-model="item.sku" 
+                                            @change="handleProductSkuChange(item)" 
+                                            class="mt-1 w-full p-2 text-sm border rounded-md bg-white" required>
+                                        <option value="">Pilih SKU</option>
+                                        <option v-for="product in state.produk.filter(p => p.model_id === item.modelProdukId)" :key="product.sku" :value="product.sku">
+                                            {{ product.sku }} - {{ product.warna }} - {{ product.varian }}
+                                        </option>
+                                    </select>
+                                    <div v-else class="mt-1 p-2 text-sm text-red-700 bg-red-100 border border-red-300 rounded-md">
+                                        <p class="mb-2">Tidak ada produk yang tersedia untuk model ini.</p>
+                                        <a href="#" @click.prevent="activePage = 'inventaris'" class="font-semibold underline">Silakan tambahkan produk baru di halaman Inventaris.</a>
+                                    </div>
+                                </div>
                                 <div><label class="block text-xs font-medium">Nama Kain</label><input list="namaKainHistory" v-model="item.namaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
                                 <datalist id="namaKainHistory"><option v-for="name in namaKainHistory" :key="name" :value="name"></option></datalist>
                                 <div><label class="block text-xs font-medium">Toko Kain</label><input list="tokoKainHistory" v-model="item.tokoKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
@@ -9516,37 +9611,38 @@ async function printLabels() {
                                 <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
                                 <div class="flex justify-between mt-2">
                                     <span class="text-slate-600">Target Qty:</span>
-                                    <span class="font-medium">{{ calculateRowSummary(item, uiState.newProduksiBatch)?.targetQty || 0 }} pcs</span>
+                                    <span class="font-medium">{{ calculateRowSummary(item, 'new')?.targetQty || 0 }} pcs</span>
                                 </div>
-                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, uiState.newProduksiBatch)?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
+                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'new')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
                                     <span>Selisih (Aktual - Target):</span>
-                                    <span>{{ (calculateRowSummary(item, uiState.newProduksiBatch)?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, uiState.newProduksiBatch)?.selisih || 0) }} pcs</span>
+                                    <span>{{ (calculateRowSummary(item, 'new')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'new')?.selisih || 0) }} pcs</span>
                                 </div>
                                 <hr class="my-2">
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya Kain:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.newProduksiBatch)?.totalBiayaKain || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaKain || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya {{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.newProduksiBatch)?.totalBiayaJasa || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaJasa || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya Alat:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.newProduksiBatch)?.totalBiayaAlat || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaAlat || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between font-bold text-base text-red-600 border-t pt-2 mt-2">
                                     <span>HPP/Pcs (sudah include kerugian):</span>
-                                    <span>{{ formatCurrency(calculateRowSummary(item, uiState.newProduksiBatch)?.hpp || 0) }}</span>
+                                    <span>{{ formatCurrency(calculateRowSummary(item, 'new')?.hpp || 0) }}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <button v-if="uiState.newProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.newProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
+                    <button v-if="uiState.newProduksiBatch.kainBahan && uiState.newProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.newProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
                 </div>
             </div>
             <button @click="addKainBahanItem(uiState.newProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
         </div>
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-4">
             <div><label class="block text-sm font-medium text-slate-700">Status Pembayaran</label><select v-model="uiState.newProduksiBatch.statusPembayaran" class="w-full p-2 border rounded-md mt-1"><option>Belum Dibayar</option><option>Sudah Dibayar</option></select></div>
             <div v-if="uiState.newProduksiBatch.statusPembayaran === 'Sudah Dibayar'"><label class="block text-sm font-medium text-slate-700">Jumlah Pembayaran</label><input v-model.number="uiState.newProduksiBatch.jumlahPembayaran" type="number" class="w-full p-2 border rounded-md mt-1"></div>
@@ -9573,7 +9669,7 @@ async function printLabels() {
                 <input type="date" v-model="uiState.editProduksiBatch.tanggal" class="mt-1 block w-full p-2 border rounded-md" required>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700">Jenis Jasa</label>
+                <label class="block text-sm font-medium text-slate-700">Jenis Status</label>
                 <select v-model="uiState.editProduksiBatch.produksiType" class="mt-1 block w-full p-2 border rounded-md" required>
                     <option value="pemaklun">Pemaklun</option>
                     <option value="penjahit">Penjahit</option>
@@ -9585,32 +9681,29 @@ async function printLabels() {
             <input type="text" v-model="uiState.editProduksiBatch.namaStatus" class="mt-1 block w-full p-2 border rounded-md" required>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-            <div>
-                <label class="block text-sm font-medium text-slate-700">Model Produk Akhir</label>
-                <select v-model="uiState.editProduksiBatch.modelProdukId" @change="handleModelChangeForBatch(uiState.editProduksiBatch)" class="mt-1 w-full p-2 border rounded-md bg-white" required>
-                    <option value="">-- Pilih Model Produk --</option>
-                    <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
-                </select>
-            </div>
-            <div v-if="uiState.editProduksiBatch.modelProdukId">
-                <label class="block text-sm font-medium text-slate-700">SKU Produk Akhir</label>
-                <select v-model="uiState.editProduksiBatch.sku" class="mt-1 w-full p-2 border rounded-md bg-white" required>
-                    <option value="">-- Pilih SKU --</option>
-                    <option v-for="product in state.produk.filter(p => p.model_id === uiState.editProduksiBatch.modelProdukId)" :key="product.sku" :value="product.sku">
-                        {{ product.sku }} - {{ product.varian }} ({{ product.warna }})
-                    </option>
-                </select>
-            </div>
-        </div>
-
         <div class="border-t pt-4">
-            <h4 class="text-lg font-semibold mb-2">Detail Bahan Produksi</h4>
+            <h4 class="text-lg font-semibold mb-2">Detail Produksi</h4>
             <div class="space-y-4">
-                <div v-for="(item, index) in uiState.editProduksiBatch?.kainBahan" :key="item.idUnik" class="p-4 border rounded-lg bg-slate-50 relative">
+                <div v-for="(item, index) in uiState.editProduksiBatch?.kainBahan" :key="index" class="p-4 border rounded-lg bg-slate-50 relative">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
                         <div class="space-y-3">
-                           <div class="grid grid-cols-2 gap-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium">Model Produk</label>
+                                    <select v-model="item.modelProdukId" @change="handleModelProdukChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white">
+                                        <option value="">Pilih Model</option>
+                                        <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
+                                    </select>
+                                </div>
+                                <div v-if="item.modelProdukId">
+                                    <label class="block text-xs font-medium">SKU Produk</label>
+                                    <select v-model="item.sku" @change="handleProductSkuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white" required>
+                                        <option value="">Pilih SKU</option>
+                                        <option v-for="product in state.produk.filter(p => p.model_id === item.modelProdukId)" :key="product.sku" :value="product.sku">
+                                            {{ product.sku }} - {{ product.warna }} - {{ product.varian }}
+                                        </option>
+                                    </select>
+                                </div>
                                 <div><label class="block text-xs font-medium">Nama Kain</label><input list="namaKainHistory" v-model="item.namaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
                                 <datalist id="namaKainHistory"><option v-for="name in namaKainHistory" :key="name" :value="name"></option></datalist>
                                 <div><label class="block text-xs font-medium">Toko Kain</label><input list="tokoKainHistory" v-model="item.tokoKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
@@ -9649,41 +9742,42 @@ async function printLabels() {
                             </div>
                         </div>
                         <div>
-                           <div class="p-4 bg-white rounded-lg space-y-2 text-sm h-full border sticky top-0">
+                            <div class="p-4 bg-white rounded-lg space-y-2 text-sm h-full border sticky top-0">
                                 <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
                                 <div class="flex justify-between mt-2">
                                     <span class="text-slate-600">Target Qty:</span>
-                                    <span class="font-medium">{{ calculateRowSummary(item, uiState.editProduksiBatch)?.targetQty || 0 }} pcs</span>
+                                    <span class="font-medium">{{ calculateRowSummary(item, 'edit')?.targetQty || 0 }} pcs</span>
                                 </div>
-                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, uiState.editProduksiBatch)?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
+                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'edit')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
                                     <span>Selisih (Aktual - Target):</span>
-                                    <span>{{ (calculateRowSummary(item, uiState.editProduksiBatch)?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, uiState.editProduksiBatch)?.selisih || 0) }} pcs</span>
+                                    <span>{{ (calculateRowSummary(item, 'edit')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'edit')?.selisih || 0) }} pcs</span>
                                 </div>
                                 <hr class="my-2">
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya Kain:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.editProduksiBatch)?.totalBiayaKain || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaKain || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya {{ uiState.editProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.editProduksiBatch)?.totalBiayaJasa || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaJasa || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-slate-600">Total Biaya Alat:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, uiState.editProduksiBatch)?.totalBiayaAlat || 0) }}</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaAlat || 0) }}</span>
                                 </div>
                                 <div class="flex justify-between font-bold text-base text-red-600 border-t pt-2 mt-2">
                                     <span>HPP/Pcs (sudah include kerugian):</span>
-                                    <span>{{ formatCurrency(calculateRowSummary(item, uiState.editProduksiBatch)?.hpp || 0) }}</span>
+                                    <span>{{ formatCurrency(calculateRowSummary(item, 'edit')?.hpp || 0) }}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <button v-if="uiState.editProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.editProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
+                    <button v-if="uiState.editProduksiBatch.kainBahan && uiState.editProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.editProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
                 </div>
             </div>
             <button @click="addKainBahanItem(uiState.editProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
         </div>
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-4">
             <div><label class="block text-sm font-medium text-slate-700">Status Pembayaran</label><select v-model="uiState.editProduksiBatch.statusPembayaran" class="w-full p-2 border rounded-md mt-1"><option>Belum Dibayar</option><option>Sudah Dibayar</option></select></div>
             <div v-if="uiState.editProduksiBatch.statusPembayaran === 'Sudah Dibayar'"><label class="block text-sm font-medium text-slate-700">Jumlah Pembayaran</label><input v-model.number="uiState.editProduksiBatch.jumlahPembayaran" type="number" class="w-full p-2 border rounded-md mt-1"></div>
@@ -9691,8 +9785,8 @@ async function printLabels() {
         </div>
         <div><label class="block text-sm font-medium text-slate-700">Catatan</label><textarea v-model="uiState.editProduksiBatch.catatan" rows="2" class="mt-1 block w-full p-2 border rounded-md"></textarea></div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-             <div><label class="block text-sm font-medium text-slate-700">Status Proses</label><select v-model="uiState.editProduksiBatch.statusProses" class="w-full p-2 border rounded-md mt-1"><option>Dalam Proses</option><option>Selesai</option><option>Revisi</option><option>Ditunda</option></select></div>
-             <div><label class="block text-sm font-medium text-slate-700">Admin (Opsional)</label><input v-model="uiState.editProduksiBatch.orangMemproses" type="text" class="mt-1 block w-full p-2 border rounded-md"></div>
+            <div><label class="block text-sm font-medium text-slate-700">Status Proses</label><select v-model="uiState.editProduksiBatch.statusProses" class="w-full p-2 border rounded-md mt-1"><option>Dalam Proses</option><option>Selesai</option><option>Revisi</option><option>Ditunda</option></select></div>
+            <div><label class="block text-sm font-medium text-slate-700">Admin (Opsional)</label><input v-model="uiState.editProduksiBatch.orangMemproses" type="text" class="mt-1 block w-full p-2 border rounded-md"></div>
         </div>
         <div class="flex justify-end gap-3 mt-6 border-t pt-4">
             <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
