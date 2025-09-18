@@ -5334,29 +5334,23 @@ onMounted(() => {
                     
 
                     if (isSubscriptionValid) {
-                        await loadAllDataFromFirebase();
+    await loadAllDataFromFirebase();
+    
+    // ...
+    // JIKA KITA SEDANG DI HALAMAN LANGGANAN DAN STATUS JADI AKTIF,
+    // PAKSA PINDAH KE DASHBOARD.
+    if (activePage.value === 'langganan') {
+        changePage('dashboard');
+    } else {
+        // Jika tidak, jalankan logika yang sudah ada
+        const storedPage = localStorage.getItem('lastActivePage');
+        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+        changePage(pageToLoad);
+    }
 
-                        if (currentUser.value.isPartner) {
-                            const commissionsQuery = query(
-                                collection(db, 'commissions'),
-                                where('partnerId', '==', currentUser.value.uid)
-                            );
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                const fetchedCommissions = [];
-                                snapshot.forEach(doc => {
-                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
-                                });
-                                commissions.value = fetchedCommissions;
-                            });
-                        }
-                        
-                        const storedPage = localStorage.getItem('lastActivePage');
-                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                        changePage(pageToLoad);
-
-                    } else {
-                        activePage.value = 'langganan';
-                    }
+} else {
+    activePage.value = 'langganan';
+}
                 } else {
                     console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                     handleLogout();
