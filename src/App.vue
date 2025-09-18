@@ -5316,9 +5316,6 @@ onMounted(() => {
             currentUser.value = user;
             
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
-                const urlParams = new URLSearchParams(window.location.search);
-                const fromPayment = urlParams.get('status') === 'success';
-
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
@@ -5334,34 +5331,29 @@ onMounted(() => {
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
                     if (isSubscriptionValid) {
-                        await loadAllDataFromFirebase();
-                        
-                        if (currentUser.value.isPartner) {
-                            const commissionsQuery = query(collection(db, 'commissions'), where('partnerId', '==', currentUser.value.uid));
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            });
+                        // Jika langganan valid, muat semua data
+                        if(state.produk.length === 0) { // Hanya muat data jika belum ada
+                           await loadAllDataFromFirebase();
                         }
-
-                        // Jika Halaman saat ini adalah langganan ATAU baru dari pembayaran, paksa ke dashboard
-                        if (activePage.value === 'langganan' || fromPayment) {
+                        
+                        // Cek apakah pengguna berada di halaman login/langganan, jika ya, pindahkan ke dashboard
+                        if (activePage.value === 'langganan' || activePage.value === 'login') {
                             changePage('dashboard');
-                             if (fromPayment) {
-                                window.history.replaceState({}, document.title, window.location.pathname);
-                            }
-                        } else if (activePage.value === 'login') {
-                           changePage('dashboard');
                         }
 
                     } else {
+                        // Jika langganan TIDAK valid, paksa ke halaman langganan
                         activePage.value = 'langganan';
                     }
                 } else {
+                    // Jika dokumen user tidak ada, logout
+                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                     handleLogout();
                 }
                 isLoading.value = false;
             });
         } else {
+            // Jika tidak ada user yang login
             currentUser.value = null;
             activePage.value = 'login';
             isLoading.value = false;
