@@ -3683,7 +3683,6 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
         return;
     }
     
-    // Temukan batch dan item yang akan diperbarui di state lokal
     const originalBatch = uiState.laporanData.laporanPerStatus.find(b => b.id === batchId);
     if (!originalBatch) {
         alert("Batch tidak ditemukan.");
@@ -3694,31 +3693,23 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
     try {
         const batch = writeBatch(db);
         const batchRef = doc(db, "production_batches", batchId);
-
+        
         const matchingProduct = getProductBySku(itemToUpdate.sku);
 
         if (matchingProduct) {
-            const productRef = doc(db, "products", matchingProduct.sku);
+            // --- PERBAIKAN UTAMA DI SINI ---
+            // Gunakan `matchingProduct.docId` (ID Dokumen asli) bukan `matchingProduct.sku`
+            const productRef = doc(db, "products", matchingProduct.docId);
+            const allocationRef = doc(db, "stock_allocations", matchingProduct.docId);
+            
             const newStock = (matchingProduct.stokFisik || 0) + (itemToUpdate.aktualJadi || 0);
-            
-            const totalAlokasi = Object.values(matchingProduct.stokAlokasi || {}).reduce((sum, val) => sum + val, 0);
-            const sisaStokFisik = newStock - totalAlokasi;
-            if (sisaStokFisik < 0) {
-                alert(`Stok master akan minus jika ditambahkan. Jumlah aktual jadi (${itemToUpdate.aktualJadi}) lebih kecil dari total alokasi yang sudah ada (${totalAlokasi})`);
-                return;
-            }
-            
-            // Perbarui dokumen batch di Firestore
+
             const newKainBahan = JSON.parse(JSON.stringify(originalBatch.kainBahan));
             newKainBahan[itemIndex].isInventoried = true;
             batch.update(batchRef, { kainBahan: newKainBahan });
 
-            // Perbarui stok fisik di Firestore
             batch.update(productRef, { physical_stock: newStock });
-
-            // Perbarui stok alokasi di Firestore
-            const allocationsCollection = collection(db, "stock_allocations");
-            const allocationRef = doc(allocationsCollection, matchingProduct.sku);
+            
             const newAlokasi = {};
             state.settings.marketplaces.forEach(mp => {
                 newAlokasi[mp.id] = (matchingProduct.stokAlokasi[mp.id] || 0);
@@ -3727,20 +3718,12 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
 
             await batch.commit();
 
-            // --- BARIS PENTING: PERBARUI STATE LOKAL SECARA LANGSUNG ---
-            // Setelah operasi batch berhasil, update status isInventoried di state
             itemToUpdate.isInventoried = true;
-
-            // Jika produk master juga butuh diperbarui, lakukan di sini
             if (matchingProduct) {
                 matchingProduct.stokFisik = newStock;
             }
 
             alert("Stok berhasil ditambahkan ke inventaris!");
-            
-            // Tidak perlu memanggil loadAllDataFromFirebase() karena state sudah diperbarui
-            // Jika Anda ingin memuat ulang data di seluruh aplikasi, panggil saja
-            // await loadAllDataFromFirebase();
             
         } else {
             throw new Error("Produk yang cocok tidak ditemukan di Inventaris. Harap tambahkan produk ini secara manual di halaman Manajemen Inventaris terlebih dahulu.");
