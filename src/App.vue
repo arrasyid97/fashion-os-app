@@ -5314,8 +5314,31 @@ onMounted(() => {
 
         if (user) {
             currentUser.value = user;
+            const userDocRef = doc(db, "users", user.uid);
 
-            onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
+            // --- PERBAIKAN UTAMA DI SINI ---
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('status') === 'success') {
+                // Jika baru kembali dari pembayaran, paksa ambil data dari server
+                console.log("Terdeteksi kembali dari pembayaran, memaksa ambil data server...");
+                try {
+                    const userDocSnap = await getDoc(userDocRef, { source: 'server' });
+                    if (userDocSnap.exists() && userDocSnap.data().subscriptionStatus === 'active') {
+                        // Jika sudah aktif, langsung arahkan ke dashboard
+                        console.log("Langganan sudah aktif dari server, mengarahkan ke dashboard.");
+                        await loadAllDataFromFirebase();
+                        changePage('dashboard');
+                        // Hapus parameter status dari URL agar tidak dijalankan lagi saat refresh
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                } catch (e) {
+                    console.error("Gagal memaksa ambil data dari server:", e);
+                }
+            }
+            // --- AKHIR PERBAIKAN ---
+
+            // Tetap jalankan onSnapshot untuk update real-time selanjutnya
+            onSnapshotListener = onSnapshot(userDocRef, async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
@@ -5323,40 +5346,21 @@ onMounted(() => {
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
-                    // --- CATATAN DEBUGGING DIMULAI DI SINI ---
-                    console.log("--- MEMERIKSA STATUS LANGGANAN ---");
-                    console.log("1. Data Pengguna dari Firestore:", userData);
-
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
                     
-                    console.log("2. Tanggal Berakhir Langganan:", endDate);
-                    console.log("3. Tanggal Sekarang:", now);
-
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                    console.log("4. Hasil Pengecekan (isSubscriptionValid):", isSubscriptionValid);
-                    // --- CATATAN DEBUGGING SELESAI ---
-
                     if (isSubscriptionValid) {
-                        console.log("5. KESIMPULAN: Langganan Valid, memuat data utama.");
-                        await loadAllDataFromFirebase();
-
-                        if (currentUser.value.isPartner) {
-                            const commissionsQuery = query(collection(db, 'commissions'), where('partnerId', '==', currentUser.value.uid));
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            });
+                        if (activePage.value === 'langganan' || activePage.value === 'login'){
+                            await loadAllDataFromFirebase();
+                            const storedPage = localStorage.getItem('lastActivePage');
+                            const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                            changePage(pageToLoad);
                         }
-                        
-                        const storedPage = localStorage.getItem('lastActivePage');
-                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                        changePage(pageToLoad);
-
                     } else {
-                        console.log("5. KESIMPULAN: Langganan TIDAK Valid, menampilkan halaman langganan.");
                         activePage.value = 'langganan';
                     }
                 } else {
@@ -5364,11 +5368,6 @@ onMounted(() => {
                     handleLogout();
                 }
                 isLoading.value = false;
-            }, (error) => {
-                console.error("Gagal mendengarkan data pengguna:", error);
-                alert("Gagal memuat data pengguna. Silakan coba lagi.");
-                isLoading.value = false;
-                handleLogout();
             });
         } else {
             currentUser.value = null;
