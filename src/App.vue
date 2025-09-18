@@ -4657,11 +4657,11 @@ async function removeProductVariant(productId) {
         const allocationRef = doc(db, "stock_allocations", productId);
         batch.delete(allocationRef);
 
-        // Hapus semua dokumen harga terkait
+        // Hapus semua dokumen harga terkait milik pengguna ini
         const pricesQuery = query(
             collection(db, "product_prices"),
             where("product_id", "==", productId),
-            where("userId", "==", userId) // <-- PENTING: PENGUATAN KEAMANAN DI SISI APLIKASI
+            where("userId", "==", userId)
         );
         const pricesSnapshot = await getDocs(pricesQuery);
         pricesSnapshot.forEach(doc => {
@@ -4688,22 +4688,25 @@ async function deleteGroup(variants) {
 
     let successCount = 0;
     const failedSkus = [];
-
-    for (const variant of variants) {
+    
+    // Gunakan Promise.all untuk menjalankan semua penghapusan secara bersamaan
+    const deletionPromises = variants.map(async (variant) => {
         try {
-            // ▼▼▼ PERBAIKAN DI SINI: Gunakan 'variant.docId' bukan 'variant.sku' ▼▼▼
-            await removeProductVariant(variant.docId); 
+            await removeProductVariant(variant.docId);
             successCount++;
         } catch (error) {
             failedSkus.push(variant.sku);
         }
-    }
+    });
+
+    await Promise.all(deletionPromises);
 
     if (failedSkus.length === 0) {
         alert(`Berhasil menghapus semua ${successCount} varian.`);
     } else {
         alert(`Berhasil menghapus ${successCount} varian. Gagal menghapus: ${failedSkus.join(', ')}.`);
     }
+    
     // Muat ulang data hanya jika ada yang gagal, untuk sinkronisasi
     if(failedSkus.length > 0) {
         await loadAllDataFromFirebase();
