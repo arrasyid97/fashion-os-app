@@ -4636,6 +4636,51 @@ async function saveStockAllocation() {
     }
 }
 
+async function deleteGroup(variants) {
+    if (!confirm(`Anda yakin ingin menghapus SEMUA ${variants.length} varian produk ini?`)) {
+        return;
+    }
+
+    if (!currentUser.value) {
+        alert("Anda harus login.");
+        return;
+    }
+
+    const userId = currentUser.value.uid;
+    const batch = writeBatch(db);
+    let successCount = 0;
+    const failedSkus = [];
+
+    variants.forEach(variant => {
+        if (variant.userId !== userId) {
+            failedSkus.push(variant.sku);
+            return;
+        }
+
+        const productRef = doc(db, "products", variant.docId);
+        batch.delete(productRef);
+
+        const allocationRef = doc(db, "stock_allocations", variant.docId);
+        batch.delete(allocationRef);
+
+        state.settings.marketplaces.forEach(mp => {
+            const priceDocId = `${variant.docId}-${mp.id}`;
+            const priceRef = doc(db, "product_prices", priceDocId);
+            batch.delete(priceRef);
+        });
+        successCount++;
+    });
+
+    try {
+        await batch.commit();
+        await loadAllDataFromFirebase();
+        alert(`Berhasil menghapus ${successCount} varian.`);
+    } catch (error) {
+        console.error("Gagal menghapus grup produk:", error);
+        alert(`Gagal menghapus produk: ${error.message}`);
+    }
+}
+
 async function removeProductVariant(productId) {
     if (!confirm(`Anda yakin ingin menghapus varian produk ini? Aksi ini tidak dapat dibatalkan.`)) {
         return;
@@ -4648,78 +4693,29 @@ async function removeProductVariant(productId) {
 
     try {
         const batch = writeBatch(db);
+        const productInState = state.produk.find(p => p.docId === productId);
+        if (!productInState || productInState.userId !== userId) {
+            throw new Error("Anda tidak memiliki izin untuk menghapus produk ini.");
+        }
 
-        // Hapus dokumen produk utama
         const productRef = doc(db, "products", productId);
         batch.delete(productRef);
 
-        // Hapus dokumen alokasi stok
         const allocationRef = doc(db, "stock_allocations", productId);
         batch.delete(allocationRef);
 
-        // Hapus semua dokumen harga terkait milik pengguna ini
-        const pricesQuery = query(
-            collection(db, "product_prices"),
-            where("product_id", "==", productId),
-            where("userId", "==", userId)
-        );
-        const pricesSnapshot = await getDocs(pricesQuery);
-        pricesSnapshot.forEach(doc => {
-            batch.delete(doc.ref);
+        state.settings.marketplaces.forEach(mp => {
+            const priceDocId = `${productId}-${mp.id}`;
+            const priceRef = doc(db, "product_prices", priceDocId);
+            batch.delete(priceRef);
         });
 
         await batch.commit();
-
-        // Hapus dari state lokal
-        state.produk = state.produk.filter(p => p.docId !== productId);
+        await loadAllDataFromFirebase();
         alert(`Varian produk berhasil dihapus.`);
-
     } catch (error) {
         console.error(`Error menghapus produk ID: ${productId}:`, error);
         alert(`Gagal menghapus produk: ${error.message}`);
-        throw error;
-    }
-}
-
-async function deleteGroup(variants) {
-    if (!confirm(`Anda yakin ingin menghapus SEMUA ${variants.length} varian produk ini?`)) {
-        return;
-    }
-
-    if (!currentUser.value) {
-        alert("Anda harus login.");
-        return;
-    }
-
-    let successCount = 0;
-    const failedSkus = [];
-    const userId = currentUser.value.uid;
-
-    const deletionPromises = variants.map(async (variant) => {
-        try {
-            // Kita harus memeriksa kepemilikan di sisi aplikasi juga
-            if (variant.userId !== userId) {
-                failedSkus.push(variant.sku);
-                throw new Error("Anda tidak memiliki izin untuk menghapus produk ini.");
-            }
-
-            await removeProductVariant(variant.docId);
-            successCount++;
-        } catch (error) {
-            failedSkus.push(variant.sku);
-        }
-    });
-
-    await Promise.all(deletionPromises);
-
-    if (failedSkus.length === 0) {
-        alert(`Berhasil menghapus semua ${successCount} varian.`);
-    } else {
-        alert(`Berhasil menghapus ${successCount} varian. Gagal menghapus: ${failedSkus.join(', ')}.`);
-    }
-
-    if(failedSkus.length > 0) {
-        await loadAllDataFromFirebase();
     }
 }
 
