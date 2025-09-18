@@ -5314,7 +5314,7 @@ onMounted(() => {
 
         if (user) {
             currentUser.value = user;
-            
+
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
@@ -5323,6 +5323,7 @@ onMounted(() => {
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
+                    // ▼▼▼ KODE DEBUGGING DIMULAI DII SINI ▼▼▼
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
@@ -5330,30 +5331,44 @@ onMounted(() => {
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
+                    
+
                     if (isSubscriptionValid) {
-                        // Jika langganan valid, muat semua data
-                        if(state.produk.length === 0) { // Hanya muat data jika belum ada
-                           await loadAllDataFromFirebase();
+                        await loadAllDataFromFirebase();
+
+                        if (currentUser.value.isPartner) {
+                            const commissionsQuery = query(
+                                collection(db, 'commissions'),
+                                where('partnerId', '==', currentUser.value.uid)
+                            );
+                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                const fetchedCommissions = [];
+                                snapshot.forEach(doc => {
+                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
+                                });
+                                commissions.value = fetchedCommissions;
+                            });
                         }
                         
-                        // Cek apakah pengguna berada di halaman login/langganan, jika ya, pindahkan ke dashboard
-                        if (activePage.value === 'langganan' || activePage.value === 'login') {
-                            changePage('dashboard');
-                        }
+                        const storedPage = localStorage.getItem('lastActivePage');
+                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                        changePage(pageToLoad);
 
                     } else {
-                        // Jika langganan TIDAK valid, paksa ke halaman langganan
                         activePage.value = 'langganan';
                     }
                 } else {
-                    // Jika dokumen user tidak ada, logout
                     console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                     handleLogout();
                 }
                 isLoading.value = false;
+            }, (error) => {
+                console.error("Gagal mendengarkan data pengguna:", error);
+                alert("Gagal memuat data pengguna. Silakan coba lagi.");
+                isLoading.value = false;
+                handleLogout();
             });
         } else {
-            // Jika tidak ada user yang login
             currentUser.value = null;
             activePage.value = 'login';
             isLoading.value = false;
@@ -7980,8 +7995,10 @@ async function printLabels() {
                 </div>
             </div>
         </div>
-     </div>
+
     </div>
+</div>
+
 </div>
 </main>
     </div>
