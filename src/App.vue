@@ -5307,24 +5307,18 @@ onMounted(() => {
     updateTime();
     intervalId = setInterval(updateTime, 1000);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const fromPayment = urlParams.get('status') === 'success';
-
-    // Jika terdeteksi baru kembali dari pembayaran, tampilkan loading screen
-    if (fromPayment) {
-        isLoading.value = true;
-    }
-
     onAuthStateChanged(auth, async (user) => {
-        if (!fromPayment) {
-            isLoading.value = true;
-        }
+        isLoading.value = true;
         if (onSnapshotListener) onSnapshotListener();
         if (commissionsListener) commissionsListener();
 
         if (user) {
             currentUser.value = user;
+            
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const fromPayment = urlParams.get('status') === 'success';
+
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
@@ -5349,24 +5343,20 @@ onMounted(() => {
                             });
                         }
 
-                        // LOGIKA BARU YANG LEBIH BAIK
-                        if (fromPayment) {
-                            // Jika baru bayar, selalu paksa ke dashboard
+                        // Jika Halaman saat ini adalah langganan ATAU baru dari pembayaran, paksa ke dashboard
+                        if (activePage.value === 'langganan' || fromPayment) {
                             changePage('dashboard');
-                            // Hapus parameter URL agar tidak dijalankan lagi saat refresh
-                            window.history.replaceState({}, document.title, window.location.pathname);
-                        } else {
-                            // Jika login biasa, kembalikan ke halaman terakhir
-                            const storedPage = localStorage.getItem('lastActivePage');
-                            const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                            changePage(pageToLoad);
+                             if (fromPayment) {
+                                window.history.replaceState({}, document.title, window.location.pathname);
+                            }
+                        } else if (activePage.value === 'login') {
+                           changePage('dashboard');
                         }
+
                     } else {
-                        // Jika tidak valid, selalu paksa ke halaman langganan
                         activePage.value = 'langganan';
                     }
                 } else {
-                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                     handleLogout();
                 }
                 isLoading.value = false;
