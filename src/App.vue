@@ -3662,25 +3662,21 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
         const batch = writeBatch(db);
         const batchRef = doc(db, "production_batches", batchId);
         
-        // Di sini kita menggunakan getProductBySku untuk mendapatkan data lengkap produk dari state
-        const matchingProduct = getProductBySku(itemToUpdate.sku);
+        // PERBAIKAN: Mengambil SKU dari data batch utama (originalBatch.sku), bukan dari item bahan.
+        const matchingProduct = getProductBySku(originalBatch.sku);
 
         if (matchingProduct) {
-            // PERBAIKAN: Gunakan `matchingProduct.docId` bukan `matchingProduct.sku`
             const productRef = doc(db, "products", matchingProduct.docId);
             const allocationRef = doc(db, "stock_allocations", matchingProduct.docId);
             
             const newStock = (matchingProduct.stokFisik || 0) + (itemToUpdate.aktualJadi || 0);
 
-            // Update dokumen batch produksi untuk menandai sudah masuk inventaris
             const newKainBahan = JSON.parse(JSON.stringify(originalBatch.kainBahan));
             newKainBahan[itemIndex].isInventoried = true;
             batch.update(batchRef, { kainBahan: newKainBahan });
 
-            // Update stok fisik di dokumen produk
             batch.update(productRef, { physical_stock: newStock });
             
-            // Update (atau buat jika belum ada) dokumen alokasi stok
             const newAlokasi = {};
             state.settings.marketplaces.forEach(mp => {
                 newAlokasi[mp.id] = (matchingProduct.stokAlokasi[mp.id] || 0);
