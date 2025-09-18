@@ -3508,34 +3508,36 @@ function removePromotionTier(modelName, channelId, tierIndex) {
     }
 }
 function setupNewProduksiBatch() {
-    uiState.newProduksiBatch = reactive({
-        tanggal: new Date().toISOString().split('T')[0],
-        produksiType: 'pemaklun',
-        namaStatus: '', // <-- DIUBAH KEMBALI KE namaStatus
-        statusProses: 'Dalam Proses',
-        kainBahan: [{
-            idUnik: generateUniqueCode(),
-            modelProdukId: '',
-            namaKain: '',
-            tokoKain: '',
-            warnaKain: '',
-            ukuran: '',
-            totalYard: null,
-            hargaKainPerYard: null,
-            yardPerModel: null,
-            aktualJadi: null,
-            hargaMaklunPerPcs: null,
-            hargaJahitPerPcs: null,
-            biayaAlat: null,
-            aktualJadiKombinasi: null,
-            isInventoried: false,
-        }],
-        statusPembayaran: 'Belum Dibayar',
-        jumlahPembayaran: null,
-        tanggalPembayaran: '',
-        catatan: '',
-        orangMemproses: '',
-    });
+    uiState.newProduksiBatch = reactive({
+        tanggal: new Date().toISOString().split('T')[0],
+        produksiType: 'pemaklun',
+        namaStatus: '',
+        statusProses: 'Dalam Proses',
+        kainBahan: [{
+            idUnik: generateUniqueCode(),
+            modelProdukId: '',
+            sku: '', // Untuk produk terdaftar di inventaris (aktual jadi)
+            skuKombinasi: '', // <-- KOLOM BARU: Untuk produk kombinasi (aktual jadi kombinasi)
+            namaKain: '',
+            tokoKain: '',
+            warnaKain: '',
+            ukuran: '',
+            totalYard: null,
+            hargaKainPerYard: null,
+            yardPerModel: null,
+            aktualJadi: null,
+            hargaMaklunPerPcs: null,
+            hargaJahitPerPcs: null,
+            biayaAlat: null,
+            aktualJadiKombinasi: null,
+            isInventoried: false,
+        }],
+        statusPembayaran: 'Belum Dibayar',
+        jumlahPembayaran: null,
+        tanggalPembayaran: '',
+        catatan: '',
+        orangMemproses: '',
+    });
 }
 
 async function submitNewProduksiBatch() {
@@ -9510,7 +9512,6 @@ async function printLabels() {
     </div>
 </div>
 
-
 <div v-if="uiState.modalType === 'addProduksi'" class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex items-center gap-4 mb-4">
         <h3 class="text-xl font-bold">Buat Batch Produksi Baru</h3>
@@ -9526,7 +9527,7 @@ async function printLabels() {
                 <input type="date" v-model="uiState.newProduksiBatch.tanggal" class="mt-1 block w-full p-2 border rounded-md" required>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700">Jenis Status</label>
+                <label class="block text-sm font-medium text-slate-700">Jenis Jasa</label>
                 <select v-model="uiState.newProduksiBatch.produksiType" class="mt-1 block w-full p-2 border rounded-md" required>
                     <option value="pemaklun">Pemaklun</option>
                     <option value="penjahit">Penjahit</option>
@@ -9534,12 +9535,12 @@ async function printLabels() {
             </div>
         </div>
         <div>
-    <label class="block text-sm font-medium text-slate-700">{{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Nama Penjahit' : 'Nama Pemaklun' }}</label>
-    <input type="text" v-model="uiState.newProduksiBatch.namaStatus" class="mt-1 block w-full p-2 border rounded-md" :placeholder="uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Contoh: Ibu Ranti' : 'Contoh: Jahit Cepat Abadi'" required>
-</div>
+            <label class="block text-sm font-medium text-slate-700">{{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Nama Penjahit' : 'Nama Pemaklun' }}</label>
+            <input type="text" v-model="uiState.newProduksiBatch.namaStatus" class="mt-1 block w-full p-2 border rounded-md" :placeholder="uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Contoh: Ibu Ranti' : 'Contoh: Jahit Cepat Abadi'" required>
+        </div>
         
         <div class="border-t pt-4">
-            <h4 class="text-lg font-semibold mb-2">Detail Produksi</h4>
+            <h4 class="text-lg font-semibold mb-2">Detail Bahan Produksi</h4>
             <div class="space-y-4">
                 <div v-for="(item, index) in uiState.newProduksiBatch.kainBahan" :key="index" class="p-4 border rounded-lg bg-slate-50 relative">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
@@ -9552,13 +9553,9 @@ async function printLabels() {
                                         <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
                                     </select>
                                 </div>
-
                                 <div v-if="item.modelProdukId">
                                     <label class="block text-xs font-medium">SKU Produk</label>
-                                    <select v-if="state.produk.filter(p => p.model_id === item.modelProdukId).length > 0" 
-                                            v-model="item.sku" 
-                                            @change="handleProductSkuChange(item)" 
-                                            class="mt-1 w-full p-2 text-sm border rounded-md bg-white" required>
+                                    <select v-if="state.produk.filter(p => p.model_id === item.modelProdukId).length > 0" v-model="item.sku" @change="handleProductSkuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white" required>
                                         <option value="">Pilih SKU</option>
                                         <option v-for="product in state.produk.filter(p => p.model_id === item.modelProdukId)" :key="product.sku" :value="product.sku">
                                             {{ product.sku }} - {{ product.warna }} - {{ product.varian }}
@@ -9637,7 +9634,7 @@ async function printLabels() {
                             </div>
                         </div>
                     </div>
-                    <button v-if="uiState.newProduksiBatch.kainBahan && uiState.newProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.newProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
+                    <button v-if="uiState.newProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.newProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
                 </div>
             </div>
             <button @click="addKainBahanItem(uiState.newProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
@@ -9669,7 +9666,7 @@ async function printLabels() {
                 <input type="date" v-model="uiState.editProduksiBatch.tanggal" class="mt-1 block w-full p-2 border rounded-md" required>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700">Jenis Status</label>
+                <label class="block text-sm font-medium text-slate-700">Jenis Jasa</label>
                 <select v-model="uiState.editProduksiBatch.produksiType" class="mt-1 block w-full p-2 border rounded-md" required>
                     <option value="pemaklun">Pemaklun</option>
                     <option value="penjahit">Penjahit</option>
@@ -9682,7 +9679,7 @@ async function printLabels() {
         </div>
         
         <div class="border-t pt-4">
-            <h4 class="text-lg font-semibold mb-2">Detail Produksi</h4>
+            <h4 class="text-lg font-semibold mb-2">Detail Bahan Produksi</h4>
             <div class="space-y-4">
                 <div v-for="(item, index) in uiState.editProduksiBatch?.kainBahan" :key="index" class="p-4 border rounded-lg bg-slate-50 relative">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
@@ -9772,7 +9769,7 @@ async function printLabels() {
                             </div>
                         </div>
                     </div>
-                    <button v-if="uiState.editProduksiBatch.kainBahan && uiState.editProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.editProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
+                    <button v-if="uiState.editProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.editProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
                 </div>
             </div>
             <button @click="addKainBahanItem(uiState.editProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
@@ -9785,8 +9782,8 @@ async function printLabels() {
         </div>
         <div><label class="block text-sm font-medium text-slate-700">Catatan</label><textarea v-model="uiState.editProduksiBatch.catatan" rows="2" class="mt-1 block w-full p-2 border rounded-md"></textarea></div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><label class="block text-sm font-medium text-slate-700">Status Proses</label><select v-model="uiState.editProduksiBatch.statusProses" class="w-full p-2 border rounded-md mt-1"><option>Dalam Proses</option><option>Selesai</option><option>Revisi</option><option>Ditunda</option></select></div>
-            <div><label class="block text-sm font-medium text-slate-700">Admin (Opsional)</label><input v-model="uiState.editProduksiBatch.orangMemproses" type="text" class="mt-1 block w-full p-2 border rounded-md"></div>
+             <div><label class="block text-sm font-medium text-slate-700">Status Proses</label><select v-model="uiState.editProduksiBatch.statusProses" class="w-full p-2 border rounded-md mt-1"><option>Dalam Proses</option><option>Selesai</option><option>Revisi</option><option>Ditunda</option></select></div>
+             <div><label class="block text-sm font-medium text-slate-700">Admin (Opsional)</label><input v-model="uiState.editProduksiBatch.orangMemproses" type="text" class="mt-1 block w-full p-2 border rounded-md"></div>
         </div>
         <div class="flex justify-end gap-3 mt-6 border-t pt-4">
             <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
