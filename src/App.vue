@@ -9995,9 +9995,9 @@ async function printLabels() {
     
     <div class="flex-1 overflow-y-auto py-4 pr-2">
         <div class="mb-4">
-            <label for="laporan-Status-filter" class="block text-sm font-medium text-slate-700 mb-1">Pilih Jenis Status</label>
+            <label for="laporan-Status-filter" class="block text-sm font-medium text-slate-700 mb-1">Pilih Jenis Jasa</label>
             <select v-model="uiState.produksiFilterType" id="laporan-Status-filter" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                <option value="all">Semua Jenis Status</option>
+                <option value="all">Semua Jenis Jasa</option>
                 <option value="pemaklun">Pemaklun</option>
                 <option value="penjahit">Penjahit</option>
             </select>
@@ -10008,7 +10008,7 @@ async function printLabels() {
             <p class="text-3xl font-bold text-blue-900">{{ formatCurrency(laporanTotalBiayaJasa) }}</p>
         </div>
 
-        <div class="space-y-4 bg-slate-100 border rounded-md">
+        <div class="space-y-4">
             <p v-if="uiState.laporanData.laporanPerStatus.length === 0" class="text-center py-8 text-slate-500">Tidak ada data untuk status ini.</p>
             
             <div v-for="batch in uiState.laporanData.laporanPerStatus.filter(b => uiState.produksiFilterType === 'all' || b.produksiType === uiState.produksiFilterType)" :key="batch.id" class="p-4 border rounded-lg bg-white shadow-sm">
@@ -10016,12 +10016,12 @@ async function printLabels() {
                     <div>
                         <p class="font-bold text-indigo-700">ID Batch: {{ batch.id }} ({{ batch.produksiType === 'penjahit' ? 'Penjahit' : 'Pemaklun' }}: {{ batch.namaStatus }})</p>
                         <span class="text-xs font-semibold px-2 py-0.5 rounded-full mt-1 inline-block"
-                                :class="{
-                                    'bg-green-100 text-green-800': batch.statusProses === 'Selesai',
-                                    'bg-blue-100 text-blue-800': batch.statusProses === 'Dalam Proses',
-                                    'bg-yellow-100 text-yellow-800': batch.statusProses === 'Revisi',
-                                    'bg-gray-100 text-gray-800': batch.statusProses === 'Ditunda',
-                                }">
+                              :class="{
+                                'bg-green-100 text-green-800': batch.statusProses === 'Selesai',
+                                'bg-blue-100 text-blue-800': batch.statusProses === 'Dalam Proses',
+                                'bg-yellow-100 text-yellow-800': batch.statusProses === 'Revisi',
+                                'bg-gray-100 text-gray-800': batch.statusProses === 'Ditunda',
+                              }">
                             {{ batch.statusProses }}
                         </span>
                     </div>
@@ -10047,11 +10047,11 @@ async function printLabels() {
                                 </ul>
                             </div>
                             <div class="flex-shrink-0 text-right">
-                                <span v-if="kb.isInventoried" class="text-green-600 font-bold">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                <span v-if="kb.isInventoried" class="text-green-600 font-bold flex items-center text-xs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
                                     Sudah Masuk Inventaris
                                 </span>
-                                <button v-else @click="updateProductionInventoryStatus(batch.id, index)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-lg hover:bg-indigo-700 text-sm">
+                                <button v-if="!kb.isInventoried && kb.aktualJadi > 0" @click="updateProductionInventoryStatus(batch.id, index)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-lg hover:bg-indigo-700 text-sm">
                                     + Masukkan ke Inventaris
                                 </button>
                             </div>
@@ -10064,15 +10064,13 @@ async function printLabels() {
                 </div>
             </div>
         </div>
-
-        <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-12 border-t">
-            <button @click="exportGroupedProduksiToExcel()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Export Laporan</button>
-            <button @click="hideModal" class="bg-slate-300 py-2 px-4 rounded-lg">Tutup</button>
-        </div>
+    </div>
+    
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="exportGroupedProduksiToExcel()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Export Laporan</button>
+        <button @click="hideModal" class="bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-400">Tutup</button>
     </div>
 </div>
-
-
 
 
 <div v-if="uiState.modalType === 'panduanProduksi'" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
