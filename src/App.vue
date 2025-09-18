@@ -3507,6 +3507,7 @@ function removePromotionTier(modelName, channelId, tierIndex) {
         state.promotions.perModel[modelName][channelId].diskonBertingkat.splice(tierIndex, 1);
     }
 }
+
 function setupNewProduksiBatch() {
     uiState.newProduksiBatch = reactive({
         tanggal: new Date().toISOString().split('T')[0],
@@ -3516,8 +3517,8 @@ function setupNewProduksiBatch() {
         kainBahan: [{
             idUnik: generateUniqueCode(),
             modelProdukId: '',
-            sku: '', // Untuk produk terdaftar di inventaris (aktual jadi)
-            skuKombinasi: '', // <-- KOLOM BARU: Untuk produk kombinasi (aktual jadi kombinasi)
+            sku: '', // Untuk produk terdaftar (aktual jadi)
+            skuKombinasi: '', // <-- FIELD BARU DITAMBAHKAN
             namaKain: '',
             tokoKain: '',
             warnaKain: '',
@@ -9553,19 +9554,26 @@ async function printLabels() {
                                         <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
                                     </select>
                                 </div>
+                                
                                 <div v-if="item.modelProdukId">
-                                    <label class="block text-xs font-medium">SKU Produk</label>
-                                    <select v-if="state.produk.filter(p => p.model_id === item.modelProdukId).length > 0" v-model="item.sku" @change="handleProductSkuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white" required>
-                                        <option value="">Pilih SKU</option>
+                                    <label class="block text-xs font-medium">SKU Produk (Untuk Aktual Jadi)</label>
+                                    <select v-if="state.produk.filter(p => p.model_id === item.modelProdukId).length > 0" v-model="item.sku" @change="handleProductSkuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white">
+                                        <option value="">-- Pilih SKU Terdaftar --</option>
                                         <option v-for="product in state.produk.filter(p => p.model_id === item.modelProdukId)" :key="product.sku" :value="product.sku">
-                                            {{ product.sku }} - {{ product.warna }} - {{ product.varian }}
+                                            {{ product.sku }} - {{ product.varian }}
                                         </option>
                                     </select>
-                                    <div v-else class="mt-1 p-2 text-sm text-red-700 bg-red-100 border border-red-300 rounded-md">
-                                        <p class="mb-2">Tidak ada produk yang tersedia untuk model ini.</p>
-                                        <a href="#" @click.prevent="activePage = 'inventaris'" class="font-semibold underline">Silakan tambahkan produk baru di halaman Inventaris.</a>
+                                     <div v-else class="mt-1 p-2 text-sm text-red-700 bg-red-100 border border-red-300 rounded-md">
+                                        <p class="mb-2">Tidak ada produk.</p>
+                                        <a href="#" @click.prevent="activePage = 'inventaris'" class="font-semibold underline">Tambah Produk</a>
                                     </div>
                                 </div>
+
+                                <div class="col-span-2">
+                                    <label class="block text-xs font-medium">SKU Kombinasi (Tulis Manual)</label>
+                                    <input type="text" v-model="item.skuKombinasi" placeholder="Misal: Lengan Merah" class="mt-1 w-full p-2 text-sm border rounded-md">
+                                </div>
+
                                 <div><label class="block text-xs font-medium">Nama Kain</label><input list="namaKainHistory" v-model="item.namaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
                                 <datalist id="namaKainHistory"><option v-for="name in namaKainHistory" :key="name" :value="name"></option></datalist>
                                 <div><label class="block text-xs font-medium">Toko Kain</label><input list="tokoKainHistory" v-model="item.tokoKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
@@ -9634,7 +9642,7 @@ async function printLabels() {
                             </div>
                         </div>
                     </div>
-                    <button v-if="uiState.newProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.newProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
+                    <button v-if="uiState.newProduksiBatch.kainBahan && uiState.newProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.newProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
                 </div>
             </div>
             <button @click="addKainBahanItem(uiState.newProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
@@ -9693,53 +9701,24 @@ async function printLabels() {
                                     </select>
                                 </div>
                                 <div v-if="item.modelProdukId">
-                                    <label class="block text-xs font-medium">SKU Produk</label>
-                                    <select v-model="item.sku" @change="handleProductSkuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white" required>
-                                        <option value="">Pilih SKU</option>
+                                    <label class="block text-xs font-medium">SKU Produk (Untuk Aktual Jadi)</label>
+                                    <select v-model="item.sku" @change="handleProductSkuChange(item)" class="mt-1 w-full p-2 text-sm border rounded-md bg-white">
+                                        <option value="">-- Pilih SKU Terdaftar --</option>
                                         <option v-for="product in state.produk.filter(p => p.model_id === item.modelProdukId)" :key="product.sku" :value="product.sku">
-                                            {{ product.sku }} - {{ product.warna }} - {{ product.varian }}
+                                            {{ product.sku }} - {{ product.varian }}
                                         </option>
                                     </select>
                                 </div>
+                                <div class="col-span-2">
+                                    <label class="block text-xs font-medium">SKU Kombinasi (Tulis Manual)</label>
+                                    <input type="text" v-model="item.skuKombinasi" placeholder="Misal: Lengan Merah" class="mt-1 w-full p-2 text-sm border rounded-md">
+                                </div>
                                 <div><label class="block text-xs font-medium">Nama Kain</label><input list="namaKainHistory" v-model="item.namaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
                                 <datalist id="namaKainHistory"><option v-for="name in namaKainHistory" :key="name" :value="name"></option></datalist>
-                                <div><label class="block text-xs font-medium">Toko Kain</label><input list="tokoKainHistory" v-model="item.tokoKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
-                                <datalist id="tokoKainHistory"><option v-for="toko in tokoKainHistory" :key="toko" :value="toko"></option></datalist>
-                                <div><label class="block text-xs font-medium">Warna Kain</label><input v-model="item.warnaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
-                                <div><label class="block text-xs font-medium">Ukuran</label><input v-model="item.ukuran" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
-                                <div><label class="block text-xs font-medium">Total Yard</label><input list="totalYardHistory" v-model.number="item.totalYard" type="number" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
-                                <datalist id="totalYardHistory"><option v-for="yard in totalYardHistory" :key="yard" :value="yard"></option></datalist>
-                                <div><label class="block text-xs font-medium">Harga/Yard</label><input list="hargaKainPerYardHistory" v-model.number="item.hargaKainPerYard" type="number" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
-                                <datalist id="hargaKainPerYardHistory"><option v-for="harga in hargaKainPerYardHistory" :key="harga" :value="harga"></option></datalist>
-                                <div v-if="uiState.editProduksiBatch.produksiType === 'penjahit'">
-                                    <label class="block text-xs font-medium">Harga Jahit/Pcs</label>
-                                    <input v-model.number="item.hargaJahitPerPcs" type="number" class="mt-1 w-full p-2 text-sm border rounded-md">
                                 </div>
-                                <div v-else>
-                                    <label class="block text-xs font-medium">Harga Maklun/Pcs</label>
-                                    <input v-model.number="item.hargaMaklunPerPcs" type="number" class="mt-1 w-full p-2 text-sm border rounded-md">
-                                </div>
-                                <div class="col-span-2"><label class="block text-xs font-medium">Biaya Alat-Alat (Rp)</label><input v-model.number="item.biayaAlat" type="number" placeholder="Plastik, kancing, dll." class="mt-1 w-full p-2 text-sm border rounded-md"></div>
-                                <div class="col-span-2 space-y-2">
-                                    <div>
-                                        <label class="block text-xs font-medium">Aktual Jadi</label>
-                                        <div class="flex items-center gap-2">
-                                            <span class="bg-indigo-100 text-indigo-800 font-bold px-2 py-1 rounded-md text-xs">{{ item.idUnik }}</span>
-                                            <input v-model.number="item.aktualJadi" type="number" class="w-full p-2 text-sm border rounded-md" placeholder="Jumlah jadi utama">
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-medium">Aktual Jadi Kombinasi (pcs)</label>
-                                        <div class="flex items-center gap-2">
-                                            <span class="bg-purple-100 text-purple-800 font-bold px-2 py-1 rounded-md text-xs">{{ item.idUnik }}</span>
-                                            <input v-model.number="item.aktualJadiKombinasi" type="number" class="w-full p-2 text-sm border rounded-md" placeholder="Jumlah komponen pelengkap">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                         <div>
-                            <div class="p-4 bg-white rounded-lg space-y-2 text-sm h-full border sticky top-0">
+                           <div class="p-4 bg-white rounded-lg space-y-2 text-sm h-full border sticky top-0">
                                 <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
                                 <div class="flex justify-between mt-2">
                                     <span class="text-slate-600">Target Qty:</span>
@@ -9774,7 +9753,6 @@ async function printLabels() {
             </div>
             <button @click="addKainBahanItem(uiState.editProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
         </div>
-
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-4">
             <div><label class="block text-sm font-medium text-slate-700">Status Pembayaran</label><select v-model="uiState.editProduksiBatch.statusPembayaran" class="w-full p-2 border rounded-md mt-1"><option>Belum Dibayar</option><option>Sudah Dibayar</option></select></div>
             <div v-if="uiState.editProduksiBatch.statusPembayaran === 'Sudah Dibayar'"><label class="block text-sm font-medium text-slate-700">Jumlah Pembayaran</label><input v-model.number="uiState.editProduksiBatch.jumlahPembayaran" type="number" class="w-full p-2 border rounded-md mt-1"></div>
