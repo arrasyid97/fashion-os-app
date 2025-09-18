@@ -4644,6 +4644,7 @@ async function removeProductVariant(productId) {
         alert("Anda harus login.");
         return;
     }
+    const userId = currentUser.value.uid;
 
     try {
         const batch = writeBatch(db);
@@ -4657,11 +4658,10 @@ async function removeProductVariant(productId) {
         batch.delete(allocationRef);
 
         // Hapus semua dokumen harga terkait
-        // ▼▼▼ PERUBAHAN KUNCI ADA DI SINI ▼▼▼
         const pricesQuery = query(
-            collection(db, "product_prices"), 
+            collection(db, "product_prices"),
             where("product_id", "==", productId),
-            where("userId", "==", currentUser.value.uid) // <-- BARIS INI DITAMBAHKAN
+            where("userId", "==", userId) // <-- PENTING: PENGUATAN KEAMANAN DI SISI APLIKASI
         );
         const pricesSnapshot = await getDocs(pricesQuery);
         pricesSnapshot.forEach(doc => {
@@ -4672,7 +4672,7 @@ async function removeProductVariant(productId) {
 
         // Hapus dari state lokal
         state.produk = state.produk.filter(p => p.docId !== productId);
-        // Tidak perlu alert di sini agar tidak muncul berulang kali saat hapus grup
+        alert(`Varian produk berhasil dihapus.`);
 
     } catch (error) {
         console.error(`Error menghapus produk ID: ${productId}:`, error);
