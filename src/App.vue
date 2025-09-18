@@ -9502,7 +9502,7 @@ async function printLabels() {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
             <div>
                 <label class="block text-sm font-medium text-slate-700">Model Produk Akhir</label>
-                <select v-model="uiState.newProduksiBatch.modelProdukId" @change="handleModelChangeForBatch(uiState.newProduksiBatch)" class="mt-1 w-full p-2 border rounded-md bg-white" required>
+                <select v-model="uiState.newProduksiBatch.modelProduksiId" @change="handleModelChangeForBatch(uiState.newProduksiBatch)" class="mt-1 w-full p-2 border rounded-md bg-white" required>
                     <option value="">-- Pilih Model Produk --</option>
                     <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
                 </select>
@@ -9565,20 +9565,50 @@ async function printLabels() {
                         <div>
                             <div class="p-4 bg-white rounded-lg space-y-2 text-sm h-full border sticky top-0">
                                 <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
+                                <div class="flex justify-between mt-2">
+                                    <span class="text-slate-600">Target Qty:</span>
+                                    <span class="font-medium">{{ calculateRowSummary(item, 'new')?.targetQty || 0 }} pcs</span>
                                 </div>
+                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'new')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
+                                    <span>Selisih (Aktual - Target):</span>
+                                    <span>{{ (calculateRowSummary(item, 'new')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'new')?.selisih || 0) }} pcs</span>
+                                </div>
+                                <hr class="my-2">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600">Total Biaya Kain:</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaKain || 0) }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600">Total Biaya {{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaJasa || 0) }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600">Total Biaya Alat:</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaAlat || 0) }}</span>
+                                </div>
+                                <div class="flex justify-between font-bold text-base text-red-600 border-t pt-2 mt-2">
+                                    <span>HPP/Pcs (sudah include kerugian):</span>
+                                    <span>{{ formatCurrency(calculateRowSummary(item, 'new')?.hpp || 0) }}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <button v-if="uiState.newProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.newProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
                 </div>
             </div>
-            <button @click="addKainBhanItem(uiState.newProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
+            <button @click="addKainBahanItem(uiState.newProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-4">
-            </div>
+            <div><label class="block text-sm font-medium text-slate-700">Status Pembayaran</label><select v-model="uiState.newProduksiBatch.statusPembayaran" class="w-full p-2 border rounded-md mt-1"><option>Belum Dibayar</option><option>Sudah Dibayar</option></select></div>
+            <div v-if="uiState.newProduksiBatch.statusPembayaran === 'Sudah Dibayar'"><label class="block text-sm font-medium text-slate-700">Jumlah Pembayaran</label><input v-model.number="uiState.newProduksiBatch.jumlahPembayaran" type="number" class="w-full p-2 border rounded-md mt-1"></div>
+            <div v-if="uiState.newProduksiBatch.statusPembayaran === 'Sudah Dibayar'"><label class="block text-sm font-medium text-slate-700">Tanggal Pembayaran</label><input v-model="uiState.newProduksiBatch.tanggalPembayaran" type="date" class="w-full p-2 border rounded-md mt-1"></div>
+        </div>
         <div><label class="block text-sm font-medium text-slate-700">Catatan</label><textarea v-model="uiState.newProduksiBatch.catatan" rows="2" class="mt-1 block w-full p-2 border rounded-md"></textarea></div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            </div>
+            <div><label class="block text-sm font-medium text-slate-700">Status Proses</label><select v-model="uiState.newProduksiBatch.statusProses" class="w-full p-2 border rounded-md mt-1"><option>Dalam Proses</option><option>Selesai</option><option>Revisi</option><option>Ditunda</option></select></div>
+            <div><label class="block text-sm font-medium text-slate-700">Admin (Opsional)</label><input v-model="uiState.newProduksiBatch.orangMemproses" type="text" class="mt-1 block w-full p-2 border rounded-md"></div>
+        </div>
         <div class="flex justify-end gap-3 mt-6 border-t pt-7">
             <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
             <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Batch Produksi</button>
@@ -9630,16 +9660,93 @@ async function printLabels() {
             <h4 class="text-lg font-semibold mb-2">Detail Bahan Produksi</h4>
             <div class="space-y-4">
                 <div v-for="(item, index) in uiState.editProduksiBatch?.kainBahan" :key="index" class="p-4 border rounded-lg bg-slate-50 relative">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
+                        <div class="space-y-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div><label class="block text-xs font-medium">Nama Kain</label><input list="namaKainHistory" v-model="item.namaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <datalist id="namaKainHistory"><option v-for="name in namaKainHistory" :key="name" :value="name"></option></datalist>
+                                <div><label class="block text-xs font-medium">Toko Kain</label><input list="tokoKainHistory" v-model="item.tokoKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <datalist id="tokoKainHistory"><option v-for="toko in tokoKainHistory" :key="toko" :value="toko"></option></datalist>
+                                <div><label class="block text-xs font-medium">Warna Kain</label><input v-model="item.warnaKain" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <div><label class="block text-xs font-medium">Ukuran</label><input v-model="item.ukuran" type="text" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <div><label class="block text-xs font-medium">Total Yard</label><input list="totalYardHistory" v-model.number="item.totalYard" type="number" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <datalist id="totalYardHistory"><option v-for="yard in totalYardHistory" :key="yard" :value="yard"></option></datalist>
+                                <div><label class="block text-xs font-medium">Harga/Yard</label><input list="hargaKainPerYardHistory" v-model.number="item.hargaKainPerYard" type="number" class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <datalist id="hargaKainPerYardHistory"><option v-for="harga in hargaKainPerYardHistory" :key="harga" :value="harga"></option></datalist>
+                                <div v-if="uiState.editProduksiBatch.produksiType === 'penjahit'">
+                                    <label class="block text-xs font-medium">Harga Jahit/Pcs</label>
+                                    <input v-model.number="item.hargaJahitPerPcs" type="number" class="mt-1 w-full p-2 text-sm border rounded-md">
+                                </div>
+                                <div v-else>
+                                    <label class="block text-xs font-medium">Harga Maklun/Pcs</label>
+                                    <input v-model.number="item.hargaMaklunPerPcs" type="number" class="mt-1 w-full p-2 text-sm border rounded-md">
+                                </div>
+                                <div class="col-span-2"><label class="block text-xs font-medium">Biaya Alat-Alat (Rp)</label><input v-model.number="item.biayaAlat" type="number" placeholder="Plastik, kancing, dll." class="mt-1 w-full p-2 text-sm border rounded-md"></div>
+                                <div class="col-span-2 space-y-2">
+                                    <div>
+                                        <label class="block text-xs font-medium">Aktual Jadi</label>
+                                        <div class="flex items-center gap-2">
+                                            <span class="bg-indigo-100 text-indigo-800 font-bold px-2 py-1 rounded-md text-xs">{{ item.idUnik }}</span>
+                                            <input v-model.number="item.aktualJadi" type="number" class="w-full p-2 text-sm border rounded-md" placeholder="Jumlah jadi utama">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium">Aktual Jadi Kombinasi (pcs)</label>
+                                        <div class="flex items-center gap-2">
+                                            <span class="bg-purple-100 text-purple-800 font-bold px-2 py-1 rounded-md text-xs">{{ item.idUnik }}</span>
+                                            <input v-model.number="item.aktualJadiKombinasi" type="number" class="w-full p-2 text-sm border rounded-md" placeholder="Jumlah komponen pelengkap">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                           <div class="p-4 bg-white rounded-lg space-y-2 text-sm h-full border sticky top-0">
+                                <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
+                                <div class="flex justify-between mt-2">
+                                    <span class="text-slate-600">Target Qty:</span>
+                                    <span class="font-medium">{{ calculateRowSummary(item, 'edit')?.targetQty || 0 }} pcs</span>
+                                </div>
+                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'edit')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
+                                    <span>Selisih (Aktual - Target):</span>
+                                    <span>{{ (calculateRowSummary(item, 'edit')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'edit')?.selisih || 0) }} pcs</span>
+                                </div>
+                                <hr class="my-2">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600">Total Biaya Kain:</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaKain || 0) }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600">Total Biaya {{ uiState.editProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaJasa || 0) }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600">Total Biaya Alat:</span>
+                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaAlat || 0) }}</span>
+                                </div>
+                                <div class="flex justify-between font-bold text-base text-red-600 border-t pt-2 mt-2">
+                                    <span>HPP/Pcs (sudah include kerugian):</span>
+                                    <span>{{ formatCurrency(calculateRowSummary(item, 'edit')?.hpp || 0) }}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    <button v-if="uiState.editProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.editProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
+                </div>
             </div>
             <button @click="addKainBahanItem(uiState.editProduksiBatch)" type="button" class="mt-3 text-sm text-blue-600 hover:underline">+ Tambah Kain & Bahan Lain</button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-4">
-            </div>
+            <div><label class="block text-sm font-medium text-slate-700">Status Pembayaran</label><select v-model="uiState.editProduksiBatch.statusPembayaran" class="w-full p-2 border rounded-md mt-1"><option>Belum Dibayar</option><option>Sudah Dibayar</option></select></div>
+            <div v-if="uiState.editProduksiBatch.statusPembayaran === 'Sudah Dibayar'"><label class="block text-sm font-medium text-slate-700">Jumlah Pembayaran</label><input v-model.number="uiState.editProduksiBatch.jumlahPembayaran" type="number" class="w-full p-2 border rounded-md mt-1"></div>
+            <div v-if="uiState.editProduksiBatch.statusPembayaran === 'Sudah Dibayar'"><label class="block text-sm font-medium text-slate-700">Tanggal Pembayaran</label><input v-model="uiState.editProduksiBatch.tanggalPembayaran" type="date" class="w-full p-2 border rounded-md mt-1"></div>
+        </div>
         <div><label class="block text-sm font-medium text-slate-700">Catatan</label><textarea v-model="uiState.editProduksiBatch.catatan" rows="2" class="mt-1 block w-full p-2 border rounded-md"></textarea></div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-             </div>
+             <div><label class="block text-sm font-medium text-slate-700">Status Proses</label><select v-model="uiState.editProduksiBatch.statusProses" class="w-full p-2 border rounded-md mt-1"><option>Dalam Proses</option><option>Selesai</option><option>Revisi</option><option>Ditunda</option></select></div>
+             <div><label class="block text-sm font-medium text-slate-700">Admin (Opsional)</label><input v-model="uiState.editProduksiBatch.orangMemproses" type="text" class="mt-1 block w-full p-2 border rounded-md"></div>
+        </div>
         <div class="flex justify-end gap-3 mt-6 border-t pt-4">
             <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
             <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Perubahan</button>
