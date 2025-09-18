@@ -4686,12 +4686,23 @@ async function deleteGroup(variants) {
         return;
     }
 
+    if (!currentUser.value) {
+        alert("Anda harus login.");
+        return;
+    }
+
     let successCount = 0;
     const failedSkus = [];
-    
-    // Gunakan Promise.all untuk menjalankan semua penghapusan secara bersamaan
+    const userId = currentUser.value.uid;
+
     const deletionPromises = variants.map(async (variant) => {
         try {
+            // Kita harus memeriksa kepemilikan di sisi aplikasi juga
+            if (variant.userId !== userId) {
+                failedSkus.push(variant.sku);
+                throw new Error("Anda tidak memiliki izin untuk menghapus produk ini.");
+            }
+
             await removeProductVariant(variant.docId);
             successCount++;
         } catch (error) {
@@ -4706,8 +4717,7 @@ async function deleteGroup(variants) {
     } else {
         alert(`Berhasil menghapus ${successCount} varian. Gagal menghapus: ${failedSkus.join(', ')}.`);
     }
-    
-    // Muat ulang data hanya jika ada yang gagal, untuk sinkronisasi
+
     if(failedSkus.length > 0) {
         await loadAllDataFromFirebase();
     }
