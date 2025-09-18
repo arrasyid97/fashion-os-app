@@ -5330,9 +5330,7 @@ onMounted(() => {
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                    // ▼▼▼ 2. LOGIKA BARU YANG LEBIH ANDAL UNTUK MENGATUR HALAMAN ▼▼▼
                     if (isSubscriptionValid) {
-                        paymentStatus.value = null; // Hapus status "processing" jika ada
                         await loadAllDataFromFirebase();
                         
                         // Jika status jadi valid saat di halaman langganan, paksa pindah ke dashboard
@@ -5348,7 +5346,6 @@ onMounted(() => {
                         // Jika status tidak valid, pastikan tetap di halaman langganan
                         activePage.value = 'langganan';
                     }
-                    // ▲▲▲ AKHIR BAGIAN 2 ▲▲▲
                     
                 } else {
                     console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
@@ -5368,6 +5365,7 @@ onMounted(() => {
         }
     });
 });
+
 
 onUnmounted(() => { // <-- PINDAHKAN KE SINI
     clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
