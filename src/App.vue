@@ -5373,52 +5373,52 @@ function connectToQZ() {
 const labelSettings = reactive({
     width: 33,
     height: 15,
-    columns: 1, // Sederhanakan ke 1 kolom, printer biasanya menanganinya sendiri
-    labelGap: 2, // Jarak antar label
+    columns: 1, 
+    labelGap: 2,
     paperType: 'gap',
     printDensity: 8,
 });
 
 const barcodeContent = ref('123456789');
 const printCount = ref(4);
-let selectedPrinterName = null;
 const lastPrintedContent = ref('');
-// FUNGSI BARU yang jauh lebih akurat
+
+let selectedPrinterName = null;
+
+// Fungsi yang menghasilkan kode ZPL untuk satu label
 function generateZplCode() {
     const { width, height, printDensity, paperType } = labelSettings;
     const barcode = barcodeContent.value || '1234567890';
 
-    const dotsPerMm = 8; // Standar untuk printer 203dpi (8 dots/mm)
+    const dotsPerMm = 8;
     const labelWidthDots = Math.round(width * dotsPerMm);
     const labelHeightDots = Math.round(height * dotsPerMm);
 
-    // Hitung posisi horizontal (X) dan vertikal (Y) untuk barcode
-    const barcodeX = Math.round(labelWidthDots / 2); // Tengah horizontal
-    const barcodeY = Math.round(labelHeightDots / 2); // Tengah vertikal
-    
-    // Tentukan jenis media berdasarkan input
     const mediaType = paperType === 'gap' ? 'N' : paperType === 'black-mark' ? 'M' : 'C';
-    
-    // Gunakan ZPL yang lebih profesional dan ringkas
-    let zpl = `^XA\n`;
-    zpl += `^FWN\n`; // Arah normal
-    zpl += `^LH0,0\n`; // Origin di 0,0
-    zpl += `^PW${labelWidthDots}\n`; // Lebar label
-    zpl += `^LL${labelHeightDots}\n`; // Tinggi label
-    zpl += `^MD${printDensity}\n`; // Kepadatan cetak
-    zpl += `^MN${mediaType}\n`; // Tipe media
 
-    // Tambahkan barcode dan teks dengan posisi yang dihitung
-    zpl += `^FO${barcodeX},${barcodeY-20}^BCN,30,Y,N,N^FS`; // Barcode di tengah, ukuran tetap
+    // Hitung posisi horizontal dan vertikal
+    const barcodeX = Math.round(labelWidthDots / 2);
+    const barcodeY = Math.round(labelHeightDots / 2);
+
+    let zpl = `^XA\n`;
+    zpl += `^FWN\n`;
+    zpl += `^LH0,0\n`;
+    zpl += `^PW${labelWidthDots}\n`;
+    zpl += `^LL${labelHeightDots}\n`;
+    zpl += `^MD${printDensity}\n`;
+    zpl += `^MN${mediaType}\n`;
+
+    // Barcode dan teks
+    zpl += `^FO${barcodeX},${barcodeY-20}^BCN,30,Y,N,N^FS`;
     zpl += `^FD${barcode}^FS\n`;
-    zpl += `^FO${barcodeX},${barcodeY+20}^A0N,20,20^FS`; // Teks di bawah barcode
+    zpl += `^FO${barcodeX},${barcodeY+20}^A0N,20,20^FS`;
     zpl += `^FD${barcode}^FS\n`;
-    
-    // Akhiri perintah
+
     zpl += `^XZ\n`;
     return zpl;
 }
 
+// Fungsi untuk mencetak, yang memanggil generateZplCode
 async function printLabels() {
     try {
         await connectToQZ();
@@ -5431,45 +5431,19 @@ async function printLabels() {
             if (!selectedPrinterName) return alert("Proses dibatalkan.");
         }
 
-        const { width, height, printDensity, paperType } = labelSettings;
-        const barcode = barcodeContent.value || '1234567890';
-        const dotsPerMm = 8;
-        const labelWidthDots = Math.round(width * dotsPerMm);
-        const labelHeightDots = Math.round(height * dotsPerMm);
-        const mediaType = paperType === 'gap' ? 'N' : paperType === 'black-mark' ? 'M' : 'C';
-
-        // Menghasilkan kode ZPL untuk dua label dalam satu baris
-        const createTwoLabelsZpl = (text) => {
-            let zpl = `^XA\n`;
-            zpl += `^PW${labelWidthDots * 2}\n`; // Lebar cetak dua kali lipat
-            zpl += `^LL${labelHeightDots}\n`;
-            zpl += `^MD${printDensity}\n`;
-            zpl += `^MN${mediaType}\n`;
-
-            // Label Pertama (Kolom 1)
-            zpl += `^FO${Math.round(labelWidthDots / 2)},${Math.round(labelHeightDots / 2) - 20}^BCN,30,Y,N,N^FD${text}^FS\n`;
-            zpl += `^FO${Math.round(labelWidthDots / 2)},${Math.round(labelHeightDots / 2) + 20}^A0N,20,20^FD${text}^FS\n`;
-
-            // Label Kedua (Kolom 2)
-            zpl += `^FO${Math.round(labelWidthDots * 1.5)},${Math.round(labelHeightDots / 2) - 20}^BCN,30,Y,N,N^FD${text}^FS\n`;
-            zpl += `^FO${Math.round(labelWidthDots * 1.5)},${Math.round(labelHeightDots / 2) + 20}^A0N,20,20^FD${text}^FS\n`;
-
-            zpl += `^XZ\n`;
-            return zpl;
-        };
-
-        const zplForTwoLabels = createTwoLabelsZpl(barcode);
+        const zplCodeForOneLabel = generateZplCode();
         const labelArray = [];
 
-        for (let i = 0; i < Math.ceil(printCount.value / 2); i++) {
-            labelArray.push(zplForTwoLabels);
+        for (let i = 0; i < printCount.value; i++) {
+            labelArray.push(zplCodeForOneLabel);
         }
 
         const config = qz.configs.create(selectedPrinterName);
-        await qz.print(config, labelArray);
 
+        await qz.print(config, labelArray);
         alert(`Perintah cetak untuk ${printCount.value} label berhasil dikirim!`);
-        lastPrintedContent.value = barcode;
+
+        lastPrintedContent.value = barcodeContent.value; 
 
     } catch (err) {
         console.error("Kesalahan saat mencetak:", err);
