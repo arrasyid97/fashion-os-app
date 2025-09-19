@@ -1548,56 +1548,6 @@ async function handleLogout() {
     await signOut(auth);
 }
 
-async function handleActivation() {
-    if (!activationCodeInput.value) {
-        activationCodeMessage.value = 'Kode tidak boleh kosong.';
-        return;
-    }
-    if (!currentUser.value) {
-        activationCodeMessage.value = 'Anda harus login untuk mengaktifkan kode.';
-        return;
-    }
-
-    try {
-        isSaving.value = true; // Menunjukkan proses sedang berjalan
-        activationCodeMessage.value = 'Memvalidasi kode...';
-
-        const codeRef = doc(db, "activation_codes", activationCodeInput.value);
-        const codeDoc = await getDoc(codeRef);
-
-        if (codeDoc.exists() && codeDoc.data().status === 'unused') {
-            const userRef = doc(db, "users", currentUser.value.uid);
-            const now = new Date();
-            const nextMonth = new Date(new Date(now).setMonth(now.getMonth() + 1));
-            
-            const batch = writeBatch(db);
-            // Update data pengguna
-            batch.update(userRef, {
-                subscriptionStatus: 'active',
-                subscriptionEndDate: nextMonth,
-                trialEndDate: null // Hapus masa trial jika ada
-            });
-            // Update status kode aktivasi
-            batch.update(codeRef, {
-                status: 'used',
-                usedBy: currentUser.value.uid,
-                usedAt: new Date()
-            });
-
-            await batch.commit();
-            
-            activationCodeMessage.value = '';
-            alert('Aktivasi berhasil! Langganan Anda sekarang aktif selama 1 bulan.');
-            // onAuthStateChanged akan otomatis memuat ulang data dan status langganan
-        } else {
-            throw new Error('Kode aktivasi tidak valid atau sudah digunakan.');
-        }
-    } catch (error) {
-        activationCodeMessage.value = error.message;
-    } finally {
-        isSaving.value = false;
-    }
-}
 
 // Metode untuk login dengan Google
 async function signInWithGoogle() {
