@@ -271,22 +271,6 @@ adminVerificationError: '',
 
 });
 
-// State untuk pengaturan label yang dikirim ke printer
-const labelSettings = reactive({
-  width: 33,
-  height: 15,
-  columns: 3,
-  labelGap: 2,
-  rowGap: 2,
-  paperType: 'gap', // 'gap', 'black-mark', 'continuous'
-  printSpeed: 2, // 1-5 ips (inches per second)
-  printDensity: 8, // 1-15 tingkat
-});
-
-
-
-const barcodeContent = ref('1234567890');
-const printCount = ref(1);
 
 const unpaidCommissions = computed(() =>
     commissions.value.filter(c => c.status === 'unpaid')
@@ -5283,62 +5267,6 @@ async function loadAllDataFromFirebase() {
     }
 }
 
-watch([barcodeContent, labelSettings], () => {
-    // Hanya jalankan kode ini jika sedang di halaman 'barcode-generator' dan ada teks barcode
-    if (activePage.value === 'barcode-generator' && barcodeContent.value) {
-        nextTick(() => {
-            const previewArea = document.getElementById('barcode-preview-area');
-            if (!previewArea) return;
-
-            // Kosongkan area pratinjau untuk menggambar ulang
-            previewArea.innerHTML = '';
-            
-            const { width, height, columns, labelGap } = labelSettings;
-            const count = printCount.value;
-
-            // Container utama yang akan memuat semua label
-            const sheet = document.createElement('div');
-            sheet.style.display = 'grid';
-            sheet.style.gridTemplateColumns = `repeat(${columns}, ${width}mm)`;
-            sheet.style.gap = `${labelGap}mm`; // Ini yang akan memvisualisasikan jarak label
-            sheet.style.padding = `10mm`;
-            sheet.style.width = `calc(${width * columns}mm + ${labelGap * (columns - 1)}mm + 20mm)`;
-            sheet.style.backgroundColor = 'white';
-            sheet.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)';
-
-            // Buat dan tambahkan setiap label barcode
-            for (let i = 0; i < count; i++) {
-                const labelBox = document.createElement('div');
-                labelBox.style.width = `${width}mm`;
-                labelBox.style.height = `${height}mm`;
-                labelBox.style.display = 'flex';
-                labelBox.style.alignItems = 'center';
-                labelBox.style.justifyContent = 'center';
-                labelBox.style.overflow = 'hidden';
-                labelBox.style.border = '1px dashed #e2e8f0';
-                labelBox.style.boxSizing = 'border-box';
-
-                const canvas = document.createElement('canvas');
-                canvas.id = `barcodeCanvas-${i}`;
-                labelBox.appendChild(canvas);
-
-                sheet.appendChild(labelBox);
-
-                // Menggambar barcode ke setiap kanvas
-                JsBarcode(canvas, barcodeContent.value, {
-                    format: "CODE128",
-                    displayValue: true,
-                    fontSize: 12,
-                    width: 1.5,
-                    height: 30,
-                });
-            }
-
-            // Masukkan lembar kertas ke area pratinjau
-            previewArea.appendChild(sheet);
-        });
-    }
-}, { immediate: true, deep: true });
 
 onMounted(() => {
 
@@ -5441,78 +5369,90 @@ function connectToQZ() {
   });
 }
 
+// State untuk pengaturan label yang dikirim ke printer
+const labelSettings = reactive({
+  width: 33,
+  height: 15,
+  columns: 2,
+  labelGap: 4, // Nama diubah untuk kejelasan
+  rowGap: 2,   // Pengaturan baru
+  paperType: 'gap',
+  printSpeed: 2,
+  printDensity: 8,
+});
+
+const barcodeContent = ref('123456789');
+const printCount = ref(4);
+
+let selectedPrinterName = null;
+
+// FUNGSI BARU yang jauh lebih akurat
 function generateZplCode() {
     const barcode = barcodeContent.value || '1234567890';
     const count = printCount.value || 1;
-    const { width, height, columns, labelGap, rowGap, printDensity } = labelSettings;
+    const { width, height, columns, labelGap, rowGap, printDensity, paperType } = labelSettings;
 
-    const dotsPerMm = 8;
+    const dotsPerMm = 8; // Standar untuk printer 203dpi
     const labelWidthDots = width * dotsPerMm;
     const labelHeightDots = height * dotsPerMm;
-    const labelGapDots = labelGap * dotsPerMm;
+    const columnGapDots = labelGap * dotsPerMm;
     const rowGapDots = rowGap * dotsPerMm;
 
+    // Menghitung lebar dan tinggi total "kertas virtual"
     const totalRows = Math.ceil(count / columns);
-    const totalWidthDots = (labelWidthDots * columns) + (labelGapDots * (columns - 1));
-    const totalHeightDots = (labelHeightDots * totalRows) + (rowGapDots * (totalRows - 1));
+    const pageHeightDots = (labelHeightDots * totalRows) + (rowGapDots * (totalRows > 1 ? totalRows - 1 : 0));
+
+    // Menentukan jenis media berdasarkan input pengguna
+    const mediaType = paperType === 'gap' ? 'N' : paperType === 'black-mark' ? 'M' : 'C';
+
+    let zpl = `^XA\n`; // Mulai Perintah
+    zpl += `^PW${labelWidthDots}\n`; // Atur lebar satu label
+    zpl += `^LL${labelHeightDots}\n`; // Atur tinggi satu label
+    zpl += `^LH0,0\n`; // Atur posisi awal (pojok kiri atas)
+    zpl += `^MD${printDensity}\n`; // Atur kepadatan cetak
+    zpl += `^MN${mediaType}\n`; // Atur jenis media
+
+    // Kalkulasi posisi barcode agar selalu di tengah
+    const barcodeHeight = Math.floor(labelHeightDots * 0.45); // Tinggi barcode 45% dari tinggi label
+    const verticalMargin = Math.floor((labelHeightDots - barcodeHeight) / 3); // Margin atas
+
+    // Buat template untuk SATU barcode yang posisinya sempurna di tengah
+    zpl += `^FO0,${verticalMargin}\n`;
+    zpl += `^BY2,3,${barcodeHeight}\n`;
+    zpl += `^BCN,${barcodeHeight},Y,N,N,A\n`; // Code 128 Auto
+    zpl += `^FB${labelWidthDots},1,0,C,0\n`; // Field Block untuk centering horizontal
+    zpl += `^FD${barcode}^FS\n`;
     
-    let zplCommands = `^XA\n`;
-    zplCommands += `^PW${totalWidthDots}\n`;
-    zplCommands += `^LL${totalHeightDots}\n`;
-    zplCommands += `^LH0,0\n`;
-    zplCommands += `^MD${printDensity}\n`;
-
-    for (let i = 0; i < count; i++) {
-        const row = Math.floor(i / columns);
-        const col = i % columns;
-
-        const xPos = col * (labelWidthDots + labelGapDots);
-        const yPos = row * (labelHeightDots + rowGapDots);
-
-        const barcodeHeight = Math.floor(labelHeightDots * 0.5);
-
-        zplCommands += `^FO${xPos},${yPos + 10}\n`; // Posisi Y ditambah sedikit margin atas
-        zplCommands += `^BY2,3,${barcodeHeight}\n`;
-        zplCommands += `^BCN,${barcodeHeight},Y,N,N,A\n`;
-        zplCommands += `^FB${labelWidthDots},1,0,C,0\n`; // Field Block untuk centering
-        zplCommands += `^FD${barcode}^FS\n`;
-    }
-
-    zplCommands += `^XZ\n`;
-    return zplCommands;
+    zpl += `^XZ\n`; // Akhiri Perintah
+    return zpl;
 }
-
-let selectedPrinterName = null;
 
 async function printLabels() {
     try {
         await connectToQZ();
-
         if (!selectedPrinterName) {
             const printers = await qz.printers.find();
             if (printers.length === 0) {
-                alert('Tidak ada printer yang ditemukan. Pastikan printer terinstal.');
-                return;
+                return alert('Tidak ada printer yang ditemukan.');
             }
-            selectedPrinterName = prompt(
-                "Pilih printer Anda dari daftar di bawah (ketik nama yang sama persis):" +
-                "\n\n" + printers.join('\n')
-            );
-            if (!selectedPrinterName) {
-                alert("Proses dibatalkan.");
-                return;
-            }
+            selectedPrinterName = prompt("Pilih printer Anda (ketik nama yang sama persis):\n\n" + printers.join('\n'));
+            if (!selectedPrinterName) return alert("Proses dibatalkan.");
         }
         
-        // --- PERBAIKAN UTAMA DI SINI ---
-        // Kita membuat satu perintah ZPL besar yang berisi semua label
-        const fullZplCommand = generateZplCode();
+        const zplCodeForOneLabel = generateZplCode();
+        const config = qz.configs.create(selectedPrinterName, { 
+            copies: printCount.value || 1,
+            spacing: {
+                x: labelSettings.labelGap,
+                y: labelSettings.rowGap,
+                units: 'mm'
+            },
+            layout: {
+                columns: labelSettings.columns
+            }
+        });
         
-        // Kita tidak lagi menggunakan 'copies', karena ZPL sudah berisi semua label
-        const config = qz.configs.create(selectedPrinterName); 
-        const data = [fullZplCommand];
-        
-        await qz.print(config, data);
+        await qz.print(config, [zplCodeForOneLabel]);
         alert('Perintah cetak berhasil dikirim!');
 
     } catch (err) {
@@ -5521,6 +5461,59 @@ async function printLabels() {
         selectedPrinterName = null;
     }
 }
+
+// FUNGSI BARU UNTUK PREVIEW YANG AKURAT
+watch([barcodeContent, printCount, labelSettings], () => {
+    if (activePage.value === 'barcode-generator' && barcodeContent.value) {
+        nextTick(() => {
+            const previewArea = document.getElementById('barcode-preview-area');
+            if (!previewArea) return;
+
+            previewArea.innerHTML = '';
+            
+            const { width, height, columns, labelGap, rowGap } = labelSettings;
+            const count = printCount.value;
+
+            const sheet = document.createElement('div');
+            sheet.style.display = 'grid';
+            sheet.style.gridTemplateColumns = `repeat(${columns}, ${width}mm)`;
+            sheet.style.gap = `${rowGap}mm ${labelGap}mm`;
+            sheet.style.padding = '1mm';
+            sheet.style.backgroundColor = 'white';
+            sheet.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)';
+
+            for (let i = 0; i < count; i++) {
+                const labelBox = document.createElement('div');
+                labelBox.style.width = `${width}mm`;
+                labelBox.style.height = `${height}mm`;
+                labelBox.style.display = 'flex';
+                labelBox.style.alignItems = 'center';
+                labelBox.style.justifyContent = 'center';
+                labelBox.style.overflow = 'hidden';
+                labelBox.style.border = '1px dashed #e2e8f0';
+                labelBox.style.boxSizing = 'border-box';
+
+                const canvas = document.createElement('canvas');
+                labelBox.appendChild(canvas);
+                sheet.appendChild(labelBox);
+
+                try {
+                    JsBarcode(canvas, barcodeContent.value, {
+                        format: "CODE128",
+                        displayValue: true,
+                        fontSize: 12,
+                        width: 1.5,
+                        height: 30,
+                        margin: 5
+                    });
+                } catch (e) {
+                    console.error("Error generating barcode preview:", e);
+                }
+            }
+            previewArea.appendChild(sheet);
+        });
+    }
+}, { immediate: true, deep: true });
 
 </script>
 
