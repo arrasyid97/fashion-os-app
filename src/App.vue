@@ -506,7 +506,8 @@ async function deleteInvestor(investorId) {
 }
 
 async function verifyCashoutRequest() {
-    if (!uiState.adminVerificationIdInput) {
+    const withdrawalId = uiState.adminVerificationIdInput.trim();
+    if (!withdrawalId) {
         uiState.adminVerificationError = 'ID Pencairan tidak boleh kosong.';
         return;
     }
@@ -516,24 +517,37 @@ async function verifyCashoutRequest() {
     uiState.adminVerificationError = '';
 
     try {
-        const withdrawalId = uiState.adminVerificationIdInput.trim();
+        // PERBAIKAN: Mencari di koleksi 'commissions' dengan status 'processing'
         const q = query(
-            collection(db, "keuangan"), 
+            collection(db, "commissions"), 
             where("withdrawalId", "==", withdrawalId),
-            where("kategori", "==", "Pembayaran Komisi Mitra")
+            where("status", "==", "processing") // Pastikan hanya yang sedang diproses
         );
 
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-            throw new Error(`Tidak ditemukan pengajuan dengan ID: ${withdrawalId}`);
+            throw new Error(`Tidak ditemukan pengajuan yang sedang diproses dengan ID: ${withdrawalId}`);
         }
 
-        const docData = querySnapshot.docs[0].data();
+        // Hitung total dari semua komisi yang terkait dengan ID ini
+        let totalAmount = 0;
+        let transactionDetails = '';
+        let requestDate = null;
+
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            totalAmount += data.commissionAmount;
+            if (!requestDate) {
+                requestDate = new Date(data.createdAt.seconds * 1000).toLocaleString('id-ID');
+                transactionDetails = `Pengajuan dari: ${data.partnerEmail || data.referralCode}`;
+            }
+        });
+
         uiState.adminVerificationResult = {
-            jumlah: docData.jumlah,
-            tanggal: new Date(docData.tanggal.seconds * 1000).toLocaleString('id-ID'),
-            catatan: docData.catatan
+            jumlah: totalAmount,
+            tanggal: requestDate,
+            catatan: transactionDetails
         };
 
     } catch (error) {
