@@ -37,50 +37,46 @@ export default async function handler(request, response) {
             return response.status(400).json({ message: 'Missing required data.' });
         }
 
-        // ... (Kode untuk query komisi tetap sama) ...
         const commissionsQuery = db.collection('commissions').where('partnerId', '==', partnerUid).where('status', '==', 'unpaid');
         const snapshot = await commissionsQuery.get();
         if (snapshot.empty) {
             throw new Error('No unpaid commissions found to process.');
         }
-        // ... (Kode batch write tetap sama) ...
+
         const batch = db.batch();
         const now = new Date();
+        
+        // --- PERUBAHAN UTAMA ---
+        // Ubah status menjadi 'processing' dan tambahkan withdrawalId
         snapshot.docs.forEach(doc => {
-            batch.update(doc.ref, { status: 'paid', paidDate: now });
+            batch.update(doc.ref, { 
+                status: 'processing', // <-- UBAH MENJADI PROCESSING
+                withdrawalId: withdrawalId // <-- TAMBAHKAN ID PENCAIRAN
+            });
         });
-        const expenseData = {
-            withdrawalId: withdrawalId,
-            kategori: 'Pembayaran Komisi Mitra',
-            jumlah: amountToWithdraw,
-            catatan: `ID Pencairan: ${withdrawalId} | Mitra: ${referralCode}`,
-            jenis: 'pengeluaran',
-            userId: '6m4bgRlZMDhL8niVyD4lZmGuarF3',
-            tanggal: now
-        };
-        const keuanganRef = db.collection('keuangan').doc();
-        batch.set(keuanganRef, expenseData);
+        // JANGAN BUAT CATATAN KEUANGAN DI SINI LAGI
+
         await batch.commit();
 
-        // --- LOGIKA BARU: KIRIM EMAIL KE ADMIN ---
-        await resend.emails.send({
-            from: 'sistem@appfashion.id', // Ganti dengan email dari domain terverifikasi Anda
-            to: 'fashion234oss@gmail.com', // Ganti dengan email admin Anda
-            subject: `Pengajuan Pencairan Komisi Baru: ${referralCode}`,
-            html: `
-                <p>Halo Admin,</p>
-                <p>Ada pengajuan pencairan komisi baru dari mitra dengan detail sebagai berikut:</p>
-                <ul>
-                    <li><strong>ID Pencairan:</strong> <code>${withdrawalId}</code></li>
-                    <li><strong>Kode Mitra:</strong> ${referralCode}</li>
-                    <li><strong>Email Mitra:</strong> ${partnerEmail}</li>
-                    <li><strong>Jumlah:</strong> Rp ${amountToWithdraw.toLocaleString('id-ID')}</li>
-                </ul>
-                <p>Silakan verifikasi menggunakan ID Pencairan di panel admin Anda sebelum melakukan transfer.</p>
-            `
-        });
+        // Kirim email notifikasi ke admin (tetap sama)
+        await resend.emails.send({
+            from: 'sistem@appfashion.id',
+            to: 'fashion234oss@gmail.com',
+            subject: `Pengajuan Pencairan Komisi Baru: ${referralCode}`,
+            html: `
+                <p>Halo Admin,</p>
+                <p>Ada pengajuan pencairan komisi baru dari mitra dengan detail sebagai berikut:</p>
+                <ul>
+                    <li><strong>ID Pencairan:</strong> <code>${withdrawalId}</code></li>
+                    <li><strong>Kode Mitra:</strong> ${referralCode}</li>
+                    <li><strong>Email Mitra:</strong> ${partnerEmail}</li>
+                    <li><strong>Jumlah:</strong> Rp ${amountToWithdraw.toLocaleString('id-ID')}</li>
+                </ul>
+                <p>Silakan verifikasi menggunakan ID Pencairan di panel admin Anda sebelum melakukan transfer.</p>
+            `
+        });
 
-        return response.status(200).json({ message: 'Cashout request processed and email sent.' });
+        return response.status(200).json({ message: 'Cashout request successfully submitted for processing.' });
 
     } catch (error) {
         console.error('FATAL ERROR: Gagal memproses cashout:', error);
