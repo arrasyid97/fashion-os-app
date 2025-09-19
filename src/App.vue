@@ -5381,9 +5381,8 @@ const labelSettings = reactive({
 
 const barcodeContent = ref('123456789');
 const printCount = ref(4);
-
+const lastPrintedContent = ref('');
 let selectedPrinterName = null;
-let lastPrintedContent = '';
 // FUNGSI BARU yang jauh lebih akurat
 function generateZplCode() {
     const { width, height, printDensity, paperType } = labelSettings;
@@ -7113,6 +7112,20 @@ watch([barcodeContent, printCount, labelSettings], () => {
                             class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
                             Cetak Label
                         </button>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2">
+                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">2. Review Barcode</h3>
+                        
+                        <div v-if="lastPrintedContent" class="mb-4 p-3 text-sm text-green-800 bg-green-100 border border-green-200 rounded-lg animate-fade-in">
+                            <p>✅ <b>Barcode terakhir yang berhasil dicetak:</b> <span class="font-mono font-bold">{{ lastPrintedContent }}</span></p>
+                        </div>
+
+                        <div id="barcode-preview-area" class="p-4 rounded-lg bg-slate-200 flex items-center justify-center min-h-[300px]">
+                            <canvas id="barcodeCanvas" class="barcode-image"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
