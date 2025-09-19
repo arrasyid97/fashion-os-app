@@ -5371,54 +5371,52 @@ function connectToQZ() {
 
 // State untuk pengaturan label yang dikirim ke printer
 const labelSettings = reactive({
-  width: 33,
-  height: 15,
-  columns: 2,
-  labelGap: 4, // Nama diubah untuk kejelasan
-  rowGap: 2,   // Pengaturan baru
-  paperType: 'gap',
-  printSpeed: 2,
-  printDensity: 8,
+    width: 33,
+    height: 15,
+    columns: 1, // Sederhanakan ke 1 kolom, printer biasanya menanganinya sendiri
+    labelGap: 2, // Jarak antar label
+    paperType: 'gap',
+    printDensity: 8,
 });
 
 const barcodeContent = ref('123456789');
 const printCount = ref(4);
 
 let selectedPrinterName = null;
-
+let lastPrintedContent = '';
 // FUNGSI BARU yang jauh lebih akurat
 function generateZplCode() {
-    const barcode = barcodeContent.value || '1234567890';
-    // Ambil hanya variabel yang kita butuhkan
     const { width, height, printDensity, paperType } = labelSettings;
+    const barcode = barcodeContent.value || '1234567890';
 
-    const dotsPerMm = 8; // Standar untuk printer 203dpi
-    const labelWidthDots = width * dotsPerMm;
-    const labelHeightDots = height * dotsPerMm;
+    const dotsPerMm = 8; // Standar untuk printer 203dpi (8 dots/mm)
+    const labelWidthDots = Math.round(width * dotsPerMm);
+    const labelHeightDots = Math.round(height * dotsPerMm);
 
-    // Menentukan jenis media berdasarkan input pengguna
+    // Hitung posisi horizontal (X) dan vertikal (Y) untuk barcode
+    const barcodeX = Math.round(labelWidthDots / 2); // Tengah horizontal
+    const barcodeY = Math.round(labelHeightDots / 2); // Tengah vertikal
+    
+    // Tentukan jenis media berdasarkan input
     const mediaType = paperType === 'gap' ? 'N' : paperType === 'black-mark' ? 'M' : 'C';
+    
+    // Gunakan ZPL yang lebih profesional dan ringkas
+    let zpl = `^XA\n`;
+    zpl += `^FWN\n`; // Arah normal
+    zpl += `^LH0,0\n`; // Origin di 0,0
+    zpl += `^PW${labelWidthDots}\n`; // Lebar label
+    zpl += `^LL${labelHeightDots}\n`; // Tinggi label
+    zpl += `^MD${printDensity}\n`; // Kepadatan cetak
+    zpl += `^MN${mediaType}\n`; // Tipe media
 
-    // Kalkulasi posisi barcode agar selalu di tengah
-    const barcodeHeight = Math.floor(labelHeightDots * 0.45); // Tinggi barcode 45% dari tinggi label
-    const verticalMargin = Math.floor((labelHeightDots - barcodeHeight) / 3); // Margin atas
-
-    // Kode ZPL untuk SATU LABEL SEMPURNA
-    let zpl = `^XA\n`; // Mulai Perintah
-    zpl += `^PW${labelWidthDots}\n`; // Atur lebar satu label
-    zpl += `^LL${labelHeightDots}\n`; // Atur tinggi satu label
-    zpl += `^LH0,0\n`; // Atur posisi awal (pojok kiri atas)
-    zpl += `^MD${printDensity}\n`; // Atur kepadatan cetak
-    zpl += `^MN${mediaType}\n`; // Atur jenis media
-
-    // Buat template untuk SATU barcode yang posisinya sempurna di tengah
-    zpl += `^FO0,${verticalMargin}\n`;
-    zpl += `^BY2,3,${barcodeHeight}\n`;
-    zpl += `^BCN,${barcodeHeight},Y,N,N,A\n`; // Code 128 Auto
-    zpl += `^FB${labelWidthDots},1,0,C,0\n`; // Field Block untuk centering horizontal
+    // Tambahkan barcode dan teks dengan posisi yang dihitung
+    zpl += `^FO${barcodeX},${barcodeY-20}^BCN,30,Y,N,N^FS`; // Barcode di tengah, ukuran tetap
     zpl += `^FD${barcode}^FS\n`;
-
-    zpl += `^XZ\n`; // Akhiri Perintah
+    zpl += `^FO${barcodeX},${barcodeY+20}^A0N,20,20^FS`; // Teks di bawah barcode
+    zpl += `^FD${barcode}^FS\n`;
+    
+    // Akhiri perintah
+    zpl += `^XZ\n`;
     return zpl;
 }
 
@@ -5433,22 +5431,20 @@ async function printLabels() {
             selectedPrinterName = prompt("Pilih printer Anda (ketik nama yang sama persis):\n\n" + printers.join('\n'));
             if (!selectedPrinterName) return alert("Proses dibatalkan.");
         }
-        
+
         const zplCodeForOneLabel = generateZplCode();
-        const config = qz.configs.create(selectedPrinterName, { 
-            copies: printCount.value || 1,
-            spacing: {
-                x: labelSettings.labelGap,
-                y: labelSettings.rowGap,
-                units: 'mm'
-            },
-            layout: {
-                columns: labelSettings.columns
-            }
-        });
-        
-        await qz.print(config, [zplCodeForOneLabel]);
-        alert('Perintah cetak berhasil dikirim!');
+        let finalZpl = '';
+
+        // Ulangi ZPL sesuai jumlah cetakan
+        for (let i = 0; i < printCount.value; i++) {
+            finalZpl += zplCodeForOneLabel;
+        }
+
+        const config = qz.configs.create(selectedPrinterName);
+
+        await qz.print(config, finalZpl);
+        alert(`Perintah cetak untuk ${printCount.value} label berhasil dikirim!`);
+        lastPrintedContent = barcodeContent.value;
 
     } catch (err) {
         console.error("Kesalahan saat mencetak:", err);
@@ -7067,7 +7063,6 @@ watch([barcodeContent, printCount, labelSettings], () => {
 <div v-if="activePage === 'barcode-generator'">
     <div id="barcode-page" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
-
             <div class="mb-8 animate-fade-in-up">
                 <h2 class="text-3xl font-bold text-slate-800">Cetak Barcode</h2>
                 <p class="text-slate-500 mt-1">Atur, review, dan cetak label barcode Anda dengan mudah.</p>
@@ -7096,25 +7091,9 @@ watch([barcodeContent, printCount, labelSettings], () => {
                                     <option value="continuous">Terus Menerus</option>
                                 </select>
                             </div>
-                            <div class="grid grid-cols-3 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Kolom</label>
-                                    <input type="number" v-model.number="labelSettings.columns" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Jarak Kolom (mm)</label>
-                                    <input type="number" v-model.number="labelSettings.labelGap" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Jarak Baris (mm)</label>
-                                    <input type="number" v-model.number="labelSettings.rowGap" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Kepadatan Cetak</label>
-                                    <input type="number" v-model.number="labelSettings.printDensity" min="1" max="15" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Kepadatan Cetak</label>
+                                <input type="number" v-model.number="labelSettings.printDensity" min="1" max="15" class="mt-1 w-full p-2 border rounded-md">
                             </div>
                         </div>
 
@@ -7134,15 +7113,6 @@ watch([barcodeContent, printCount, labelSettings], () => {
                             class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
                             Cetak Label
                         </button>
-                    </div>
-                </div>
-
-                <div class="lg:col-span-2">
-                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">2. Review Barcode</h3>
-                        <div id="barcode-preview-area" class="p-4 rounded-lg bg-slate-200 flex items-center justify-center min-h-[300px]">
-                            <canvas id="barcodeCanvas" class="barcode-image"></canvas>
-                        </div>
                     </div>
                 </div>
             </div>
