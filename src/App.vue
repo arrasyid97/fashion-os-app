@@ -905,40 +905,40 @@ async function handleCashoutRequest() {
         return alert("Tidak ada komisi yang tersedia untuk dicairkan.");
     }
 
-    // BUAT ID UNIK UNTUK PENCAIRAN INI
     const withdrawalId = `WDRW-${Date.now()}`;
 
     if (!confirm(`Anda akan mengajukan pencairan seluruh komisi sebesar ${formatCurrency(amountToWithdraw)}. Lanjutkan?`)) {
         return;
     }
 
+    isSaving.value = true;
     try {
-        isSaving.value = true;
-        const batch = writeBatch(db);
-        const now = new Date();
+        // 1. Dapatkan token otentikasi dari pengguna yang sedang login
+        const idToken = await auth.currentUser.getIdToken(true);
 
-        commissions.value.filter(c => c.status === 'unpaid').forEach(c => {
-            const commissionRef = doc(db, "commissions", c.id);
-            batch.update(commissionRef, { status: 'paid', paidDate: now });
+        // 2. Kirim permintaan ke serverless function yang aman
+        const response = await fetch('/api/request-cashout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                amountToWithdraw: amountToWithdraw,
+                withdrawalId: withdrawalId,
+                referralCode: currentUser.value.referralCode
+            })
         });
 
-        const expenseData = {
-            kategori: 'Pembayaran Komisi Mitra',
-            jumlah: amountToWithdraw,
-            catatan: `ID Pencairan: ${withdrawalId} | Mitra: ${currentUser.value.referralCode}`,
-            jenis: 'pengeluaran',
-            // ▼▼▼ INI ADALAH PERUBAHAN KUNCI ▼▼▼
-            // Mencatat pengeluaran ini di bawah akun Admin, bukan akun Mitra.
-            userId: '6m4bgRlZMDhL8niVyD4lZmGuarF3', 
-            tanggal: now
-        };
-        const keuanganRef = doc(collection(db, "keuangan"));
-        batch.set(keuanganRef, expenseData);
+        const data = await response.json();
 
-        await batch.commit();
+        if (!response.ok) {
+            // Jika server merespons dengan error, tampilkan pesannya
+            throw new Error(data.message || 'Terjadi kesalahan di server.');
+        }
 
-        const yourWhatsAppNumber = '6285691803476'; // GANTI DENGAN NOMOR ANDA
-
+        // 3. Jika berhasil, lanjutkan ke WhatsApp (listener akan mengupdate UI secara otomatis)
+        const yourWhatsAppNumber = '6285691803476';
         const messageLines = [
             "Halo Admin Fashion OS,",
             "",
@@ -952,18 +952,18 @@ async function handleCashoutRequest() {
             "Mohon untuk segera diproses.",
             "Terima kasih."
         ];
-        
+
         const messageTemplate = messageLines.join('\n');
         const encodedMessage = encodeURIComponent(messageTemplate);
         const whatsappUrl = `https://api.whatsapp.com/send?phone=${yourWhatsAppNumber}&text=${encodedMessage}`;
-        
+
         window.open(whatsappUrl, '_blank');
 
         alert('Permintaan pencairan berhasil dicatat! Anda akan diarahkan ke WhatsApp untuk konfirmasi.');
 
     } catch (error) {
         console.error('Error saat mencairkan komisi:', error);
-        alert('Gagal mencairkan komisi. Silakan coba lagi.');
+        alert(`Gagal mencairkan komisi: ${error.message}`);
     } finally {
         isSaving.value = false;
     }
