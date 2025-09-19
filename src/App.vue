@@ -26,7 +26,7 @@ import { 
 } from "firebase/auth";
 
 // --- STATE MANAGEMENT ---
-const activePage = ref('dashboard');
+const activePage = ref(localStorage.getItem('lastActivePage') || 'dashboard');
 const isLoading = ref(true);
 const isSaving = ref(false); // Untuk tombol simpan umum
 const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengaturan
