@@ -38,6 +38,7 @@ const activationCodeInput = ref('');
 const activationCodeMessage = ref('');
 const commissionPayouts = ref([]);
 const commissions = ref([]);
+const processingCommissions = ref([]);
 const activationCodes = ref([]);
 const newActivationCode = ref('');
 const state = reactive({
@@ -287,31 +288,41 @@ const labelSettings = reactive({
 const barcodeContent = ref('1234567890');
 const printCount = ref(1);
 
-const totalUnpaidCommission = computed(() => {
-    return commissions.value.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + c.commissionAmount, 0);
-});
-
 const totalPaidCommission = computed(() => {
-    return commissions.value.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.commissionAmount, 0);
+    return commissions.value.filter(c => c.status === 'paid').reduce((sum, c) => sum + c.commissionAmount, 0);
 });
 
-const totalRevenue = computed(() => {
-  // Total semua komisi yang pernah didapat (dibayar + belum dibayar)
-  return totalPaidCommission.value + totalUnpaidCommission.value;
+const totalProcessingCommission = computed(() => {
+    return processingCommissions.value.reduce((sum, c) => sum + c.commissionAmount, 0);
 });
 
-const availableForWithdrawal = computed(() => {
-  // Alias untuk totalUnpaidCommission agar lebih jelas
-  return totalUnpaidCommission.value;
-});
-
-const totalWithdrawn = computed(() => {
-  // Alias untuk totalPaidCommission agar lebih jelas
-  return totalPaidCommission.value;
+const totalUnpaidCommission = computed(() => {
+    const processingIds = new Set(processingCommissions.value.map(c => c.id));
+    return commissions.value
+        .filter(c => c.status === 'unpaid' && !processingIds.has(c.id))
+        .reduce((sum, c) => sum + c.commissionAmount, 0);
 });
 
 const unpaidCommissions = computed(() => {
-    return commissions.value.filter(c => c.status === 'unpaid').sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000));
+    const processingIds = new Set(processingCommissions.value.map(c => c.id));
+    return commissions.value
+        .filter(c => c.status === 'unpaid' && !processingIds.has(c.id))
+        .sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000));
+});
+
+const totalRevenue = computed(() => {
+  // Total pendapatan adalah jumlah dari yang sudah dibayar, belum dibayar, dan sedang diproses
+  return totalPaidCommission.value + totalUnpaidCommission.value + totalProcessingCommission.value;
+});
+
+const availableForWithdrawal = computed(() => {
+  // Alias untuk totalUnpaidCommission yang sudah diperbarui
+  return totalUnpaidCommission.value;
+});
+
+const totalWithdrawn = computed(() => {
+  // Alias untuk totalPaidCommission
+  return totalPaidCommission.value;
 });
 
 
@@ -921,9 +932,7 @@ async function handleCashoutRequest() {
     if (amountToWithdraw <= 0) {
         return alert("Tidak ada komisi yang tersedia untuk dicairkan.");
     }
-
     const withdrawalId = `WDRW-${Date.now()}`;
-
     if (!confirm(`Anda akan mengajukan pencairan seluruh komisi sebesar ${formatCurrency(amountToWithdraw)}. Lanjutkan?`)) {
         return;
     }
@@ -931,13 +940,9 @@ async function handleCashoutRequest() {
     isSaving.value = true;
     try {
         const idToken = await auth.currentUser.getIdToken(true);
-
         const response = await fetch('/api/request-cashout', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
             body: JSON.stringify({
                 amountToWithdraw: amountToWithdraw,
                 withdrawalId: withdrawalId,
@@ -946,12 +951,19 @@ async function handleCashoutRequest() {
         });
 
         const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.message || 'Terjadi kesalahan di server.');
-        }
+        if (!response.ok) { throw new Error(data.message || 'Terjadi kesalahan di server.'); }
 
-        // Notifikasi sukses untuk mitra
-        alert('Permintaan pencairan Anda telah berhasil diajukan. Admin akan segera memprosesnya melalui email.');
+        // --- PERUBAHAN UTAMA: UPDATE UI SECARA OPTIMIS ---
+        // 1. Pindahkan semua komisi yang belum dibayar ke dalam state 'processing'
+        const commissionsToProcess = commissions.value.filter(c => c.status === 'unpaid');
+        processingCommissions.value.push(...commissionsToProcess);
+
+        // 2. Tandai komisi yang sudah dipindahkan agar tidak tampil lagi di daftar 'unpaid'
+        //    (Listener onSnapshot akan membersihkan ini secara otomatis nanti)
+        const idsToProcess = new Set(commissionsToProcess.map(c => c.id));
+        commissions.value = commissions.value.filter(c => !idsToProcess.has(c.id));
+
+        alert('Permintaan pencairan Anda telah berhasil diajukan dan sedang diproses.');
 
     } catch (error) {
         console.error('Error saat mencairkan komisi:', error);
@@ -7262,93 +7274,95 @@ async function printLabels() {
 
 <div v-if="activePage === 'mitra'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-        
-        <div v-if="currentUser && !currentUser.isPartner" class="flex items-center justify-center h-full animate-fade-in">
-            <div class="bg-white p-8 rounded-2xl shadow-xl border text-center max-w-md">
-                <h3 class="text-2xl font-bold text-slate-800 mb-4">Jadilah Mitra & Dapatkan Penghasilan</h3>
-                <p class="text-slate-600 mb-6">Dapatkan komisi dari setiap pelanggan yang Anda ajak. Jadilah bagian dari tim kami untuk mengembangkan Fashion OS bersama.</p>
-                <button @click="showModal('registerPartner')" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">
-                    Daftar Menjadi Mitra
-                </button>
-            </div>
-        </div>
-        
-        <div v-else-if="currentUser && currentUser.isPartner" class="max-w-7xl mx-auto">
+        <div v-if="currentUser && currentUser.isPartner" class="max-w-7xl mx-auto">
             <div class="mb-8 animate-fade-in-up">
                 <h2 class="text-3xl font-bold text-slate-800">Dashboard Mitra</h2>
                 <p class="text-slate-500 mt-1">Pantau kinerja dan penghasilan Anda di sini.</p>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200">
                     <h4 class="text-sm font-medium text-slate-500">Kode Rujukan Anda</h4>
                     <p class="text-2xl font-mono font-bold text-indigo-600 mt-2">{{ currentUser.referralCode }}</p>
                 </div>
 
-                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 200ms;">
-                    <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                        </svg>
-                    </div>
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4">
                     <div>
                         <h4 class="text-sm font-medium text-slate-500">Total Pendapatan</h4>
                         <p class="text-2xl font-bold text-slate-800 mt-1">{{ formatCurrency(totalRevenue) }}</p>
                     </div>
                 </div>
 
-                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 300ms;">
-                    <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                    </div>
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4">
                     <div>
                         <h4 class="text-sm font-medium text-slate-500">Tersedia untuk Dicairkan</h4>
                         <p class="text-2xl font-bold text-green-600 mt-1">{{ formatCurrency(availableForWithdrawal) }}</p>
                     </div>
                 </div>
-                
-                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 400ms;">
-                    <div class="bg-cyan-100 text-cyan-600 p-3 rounded-lg flex-shrink-0">
+
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4">
+                    <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
+                    <div>
+                        <h4 class="text-sm font-medium text-slate-500">Sedang Diproses</h4>
+                        <p class="text-2xl font-bold text-yellow-600 mt-1">{{ formatCurrency(totalProcessingCommission) }}</p>
+                    </div>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4">
                     <div>
                         <h4 class="text-sm font-medium text-slate-500">Sudah Dicairkan</h4>
                         <p class="text-2xl font-bold text-slate-800 mt-1">{{ formatCurrency(totalWithdrawn) }}</p>
                     </div>
                 </div>
             </div>
-            
-            <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 500ms;">
+
+            <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-slate-800">Riwayat Komisi Belum Dibayar</h3>
-                    <button @click="handleCashoutRequest" :disabled="totalUnpaidCommission === 0" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-lg shadow-green-500/20 hover:bg-green-700 transition-colors disabled:bg-slate-400 disabled:shadow-none">
-                        Cairkan Komisi
+                    <h3 class="text-lg font-semibold text-slate-800">Riwayat Komisi (Siap Dicairkan)</h3>
+                    <button @click="handleCashoutRequest" :disabled="totalUnpaidCommission === 0 || isSaving" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-lg shadow-green-500/20 hover:bg-green-700 transition-colors disabled:bg-slate-400 disabled:shadow-none">
+                        <span v-if="isSaving">Mengajukan...</span>
+                        <span v-else>Cairkan Semua Komisi</span>
                     </button>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left text-slate-500">
+                        <tbody class="divide-y divide-slate-200/50">
+                            <tr v-if="unpaidCommissions.length === 0">
+                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada komisi yang siap dicairkan.</td>
+                            </tr>
+                            <tr v-for="com in unpaidCommissions" :key="com.id" class="hover:bg-slate-50/50">
+                                </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Pencairan Sedang Diproses</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-500">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-50/50">
                             <tr>
-                                <th class="px-6 py-3">Tanggal</th>
+                                <th class="px-6 py-3">Tanggal Pengajuan</th>
                                 <th class="px-6 py-3">Pelanggan Rujukan</th>
                                 <th class="px-6 py-3 text-right">Jumlah Komisi</th>
                                 <th class="px-6 py-3 text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="unpaidCommissions.length === 0">
-                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada komisi yang belum dibayar.</td>
+                            <tr v-if="processingCommissions.length === 0">
+                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada pencairan yang sedang diproses.</td>
                             </tr>
-                            <tr v-for="com in unpaidCommissions" :key="com.id" class="hover:bg-slate-50/50">
+                            <tr v-for="com in processingCommissions" :key="com.id" class="hover:bg-slate-50/50">
                                 <td class="px-6 py-4">{{ new Date(com.createdAt.seconds * 1000).toLocaleDateString('id-ID') }}</td>
                                 <td class="px-6 py-4">{{ com.referredUserEmail }}</td>
-                                <td class="px-6 py-4 text-right font-bold text-green-600">{{ formatCurrency(com.commissionAmount) }}</td>
+                                <td class="px-6 py-4 text-right font-bold text-yellow-600">{{ formatCurrency(com.commissionAmount) }}</td>
                                 <td class="px-6 py-4 text-center">
-                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 capitalize">{{ com.status }}</span>
+                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">Processing</span>
                                 </td>
                             </tr>
                         </tbody>
@@ -7356,7 +7370,6 @@ async function printLabels() {
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
