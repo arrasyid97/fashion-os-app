@@ -7316,7 +7316,7 @@ async function printLabels() {
                 <!-- Kolom Kode Rujukan -->
                 <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
                     <h4 class="text-sm font-medium text-slate-500">Kode Rujukan Anda</h4>
-                    <p class="text-xl lg:text-2xl font-mono font-bold text-indigo-600 mt-2">{{ currentUser.referralCode }}</p>
+                    <p class="text-xl lg:text-2xl font-mono font-bold text-indigo-600 mt-2 break-all">{{ currentUser.referralCode }}</p>
                 </div>
 
                 <!-- Kolom Total Pendapatan -->
@@ -7326,9 +7326,9 @@ async function printLabels() {
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                         </svg>
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <h4 class="text-sm font-medium text-slate-500">Total Pendapatan</h4>
-                        <p class="text-xl lg:text-2xl font-bold text-slate-800 mt-1">{{ formatCurrency(totalRevenue) }}</p>
+                        <p class="text-xl lg:text-2xl font-bold text-slate-800 mt-1 break-words">{{ formatCurrency(totalRevenue) }}</p>
                     </div>
                 </div>
 
@@ -7339,22 +7339,22 @@ async function printLabels() {
                              <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <h4 class="text-sm font-medium text-slate-500">Tersedia untuk Dicairkan</h4>
-                        <p class="text-xl lg:text-2xl font-bold text-green-600 mt-1">{{ formatCurrency(availableForWithdrawal) }}</p>
+                        <p class="text-xl lg:text-2xl font-bold text-green-600 mt-1 break-words">{{ formatCurrency(availableForWithdrawal) }}</p>
                     </div>
                 </div>
                 
-                <!-- Kolom Baru: Sedang Diproses -->
+                <!-- Kolom Sedang Diproses -->
                 <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 400ms;">
                     <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <h4 class="text-sm font-medium text-slate-500">Sedang Diproses</h4>
-                        <p class="text-xl lg:text-2xl font-bold text-yellow-600 mt-1">{{ formatCurrency(totalProcessingCommission) }}</p>
+                        <p class="text-xl lg:text-2xl font-bold text-yellow-600 mt-1 break-words">{{ formatCurrency(totalProcessingCommission) }}</p>
                     </div>
                 </div>
 
@@ -7365,13 +7365,14 @@ async function printLabels() {
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <h4 class="text-sm font-medium text-slate-500">Sudah Dicairkan</h4>
-                        <p class="text-xl lg:text-2xl font-bold text-slate-800 mt-1">{{ formatCurrency(totalWithdrawn) }}</p>
+                        <p class="text-xl lg:text-2xl font-bold text-slate-800 mt-1 break-words">{{ formatCurrency(totalWithdrawn) }}</p>
                     </div>
                 </div>
             </div>
             
+            <!-- (Sisa kode untuk tabel tidak berubah) -->
             <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 600ms;">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-semibold text-slate-800">Riwayat Komisi (Siap Dicairkan)</h3>
@@ -7438,7 +7439,6 @@ async function printLabels() {
         </div>
     </div>
 </div>
-
 
 <div v-if="activePage === 'pengaturan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
     <div class="max-w-7xl mx-auto">
