@@ -978,42 +978,12 @@ async function handleCashoutRequest() {
             throw new Error(data.message || 'Terjadi kesalahan di server.');
         }
 
-        // --- BAGIAN YANG DIPERBAIKI ---
-        
-        // 1. Definisikan ulang semua variabel yang dibutuhkan untuk pesan WhatsApp
-        const waNumber = '6285691803476';
-        const partnerCode = currentUser.value.referralCode;
-        const partnerEmail = currentUser.value.email;
-
-        // 2. Buat template pesan dengan variabel yang sudah pasti
-        const messageLines = [
-            "Halo Admin Fashion OS,",
-            "",
-            "Saya ingin mengajukan permohonan pencairan komisi dengan rincian sebagai berikut:",
-            "",
-            `- *ID Pencairan:* ${withdrawalId}`,
-            `- *Kode Mitra:* ${partnerCode}`,
-            `- *Email Mitra:* ${partnerEmail}`,
-            `- *Jumlah Pencairan:* *${formatCurrency(amountToWithdraw)}*`,
-            "",
-            "Mohon untuk segera diproses.",
-            "Terima kasih."
-        ];
-        
-        const messageTemplate = messageLines.join('\n');
-        const encodedMessage = encodeURIComponent(messageTemplate);
-        const whatsappUrl = `https://api.whatsapp.com/send?phone=${waNumber}&text=${encodedMessage}`;
-        
-        // 3. (PENTING) Tambahkan console.log untuk debugging
-        console.log("Generated WhatsApp URL:", whatsappUrl);
-
-        // 4. Buka link WhatsApp
-        window.open(whatsappUrl, '_blank');
-        alert('Permintaan pencairan berhasil dicatat! Anda akan diarahkan ke WhatsApp untuk konfirmasi.');
+        // Notifikasi sukses untuk mitra
+        alert('Permintaan pencairan Anda telah berhasil diajukan. Admin akan segera memprosesnya melalui email.');
 
     } catch (error) {
         console.error('Error saat mencairkan komisi:', error);
-        alert(`Gagal mencairkan komisi: ${error.message}`);
+        alert(`Gagal mengajukan pencairan: ${error.message}`);
     } finally {
         isSaving.value = false;
     }
