@@ -7316,7 +7316,7 @@ async function printLabels() {
                 <!-- Kolom Kode Rujukan -->
                 <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
                     <h4 class="text-sm font-medium text-slate-500">Kode Rujukan Anda</h4>
-                    <p class="text-2xl font-mono font-bold text-indigo-600 mt-2">{{ currentUser.referralCode }}</p>
+                    <p class="text-xl lg:text-2xl font-mono font-bold text-indigo-600 mt-2">{{ currentUser.referralCode }}</p>
                 </div>
 
                 <!-- Kolom Total Pendapatan -->
@@ -7328,7 +7328,7 @@ async function printLabels() {
                     </div>
                     <div>
                         <h4 class="text-sm font-medium text-slate-500">Total Pendapatan</h4>
-                        <p class="text-2xl font-bold text-slate-800 mt-1">{{ formatCurrency(totalRevenue) }}</p>
+                        <p class="text-xl lg:text-2xl font-bold text-slate-800 mt-1">{{ formatCurrency(totalRevenue) }}</p>
                     </div>
                 </div>
 
@@ -7341,7 +7341,7 @@ async function printLabels() {
                     </div>
                     <div>
                         <h4 class="text-sm font-medium text-slate-500">Tersedia untuk Dicairkan</h4>
-                        <p class="text-2xl font-bold text-green-600 mt-1">{{ formatCurrency(availableForWithdrawal) }}</p>
+                        <p class="text-xl lg:text-2xl font-bold text-green-600 mt-1">{{ formatCurrency(availableForWithdrawal) }}</p>
                     </div>
                 </div>
                 
@@ -7354,7 +7354,7 @@ async function printLabels() {
                     </div>
                     <div>
                         <h4 class="text-sm font-medium text-slate-500">Sedang Diproses</h4>
-                        <p class="text-2xl font-bold text-yellow-600 mt-1">{{ formatCurrency(totalProcessingCommission) }}</p>
+                        <p class="text-xl lg:text-2xl font-bold text-yellow-600 mt-1">{{ formatCurrency(totalProcessingCommission) }}</p>
                     </div>
                 </div>
 
@@ -7367,7 +7367,7 @@ async function printLabels() {
                     </div>
                     <div>
                         <h4 class="text-sm font-medium text-slate-500">Sudah Dicairkan</h4>
-                        <p class="text-2xl font-bold text-slate-800 mt-1">{{ formatCurrency(totalWithdrawn) }}</p>
+                        <p class="text-xl lg:text-2xl font-bold text-slate-800 mt-1">{{ formatCurrency(totalWithdrawn) }}</p>
                     </div>
                 </div>
             </div>
