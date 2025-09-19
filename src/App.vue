@@ -5315,27 +5315,23 @@ onMounted(() => {
         if (user) {
             currentUser.value = user;
 
+            // Load initial data and set up real-time listener for user document
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
-                    state.settings.dashboardPin = userData.dashboardPin || '';
-                    currentUser.value.isPartner = userData.isPartner || false;
-                    currentUser.value.referralCode = userData.referralCode || null;
 
-                    // ▼▼▼ KODE DEBUGGING DIMULAI DII SINI ▼▼▼
+                    // Periksa status langganan yang diperbarui dari Firebase
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
-                    
+
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                    
-
+                    // Perbarui data aplikasi hanya jika langganan valid
                     if (isSubscriptionValid) {
                         await loadAllDataFromFirebase();
-
                         if (currentUser.value.isPartner) {
                             const commissionsQuery = query(
                                 collection(db, 'commissions'),
@@ -5349,11 +5345,10 @@ onMounted(() => {
                                 commissions.value = fetchedCommissions;
                             });
                         }
-                        
+
                         const storedPage = localStorage.getItem('lastActivePage');
                         const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         changePage(pageToLoad);
-
                     } else {
                         activePage.value = 'langganan';
                     }
@@ -7888,7 +7883,7 @@ async function printLabels() {
                 </div>
             </div>
         </div>
-        
+
         <div v-else-if="currentUser?.userData?.subscriptionStatus === 'trial' && new Date(currentUser.userData.trialEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
             <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-blue-200 flex flex-col items-center">
                 <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6">
@@ -7908,53 +7903,36 @@ async function printLabels() {
                 </div>
             </div>
         </div>
-        
+
         <div v-else class="max-w-5xl mx-auto text-center">
             <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800 animate-fade-in-up">
                 <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Mulai Langganan Anda</span>
             </h2>
             <p class="text-lg text-slate-600 mt-4 mb-10 max-w-2xl mx-auto animate-fade-in-up" style="animation-delay: 100ms;">
-                Pilih paket di bawah ini atau masukkan kode aktivasi jika Anda sudah melakukan pembayaran di luar aplikasi.
+                Pilih paket di bawah ini untuk memulai langganan premium Anda.
             </p>
 
-            <div class="max-w-xl mx-auto mb-8 p-6 rounded-xl border-2 border-dashed border-green-400 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 200ms;">
-                <h3 class="text-lg font-semibold text-green-700">Punya Kode Aktivasi? (Dari Shopee, dll.)</h3>
-                <p class="text-sm text-slate-600 mb-2">
-                    Jika Anda sudah membayar, masukkan kode aktivasi yang Anda terima di sini untuk mengaktifkan langganan Anda.
-                </p>
-                <div class="flex gap-2">
-                    <input type="text" v-model="activationCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400" placeholder="Masukkan Kode Aktivasi...">
-                    <button @click.prevent="handleActivation" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
-                        <span v-if="isSaving && activationCodeMessage">...</span>
-                        <span v-else>Aktifkan</span>
-                    </button>
-                </div>
-                <p v-if="activationCodeMessage" class="mt-2 text-xs font-medium text-red-600">
-                    {{ activationCodeMessage }}
-                </p>
-            </div>
-            
-            <div class="max-w-xl mx-auto mb-12 p-6 rounded-xl border border-dashed border-indigo-300 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 300ms;">
+            <div class="max-w-xl mx-auto mb-12 p-6 rounded-xl border border-dashed border-indigo-300 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 200ms;">
                 <h3 class="text-lg font-semibold text-indigo-700">Punya Kode Rujukan? (Untuk Diskon)</h3>
-                <p v-if="!currentUser?.userData?.referredBy" class="text-sm text-slate-600 mb-2">
+                <p v-if="!currentUser?.userData?.referredBy && !uiState.referralCodeApplied" class="text-sm text-slate-600 mb-2">
                     Masukkan kode dari mitra kami untuk mendapatkan diskon khusus.
                 </p>
-                <div v-if="!currentUser?.userData?.referredBy" class="flex gap-2">
+                <div v-if="!currentUser?.userData?.referredBy && !uiState.referralCodeApplied" class="flex gap-2">
                     <input type="text" v-model="uiState.referralCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400" placeholder="Contoh: PARTNER-ABCDE">
                     <button @click.prevent="applyReferralCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">Terapkan</button>
                 </div>
                 <p v-if="uiState.referralCodeMessage" class="mt-2 text-xs font-medium" :class="uiState.referralCodeApplied ? 'text-green-600' : 'text-red-500'">
                     {{ uiState.referralCodeMessage }}
                 </p>
-                <p v-if="currentUser?.userData?.referredBy" class="text-sm text-green-600 font-medium">
+                <p v-if="currentUser?.userData?.referredBy || uiState.referralCodeApplied" class="text-sm text-green-600 font-medium">
                     Selamat! Diskon rujukan sudah berlaku selamanya untuk akun Anda.
                 </p>
             </div>
-            
+
             <div class="flex flex-col md:flex-row items-center justify-center gap-8">
-                <div class="bg-white p-8 rounded-2xl shadow-lg border w-full md:w-96 transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 animate-fade-in-up" style="animation-delay: 400ms;">
+                <div class="bg-white p-8 rounded-2xl shadow-lg border w-full md:w-96 transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 animate-fade-in-up" style="animation-delay: 300ms;">
                     <h3 class="text-xl font-semibold text-slate-800">Paket Bulanan</h3>
-                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                    <div v-if="currentUser?.userData?.referredBy || uiState.referralCodeApplied" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(monthlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedMonthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span></p>
                     </div>
@@ -7972,10 +7950,10 @@ async function printLabels() {
                     </button>
                 </div>
 
-                <div class="relative bg-white p-8 rounded-2xl shadow-2xl border-2 border-indigo-500 w-full md:w-96 transform hover:-translate-y-2 hover:shadow-indigo-200 transition-all duration-300 animate-fade-in-up" style="animation-delay: 500ms;">
+                <div class="relative bg-white p-8 rounded-2xl shadow-2xl border-2 border-indigo-500 w-full md:w-96 transform hover:-translate-y-2 hover:shadow-indigo-200 transition-all duration-300 animate-fade-in-up" style="animation-delay: 400ms;">
                     <div class="absolute top-0 right-6 -mt-3 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Paling Hemat</div>
                     <h3 class="text-xl font-semibold text-slate-800">Paket Tahunan</h3>
-                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                    <div v-if="currentUser?.userData?.referredBy || uiState.referralCodeApplied" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(yearlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedYearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span></p>
                     </div>
@@ -7989,13 +7967,12 @@ async function printLabels() {
                         <li class="flex items-center gap-3 font-semibold text-green-600"><svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Diskon setara 2 bulan!</li>
                     </ul>
                     <button @click="handleSubscriptionMayar('tahunan')" :disabled="isSubscribingYearly" class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:bg-slate-400 disabled:shadow-none">
-                         <span v-if="isSubscribingYearly">Memproses...</span>
+                        <span v-if="isSubscribingYearly">Memproses...</span>
                         <span v-else>Pilih Paket Tahunan</span>
                     </button>
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
