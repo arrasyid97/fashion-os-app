@@ -5443,36 +5443,43 @@ function connectToQZ() {
 
 function generateZplCode() {
     const barcode = barcodeContent.value || '1234567890';
-    const { width, height, printDensity } = labelSettings;
+    const count = printCount.value || 1;
+    const { width, height, columns, labelGap, rowGap, printDensity } = labelSettings;
 
-    // Konversi milimeter ke dots (titik). Standar printer thermal adalah 8 dots/mm.
     const dotsPerMm = 8;
     const labelWidthDots = width * dotsPerMm;
     const labelHeightDots = height * dotsPerMm;
+    const labelGapDots = labelGap * dotsPerMm;
+    const rowGapDots = rowGap * dotsPerMm;
+
+    const totalRows = Math.ceil(count / columns);
+    const totalWidthDots = (labelWidthDots * columns) + (labelGapDots * (columns - 1));
+    const totalHeightDots = (labelHeightDots * totalRows) + (rowGapDots * (totalRows - 1));
     
-    // Kalkulasi posisi agar barcode selalu di tengah label
-    // Kita buat Field Block (FB) selebar label, dan ZPL akan menempatkan barcode di tengahnya.
-    const barcodeHeightDots = Math.floor(labelHeightDots * 0.5); // Tinggi barcode 50% dari tinggi label
-    
+    let zplCommands = `^XA\n`;
+    zplCommands += `^PW${totalWidthDots}\n`;
+    zplCommands += `^LL${totalHeightDots}\n`;
+    zplCommands += `^LH0,0\n`;
+    zplCommands += `^MD${printDensity}\n`;
 
-    // Kode ZPL untuk SATU LABEL SEMPURNA
-    const zpl = `
-^XA
-^PW${labelWidthDots}
-^LL${labelHeightDots}
-^LH0,0
-^MD${printDensity}
+    for (let i = 0; i < count; i++) {
+        const row = Math.floor(i / columns);
+        const col = i % columns;
 
-^FX --- Barcode (Centered) ---
-^FO0,10
-^BY2,3,${barcodeHeightDots}
-^BCN,${barcodeHeightDots},Y,N,N,A
-^FB${labelWidthDots},1,0,C,0
-^FD${barcode}^FS
+        const xPos = col * (labelWidthDots + labelGapDots);
+        const yPos = row * (labelHeightDots + rowGapDots);
 
-^XZ
-`;
-    return zpl;
+        const barcodeHeight = Math.floor(labelHeightDots * 0.5);
+
+        zplCommands += `^FO${xPos},${yPos + 10}\n`; // Posisi Y ditambah sedikit margin atas
+        zplCommands += `^BY2,3,${barcodeHeight}\n`;
+        zplCommands += `^BCN,${barcodeHeight},Y,N,N,A\n`;
+        zplCommands += `^FB${labelWidthDots},1,0,C,0\n`; // Field Block untuk centering
+        zplCommands += `^FD${barcode}^FS\n`;
+    }
+
+    zplCommands += `^XZ\n`;
+    return zplCommands;
 }
 
 let selectedPrinterName = null;
