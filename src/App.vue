@@ -5452,7 +5452,7 @@ function generateZplCode() {
     // Kalkulasi posisi agar barcode selalu di tengah label
     // Kita buat Field Block (FB) selebar label, dan ZPL akan menempatkan barcode di tengahnya.
     const barcodeHeightDots = Math.floor(labelHeightDots * 0.5); // Tinggi barcode 50% dari tinggi label
-    const textYPos = barcodeHeightDots + 15; // Posisi teks di bawah barcode
+    
 
     // Kode ZPL untuk SATU LABEL SEMPURNA
     const zpl = `
