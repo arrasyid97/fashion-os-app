@@ -218,6 +218,11 @@ const uiState = reactive({
     referralCodeApplied: false,
     referralCodeMessage: '',
 
+adminVerificationIdInput: '',
+adminVerificationResult: null,
+isVerifying: false,
+adminVerificationError: '',
+
     pengaturanTab: 'umum',
     isKeuanganInfoVisible: false,
     priceCalculator: {
@@ -276,6 +281,8 @@ const labelSettings = reactive({
   printSpeed: 2, // 1-5 ips (inches per second)
   printDensity: 8, // 1-15 tingkat
 });
+
+
 
 const barcodeContent = ref('1234567890');
 const printCount = ref(1);
@@ -517,6 +524,44 @@ async function deleteInvestor(investorId) {
     } catch (error) {
         console.error("Error menghapus investor:", error);
         alert("Gagal menghapus data investor.");
+    }
+}
+
+async function verifyCashoutRequest() {
+    if (!uiState.adminVerificationIdInput) {
+        uiState.adminVerificationError = 'ID Pencairan tidak boleh kosong.';
+        return;
+    }
+
+    uiState.isVerifying = true;
+    uiState.adminVerificationResult = null;
+    uiState.adminVerificationError = '';
+
+    try {
+        const withdrawalId = uiState.adminVerificationIdInput.trim();
+        const q = query(
+            collection(db, "keuangan"), 
+            where("withdrawalId", "==", withdrawalId),
+            where("kategori", "==", "Pembayaran Komisi Mitra")
+        );
+
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            throw new Error(`Tidak ditemukan pengajuan dengan ID: ${withdrawalId}`);
+        }
+
+        const docData = querySnapshot.docs[0].data();
+        uiState.adminVerificationResult = {
+            jumlah: docData.jumlah,
+            tanggal: new Date(docData.tanggal.seconds * 1000).toLocaleString('id-ID'),
+            catatan: docData.catatan
+        };
+
+    } catch (error) {
+        uiState.adminVerificationError = error.message;
+    } finally {
+        uiState.isVerifying = false;
     }
 }
 
@@ -7719,8 +7764,8 @@ async function printLabels() {
             <div class="flex gap-2 mb-6">
                 <input type="text" v-model="newActivationCode" placeholder="Ketik kode kustom (opsional)" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
                 <button @click="createActivationCode" :disabled="isSaving" class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">
-                     <span v-if="isSaving">...</span>
-                     <span v-else>Buat Kode</span>
+                    <span v-if="isSaving">...</span>
+                    <span v-else>Buat Kode</span>
                 </button>
             </div>
             <div class="overflow-x-auto max-h-96">
@@ -7739,8 +7784,8 @@ async function printLabels() {
                         <tr v-for="code in activationCodes" :key="code.id">
                             <td class="p-3 font-mono text-indigo-600">{{ code.id }}</td>
                             <td class="p-3 text-center">
-                                 <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                                      :class="code.status === 'unused' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'">
+                                <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                                    :class="code.status === 'unused' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'">
                                     {{ code.status }}
                                 </span>
                             </td>
@@ -7750,8 +7795,45 @@ async function printLabels() {
                 </table>
             </div>
         </div>
-    </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mt-6">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Verifikasi Pencairan Komisi Mitra</h3>
+            <p class="text-sm text-slate-500 mb-4">
+                Masukkan ID Pencairan dari chat WhatsApp untuk memverifikasi jumlah yang benar.
+            </p>
+            <form @submit.prevent="verifyCashoutRequest" class="flex gap-2">
+                <input 
+                    type="text" 
+                    v-model="uiState.adminVerificationIdInput" 
+                    placeholder="Contoh: WDRW-17..." 
+                    class="w-full p-2 border border-slate-300 rounded-md shadow-sm font-mono"
+                >
+                <button 
+                    type="submit" 
+                    :disabled="uiState.isVerifying" 
+                    class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400"
+                >
+                    <span v-if="uiState.isVerifying">...</span>
+                    <span v-else>Verifikasi</span>
+                </button>
+            </form>
+
+            <div v-if="uiState.adminVerificationResult" class="mt-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-800 animate-fade-in">
+                <p class="font-bold text-lg">✅ Verifikasi Berhasil</p>
+                <div class="mt-2 space-y-1 text-sm">
+                    <p><strong>Jumlah Asli:</strong> <span class="text-2xl font-bold">{{ formatCurrency(uiState.adminVerificationResult.jumlah) }}</span></p>
+                    <p><strong>Tanggal Pengajuan:</strong> {{ uiState.adminVerificationResult.tanggal }}</p>
+                    <p><strong>Detail:</strong> {{ uiState.adminVerificationResult.catatan }}</p>
+                </div>
+            </div>
+            <div v-if="uiState.adminVerificationError" class="mt-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-800 animate-fade-in">
+                <p class="font-bold text-lg">❌ Gagal Verifikasi</p>
+                <p class="text-sm mt-1">{{ uiState.adminVerificationError }}</p>
+            </div>
+        </div>
+        </div>
 </div>
+
                     </div>
                 </div>
             </div>

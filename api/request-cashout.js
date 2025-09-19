@@ -51,13 +51,14 @@ export default async function handler(request, response) {
         });
 
         const expenseData = {
-            kategori: 'Pembayaran Komisi Mitra',
-            jumlah: amountToWithdraw,
-            catatan: `ID Pencairan: ${withdrawalId} | Mitra: ${referralCode}`,
-            jenis: 'pengeluaran',
-            userId: '6m4bgRlZMDhL8niVyD4lZmGuarF3', // ADMIN_UID
-            tanggal: now
-        };
+    withdrawalId: withdrawalId, // <-- TAMBAHKAN BARIS INI
+    kategori: 'Pembayaran Komisi Mitra',
+    jumlah: amountToWithdraw,
+    catatan: `ID Pencairan: ${withdrawalId} | Mitra: ${referralCode}`,
+    jenis: 'pengeluaran',
+    userId: '6m4bgRlZMDhL8niVyD4lZmGuarF3', // ADMIN_UID
+    tanggal: now
+};
         const keuanganRef = db.collection('keuangan').doc();
         batch.set(keuanganRef, expenseData);
 
