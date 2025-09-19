@@ -5389,22 +5389,21 @@ let selectedPrinterName = null;
 // FUNGSI BARU yang jauh lebih akurat
 function generateZplCode() {
     const barcode = barcodeContent.value || '1234567890';
-    const count = printCount.value || 1;
-    const { width, height, columns, labelGap, rowGap, printDensity, paperType } = labelSettings;
+    // Ambil hanya variabel yang kita butuhkan
+    const { width, height, printDensity, paperType } = labelSettings;
 
     const dotsPerMm = 8; // Standar untuk printer 203dpi
     const labelWidthDots = width * dotsPerMm;
     const labelHeightDots = height * dotsPerMm;
-    
-    const rowGapDots = rowGap * dotsPerMm;
-
-    // Menghitung lebar dan tinggi total "kertas virtual"
-    const totalRows = Math.ceil(count / columns);
-    
 
     // Menentukan jenis media berdasarkan input pengguna
     const mediaType = paperType === 'gap' ? 'N' : paperType === 'black-mark' ? 'M' : 'C';
 
+    // Kalkulasi posisi barcode agar selalu di tengah
+    const barcodeHeight = Math.floor(labelHeightDots * 0.45); // Tinggi barcode 45% dari tinggi label
+    const verticalMargin = Math.floor((labelHeightDots - barcodeHeight) / 3); // Margin atas
+
+    // Kode ZPL untuk SATU LABEL SEMPURNA
     let zpl = `^XA\n`; // Mulai Perintah
     zpl += `^PW${labelWidthDots}\n`; // Atur lebar satu label
     zpl += `^LL${labelHeightDots}\n`; // Atur tinggi satu label
@@ -5412,17 +5411,13 @@ function generateZplCode() {
     zpl += `^MD${printDensity}\n`; // Atur kepadatan cetak
     zpl += `^MN${mediaType}\n`; // Atur jenis media
 
-    // Kalkulasi posisi barcode agar selalu di tengah
-    const barcodeHeight = Math.floor(labelHeightDots * 0.45); // Tinggi barcode 45% dari tinggi label
-    const verticalMargin = Math.floor((labelHeightDots - barcodeHeight) / 3); // Margin atas
-
     // Buat template untuk SATU barcode yang posisinya sempurna di tengah
     zpl += `^FO0,${verticalMargin}\n`;
     zpl += `^BY2,3,${barcodeHeight}\n`;
     zpl += `^BCN,${barcodeHeight},Y,N,N,A\n`; // Code 128 Auto
     zpl += `^FB${labelWidthDots},1,0,C,0\n`; // Field Block untuk centering horizontal
     zpl += `^FD${barcode}^FS\n`;
-    
+
     zpl += `^XZ\n`; // Akhiri Perintah
     return zpl;
 }
