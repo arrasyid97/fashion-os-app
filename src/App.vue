@@ -958,10 +958,8 @@ async function handleCashoutRequest() {
 
     isSaving.value = true;
     try {
-        // 1. Dapatkan token otentikasi dari pengguna yang sedang login
         const idToken = await auth.currentUser.getIdToken(true);
 
-        // 2. Kirim permintaan ke serverless function yang aman
         const response = await fetch('/api/request-cashout', {
             method: 'POST',
             headers: {
@@ -976,34 +974,41 @@ async function handleCashoutRequest() {
         });
 
         const data = await response.json();
-
         if (!response.ok) {
-            // Jika server merespons dengan error, tampilkan pesannya
             throw new Error(data.message || 'Terjadi kesalahan di server.');
         }
 
-        // 3. Jika berhasil, lanjutkan ke WhatsApp (listener akan mengupdate UI secara otomatis)
-        const yourWhatsAppNumber = '6285691803476';
+        // --- BAGIAN YANG DIPERBAIKI ---
+        
+        // 1. Definisikan ulang semua variabel yang dibutuhkan untuk pesan WhatsApp
+        const waNumber = '6285691803476';
+        const partnerCode = currentUser.value.referralCode;
+        const partnerEmail = currentUser.value.email;
+
+        // 2. Buat template pesan dengan variabel yang sudah pasti
         const messageLines = [
             "Halo Admin Fashion OS,",
             "",
             "Saya ingin mengajukan permohonan pencairan komisi dengan rincian sebagai berikut:",
             "",
             `- *ID Pencairan:* ${withdrawalId}`,
-            `- *Kode Mitra:* ${currentUser.value.referralCode}`,
-            `- *Email Mitra:* ${currentUser.value.email}`,
+            `- *Kode Mitra:* ${partnerCode}`,
+            `- *Email Mitra:* ${partnerEmail}`,
             `- *Jumlah Pencairan:* *${formatCurrency(amountToWithdraw)}*`,
             "",
             "Mohon untuk segera diproses.",
             "Terima kasih."
         ];
-
+        
         const messageTemplate = messageLines.join('\n');
         const encodedMessage = encodeURIComponent(messageTemplate);
-        const whatsappUrl = `https://api.whatsapp.com/send?phone=${yourWhatsAppNumber}&text=${encodedMessage}`;
+        const whatsappUrl = `https://api.whatsapp.com/send?phone=${waNumber}&text=${encodedMessage}`;
+        
+        // 3. (PENTING) Tambahkan console.log untuk debugging
+        console.log("Generated WhatsApp URL:", whatsappUrl);
 
+        // 4. Buka link WhatsApp
         window.open(whatsappUrl, '_blank');
-
         alert('Permintaan pencairan berhasil dicatat! Anda akan diarahkan ke WhatsApp untuk konfirmasi.');
 
     } catch (error) {
