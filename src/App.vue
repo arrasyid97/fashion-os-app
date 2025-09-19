@@ -1,6 +1,6 @@
 <script setup>
 import qz from 'qz-tray';
-import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
@@ -333,8 +333,6 @@ const parsePercentageInput = (value) => {
 
 let onSnapshotListener = null;
 let commissionsListener = null;
-
-let intervalId = null;
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
@@ -5309,8 +5307,6 @@ watch([barcodeContent, labelSettings], () => {
 }, { immediate: true, deep: true });
 
 onMounted(() => {
-    updateTime();
-    intervalId = setInterval(updateTime, 1000);
 
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
