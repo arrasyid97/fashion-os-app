@@ -277,6 +277,7 @@ const labelSettings = reactive({
   height: 15,
   columns: 3,
   labelGap: 2,
+  rowGap: 2,
   paperType: 'gap', // 'gap', 'black-mark', 'continuous'
   printSpeed: 2, // 1-5 ips (inches per second)
   printDensity: 8, // 1-15 tingkat
@@ -5442,36 +5443,43 @@ function connectToQZ() {
 
 function generateZplCode() {
     const barcode = barcodeContent.value || '1234567890';
-    const { width, height, printDensity } = labelSettings;
+    const count = printCount.value || 1;
+    const { width, height, columns, labelGap, rowGap, printDensity } = labelSettings;
 
-    // Konversi milimeter ke dots (titik). Standar printer thermal adalah 8 dots/mm.
     const dotsPerMm = 8;
     const labelWidthDots = width * dotsPerMm;
     const labelHeightDots = height * dotsPerMm;
+    const labelGapDots = labelGap * dotsPerMm;
+    const rowGapDots = rowGap * dotsPerMm;
+
+    const totalRows = Math.ceil(count / columns);
+    const totalWidthDots = (labelWidthDots * columns) + (labelGapDots * (columns - 1));
+    const totalHeightDots = (labelHeightDots * totalRows) + (rowGapDots * (totalRows - 1));
     
-    // Kalkulasi posisi agar barcode selalu di tengah label
-    // Kita buat Field Block (FB) selebar label, dan ZPL akan menempatkan barcode di tengahnya.
-    const barcodeHeightDots = Math.floor(labelHeightDots * 0.5); // Tinggi barcode 50% dari tinggi label
-    
+    let zplCommands = `^XA\n`;
+    zplCommands += `^PW${totalWidthDots}\n`;
+    zplCommands += `^LL${totalHeightDots}\n`;
+    zplCommands += `^LH0,0\n`;
+    zplCommands += `^MD${printDensity}\n`;
 
-    // Kode ZPL untuk SATU LABEL SEMPURNA
-    const zpl = `
-^XA
-^PW${labelWidthDots}
-^LL${labelHeightDots}
-^LH0,0
-^MD${printDensity}
+    for (let i = 0; i < count; i++) {
+        const row = Math.floor(i / columns);
+        const col = i % columns;
 
-^FX --- Barcode (Centered) ---
-^FO0,10
-^BY2,3,${barcodeHeightDots}
-^BCN,${barcodeHeightDots},Y,N,N,A
-^FB${labelWidthDots},1,0,C,0
-^FD${barcode}^FS
+        const xPos = col * (labelWidthDots + labelGapDots);
+        const yPos = row * (labelHeightDots + rowGapDots);
 
-^XZ
-`;
-    return zpl;
+        const barcodeHeight = Math.floor(labelHeightDots * 0.5);
+
+        zplCommands += `^FO${xPos},${yPos + 10}\n`; // Posisi Y ditambah sedikit margin atas
+        zplCommands += `^BY2,3,${barcodeHeight}\n`;
+        zplCommands += `^BCN,${barcodeHeight},Y,N,N,A\n`;
+        zplCommands += `^FB${labelWidthDots},1,0,C,0\n`; // Field Block untuk centering
+        zplCommands += `^FD${barcode}^FS\n`;
+    }
+
+    zplCommands += `^XZ\n`;
+    return zplCommands;
 }
 
 let selectedPrinterName = null;
@@ -5497,15 +5505,12 @@ async function printLabels() {
         }
         
         // --- PERBAIKAN UTAMA DI SINI ---
-        // 1. Buat ZPL untuk satu label saja
-        const zplCodeForOneLabel = generateZplCode();
+        // Kita membuat satu perintah ZPL besar yang berisi semua label
+        const fullZplCommand = generateZplCode();
         
-        // 2. Ambil jumlah cetak dari input pengguna
-        const copies = printCount.value || 1;
-
-        // 3. Perintahkan QZ Tray untuk mencetak sebanyak 'copies'
-        const config = qz.configs.create(selectedPrinterName, { copies: copies });
-        const data = [zplCodeForOneLabel];
+        // Kita tidak lagi menggunakan 'copies', karena ZPL sudah berisi semua label
+        const config = qz.configs.create(selectedPrinterName); 
+        const data = [fullZplCommand];
         
         await qz.print(config, data);
         alert('Perintah cetak berhasil dikirim!');
@@ -5513,7 +5518,7 @@ async function printLabels() {
     } catch (err) {
         console.error("Kesalahan saat mencetak:", err);
         alert("Gagal mencetak: " + err.message);
-        selectedPrinterName = null; // Reset printer jika gagal agar bisa dipilih ulang
+        selectedPrinterName = null;
     }
 }
 
@@ -7075,7 +7080,7 @@ async function printLabels() {
     <div id="barcode-page" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
 
-             <div class="mb-8 animate-fade-in-up">
+            <div class="mb-8 animate-fade-in-up">
                 <h2 class="text-3xl font-bold text-slate-800">Cetak Barcode</h2>
                 <p class="text-slate-500 mt-1">Atur, review, dan cetak label barcode Anda dengan mudah.</p>
             </div>
@@ -7103,14 +7108,18 @@ async function printLabels() {
                                     <option value="continuous">Terus Menerus</option>
                                 </select>
                             </div>
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700">Kolom</label>
                                     <input type="number" v-model.number="labelSettings.columns" class="mt-1 w-full p-2 border rounded-md">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700">Jarak Label (mm)</label>
+                                    <label class="block text-sm font-medium text-slate-700">Jarak Kolom (mm)</label>
                                     <input type="number" v-model.number="labelSettings.labelGap" class="mt-1 w-full p-2 border rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Jarak Baris (mm)</label>
+                                    <input type="number" v-model.number="labelSettings.rowGap" class="mt-1 w-full p-2 border rounded-md">
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
@@ -7134,20 +7143,20 @@ async function printLabels() {
                         </div>
 
                         <button @click="printLabels" :disabled="!barcodeContent || printCount < 1"
-    class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
-    Cetak Label
-</button>
+                            class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
+                            Cetak Label
+                        </button>
                     </div>
                 </div>
 
                 <div class="lg:col-span-2">
-    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">2. Review Barcode</h3>
-        <div id="barcode-preview-area" class="p-4 rounded-lg bg-slate-200 flex items-center justify-center min-h-[300px]">
-            <canvas id="barcodeCanvas" class="barcode-image"></canvas>
-        </div>
-    </div>
-</div>
+                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">2. Review Barcode</h3>
+                        <div id="barcode-preview-area" class="p-4 rounded-lg bg-slate-200 flex items-center justify-center min-h-[300px]">
+                            <canvas id="barcodeCanvas" class="barcode-image"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
