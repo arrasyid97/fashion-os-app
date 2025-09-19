@@ -5268,60 +5268,60 @@ onMounted(() => {
 
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
+        
+        // Hapus listener lama jika ada
         if (onSnapshotListener) onSnapshotListener();
         if (commissionsListener) commissionsListener();
 
         if (user) {
             currentUser.value = user;
 
-            // Load initial data and set up real-time listener for user document
+            // Buat listener baru untuk dokumen pengguna saat login
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
 
-                    // Periksa status langganan yang diperbarui dari Firebase
+                    // Periksa status langganan
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
 
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                    // Perbarui data aplikasi hanya jika langganan valid
                     if (isSubscriptionValid) {
+                        // Jika langganan valid, pastikan data dimuat dan arahkan ke dasbor
                         await loadAllDataFromFirebase();
-                        if (currentUser.value.isPartner) {
-                            const commissionsQuery = query(
-                                collection(db, 'commissions'),
-                                where('partnerId', '==', currentUser.value.uid)
-                            );
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                const fetchedCommissions = [];
-                                snapshot.forEach(doc => {
-                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
-                                });
-                                commissions.value = fetchedCommissions;
-                            });
+                        if (user.uid === ADMIN_UID) {
+                            // Aktifkan listener komisi hanya untuk admin
+                            fetchCommissionPayouts();
+                            fetchActivationCodes();
+                        }
+                        
+                        const storedPage = localStorage.getItem('lastActivePage');
+                        if (activePage.value === 'langganan' || activePage.value === 'login' || activePage.value === 'register') {
+                            changePage('dashboard');
+                        } else {
+                            changePage(storedPage || 'dashboard');
                         }
 
-                        const storedPage = localStorage.getItem('lastActivePage');
-                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                        changePage(pageToLoad);
                     } else {
+                        // Jika langganan tidak valid, paksa ke halaman langganan
                         activePage.value = 'langganan';
+                        isLoading.value = false; // Pastikan loading dimatikan
                     }
                 } else {
                     console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                     handleLogout();
                 }
-                isLoading.value = false;
             }, (error) => {
                 console.error("Gagal mendengarkan data pengguna:", error);
                 alert("Gagal memuat data pengguna. Silakan coba lagi.");
                 isLoading.value = false;
                 handleLogout();
             });
+
         } else {
             currentUser.value = null;
             activePage.value = 'login';
