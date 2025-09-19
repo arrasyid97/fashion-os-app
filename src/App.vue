@@ -5395,12 +5395,12 @@ function generateZplCode() {
     const dotsPerMm = 8; // Standar untuk printer 203dpi
     const labelWidthDots = width * dotsPerMm;
     const labelHeightDots = height * dotsPerMm;
-    const columnGapDots = labelGap * dotsPerMm;
+    
     const rowGapDots = rowGap * dotsPerMm;
 
     // Menghitung lebar dan tinggi total "kertas virtual"
     const totalRows = Math.ceil(count / columns);
-    const pageHeightDots = (labelHeightDots * totalRows) + (rowGapDots * (totalRows > 1 ? totalRows - 1 : 0));
+    
 
     // Menentukan jenis media berdasarkan input pengguna
     const mediaType = paperType === 'gap' ? 'N' : paperType === 'black-mark' ? 'M' : 'C';
