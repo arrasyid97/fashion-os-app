@@ -206,11 +206,11 @@ const uiState = reactive({
     confirmNewPin: '',
     pinError: '',
 
-    isPemasukanLocked: true,       // Status terkunci untuk tabel pemasukan
+    isPemasukanLocked: false,       // Status terkunci untuk tabel pemasukan
     pemasukanPinInput: '',         // Untuk input PIN di halaman keuangan
     pemasukanPinError: '',         // Pesan error jika PIN salah
 
-    isInvestasiLocked: true,     // Status terkunci untuk halaman investasi
+    isInvestasiLocked: false,     // Status terkunci untuk halaman investasi
     investasiPinInput: '',       // Untuk input PIN di halaman investasi
     investasiPinError: '',       // Pesan error jika PIN salah
 
@@ -315,8 +315,7 @@ const unpaidCommissions = computed(() => {
 });
 
 
-
-const isDashboardLocked = ref(true);
+const isDashboardLocked = ref(false);
 const dashboardPinInput = ref('');
 const dashboardPinError = ref('');
 const ADMIN_UID = '6m4bgRlZMDhL8niVyD4lZmGuarF3'; 
