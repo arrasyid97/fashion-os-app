@@ -5431,22 +5431,45 @@ async function printLabels() {
             if (!selectedPrinterName) return alert("Proses dibatalkan.");
         }
 
-        const zplCodeForOneLabel = generateZplCode();
+        const { width, height, printDensity, paperType } = labelSettings;
+        const barcode = barcodeContent.value || '1234567890';
+        const dotsPerMm = 8;
+        const labelWidthDots = Math.round(width * dotsPerMm);
+        const labelHeightDots = Math.round(height * dotsPerMm);
+        const mediaType = paperType === 'gap' ? 'N' : paperType === 'black-mark' ? 'M' : 'C';
 
-        // Perbaikan: Buat array untuk menampung setiap ZPL label
+        // Menghasilkan kode ZPL untuk dua label dalam satu baris
+        const createTwoLabelsZpl = (text) => {
+            let zpl = `^XA\n`;
+            zpl += `^PW${labelWidthDots * 2}\n`; // Lebar cetak dua kali lipat
+            zpl += `^LL${labelHeightDots}\n`;
+            zpl += `^MD${printDensity}\n`;
+            zpl += `^MN${mediaType}\n`;
+
+            // Label Pertama (Kolom 1)
+            zpl += `^FO${Math.round(labelWidthDots / 2)},${Math.round(labelHeightDots / 2) - 20}^BCN,30,Y,N,N^FD${text}^FS\n`;
+            zpl += `^FO${Math.round(labelWidthDots / 2)},${Math.round(labelHeightDots / 2) + 20}^A0N,20,20^FD${text}^FS\n`;
+
+            // Label Kedua (Kolom 2)
+            zpl += `^FO${Math.round(labelWidthDots * 1.5)},${Math.round(labelHeightDots / 2) - 20}^BCN,30,Y,N,N^FD${text}^FS\n`;
+            zpl += `^FO${Math.round(labelWidthDots * 1.5)},${Math.round(labelHeightDots / 2) + 20}^A0N,20,20^FD${text}^FS\n`;
+
+            zpl += `^XZ\n`;
+            return zpl;
+        };
+
+        const zplForTwoLabels = createTwoLabelsZpl(barcode);
         const labelArray = [];
-        for (let i = 0; i < printCount.value; i++) {
-            labelArray.push(zplCodeForOneLabel);
+
+        for (let i = 0; i < Math.ceil(printCount.value / 2); i++) {
+            labelArray.push(zplForTwoLabels);
         }
 
         const config = qz.configs.create(selectedPrinterName);
-
-        // Perbaikan: Kirim array ke QZ Tray
         await qz.print(config, labelArray);
-        alert(`Perintah cetak untuk ${printCount.value} label berhasil dikirim!`);
 
-        // Perbaikan: Gunakan .value untuk mengubah nilai ref
-        lastPrintedContent.value = barcodeContent.value; 
+        alert(`Perintah cetak untuk ${printCount.value} label berhasil dikirim!`);
+        lastPrintedContent.value = barcode;
 
     } catch (err) {
         console.error("Kesalahan saat mencetak:", err);
