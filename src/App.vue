@@ -1266,31 +1266,42 @@ async function handleSubscriptionMayar(plan) {
     }
     isSubscribingPlan.value = true;
 
-    const referredByCode = uiState.referralCodeApplied ? uiState.referralCodeInput : (currentUser.value?.userData?.referredBy || null);
+    // --- Perbaikan Utama: Tentukan harga yang benar sebelum membuat invoice ---
+    let priceToPay;
+    if (plan === 'bulanan') {
+        priceToPay = (currentUser.value?.userData?.referredBy || uiState.referralCodeApplied) ? discountedMonthlyPrice.value : monthlyPrice.value;
+    } else if (plan === 'tahunan') {
+        priceToPay = (currentUser.value?.userData?.referredBy || uiState.referralCodeApplied) ? discountedYearlyPrice.value : yearlyPrice.value;
+    } else {
+        // Logika pengaman jika plan tidak dikenali, gunakan harga normal bulanan
+        priceToPay = monthlyPrice.value;
+    }
+
+    // Dapatkan kode rujukan dari user data (yang sudah tersimpan saat register/login)
+    const referredByCode = (currentUser.value?.userData?.referredBy || uiState.referralCodeInput) || null;
 
     try {
-        if (referredByCode) {
-            // --- AWAL PERBAIKAN: Menyimpan data referral di Firestore sebelum pembayaran ---
+        // Jika ada kode rujukan DAN pembayaran adalah harga diskon, simpan di 'pending_commissions'
+        if (referredByCode && (priceToPay === discountedMonthlyPrice.value || priceToPay === discountedYearlyPrice.value)) {
             const pendingCommissionRef = doc(db, 'pending_commissions', currentUser.value.email);
             await setDoc(pendingCommissionRef, {
                 referredByCode: referredByCode,
                 timestamp: new Date(),
             }, { merge: true });
             console.log(`INFO: Data referral untuk ${currentUser.value.email} disimpan di Firestore.`);
-            // --- AKHIR PERBAIKAN ---
         }
 
         const response = await fetch('/api/create-mayar-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-    amount: plan === 'bulanan' ? discountedMonthlyPrice.value : discountedYearlyPrice.value,
-    item_name: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
-    customer_email: currentUser.value.email,
-    callback_url: 'https://appfashion.id/api/mayar-webhook',
-    redirect_url: `https://appfashion.id/langganan?status=success`,
-    merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
-}),
+                amount: priceToPay, // Menggunakan harga yang telah disesuaikan
+                item_name: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
+                customer_email: currentUser.value.email,
+                callback_url: 'https://appfashion.id/api/mayar-webhook',
+                redirect_url: `https://appfashion.id/langganan?status=success`,
+                merchant_ref: `FASHIONOS-${currentUser.value.uid}-${Date.now()}-${plan}`,
+            }),
         });
 
         const data = await response.json();
