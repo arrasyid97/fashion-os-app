@@ -313,7 +313,7 @@ const isDashboardLocked = ref(true);
 const dashboardPinInput = ref('');
 const dashboardPinError = ref('');
 const ADMIN_UID = '6m4bgRlZMDhL8niVyD4lZmGuarF3'; 
-
+const hasLoadedInitialData = ref(false);
 // Properti ini akan otomatis bernilai 'true' jika yang login adalah Anda (Admin)
 const isAdmin = computed(() => {
   return currentUser.value && currentUser.value.uid === ADMIN_UID;
@@ -5316,58 +5316,63 @@ onMounted(() => {
             currentUser.value = user;
 
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
-                if (userDocSnap.exists()) {
-                    const userData = userDocSnap.data();
-                    currentUser.value.userData = userData;
-                    state.settings.dashboardPin = userData.dashboardPin || '';
-                    currentUser.value.isPartner = userData.isPartner || false;
-                    currentUser.value.referralCode = userData.referralCode || null;
+    if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        // 1. Update data pengguna secara reaktif
+        currentUser.value.userData = userData;
+        state.settings.dashboardPin = userData.dashboardPin || '';
+        currentUser.value.isPartner = userData.isPartner || false;
+        currentUser.value.referralCode = userData.referralCode || null;
 
-                    // ▼▼▼ KODE DEBUGGING DIMULAI DII SINI ▼▼▼
-                    const now = new Date();
-                    const endDate = userData.subscriptionEndDate?.toDate();
-                    const trialDate = userData.trialEndDate?.toDate();
-                    
-                    const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+        const now = new Date();
+        const endDate = userData.subscriptionEndDate?.toDate();
+        const trialDate = userData.trialEndDate?.toDate();
 
-                    
+        const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+                                    (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                    if (isSubscriptionValid) {
-                        await loadAllDataFromFirebase();
+        if (isSubscriptionValid) {
+            // 2. Hanya muat semua data aplikasi JIKA belum pernah dimuat sebelumnya
+            if (!hasLoadedInitialData.value) {
+                await loadAllDataFromFirebase();
+                hasLoadedInitialData.value = true;
 
-                        if (currentUser.value.isPartner) {
-                            const commissionsQuery = query(
-                                collection(db, 'commissions'),
-                                where('partnerId', '==', currentUser.value.uid)
-                            );
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                const fetchedCommissions = [];
-                                snapshot.forEach(doc => {
-                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
-                                });
-                                commissions.value = fetchedCommissions;
-                            });
-                        }
-                        
-                        const storedPage = localStorage.getItem('lastActivePage');
-                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                        changePage(pageToLoad);
-
-                    } else {
-                        activePage.value = 'langganan';
-                    }
-                } else {
-                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
-                    handleLogout();
+                // Setup listener komisi HANYA setelah data dimuat
+                if (currentUser.value.isPartner) {
+                    const commissionsQuery = query(
+                        collection(db, 'commissions'),
+                        where('partnerId', '==', currentUser.value.uid)
+                    );
+                    commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                        commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    });
                 }
-                isLoading.value = false;
-            }, (error) => {
-                console.error("Gagal mendengarkan data pengguna:", error);
-                alert("Gagal memuat data pengguna. Silakan coba lagi.");
-                isLoading.value = false;
-                handleLogout();
-            });
+
+                // 3. Hanya redirect jika pengguna baru saja login
+                if (activePage.value === 'login') {
+                    const storedPage = localStorage.getItem('lastActivePage');
+                    const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                    changePage(pageToLoad);
+                }
+            }
+            // TIDAK ADA navigasi paksa jika sudah berada di dalam aplikasi.
+            // Ini membiarkan halaman langganan menampilkan status aktifnya.
+        } else {
+            // 4. Jika langganan tidak valid (berakhir), paksa ke halaman langganan
+            activePage.value = 'langganan';
+            hasLoadedInitialData.value = false; // Reset agar data bisa dimuat lagi jika langganan aktif kembali
+        }
+    } else {
+        console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
+        handleLogout();
+    }
+    isLoading.value = false;
+}, (error) => {
+    console.error("Gagal mendengarkan data pengguna:", error);
+    alert("Gagal memuat data pengguna. Silakan coba lagi.");
+    isLoading.value = false;
+    handleLogout();
+});
         } else {
             currentUser.value = null;
             activePage.value = 'login';
