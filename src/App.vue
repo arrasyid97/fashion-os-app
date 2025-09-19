@@ -5432,19 +5432,20 @@ async function printLabels() {
         }
 
         const zplCodeForOneLabel = generateZplCode();
-        let finalZpl = '';
 
-        // Ulangi ZPL sesuai jumlah cetakan
+        // Perbaikan: Buat array untuk menampung setiap ZPL label
+        const labelArray = [];
         for (let i = 0; i < printCount.value; i++) {
-            finalZpl += zplCodeForOneLabel;
+            labelArray.push(zplCodeForOneLabel);
         }
 
         const config = qz.configs.create(selectedPrinterName);
 
-        await qz.print(config, finalZpl);
+        // Perbaikan: Kirim array ke QZ Tray
+        await qz.print(config, labelArray);
         alert(`Perintah cetak untuk ${printCount.value} label berhasil dikirim!`);
-        
-        // Perbaikan: Cara yang benar untuk mengubah nilai ref()
+
+        // Perbaikan: Gunakan .value untuk mengubah nilai ref
         lastPrintedContent.value = barcodeContent.value; 
 
     } catch (err) {
