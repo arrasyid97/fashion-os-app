@@ -5268,51 +5268,47 @@ onMounted(() => {
 
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
-        
         if (onSnapshotListener) onSnapshotListener();
         if (commissionsListener) commissionsListener();
 
         if (user) {
             currentUser.value = user;
 
-            // Logika deteksi URL setelah pembayaran
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('status') === 'success' && activePage.value === 'langganan') {
-                console.log("SUCCESS: Pembayaran terdeteksi! Memuat ulang data dan mengalihkan ke dashboard.");
-                await loadAllDataFromFirebase();
-                changePage('dashboard');
-                return; // Hentikan eksekusi lebih lanjut
-            }
-
-            // Atur listener Firestore untuk pembaruan real-time
+            // Load initial data and set up real-time listener for user document
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
                     currentUser.value.userData = userData;
 
+                    // Periksa status langganan yang diperbarui dari Firebase
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
 
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-                    
-                    // Logika alih halaman berdasarkan status langganan
+                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+
+                    // Perbarui data aplikasi hanya jika langganan valid
                     if (isSubscriptionValid) {
                         await loadAllDataFromFirebase();
-                        if (user.uid === ADMIN_UID) {
-                            fetchCommissionPayouts();
-                            fetchActivationCodes();
+                        if (currentUser.value.isPartner) {
+                            const commissionsQuery = query(
+                                collection(db, 'commissions'),
+                                where('partnerId', '==', currentUser.value.uid)
+                            );
+                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                const fetchedCommissions = [];
+                                snapshot.forEach(doc => {
+                                    fetchedCommissions.push({ id: doc.id, ...doc.data() });
+                                });
+                                commissions.value = fetchedCommissions;
+                            });
                         }
-                        
-                        // Periksa halaman saat ini dan alihkan ke dashboard jika pengguna masih di halaman login/langganan
-                        if (activePage.value === 'login' || activePage.value === 'register' || activePage.value === 'langganan') {
-                            changePage('dashboard');
-                        } else {
-                            changePage(activePage.value); // Tetap di halaman sebelumnya
-                        }
+
+                        const storedPage = localStorage.getItem('lastActivePage');
+                        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                        changePage(pageToLoad);
                     } else {
-                        // Jika langganan tidak valid, paksa ke halaman langganan
                         activePage.value = 'langganan';
                     }
                 } else {
@@ -5326,7 +5322,6 @@ onMounted(() => {
                 isLoading.value = false;
                 handleLogout();
             });
-
         } else {
             currentUser.value = null;
             activePage.value = 'login';
@@ -7867,7 +7862,7 @@ async function printLabels() {
                 </div>
             </div>
         </div>
-        
+
         <div v-else class="max-w-5xl mx-auto text-center">
             <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800 animate-fade-in-up">
                 <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Mulai Langganan Anda</span>
