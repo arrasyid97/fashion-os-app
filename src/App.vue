@@ -5381,8 +5381,8 @@ const labelSettings = reactive({
 
 const barcodeContent = ref('123456789');
 const printCount = ref(4);
-const lastPrintedContent = ref('');
 let selectedPrinterName = null;
+const lastPrintedContent = ref('');
 // FUNGSI BARU yang jauh lebih akurat
 function generateZplCode() {
     const { width, height, printDensity, paperType } = labelSettings;
@@ -5443,7 +5443,9 @@ async function printLabels() {
 
         await qz.print(config, finalZpl);
         alert(`Perintah cetak untuk ${printCount.value} label berhasil dikirim!`);
-        lastPrintedContent = barcodeContent.value;
+        
+        // Perbaikan: Cara yang benar untuk mengubah nilai ref()
+        lastPrintedContent.value = barcodeContent.value; 
 
     } catch (err) {
         console.error("Kesalahan saat mencetak:", err);
