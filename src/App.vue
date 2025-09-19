@@ -5442,91 +5442,81 @@ function connectToQZ() {
 
 function generateZplCode() {
     const barcode = barcodeContent.value || '1234567890';
-    const count = printCount.value || 1;
-    
-    const { width, height, columns, labelGap, printDensity, paperType } = labelSettings;
+    const { width, height, printDensity } = labelSettings;
 
+    // Konversi milimeter ke dots (titik). Standar printer thermal adalah 8 dots/mm.
     const dotsPerMm = 8;
     const labelWidthDots = width * dotsPerMm;
     const labelHeightDots = height * dotsPerMm;
-    const totalWidthDots = (labelWidthDots * columns) + (labelGap * dotsPerMm * (columns - 1));
-    const labelGapDots = labelGap * dotsPerMm;
     
-    let zpl = `^XA
-^PW${totalWidthDots}
-^LL${labelHeightDots}
-^FX Mengatur jenis media dan kepadatan cetak sesuai input pengguna
-^MN${paperType === 'gap' ? 'g' : 'n'}
-^MD${printDensity}
-^LH0,0
-`;
-    
-    let xPos = 0;
-    let yPos = 0;
-    
-    for (let i = 0; i < count; i++) {
-        const currentColumn = i % columns;
-        const currentRow = Math.floor(i / columns);
-        
-        xPos = currentColumn * (labelWidthDots + labelGapDots);
-        yPos = currentRow * (labelHeightDots + labelGapDots);
-        
-        zpl += `^FO${xPos},${yPos}^BY3^BCN,100,Y,N,N^FD${barcode}^FS\n`;
-    }
+    // Kalkulasi posisi agar barcode selalu di tengah label
+    // Kita buat Field Block (FB) selebar label, dan ZPL akan menempatkan barcode di tengahnya.
+    const barcodeHeightDots = Math.floor(labelHeightDots * 0.5); // Tinggi barcode 50% dari tinggi label
+    const textYPos = barcodeHeightDots + 15; // Posisi teks di bawah barcode
 
-    zpl += `^XZ`;
-    
+    // Kode ZPL untuk SATU LABEL SEMPURNA
+    const zpl = `
+^XA
+^PW${labelWidthDots}
+^LL${labelHeightDots}
+^LH0,0
+^MD${printDensity}
+
+^FX --- Barcode (Centered) ---
+^FO0,10
+^BY2,3,${barcodeHeightDots}
+^BCN,${barcodeHeightDots},Y,N,N,A
+^FB${labelWidthDots},1,0,C,0
+^FD${barcode}^FS
+
+^XZ
+`;
     return zpl;
 }
 
 let selectedPrinterName = null;
 
 async function printLabels() {
-  try {
-    await connectToQZ();
+    try {
+        await connectToQZ();
 
-    if (!selectedPrinterName) {
-      const printers = await qz.printers.find();
+        if (!selectedPrinterName) {
+            const printers = await qz.printers.find();
+            if (printers.length === 0) {
+                alert('Tidak ada printer yang ditemukan. Pastikan printer terinstal.');
+                return;
+            }
+            selectedPrinterName = prompt(
+                "Pilih printer Anda dari daftar di bawah (ketik nama yang sama persis):" +
+                "\n\n" + printers.join('\n')
+            );
+            if (!selectedPrinterName) {
+                alert("Proses dibatalkan.");
+                return;
+            }
+        }
+        
+        // --- PERBAIKAN UTAMA DI SINI ---
+        // 1. Buat ZPL untuk satu label saja
+        const zplCodeForOneLabel = generateZplCode();
+        
+        // 2. Ambil jumlah cetak dari input pengguna
+        const copies = printCount.value || 1;
 
-      if (printers.length === 0) {
-        alert('Tidak ada printer yang ditemukan. Pastikan printer terinstal.');
-        return;
-      }
+        // 3. Perintahkan QZ Tray untuk mencetak sebanyak 'copies'
+        const config = qz.configs.create(selectedPrinterName, { copies: copies });
+        const data = [zplCodeForOneLabel];
+        
+        await qz.print(config, data);
+        alert('Perintah cetak berhasil dikirim!');
 
-      selectedPrinterName = prompt(
-        "Pilih printer Anda dari daftar di bawah (ketik nama yang sama persis):" +
-        "\n\n" + printers.join('\n')
-      );
-
-      if (!selectedPrinterName) {
-        alert("Proses dibatalkan.");
-        return;
-      }
+    } catch (err) {
+        console.error("Kesalahan saat mencetak:", err);
+        alert("Gagal mencetak: " + err.message);
+        selectedPrinterName = null; // Reset printer jika gagal agar bisa dipilih ulang
     }
-
-    const zplCode = generateZplCode();
-    const copies = 1;
-
-    qz.printers.find(selectedPrinterName).then(function(found) {
-      if (!found) {
-        // Jika printer yang disimpan tidak ditemukan, reset dan minta ulang
-        selectedPrinterName = null; 
-        throw new Error(`Printer '${selectedPrinterName}' tidak ditemukan. Silakan coba lagi.`);
-      }
-      var config = qz.configs.create(found, { copies: copies });
-      var data = [zplCode];
-      return qz.print(config, data);
-    }).then(() => {
-      alert('Perintah cetak berhasil dikirim!');
-    }).catch(err => {
-      console.error("Kesalahan saat mencetak:", err);
-      alert("Gagal mencetak: " + err.message);
-    });
-  } catch (error) {
-    console.error("Gagal mencetak:", error);
-    alert("Gagal mencetak: " + error.message);
-  }
 }
+
 </script>
 
 <template>
