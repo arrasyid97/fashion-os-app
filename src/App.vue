@@ -334,31 +334,7 @@ const parsePercentageInput = (value) => {
 let onSnapshotListener = null;
 let commissionsListener = null;
 
-const currentDate = ref('');
-const currentTime = ref('');
 let intervalId = null;
-
-const updateTime = () => {
-    const now = new Date();
-    
-    // Format tanggal (Tanggal Bulan Tahun)
-    currentDate.value = new Intl.DateTimeFormat('id-ID', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        timeZone: 'Asia/Jakarta'
-    }).format(now);
-    
-    // Format waktu (Jam:Menit:Detik)
-    currentTime.value = new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZone: 'Asia/Jakarta',
-        hour12: false // Gunakan format 24 jam
-    }).format(now).replace(/\./g, ':'); // Mengganti titik menjadi titik dua
-};
-
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
@@ -5410,10 +5386,6 @@ changePage(activePage.value);
     });
 });
 
-onUnmounted(() => { // <-- PINDAHKAN KE SINI
-    clearInterval(intervalId); // Hentikan pembaruan saat komponen dilepas
-});
-
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
@@ -5596,10 +5568,6 @@ async function printLabels() {
     <div class="h-16 flex items-center justify-center px-4 border-b border-gray-700/50">
         <h1 class="text-xl font-bold text-white tracking-wider">{{ state.settings.brandName }}</h1>
     </div>
-    <div class="p-4 text-center text-white border-b border-gray-700/50">
-    <p class="font-semibold text-sm tracking-wide">{{ currentDate }}</p>
-    <p class="font-mono text-lg tracking-wider">{{ currentTime }}</p>
-</div>
     
     <div class="flex-1 flex flex-col overflow-y-auto">
         <nav class="flex-1 px-2 py-4 space-y-1">
