@@ -5315,6 +5315,9 @@ onMounted(() => {
         if (user) {
             currentUser.value = user;
 
+            // Memuat semua data aplikasi hanya sekali saat login berhasil
+            await loadAllDataFromFirebase();
+
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data();
@@ -5323,19 +5326,14 @@ onMounted(() => {
                     currentUser.value.isPartner = userData.isPartner || false;
                     currentUser.value.referralCode = userData.referralCode || null;
 
-                    // ▼▼▼ KODE DEBUGGING DIMULAI DII SINI ▼▼▼
                     const now = new Date();
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
                     
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-
                     
-
-                    if (isSubscriptionValid) {
-                        await loadAllDataFromFirebase();
-
+                    if (isSubscriptionValid || isAdmin.value) {
                         if (currentUser.value.isPartner) {
                             const commissionsQuery = query(
                                 collection(db, 'commissions'),
@@ -5353,7 +5351,6 @@ onMounted(() => {
                         const storedPage = localStorage.getItem('lastActivePage');
                         const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
                         changePage(pageToLoad);
-
                     } else {
                         activePage.value = 'langganan';
                     }
