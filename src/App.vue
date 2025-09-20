@@ -270,14 +270,14 @@ adminVerificationError: '',
 });
 
 const isSubscriptionValid = computed(() => {
-    if (!currentUser.value?.userData) return false;
-    const userData = currentUser.value.userData;
-    const now = new Date();
-    const endDate = userData.subscriptionEndDate?.toDate();
-    const trialDate = userData.trialEndDate?.toDate();
+    if (!currentUser.value?.userData) return false;
+    const userData = currentUser.value.userData;
+    const now = new Date();
+    const endDate = userData.subscriptionEndDate?.toDate();
+    const trialDate = userData.trialEndDate?.toDate();
 
-    return (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-           (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+    return (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+           (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 });
 
 const unpaidCommissions = computed(() =>
@@ -5323,7 +5323,7 @@ onMounted(() => {
                     
 
                     // --- AWAL PERUBAHAN LOGIKA ---
-                    if (isSubscriptionValid) {
+                    if (isSubscriptionValid.value) {
                         // Jika langganan valid, muat semua data seperti biasa
                         if (!hasLoadedInitialData.value) {
                             await loadAllDataFromFirebase();
