@@ -6913,7 +6913,40 @@ watch(activePage, (newPage) => {
             </div>
             <div class="space-y-10">
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 1: Pengaturan di Aplikasi "Print Label"</h3>
+                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 1: Persiapan Awal Kertas & Kalibrasi Printer</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 1: Membeli Kertas Label</h4>
+                            <p class="text-slate-700">
+                                Sebelum memulai, pastikan Anda telah membeli kertas label khusus barcode. Anda bisa mencarinya di marketplace dengan kata kunci **"label thermal 33x15mm 2 line"**. Panduan ini menggunakan ukuran tersebut sebagai contoh, namun Anda bisa menyesuaikan pengaturan di aplikasi atau PC jika Anda menggunakan ukuran lain.
+                            </p>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 2: Mengkalibrasi Printer</h4>
+                            <p class="text-slate-700">
+                                Kalibrasi penting untuk memastikan printer mengenali ukuran kertas dan mencetak dengan presisi.
+                            </p>
+                            <ul class="list-disc list-inside ml-4 space-y-2 text-slate-700 mt-2">
+                                <li>
+                                    <p class="font-bold">Untuk Printer Xprinter XP-D4601B:</p>
+                                    <ol class="list-decimal list-inside ml-4">
+                                        <li>Matikan printer (posisi **OFF**).</li>
+                                        <li>Tekan dan tahan tombol bulat di atas printer, lalu hidupkan printer (posisi **ON**).</li>
+                                        <li>Jangan lepas tombol sampai lampu indikator berkedip merah sebanyak **lima kali**. Setelah itu, lepaskan tombol.</li>
+                                        <li>Printer akan menyesuaikan diri. Untuk menguji, tekan tombol bulat satu kali. Jika printer mengeluarkan satu baris dengan dua label kosong, kalibrasi berhasil.</li>
+                                    </ol>
+                                </li>
+                                <li>
+                                    <p class="font-bold">Untuk Printer Lain:</p>
+                                    <p>Silakan cari panduan kalibrasi di Google atau YouTube sesuai merek dan model printer Anda.</p>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 2: Pengaturan di Aplikasi "Print Label"</h3>
                     <div class="space-y-6">
                         <div>
                             <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 1: Menginstal Aplikasi</h4>
@@ -6942,7 +6975,7 @@ watch(activePage, (newPage) => {
                             <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 4: Menambahkan Barcode</h4>
                             <ol class="list-decimal list-inside space-y-2 text-slate-700">
                                 <li>Di halaman editor, klik ikon **"BarCode"** di bagian bawah.</li>
-                                <li>Klik barcode untuk mengedit teksnya dan masukkan **SKU** produk Anda.</li>
+                                <li>Edit konten teks di bawah barcode dengan **SKU** produk Anda.</li>
                             </ol>
                         </div>
                         <div>
@@ -6955,8 +6988,8 @@ watch(activePage, (newPage) => {
                     </div>
                 </div>
 
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 600ms;">
-                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 2: Jika Hasil Cetak Tidak Pas</h3>
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 700ms;">
+                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 3: Jika Hasil Cetak Tidak Pas</h3>
                     <p class="text-slate-600 mb-4">
                         Jika hasil cetak masih kurang presisi, Anda perlu mengatur ulang konfigurasi printer langsung dari PC atau laptop Anda.
                     </p>
