@@ -5510,16 +5510,13 @@ async function printLabels() {
                 return;
             }
         }
-        
-        const labelsToPrint = generateZplLabels();
-        const config = qz.configs.create(selectedPrinterName, {
-            // Kita biarkan driver printer yang menangani cetak multi-kolom
-            // Kita hanya perlu memastikan total cetakan benar
-            copies: labelsToPrint.length
-        });
-        
-        // Kirim hanya satu template ZPL, dan biarkan QZ Tray menduplikasinya
-        await qz.print(config, labelsToPrint[0]);
+
+        const zplTemplate = generateZplLabels();
+        const config = qz.configs.create(selectedPrinterName);
+
+        // Perbaikan di sini: Pastikan data cetak selalu dalam format array
+        await qz.print(config, zplTemplate);
+
         alert('Perintah cetak berhasil dikirim!');
 
     } catch (err) {
