@@ -403,6 +403,29 @@ async function fetchActivationCodes() {
     }
 }
 
+async function deleteActivationCode(codeId) {
+    if (!confirm('Anda yakin ingin menghapus kode aktivasi ini? Aksi ini tidak dapat dibatalkan.')) {
+        return;
+    }
+
+    if (!isAdmin.value) {
+        alert("Anda tidak memiliki izin untuk melakukan tindakan ini.");
+        return;
+    }
+
+    try {
+        await deleteDoc(doc(db, "activation_codes", codeId));
+
+        // Perbarui state lokal untuk memperbarui UI
+        activationCodes.value = activationCodes.value.filter(code => code.id !== codeId);
+
+        alert(`Kode aktivasi "${codeId}" berhasil dihapus.`);
+    } catch (error) {
+        console.error("Gagal menghapus kode aktivasi:", error);
+        alert("Gagal menghapus kode aktivasi. Silakan coba lagi.");
+    }
+}
+
 // Fungsi untuk membuat kode aktivasi baru
 async function createActivationCode() {
     if (!isAdmin.value) return;
@@ -7663,31 +7686,37 @@ watch(activePage, (newPage) => {
                 </button>
             </div>
             <div class="overflow-x-auto max-h-96">
-                <table class="w-full text-sm">
-                    <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
-                        <tr>
-                            <th class="p-3 font-medium">KODE AKTIVASI</th>
-                            <th class="p-3 font-medium text-center">STATUS</th>
-                            <th class="p-3 font-medium">DIGUNAKAN OLEH</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        <tr v-if="activationCodes.length === 0">
-                            <td colspan="3" class="p-4 text-center text-slate-500">Belum ada kode aktivasi yang dibuat.</td>
-                        </tr>
-                        <tr v-for="code in activationCodes" :key="code.id">
-                            <td class="p-3 font-mono text-indigo-600">{{ code.id }}</td>
-                            <td class="p-3 text-center">
-                                <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                                    :class="code.status === 'unused' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'">
-                                    {{ code.status }}
-                                </span>
-                            </td>
-                            <td class="p-3 text-slate-500">{{ code.usedByEmail || '-' }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+    <table class="w-full text-sm">
+        <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
+            <tr>
+                <th class="p-3 font-medium">KODE AKTIVASI</th>
+                <th class="p-3 font-medium text-center">STATUS</th>
+                <th class="p-3 font-medium">DIGUNAKAN OLEH</th>
+                <th class="p-3 font-medium text-right">AKSI</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+            <tr v-if="activationCodes.length === 0">
+                <td colspan="4" class="p-4 text-center text-slate-500">Belum ada kode aktivasi yang dibuat.</td>
+            </tr>
+            <tr v-for="code in activationCodes" :key="code.id">
+                <td class="p-3 font-mono text-indigo-600">{{ code.id }}</td>
+                <td class="p-3 text-center">
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                          :class="code.status === 'unused' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'">
+                        {{ code.status }}
+                    </span>
+                </td>
+                <td class="p-3 text-slate-500">{{ code.usedByEmail || '-' }}</td>
+                <td class="p-3 text-right">
+                    <button @click="deleteActivationCode(code.id)" class="text-red-500 hover:text-red-700">
+                        <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
         </div>
 
         <!-- 👇👇 BLOK VERIFIKASI YANG SUDAH DIPERBAIKI 👇👇 -->
