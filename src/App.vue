@@ -5441,60 +5441,51 @@ function connectToQZ() {
   });
 }
 
-function generateZplCode() {
+function generateZplLabels() {
     const barcodeText = barcodeContent.value || '1234567890';
     const labelCount = printCount.value || 1;
+    const labels = [];
 
     // Pengaturan label dari UI (dalam mm)
-    const { width, height, columns, labelGap, rowGap, printDensity } = labelSettings;
+    const { width, height } = labelSettings;
     const dpi = 8; // Dots per mm (standar untuk printer thermal)
 
     // Konversi milimeter ke dots
     const labelWidthDots = Math.round(width * dpi);
     const labelHeightDots = Math.round(height * dpi);
-    const labelGapDots = Math.round(labelGap * dpi);
-    const rowGapDots = Math.round(rowGap * dpi);
 
     // Tinggi barcode dan teks
-    const barcodeHeightDots = Math.round(labelHeightDots * 0.5);
+    const barcodeHeightDots = Math.round(labelHeightDots * 0.4);
     const textHeightDots = Math.round(labelHeightDots * 0.2);
-    const verticalBarcodeOffset = Math.round(labelHeightDots * 0.1);
-    const verticalTextOffset = verticalBarcodeOffset + barcodeHeightDots + 5; // Jarak bawah barcode + sedikit margin
-
-    let zplCommands = `^XA\n`;
-    // Gunakan PW untuk mengatur lebar kertas agar sesuai dengan layout 2 kolom
-    const totalPrintWidth = (labelWidthDots * columns) + (labelGapDots * (columns - 1));
-    zplCommands += `^PW${totalPrintWidth}\n`;
-    zplCommands += `^MD${printDensity}\n`;
 
     for (let i = 0; i < labelCount; i++) {
-        const row = Math.floor(i / columns);
-        const col = i % columns;
-
-        // Hitung posisi X dan Y untuk setiap label
-        const xPos = col * (labelWidthDots + labelGapDots);
-        const yPos = row * (labelHeightDots + rowGapDots);
-
-        // Cetak di posisi relatif untuk setiap label
-        zplCommands += `^FO${xPos},${yPos}\n`;
+        // ZPL untuk satu label tunggal
+        let zplCommands = `^XA\n`;
+        zplCommands += `^PW${labelWidthDots}\n`; // Lebar cetak disesuaikan dengan lebar 1 label
+        zplCommands += `^LL${labelHeightDots}\n`;
+        zplCommands += `^MD${labelSettings.printDensity}\n`;
+        zplCommands += `^CI28\n`;
+        zplCommands += `^LH0,0\n`;
 
         // Barcode
-        zplCommands += `^FO${xPos + 5},${yPos + verticalBarcodeOffset}\n`;
+        zplCommands += `^FO${Math.round(labelWidthDots * 0.05)},${Math.round(labelHeightDots * 0.1)}\n`; // Margin 5%
         zplCommands += `^BY2,3,${barcodeHeightDots}\n`;
         zplCommands += `^BCN,${barcodeHeightDots},Y,N,N,A\n`;
         zplCommands += `^FD${barcodeText}^FS\n`;
 
         // Teks di bawah barcode
-        zplCommands += `^FO${xPos},${yPos + verticalTextOffset}\n`;
-        zplCommands += `^A0,${textHeightDots},${textHeightDots}\n`;
-        zplCommands += `^FB${labelWidthDots},1,0,C,0\n`;
+        const textYPos = Math.round(labelHeightDots * 0.1) + barcodeHeightDots + 5;
+        zplCommands += `^FO0,${textYPos}\n`;
+        zplCommands += `^A0N,${textHeightDots},${textHeightDots}\n`;
+        zplCommands += `^FB${labelWidthDots},1,0,C\n`;
         zplCommands += `^FD${barcodeText}^FS\n`;
+        
+        zplCommands += `^XZ\n`;
+        labels.push(zplCommands);
     }
-
-    zplCommands += `^XZ\n`;
     
-    console.log("Generated ZPL:", zplCommands);
-    return zplCommands;
+    console.log("Generated ZPL for one label:", labels[0]);
+    return labels;
 }
 
 let selectedPrinterName = null;
@@ -5519,15 +5510,10 @@ async function printLabels() {
             }
         }
         
-        // --- PERBAIKAN UTAMA DI SINI ---
-        // Kita membuat satu perintah ZPL besar yang berisi semua label
-        const fullZplCommand = generateZplCode();
+        const labelsToPrint = generateZplLabels();
+        const config = qz.configs.create(selectedPrinterName);
         
-        // Kita tidak lagi menggunakan 'copies', karena ZPL sudah berisi semua label
-        const config = qz.configs.create(selectedPrinterName); 
-        const data = [fullZplCommand];
-        
-        await qz.print(config, data);
+        await qz.print(config, labelsToPrint);
         alert('Perintah cetak berhasil dikirim!');
 
     } catch (err) {
@@ -7132,16 +7118,10 @@ async function printLabels() {
                                     <label class="block text-sm font-medium text-slate-700">Jarak Kolom (mm)</label>
                                     <input type="number" v-model.number="labelSettings.labelGap" class="mt-1 w-full p-2 border rounded-md">
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Jarak Baris (mm)</label>
-                                    <input type="number" v-model.number="labelSettings.rowGap" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
+                                
                             </div>
                             <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Kepadatan Cetak</label>
-                                    <input type="number" v-model.number="labelSettings.printDensity" min="1" max="15" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
+                        
                             </div>
                         </div>
 
