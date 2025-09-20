@@ -5442,43 +5442,59 @@ function connectToQZ() {
 }
 
 function generateZplCode() {
-    const barcode = barcodeContent.value || '1234567890';
-    const count = printCount.value || 1;
+    const barcodeText = barcodeContent.value || '1234567890';
+    const labelCount = printCount.value || 1;
+
+    // Pengaturan label dari UI (dalam mm)
     const { width, height, columns, labelGap, rowGap, printDensity } = labelSettings;
+    const dpi = 8; // Dots per mm (standar untuk printer thermal)
 
-    const dotsPerMm = 8;
-    const labelWidthDots = width * dotsPerMm;
-    const labelHeightDots = height * dotsPerMm;
-    const labelGapDots = labelGap * dotsPerMm;
-    const rowGapDots = rowGap * dotsPerMm;
+    // Konversi milimeter ke dots
+    const labelWidthDots = Math.round(width * dpi);
+    const labelHeightDots = Math.round(height * dpi);
+    const labelGapDots = Math.round(labelGap * dpi);
+    const rowGapDots = Math.round(rowGap * dpi);
 
-    const totalRows = Math.ceil(count / columns);
-    const totalWidthDots = (labelWidthDots * columns) + (labelGapDots * (columns - 1));
-    const totalHeightDots = (labelHeightDots * totalRows) + (rowGapDots * (totalRows - 1));
-    
-    let zplCommands = `^XA\n`;
-    zplCommands += `^PW${totalWidthDots}\n`;
-    zplCommands += `^LL${totalHeightDots}\n`;
-    zplCommands += `^LH0,0\n`;
-    zplCommands += `^MD${printDensity}\n`;
+    // Tinggi barcode dan teks
+    const barcodeHeightDots = Math.round(height * dpi * 0.5);
+    const textHeightDots = Math.round(height * dpi * 0.2);
+    const verticalOffset = Math.round(height * dpi * 0.1); // Offset agar tidak terlalu mepet atas
 
-    for (let i = 0; i < count; i++) {
+    let zplCommands = ``;
+
+    for (let i = 0; i < labelCount; i++) {
         const row = Math.floor(i / columns);
         const col = i % columns;
 
+        // Hitung posisi X dan Y untuk setiap label
         const xPos = col * (labelWidthDots + labelGapDots);
         const yPos = row * (labelHeightDots + rowGapDots);
 
-        const barcodeHeight = Math.floor(labelHeightDots * 0.5);
+        // Header
+        zplCommands += `^XA\n`;
+        zplCommands += `^PW${labelWidthDots * columns + labelGapDots * (columns - 1)}\n`; // Lebar total kertas
+        zplCommands += `^LL${labelHeightDots}\n`;
+        zplCommands += `^MD${printDensity}\n`;
+        zplCommands += `^CI28\n`; // Menghapus karakter non-ASCII yang mungkin menyebabkan error
+        zplCommands += `^LH${xPos},${yPos}\n`; // Set posisi awal (X,Y)
 
-        zplCommands += `^FO${xPos},${yPos + 10}\n`; // Posisi Y ditambah sedikit margin atas
-        zplCommands += `^BY2,3,${barcodeHeight}\n`;
-        zplCommands += `^BCN,${barcodeHeight},Y,N,N,A\n`;
-        zplCommands += `^FB${labelWidthDots},1,0,C,0\n`; // Field Block untuk centering
-        zplCommands += `^FD${barcode}^FS\n`;
+        // Barcode
+        zplCommands += `^FO5,${verticalOffset}\n`; // FO (Field Origin) di dalam setiap label
+        zplCommands += `^BY2,3,${barcodeHeightDots}\n`;
+        zplCommands += `^BCN,${barcodeHeightDots},Y,N,N,A\n`;
+        zplCommands += `^FD${barcodeText}^FS\n`;
+
+        // Teks di bawah barcode
+        zplCommands += `^FO0,${verticalOffset + barcodeHeightDots + 5}\n`; // Posisi Y disesuaikan
+        zplCommands += `^A0,${textHeightDots},${textHeightDots}\n`;
+        zplCommands += `^FB${labelWidthDots},1,0,C,0\n`;
+        zplCommands += `^FD${barcodeText}^FS\n`;
+
+        // Footer
+        zplCommands += `^XZ\n`;
     }
-
-    zplCommands += `^XZ\n`;
+    
+    console.log("Generated ZPL:", zplCommands);
     return zplCommands;
 }
 
