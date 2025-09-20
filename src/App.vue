@@ -7551,46 +7551,46 @@ watch(activePage, (newPage) => {
             <p class="text-sm text-slate-500 mb-4">
                 Pilih pengguna di bawah ini untuk menjadikannya mitra. Kode rujukan unik akan dibuat otomatis.
             </p>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="text-left text-slate-500">
-                            <th class="p-2 font-medium">Email Pengguna</th>
-                            <th class="p-2 font-medium text-center">Status Mitra</th>
-                            <th class="p-2 font-medium text-center">Kode Rujukan</th>
-                            <th class="p-2 font-medium text-right">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        <tr v-if="uiState.allUsers.length === 0">
-                            <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada pengguna terdaftar.</td>
-                        </tr>
-                        <tr v-for="user in uiState.allUsers" :key="user.uid" class="hover:bg-slate-50">
-                            <td class="p-3">{{ user.email }}</td>
-                            <td class="p-3 text-center">
-                                <span v-if="user.isPartner" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">Ya</span>
-                                <span v-else class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800">Tidak</span>
-                            </td>
-                            <td class="p-3 text-center font-mono text-sm">
-                                {{ user.referralCode || '-' }}
-                            </td>
-                            <td class="p-3 text-right space-x-2">
-                                <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
-                                    Jadikan Mitra
-                                </button>
-                                <div v-else class="inline-flex items-center gap-2">
-                                    <button @click="showModal('editReferralCode', { user: user, newReferralCode: user.referralCode })" class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-md hover:bg-blue-200 text-xs">
-                                        Edit
-                                    </button>
-                                    <button @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
-                                        Lihat Kode
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <div class="overflow-x-auto max-h-96">
+    <table class="w-full text-sm">
+        <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
+            <tr>
+                <th class="p-2 font-medium">Email Pengguna</th>
+                <th class="p-2 font-medium text-center">Status Mitra</th>
+                <th class="p-2 font-medium text-center">Kode Rujukan</th>
+                <th class="p-2 font-medium text-right">Aksi</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+            <tr v-if="uiState.allUsers.length === 0">
+                <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada pengguna terdaftar.</td>
+            </tr>
+            <tr v-for="user in uiState.allUsers" :key="user.uid" class="hover:bg-slate-50">
+                <td class="p-3">{{ user.email }}</td>
+                <td class="p-3 text-center">
+                    <span v-if="user.isPartner" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">Ya</span>
+                    <span v-else class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800">Tidak</span>
+                </td>
+                <td class="p-3 text-center font-mono text-sm">
+                    {{ user.referralCode || '-' }}
+                </td>
+                <td class="p-3 text-right space-x-2">
+                    <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
+                        Jadikan Mitra
+                    </button>
+                    <div v-else class="inline-flex items-center gap-2">
+                        <button @click="showModal('editReferralCode', { user: user, newReferralCode: user.referralCode })" class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-md hover:bg-blue-200 text-xs">
+                            Edit
+                        </button>
+                        <button @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
+                            Lihat Kode
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
         </div>
 
         <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
