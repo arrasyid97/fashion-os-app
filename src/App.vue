@@ -1,5 +1,4 @@
 <script setup>
-import qz from 'qz-tray';
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
@@ -11,7 +10,6 @@ import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
-import JsBarcode from 'jsbarcode';
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
@@ -271,22 +269,6 @@ adminVerificationError: '',
 
 });
 
-// State untuk pengaturan label yang dikirim ke printer
-const labelSettings = reactive({
-  width: 33,
-  height: 15,
-  columns: 3,
-  labelGap: 2,
-  rowGap: 2,
-  paperType: 'gap', // 'gap', 'black-mark', 'continuous'
-  printSpeed: 2, // 1-5 ips (inches per second)
-  printDensity: 8, // 1-15 tingkat
-});
-
-
-
-const barcodeContent = ref('1234567890');
-const printCount = ref(1);
 
 const unpaidCommissions = computed(() =>
     commissions.value.filter(c => c.status === 'unpaid')
@@ -5283,63 +5265,6 @@ async function loadAllDataFromFirebase() {
     }
 }
 
-watch([barcodeContent, labelSettings], () => {
-    // Hanya jalankan kode ini jika sedang di halaman 'barcode-generator' dan ada teks barcode
-    if (activePage.value === 'barcode-generator' && barcodeContent.value) {
-        nextTick(() => {
-            const previewArea = document.getElementById('barcode-preview-area');
-            if (!previewArea) return;
-
-            // Kosongkan area pratinjau untuk menggambar ulang
-            previewArea.innerHTML = '';
-            
-            const { width, height, columns, labelGap } = labelSettings;
-            const count = printCount.value;
-
-            // Container utama yang akan memuat semua label
-            const sheet = document.createElement('div');
-            sheet.style.display = 'grid';
-            sheet.style.gridTemplateColumns = `repeat(${columns}, ${width}mm)`;
-            sheet.style.gap = `${labelGap}mm`; // Ini yang akan memvisualisasikan jarak label
-            sheet.style.padding = `10mm`;
-            sheet.style.width = `calc(${width * columns}mm + ${labelGap * (columns - 1)}mm + 20mm)`;
-            sheet.style.backgroundColor = 'white';
-            sheet.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)';
-
-            // Buat dan tambahkan setiap label barcode
-            for (let i = 0; i < count; i++) {
-                const labelBox = document.createElement('div');
-                labelBox.style.width = `${width}mm`;
-                labelBox.style.height = `${height}mm`;
-                labelBox.style.display = 'flex';
-                labelBox.style.alignItems = 'center';
-                labelBox.style.justifyContent = 'center';
-                labelBox.style.overflow = 'hidden';
-                labelBox.style.border = '1px dashed #e2e8f0';
-                labelBox.style.boxSizing = 'border-box';
-
-                const canvas = document.createElement('canvas');
-                canvas.id = `barcodeCanvas-${i}`;
-                labelBox.appendChild(canvas);
-
-                sheet.appendChild(labelBox);
-
-                // Menggambar barcode ke setiap kanvas
-                JsBarcode(canvas, barcodeContent.value, {
-                    format: "CODE128",
-                    displayValue: true,
-                    fontSize: 12,
-                    width: 1.5,
-                    height: 30,
-                });
-            }
-
-            // Masukkan lembar kertas ke area pratinjau
-            previewArea.appendChild(sheet);
-        });
-    }
-}, { immediate: true, deep: true });
-
 onMounted(() => {
 
     onAuthStateChanged(auth, async (user) => {
@@ -5420,109 +5345,6 @@ changePage(activePage.value);
 watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
 });
-
-
-function connectToQZ() {
-  if (qz.websocket.isActive()) {
-    console.log("Koneksi QZ Tray sudah aktif.");
-    return Promise.resolve(true);
-  }
-  return new Promise((resolve, reject) => {
-    qz.websocket.connect()
-      .then(() => {
-        console.log("Terhubung ke QZ Tray!");
-        resolve(true);
-      })
-      .catch(err => {
-        console.error("Gagal terhubung ke QZ Tray:", err);
-        alert("Gagal terhubung ke QZ Tray. Pastikan aplikasi sudah berjalan dan terhubung.");
-        reject(err);
-      });
-  });
-}
-
-function generateZplLabels() {
-    const barcodeText = barcodeContent.value || '1234567890';
-    
-    // Pengaturan label dari UI (dalam mm)
-    const { width, height } = labelSettings;
-    const dpi = 8; // Dots per mm (standar untuk printer thermal)
-
-    // Konversi milimeter ke dots
-    const labelWidthDots = Math.round(width * dpi);
-    const labelHeightDots = Math.round(height * dpi);
-
-    // Tinggi barcode dan teks
-    const barcodeHeightDots = Math.round(labelHeightDots * 0.4);
-    const textHeightDots = Math.round(labelHeightDots * 0.25);
-    const verticalBarcodeOffset = Math.round(labelHeightDots * 0.1);
-
-    // Hanya menghasilkan satu perintah ZPL untuk satu label
-    let zplCommands = `^XA\n`;
-    zplCommands += `^PW${labelWidthDots}\n`;
-    zplCommands += `^LL${labelHeightDots}\n`;
-    zplCommands += `^MD${labelSettings.printDensity}\n`;
-    zplCommands += `^CI28\n`;
-
-    // Barcode
-    zplCommands += `^FO0,${verticalBarcodeOffset}\n`;
-    zplCommands += `^BY2,3,${barcodeHeightDots}\n`;
-    zplCommands += `^BCN,${barcodeHeightDots},Y,N,N,A\n`;
-    zplCommands += `^FB${labelWidthDots},1,0,C\n`;
-    zplCommands += `^FD${barcodeText}^FS\n`;
-
-    // Teks di bawah barcode
-    const textYPos = verticalBarcodeOffset + barcodeHeightDots + 5;
-    zplCommands += `^FO0,${textYPos}\n`;
-    zplCommands += `^A0N,${textHeightDots},${textHeightDots}\n`;
-    zplCommands += `^FB${labelWidthDots},1,0,C\n`;
-    zplCommands += `^FD${barcodeText}^FS\n`;
-    
-    zplCommands += `^XZ\n`;
-    
-    console.log("Generated ZPL template:", zplCommands);
-    return zplCommands;
-}
-
-let selectedPrinterName = null;
-
-async function printLabels() {
-    try {
-        await connectToQZ();
-
-        if (!selectedPrinterName) {
-            const printers = await qz.printers.find();
-            if (printers.length === 0) {
-                alert('Tidak ada printer yang ditemukan. Pastikan printer terinstal.');
-                return;
-            }
-            selectedPrinterName = prompt(
-                "Pilih printer Anda dari daftar di bawah (ketik nama yang sama persis):" +
-                "\n\n" + printers.join('\n')
-            );
-            if (!selectedPrinterName) {
-                alert("Proses dibatalkan.");
-                return;
-            }
-        }
-        
-        // Memanggil fungsi untuk mendapatkan template ZPL tunggal
-        const zplTemplate = generateZplLabels();
-        
-        // Perbaikan di sini: Mengirim data cetak sebagai array, meskipun hanya satu item
-        // Menggunakan parameter 'copies' untuk menduplikasi cetakan
-        const config = qz.configs.create(selectedPrinterName, { copies: printCount.value });
-
-        // Kirim array yang berisi template tunggal.
-        await qz.print(config, [zplTemplate]);
-        alert('Perintah cetak berhasil dikirim!');
-
-    } catch (err) {
-        console.error("Kesalahan saat mencetak:", err);
-        alert("Gagal mencetak: " + err.message);
-        selectedPrinterName = null;
-    }
-}
 
 </script>
 
@@ -7075,86 +6897,6 @@ async function printLabels() {
             </div>
         </div>
 
-    </div>
-</div>
-
-<div v-if="activePage === 'barcode-generator'">
-    <div id="barcode-page" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-        <div class="max-w-7xl mx-auto">
-
-            <div class="mb-8 animate-fade-in-up">
-                <h2 class="text-3xl font-bold text-slate-800">Cetak Barcode</h2>
-                <p class="text-slate-500 mt-1">Atur, review, dan cetak label barcode Anda dengan mudah.</p>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-1">
-                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-                        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">1. Pengaturan Label</h3>
-                        <div class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Lebar Label (mm)</label>
-                                    <input type="number" v-model.number="labelSettings.width" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Tinggi Label (mm)</label>
-                                    <input type="number" v-model.number="labelSettings.height" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700">Jenis Kertas</label>
-                                <select v-model="labelSettings.paperType" class="mt-1 w-full p-2 border rounded-md bg-white">
-                                    <option value="gap">Celah (Gap)</option>
-                                    <option value="black-mark">Tanda Hitam</option>
-                                    <option value="continuous">Terus Menerus</option>
-                                </select>
-                            </div>
-                            <div class="grid grid-cols-3 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Kolom</label>
-                                    <input type="number" v-model.number="labelSettings.columns" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Jarak Kolom (mm)</label>
-                                    <input type="number" v-model.number="labelSettings.labelGap" class="mt-1 w-full p-2 border rounded-md">
-                                </div>
-                                
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                        
-                            </div>
-                        </div>
-
-                        <div class="border-t pt-4 mt-4">
-                            <h4 class="font-semibold text-sm mb-2">Opsi Cetak</h4>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700">Teks Barcode</label>
-                                <input type="text" v-model="barcodeContent" class="mt-1 w-full p-2 border rounded-md">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mt-2">Jumlah Cetakan</label>
-                                <input type="number" v-model.number="printCount" class="mt-1 w-full p-2 border rounded-md">
-                            </div>
-                        </div>
-
-                        <button @click="printLabels" :disabled="!barcodeContent || printCount < 1"
-                            class="w-full mt-6 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-400 shadow-lg shadow-indigo-500/30 transition-all">
-                            Cetak Label
-                        </button>
-                    </div>
-                </div>
-
-                <div class="lg:col-span-2">
-                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                        <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-3">2. Review Barcode</h3>
-                        <div id="barcode-preview-area" class="p-4 rounded-lg bg-slate-200 flex items-center justify-center min-h-[300px]">
-                            <canvas id="barcodeCanvas" class="barcode-image"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
