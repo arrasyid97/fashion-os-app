@@ -269,6 +269,16 @@ adminVerificationError: '',
 
 });
 
+const isSubscriptionValid = computed(() => {
+    if (!currentUser.value?.userData) return false;
+    const userData = currentUser.value.userData;
+    const now = new Date();
+    const endDate = userData.subscriptionEndDate?.toDate();
+    const trialDate = userData.trialEndDate?.toDate();
+
+    return (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+           (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+});
 
 const unpaidCommissions = computed(() =>
     commissions.value.filter(c => c.status === 'unpaid')
@@ -5289,7 +5299,6 @@ async function loadAllDataFromFirebase() {
 }
 
 onMounted(() => {
-
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
         if (onSnapshotListener) onSnapshotListener();
@@ -5299,63 +5308,68 @@ onMounted(() => {
             currentUser.value = user;
 
             onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
-    if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        // 1. Update data pengguna secara reaktif
-        currentUser.value.userData = userData;
-        state.settings.dashboardPin = userData.dashboardPin || '';
-        currentUser.value.isPartner = userData.isPartner || false;
-        currentUser.value.referralCode = userData.referralCode || null;
+                if (userDocSnap.exists()) {
+                    const userData = userDocSnap.data();
+                    // 1. Update data pengguna secara reaktif
+                    currentUser.value.userData = userData;
+                    state.settings.dashboardPin = userData.dashboardPin || '';
+                    currentUser.value.isPartner = userData.isPartner || false;
+                    currentUser.value.referralCode = userData.referralCode || null;
 
-        const now = new Date();
-        const endDate = userData.subscriptionEndDate?.toDate();
-        const trialDate = userData.trialEndDate?.toDate();
+                    const now = new Date();
+                    const endDate = userData.subscriptionEndDate?.toDate();
+                    const trialDate = userData.trialEndDate?.toDate();
 
-        const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                    (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+                    const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
+                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-        if (isSubscriptionValid) {
-            // 2. Hanya muat semua data aplikasi JIKA belum pernah dimuat sebelumnya
-            if (!hasLoadedInitialData.value) {
-                await loadAllDataFromFirebase();
-                hasLoadedInitialData.value = true;
-changePage(activePage.value);
-                // Setup listener komisi HANYA setelah data dimuat
-                if (currentUser.value.isPartner) {
-                    const commissionsQuery = query(
-                        collection(db, 'commissions'),
-                        where('partnerId', '==', currentUser.value.uid)
-                    );
-                    commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                        commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    });
+                    // --- AWAL PERUBAHAN LOGIKA ---
+                    if (isSubscriptionValid) {
+                        // Jika langganan valid, muat semua data seperti biasa
+                        if (!hasLoadedInitialData.value) {
+                            await loadAllDataFromFirebase();
+                            hasLoadedInitialData.value = true;
+                            changePage(activePage.value);
+                            
+                            if (currentUser.value.isPartner) {
+                                const commissionsQuery = query(
+                                    collection(db, 'commissions'),
+                                    where('partnerId', '==', currentUser.value.uid)
+                                );
+                                commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                    commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                                });
+                            }
+
+                            if (activePage.value === 'login') {
+                                const storedPage = localStorage.getItem('lastActivePage');
+                                const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                                changePage(pageToLoad);
+                            }
+                        }
+                    } else if (
+                        activePage.value !== 'mitra' && 
+                        activePage.value !== 'pengaturan' && 
+                        activePage.value !== 'langganan'
+                    ) {
+                        // Jika langganan TIDAK valid DAN halaman BUKAN mitra/pengaturan/langganan,
+                        // baru alihkan ke halaman langganan.
+                        activePage.value = 'langganan';
+                        hasLoadedInitialData.value = false;
+                    }
+                    // --- AKHIR PERUBAHAN LOGIKA ---
+
+                } else {
+                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
+                    handleLogout();
                 }
-
-                // 3. Hanya redirect jika pengguna baru saja login
-                if (activePage.value === 'login') {
-                    const storedPage = localStorage.getItem('lastActivePage');
-                    const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                    changePage(pageToLoad);
-                }
-            }
-            // TIDAK ADA navigasi paksa jika sudah berada di dalam aplikasi.
-            // Ini membiarkan halaman langganan menampilkan status aktifnya.
-        } else {
-            // 4. Jika langganan tidak valid (berakhir), paksa ke halaman langganan
-            activePage.value = 'langganan';
-            hasLoadedInitialData.value = false; // Reset agar data bisa dimuat lagi jika langganan aktif kembali
-        }
-    } else {
-        console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
-        handleLogout();
-    }
-    isLoading.value = false;
-}, (error) => {
-    console.error("Gagal mendengarkan data pengguna:", error);
-    alert("Gagal memuat data pengguna. Silakan coba lagi.");
-    isLoading.value = false;
-    handleLogout();
-});
+                isLoading.value = false;
+            }, (error) => {
+                console.error("Gagal mendengarkan data pengguna:", error);
+                alert("Gagal memuat data pengguna. Silakan coba lagi.");
+                isLoading.value = false;
+                handleLogout();
+            });
         } else {
             currentUser.value = null;
             activePage.value = 'login';
