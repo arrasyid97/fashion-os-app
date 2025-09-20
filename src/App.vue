@@ -5506,14 +5506,15 @@ async function printLabels() {
             }
         }
         
+        // Memanggil fungsi untuk mendapatkan template ZPL tunggal
         const zplTemplate = generateZplLabels();
         
-        // Perbaikan di sini: Menggunakan parameter 'copies' untuk menduplikasi cetakan
-        // Ini akan mencetak satu label dan menduplikasinya sebanyak jumlah cetakan yang diminta
+        // Perbaikan di sini: Mengirim data cetak sebagai array, meskipun hanya satu item
+        // Menggunakan parameter 'copies' untuk menduplikasi cetakan
         const config = qz.configs.create(selectedPrinterName, { copies: printCount.value });
 
-        // Kirim hanya satu template ZPL
-        await qz.print(config, zplTemplate);
+        // Kirim array yang berisi template tunggal.
+        await qz.print(config, [zplTemplate]);
         alert('Perintah cetak berhasil dikirim!');
 
     } catch (err) {
