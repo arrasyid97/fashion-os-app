@@ -5320,8 +5320,7 @@ onMounted(() => {
                     const endDate = userData.subscriptionEndDate?.toDate();
                     const trialDate = userData.trialEndDate?.toDate();
 
-                    const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
+                    
 
                     // --- AWAL PERUBAHAN LOGIKA ---
                     if (isSubscriptionValid) {
