@@ -877,8 +877,8 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
 
 const monthlyPrice = ref(350000);
 const yearlyPrice = ref(4200000);
-const discountedMonthlyPrice = ref(100);
-const discountedYearlyPrice = ref(200);
+const discountedMonthlyPrice = ref(5000);
+const discountedYearlyPrice = ref(6000);
 
 async function submitAddProduct() {
     const form = uiState.modalData;
