@@ -6908,46 +6908,96 @@ watch(activePage, (newPage) => {
                     <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Panduan Mencetak Barcode</span>
                 </h2>
                 <p class="text-lg text-slate-600 mt-4 max-w-2xl mx-auto">
-                    Berikut panduan lengkap untuk mencetak label barcode produk Anda menggunakan aplikasi pihak ketiga.
+                    Ikuti panduan lengkap ini untuk mencetak label barcode produk Anda menggunakan aplikasi pihak ketiga.
                 </p>
             </div>
             <div class="space-y-10">
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 1: Menginstal Aplikasi "Print Label"</h3>
-                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                        <li>Cari aplikasi **"Print Label"** di Google Play Store.</li>
-                        <li>Jika tidak dapat diinstal dari Play Store, coba cari dan instal dari **GetApps**.</li>
-                    </ol>
+                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 1: Pengaturan di Aplikasi "Print Label"</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 1: Menginstal Aplikasi</h4>
+                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                                <li>Cari aplikasi **"Print Label"** di Google Play Store.</li>
+                                <li>Jika tidak dapat diinstal, coba cari dan instal dari **GetApps**.</li>
+                            </ol>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 2: Menghubungkan ke Printer</h4>
+                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                                <li>Di layar utama, klik **ikon gambar printer** di pojok kanan atas.</li>
+                                <li>Pada halaman **"Set bluetooth connection"**, klik tombol **"Search"**.</li>
+                                <li>Setelah nama printer Anda muncul, klik nama tersebut untuk menghubungkannya.</li>
+                            </ol>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 3: Mengatur Ukuran Label</h4>
+                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                                <li>Kembali ke menu utama dan klik **"New Label"**.</li>
+                                <li>Pilih **"Gap paper"** dan **"Rectangle"**. Atur **Width** menjadi **33** mm dan **Height** menjadi **15** mm (sesuaikan jika kertas Anda berbeda).</li>
+                                <li>Klik tombol **"NEW LABEL"**.</li>
+                            </ol>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 4: Menambahkan Barcode</h4>
+                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                                <li>Di halaman editor, klik ikon **"BarCode"** di bagian bawah.</li>
+                                <li>Klik barcode untuk mengedit teksnya dan masukkan **SKU** produk Anda.</li>
+                            </ol>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 5: Meninjau dan Mencetak</h4>
+                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                                <li>Klik **"Print"**, lalu atur **"Print direction"** (0 atau 180) dan **"Print density"** (misalnya, 5).</li>
+                                <li>Atur **"Number of prints"** sesuai jumlah salinan yang Anda inginkan, lalu klik **"OK"**.</li>
+                            </ol>
+                        </div>
+                    </div>
                 </div>
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 2: Menghubungkan Aplikasi ke Printer</h3>
-                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                        <li>Di layar utama, klik **ikon gambar printer** di pojok kanan atas.</li>
-                        <li>Pada halaman **"Set bluetooth connection"**, klik tombol **"Search"**.</li>
-                        <li>Setelah nama printer Anda muncul (misalnya, **"XP-D4601B"**), klik nama tersebut untuk menghubungkannya.</li>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 600ms;">
+                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 2: Jika Hasil Cetak Tidak Pas</h3>
+                    <p class="text-slate-600 mb-4">
+                        Jika hasil cetak masih kurang presisi, Anda perlu mengatur ulang konfigurasi printer langsung dari PC atau laptop Anda.
+                    </p>
+                    <ol class="list-decimal list-inside space-y-4 text-slate-700">
+                        <li>
+                            <p class="font-bold">Buka Pengaturan Printer:</p>
+                            <ul class="list-disc list-inside ml-4">
+                                <li>Pada PC atau laptop Anda, buka menu **Bluetooth & devices**.</li>
+                                <li>Pilih perangkat printer Anda, lalu klik **Printer properties** atau **Printing preferences**.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <p class="font-bold">Atur Ukuran Kertas di Tab "Page Setup":</p>
+                            <ul class="list-disc list-inside ml-4">
+                                <li>Pilih tab **Page Setup**, lalu klik tombol **New**.</li>
+                                <li>Beri nama **Label_33x15mm** di kolom **Stock Name**.</li>
+                                <li>Di bagian **Label size**, atur **Width** menjadi **33.0 mm** dan **Height** menjadi **15.0 mm**.</li>
+                                <li>Di bagian **Exposed liner width**, atur kolom **Left** dan **Right** menjadi **2.0 mm**.</li>
+                                <li>Klik **OK**.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <p class="font-bold">Atur Tipe Kertas di Tab "Stock":</p>
+                            <ul class="list-disc list-inside ml-4">
+                                <li>Pilih tab **Stock**.</li>
+                                <li>Di bagian **Media Settings**, atur **Method** menjadi **Direct Thermal** dan **Type** menjadi **Labels with gaps**.</li>
+                                <li>Atur **Gap Height** menjadi **2.0 mm** dan **Gap Offset** menjadi **0.0 mm**.</li>
+                                <li>Di bagian **Media Handling**, atur **Post-Print Action** ke **Tear Off** dan **Feed Offset** ke **0.0 mm**.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <p class="font-bold">Simpan Pengaturan:</p>
+                            <ul class="list-disc list-inside ml-4">
+                                <li>Di bagian bawah, pastikan kotak **"Use current printer settings"** sudah dicentang.</li>
+                                <li>Klik **Apply**, lalu klik **OK**.</li>
+                            </ul>
+                        </li>
                     </ol>
-                </div>
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 300ms;">
-                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 3: Membuat dan Mengatur Ukuran Label</h3>
-                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                        <li>Kembali ke halaman utama dan klik **"New Label"**.</li>
-                        <li>Pilih **"Gap paper"** dan **"Rectangle"**. Atur **Width** menjadi **33** mm dan **Height** menjadi **15** mm. Sesuaikan jika Anda menggunakan ukuran kertas yang berbeda.</li>
-                        <li>Klik tombol **"NEW LABEL"**.</li>
-                    </ol>
-                </div>
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 400ms;">
-                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 4: Menambahkan dan Mengedit Barcode</h3>
-                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                        <li>Di halaman editor, klik ikon **"BarCode"**.</li>
-                        <li>Edit konten teks di bawah barcode dengan **SKU** produk Anda.</li>
-                    </ol>
-                </div>
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 500ms;">
-                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 5: Meninjau dan Mencetak</h3>
-                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                        <li>Klik **"Print"**, lalu atur **"Print direction"** (0 atau 180) dan **"Print density"** (misalnya, 5).</li>
-                        <li>Atur **"Number of prints"** sesuai jumlah salinan yang Anda inginkan, lalu klik **"OK"**.</li>
-                    </ol>
+                    <p class="text-sm font-semibold text-red-600 mt-6">
+                        Catatan: Disarankan memiliki printer khusus untuk cetak barcode dan printer terpisah untuk mencetak resi pengiriman agar lebih efisien dan nyaman.
+                    </p>
                 </div>
             </div>
         </div>
