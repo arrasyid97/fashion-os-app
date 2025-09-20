@@ -12,6 +12,7 @@ export default async function (req, res) {
     }
 
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
+console.log('Kunci API yang Digunakan Vercel (5 digit terakhir):', MAYAR_API_KEY ? `...${MAYAR_API_KEY.slice(-5)}` : 'KUNCI TIDAK DITEMUKAN');
     const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
 
     try {
