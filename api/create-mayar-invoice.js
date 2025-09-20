@@ -12,7 +12,8 @@ export default async function (req, res) {
     }
 
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY;
-    const mayarApiUrl = 'https://api.mayar.club/hl/v1/invoice/create';
+    // --- PERUBAHAN UTAMA DI SINI ---
+    const mayarApiUrl = 'https://api.mayar.id/hl/v1/invoice/create'; // Menggunakan URL Produksi
 
     try {
         const mayarPayload = {
@@ -31,25 +32,12 @@ export default async function (req, res) {
             }]
         };
 
-        // --- BLOK LOGGING BARU DIMULAI ---
-        const trimmedApiKey = MAYAR_API_KEY ? MAYAR_API_KEY.trim() : '';
-        
-        const requestConfig = {
-            headers: {
-                'Authorization': `Bearer ${trimmedApiKey}`,
-                'Content-Type': 'application/json'
-            }
-        };
-
-        console.log('--- MEMULAI PROSES DIAGNOSIS REQUEST KE MAYAR ---');
-        console.log('Metode:', 'POST');
-        console.log('URL Tujuan:', mayarApiUrl);
-        console.log('Header Otorisasi (Format):', requestConfig.headers.Authorization ? `Bearer [${requestConfig.headers.Authorization.substring(7, 12)}...${requestConfig.headers.Authorization.slice(-5)}]` : 'Header Otorisasi TIDAK ADA');
-        console.log('Payload Body:', JSON.stringify(mayarPayload));
-        console.log('--- AKHIR DARI DIAGNOSIS ---');
-        // --- BLOK LOGGING BARU SELESAI ---
-
-        const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, requestConfig);
+        const mayarResponse = await axios.post(mayarApiUrl, mayarPayload, {
+            headers: { 
+                'Authorization': `Bearer ${MAYAR_API_KEY ? MAYAR_API_KEY.trim() : ''}`, 
+                'Content-Type': 'application/json' 
+            },
+        });
 
         if (mayarResponse.data?.data?.link) {
             return res.status(200).json({ invoice_url: mayarResponse.data.data.link });
@@ -57,8 +45,7 @@ export default async function (req, res) {
             throw new Error('Respons sukses dari Mayar tetapi tidak berisi link invoice.');
         }
     } catch (error) {
-        console.error('--- ERROR TERJADI SAAT REQUEST ---');
-        console.error('Pesan Error Axios:', error.message);
+        console.error('Fatal Error saat memproses pembuatan invoice:', error.message);
         if (error.response) {
             console.error('Status Error:', error.response.status);
             console.error('Data Error dari Mayar:', JSON.stringify(error.response.data, null, 2));
