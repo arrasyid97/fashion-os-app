@@ -18,24 +18,18 @@ export default async function handler(request, response) {
         return response.status(405).json({ message: 'Method Not Allowed' });
     }
 
-    // --- BLOK DIAGNOSIS BARU DIMULAI ---
-    console.log('--- MEMULAI DIAGNOSIS TOKEN WEBHOOK ---');
-    const mayarToken = request.headers['x-mayar-signature'];
+    // --- PERUBAHAN UTAMA DI SINI ---
+    const mayarToken = request.headers['x-callback-token']; // Nama header diperbaiki
     const webhookToken = process.env.MAYAR_WEBHOOK_TOKEN ? process.env.MAYAR_WEBHOOK_TOKEN.trim() : null;
-
-    console.log('Token dari Header Mayar:', mayarToken || 'TIDAK DITEMUKAN');
-    console.log('Token dari Vercel Env:', webhookToken || 'TIDAK DITEMUKAN');
-    console.log('Apakah Keduanya Sama Persis?:', mayarToken === webhookToken);
-    console.log('--- AKHIR DARI DIAGNOSIS ---');
-    // --- BLOK DIAGNOSIS BARU SELESAI ---
 
     // Verifikasi Token Webhook
     if (!mayarToken || mayarToken !== webhookToken) {
-        console.warn('PERINGATAN: Upaya akses webhook tidak sah terdeteksi.');
+        console.warn('PERINGATAN: Upaya akses webhook tidak sah terdeteksi. Token tidak cocok.');
+        console.log('Token dari Header Mayar (x-callback-token):', mayarToken || 'TIDAK DITEMUKAN');
+        console.log('Token dari Vercel Env:', webhookToken || 'TIDAK DITEMUKAN');
         return response.status(401).json({ message: 'Unauthorized' });
     }
     
-    // ... sisa kode Anda tetap sama ...
     const { event, data } = request.body;
     
     if (event !== 'payment.received' || data.status !== 'SUCCESS') {
@@ -75,7 +69,7 @@ export default async function handler(request, response) {
             let subscriptionEndDate;
             const now = new Date();
 
-            if (amount === 250000 || amount === 350000 || amount === 5000) { // Menambahkan harga uji coba
+            if (amount === 250000 || amount === 350000 || amount === 5000) {
                 plan = 'bulanan';
                 commissionAmount = 50000;
                 subscriptionEndDate = new Date(new Date().setMonth(now.getMonth() + 1));
