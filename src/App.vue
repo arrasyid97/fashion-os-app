@@ -5443,11 +5443,9 @@ function connectToQZ() {
 
 function generateZplLabels() {
     const barcodeText = barcodeContent.value || '1234567890';
-    const labelCount = printCount.value || 1;
-    const labels = [];
-
+    
     // Pengaturan label dari UI (dalam mm)
-    const { width, height, printDensity } = labelSettings;
+    const { width, height } = labelSettings;
     const dpi = 8; // Dots per mm (standar untuk printer thermal)
 
     // Konversi milimeter ke dots
@@ -5459,34 +5457,31 @@ function generateZplLabels() {
     const textHeightDots = Math.round(labelHeightDots * 0.25);
     const verticalBarcodeOffset = Math.round(labelHeightDots * 0.1);
 
-    for (let i = 0; i < labelCount; i++) {
-        // ZPL untuk satu label tunggal, dengan centering
-        let zplCommands = `^XA\n`;
-        zplCommands += `^PW${labelWidthDots}\n`;
-        zplCommands += `^LL${labelHeightDots}\n`;
-        zplCommands += `^MD${printDensity}\n`;
-        zplCommands += `^CI28\n`;
-        zplCommands += `^LH0,0\n`;
+    // Hanya menghasilkan satu perintah ZPL untuk satu label
+    let zplCommands = `^XA\n`;
+    zplCommands += `^PW${labelWidthDots}\n`;
+    zplCommands += `^LL${labelHeightDots}\n`;
+    zplCommands += `^MD${labelSettings.printDensity}\n`;
+    zplCommands += `^CI28\n`;
 
-        // Barcode
-        zplCommands += `^FO0,${verticalBarcodeOffset}\n`;
-        zplCommands += `^BCN,${barcodeHeightDots},Y,N,N,A\n`;
-        zplCommands += `^FB${labelWidthDots},1,0,C\n`;
-        zplCommands += `^FD${barcodeText}^FS\n`;
+    // Barcode
+    zplCommands += `^FO0,${verticalBarcodeOffset}\n`;
+    zplCommands += `^BY2,3,${barcodeHeightDots}\n`;
+    zplCommands += `^BCN,${barcodeHeightDots},Y,N,N,A\n`;
+    zplCommands += `^FB${labelWidthDots},1,0,C\n`;
+    zplCommands += `^FD${barcodeText}^FS\n`;
 
-        // Teks di bawah barcode
-        const textYPos = verticalBarcodeOffset + barcodeHeightDots + 5;
-        zplCommands += `^FO0,${textYPos}\n`;
-        zplCommands += `^A0N,${textHeightDots},${textHeightDots}\n`;
-        zplCommands += `^FB${labelWidthDots},1,0,C\n`;
-        zplCommands += `^FD${barcodeText}^FS\n`;
-        
-        zplCommands += `^XZ\n`;
-        labels.push(zplCommands);
-    }
+    // Teks di bawah barcode
+    const textYPos = verticalBarcodeOffset + barcodeHeightDots + 5;
+    zplCommands += `^FO0,${textYPos}\n`;
+    zplCommands += `^A0N,${textHeightDots},${textHeightDots}\n`;
+    zplCommands += `^FB${labelWidthDots},1,0,C\n`;
+    zplCommands += `^FD${barcodeText}^FS\n`;
     
-    console.log("Generated ZPL for one label:", labels[0]);
-    return labels;
+    zplCommands += `^XZ\n`;
+    
+    console.log("Generated ZPL template:", zplCommands);
+    return zplCommands;
 }
 
 let selectedPrinterName = null;
@@ -5510,13 +5505,15 @@ async function printLabels() {
                 return;
             }
         }
-
+        
         const zplTemplate = generateZplLabels();
-        const config = qz.configs.create(selectedPrinterName);
+        
+        // Perbaikan di sini: Menggunakan parameter 'copies' untuk menduplikasi cetakan
+        // Ini akan mencetak satu label dan menduplikasinya sebanyak jumlah cetakan yang diminta
+        const config = qz.configs.create(selectedPrinterName, { copies: printCount.value });
 
-        // Perbaikan di sini: Pastikan data cetak selalu dalam format array
+        // Kirim hanya satu template ZPL
         await qz.print(config, zplTemplate);
-
         alert('Perintah cetak berhasil dikirim!');
 
     } catch (err) {
