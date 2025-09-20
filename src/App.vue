@@ -6900,6 +6900,60 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
+<div v-if="activePage === 'barcode-generator'">
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center mb-12 animate-fade-in-up">
+                <h2 class="text-3xl md:text-4xl font-extrabold text-slate-800">
+                    <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Panduan Mencetak Barcode</span>
+                </h2>
+                <p class="text-lg text-slate-600 mt-4 max-w-2xl mx-auto">
+                    Berikut panduan lengkap untuk mencetak label barcode produk Anda menggunakan aplikasi pihak ketiga.
+                </p>
+            </div>
+            <div class="space-y-10">
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 1: Menginstal Aplikasi "Print Label"</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                        <li>Cari aplikasi **"Print Label"** di Google Play Store.</li>
+                        <li>Jika tidak dapat diinstal dari Play Store, coba cari dan instal dari **GetApps**.</li>
+                    </ol>
+                </div>
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 2: Menghubungkan Aplikasi ke Printer</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                        <li>Di layar utama, klik **ikon gambar printer** di pojok kanan atas.</li>
+                        <li>Pada halaman **"Set bluetooth connection"**, klik tombol **"Search"**.</li>
+                        <li>Setelah nama printer Anda muncul (misalnya, **"XP-D4601B"**), klik nama tersebut untuk menghubungkannya.</li>
+                    </ol>
+                </div>
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 300ms;">
+                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 3: Membuat dan Mengatur Ukuran Label</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                        <li>Kembali ke halaman utama dan klik **"New Label"**.</li>
+                        <li>Pilih **"Gap paper"** dan **"Rectangle"**. Atur **Width** menjadi **33** mm dan **Height** menjadi **15** mm. Sesuaikan jika Anda menggunakan ukuran kertas yang berbeda.</li>
+                        <li>Klik tombol **"NEW LABEL"**.</li>
+                    </ol>
+                </div>
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 400ms;">
+                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 4: Menambahkan dan Mengedit Barcode</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                        <li>Di halaman editor, klik ikon **"BarCode"**.</li>
+                        <li>Edit konten teks di bawah barcode dengan **SKU** produk Anda.</li>
+                    </ol>
+                </div>
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 500ms;">
+                    <h3 class="text-xl font-bold text-indigo-700 mb-4">Langkah 5: Meninjau dan Mencetak</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-slate-700">
+                        <li>Klik **"Print"**, lalu atur **"Print direction"** (0 atau 180) dan **"Print density"** (misalnya, 5).</li>
+                        <li>Atur **"Number of prints"** sesuai jumlah salinan yang Anda inginkan, lalu klik **"OK"**.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div v-if="activePage === 'retur'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
