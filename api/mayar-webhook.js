@@ -37,7 +37,7 @@ export default async function handler(request, response) {
     }
 
     const { customerEmail, amount, merchantRef, id: mayarTransactionId } = data;
-
+console.log(`Webhook Diterima - Amount: ${amount}, Tipe Data: ${typeof amount}`);
     try {
         await db.runTransaction(async (transaction) => {
             const usersRef = db.collection('users');
