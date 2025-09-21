@@ -5001,23 +5001,16 @@ async function deleteTransaction(transactionId) {
 function handleModelProdukChange(item) {
     const selectedModel = state.settings.modelProduk.find(m => m.id === item.modelProdukId);
     if (selectedModel) {
-        // BARIS KUNCI: Set properti yang relevan
-        item.yardPerModel = selectedModel.yardPerModel;
-        item.hargaMaklunPerPcs = selectedModel.hargaMaklun;
-        item.hargaJahitPerPcs = selectedModel.hargaJahit;
-        
-        
-        // Kosongkan SKU agar pengguna memilih ulang
-        item.sku = '';
-        item.warnaKain = '';
-        item.ukuran = '';
+        // Mengisi data warna dan ukuran ke dalam form modal
+        uiState.modalData.warna = selectedModel.warna || '';
+        uiState.modalData.varian = selectedModel.ukuran || '';
     } else {
-        item.yardPerModel = null;
-        item.hargaMaklunPerPcs = null;
-        item.hargaJahitPerPcs = null;
-        
+        // Mengosongkan field jika pilihan dibatalkan
+        uiState.modalData.warna = '';
+        uiState.modalData.varian = '';
     }
 }
+
 function handleProductSkuChange(item) {
     const selectedProduct = state.produk.find(p => p.sku === item.sku);
     if (selectedProduct) {
@@ -8444,19 +8437,19 @@ watch(activePage, (newPage) => {
         
         <!-- KODE PERBAIKAN DI SINI -->
         <div>
-            <label for="product-model" class="block text-sm font-medium text-slate-700">Model Produk</label>
-            <div v-if="state.settings.modelProduk.length === 0" class="mt-1 p-3 bg-red-100 text-red-800 border-l-4 border-red-500 rounded-lg shadow-sm">
-                <p class="font-semibold mb-1">Peringatan:</p>
-                <p class="text-sm">Anda belum memiliki data model Produk. Silakan tambahkan di halaman **Pengaturan** terlebih dahulu.</p>
-                <a href="#" @click.prevent="changePage('pengaturan'); hideModal();" class="mt-2 inline-block text-red-700 font-bold hover:underline">
-                    Buka Halaman Pengaturan &raquo;
-                </a>
-            </div>
-            <select v-else v-model="uiState.modalData.modelId" id="product-model" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" required>
-                <option value="">-- Pilih Model --</option>
-                <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
-            </select>
-        </div>
+    <label for="product-model" class="block text-sm font-medium text-slate-700">Model Produk</label>
+    <div v-if="state.settings.modelProduk.length === 0" class="mt-1 p-3 bg-red-100 text-red-800 border-l-4 border-red-500 rounded-lg shadow-sm">
+        <p class="font-semibold mb-1">Peringatan:</p>
+        <p class="text-sm">Anda belum memiliki data model Produk. Silakan tambahkan di halaman **Pengaturan** terlebih dahulu.</p>
+        <a href="#" @click.prevent="changePage('pengaturan'); hideModal();" class="mt-2 inline-block text-red-700 font-bold hover:underline">
+            Buka Halaman Pengaturan &raquo;
+        </a>
+    </div>
+    <select v-else v-model="uiState.modalData.modelId" @change="handleModelProdukChange(uiState.modalData.modelId)" id="product-model" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" required>
+        <option value="">-- Pilih Model --</option>
+        <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
+    </select>
+</div>
         <!-- AKHIR KODE PERBAIKAN -->
         
         <div>
