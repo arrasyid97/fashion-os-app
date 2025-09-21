@@ -7324,25 +7324,25 @@ watch(activePage, (newPage) => {
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left text-slate-500">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-50/50">
-                            <tr>
-                                <th class="px-6 py-3">Tanggal Pengajuan</th>
-                                <th class="px-6 py-3">Pelanggan Rujukan</th>
-                                <th class="px-6 py-3 text-right">Jumlah Komisi</th>
-                                <th class="px-6 py-3 text-center">Status</th>
-                            </tr>
-                        </thead>
+    <tr>
+        <th class="px-6 py-3">Tanggal Pengajuan</th>
+        <th class="px-6 py-3">ID Pencairan</th> <th class="px-6 py-3">Pelanggan Rujukan</th>
+        <th class="px-6 py-3 text-right">Jumlah Komisi</th>
+        <th class="px-6 py-3 text-center">Status</th>
+    </tr>
+</thead>
                         <tbody class="divide-y divide-slate-200/50">
                             <tr v-if="processingCommissions.length === 0">
                                 <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada pencairan yang sedang diproses.</td>
                             </tr>
                             <tr v-for="com in processingCommissions" :key="com.id" class="hover:bg-slate-50/50">
-                                <td class="px-6 py-4">{{ new Date(com.createdAt.seconds * 1000).toLocaleDateString('id-ID') }}</td>
-                                <td class="px-6 py-4">{{ com.referredUserEmail }}</td>
-                                <td class="px-6 py-4 text-right font-bold text-yellow-600">{{ formatCurrency(com.commissionAmount) }}</td>
-                                <td class="px-6 py-4 text-center">
-                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">Processing</span>
-                                </td>
-                            </tr>
+    <td class="px-6 py-4">{{ new Date(com.createdAt.seconds * 1000).toLocaleDateString('id-ID') }}</td>
+    <td class="px-6 py-4 font-mono text-xs">{{ com.withdrawalId }}</td> <td class="px-6 py-4">{{ com.referredUserEmail }}</td>
+    <td class="px-6 py-4 text-right font-bold text-yellow-600">{{ formatCurrency(com.commissionAmount) }}</td>
+    <td class="px-6 py-4 text-center">
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">Processing</span>
+    </td>
+</tr>
                         </tbody>
                     </table>
                 </div>
