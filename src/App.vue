@@ -8407,7 +8407,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'investorInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
+<div v-if="uiState.modalType === 'investorInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Informasi Halaman Manajemen Investor</h3>
         <p class="text-slate-500">Panduan untuk mengelola modal, melacak profitabilitas, dan memahami metrik kunci.</p>
