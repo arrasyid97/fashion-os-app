@@ -5312,44 +5312,54 @@ onMounted(() => {
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                    // --- AWAL PERUBAHAN LOGIKA ---
-                    const shouldLoadData = isSubscriptionValid.value || currentUser.value.isPartner;
+                    // --- AWAL LOGIKA BARU YANG LEBIH AKURAT ---
+                    if (isSubscriptionValid) {
+                        // SKENARIO 1: Langganan Aktif
+                        // Muat semua data aplikasi seperti biasa jika belum dimuat.
+                        if (!hasLoadedInitialData.value) {
+                            await loadAllDataFromFirebase();
+                            hasLoadedInitialData.value = true;
+                            changePage(activePage.value);
+                            
+                            if (currentUser.value.isPartner) {
+                                const commissionsQuery = query(
+                                    collection(db, 'commissions'),
+                                    where('partnerId', '==', currentUser.value.uid)
+                                );
+                                commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                    commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                                });
+                            }
 
-// Langkah 2: Muat data jika diperlukan dan belum pernah dimuat sebelumnya.
-if (shouldLoadData && !hasLoadedInitialData.value) {
-    await loadAllDataFromFirebase();
-    hasLoadedInitialData.value = true;
-    changePage(activePage.value);
-    
-    if (currentUser.value.isPartner) {
-        const commissionsQuery = query(
-            collection(db, 'commissions'),
-            where('partnerId', '==', currentUser.value.uid)
-        );
-        commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-            commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        });
-    }
+                            if (activePage.value === 'login') {
+                                const storedPage = localStorage.getItem('lastActivePage');
+                                const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+                                changePage(pageToLoad);
+                            }
+                        }
+                    } else {
+                        // SKENARIO 2: Langganan Habis
+                        hasLoadedInitialData.value = false; // Reset agar data tidak ditampilkan di halaman lain
 
-    if (activePage.value === 'login') {
-        const storedPage = localStorage.getItem('lastActivePage');
-        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-        changePage(pageToLoad);
-    }
-}
-
-// Langkah 3: Tentukan apakah pengguna perlu dialihkan (logika ini tetap sama).
-if (!isSubscriptionValid.value && 
-    activePage.value !== 'mitra' && 
-    activePage.value !== 'pengaturan' && 
-    activePage.value !== 'langganan' &&
-    activePage.value !== 'tentang' &&
-    activePage.value !== 'panduan'
-) {
-    activePage.value = 'langganan';
-    hasLoadedInitialData.value = false;
-}
-                    // --- AKHIR PERUBAHAN LOGIKA ---
+                        if (currentUser.value.isPartner) {
+                            // Jika pengguna adalah MITRA, muat HANYA data komisi mereka.
+                            const commissionsQuery = query(
+                                collection(db, 'commissions'),
+                                where('partnerId', '==', currentUser.value.uid)
+                            );
+                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+                                commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            });
+                        }
+                        
+                        // Periksa halaman yang diizinkan untuk diakses saat langganan habis.
+                        const allowedPages = ['mitra', 'pengaturan', 'langganan', 'tentang', 'panduan'];
+                        if (!allowedPages.includes(activePage.value)) {
+                            // Jika halaman saat ini tidak diizinkan, alihkan ke halaman langganan.
+                            activePage.value = 'langganan';
+                        }
+                    }
+                    // --- AKHIR LOGIKA BARU ---
 
                 } else {
                     console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
