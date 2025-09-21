@@ -5004,29 +5004,20 @@ async function deleteTransaction(transactionId) {
 }
 
 
-function handleModelProdukChange(item) {
-    const selectedModel = state.settings.modelProduk.find(m => m.id === item.modelProdukId);
+function handleModelProdukChange() {
+    const selectedModel = state.settings.modelProduk.find(
+        model => model.id === uiState.modalData.modelId
+    );
     if (selectedModel) {
-        // Mengisi properti item yang dipilih dengan data dari model
-        item.nama = selectedModel.namaModel || '';
-        item.warna = selectedModel.warna || '';
-        item.varian = selectedModel.ukuran || '';
-        item.yardPerModel = selectedModel.yardPerModel;
-        
-        // Mengisi harga jasa berdasarkan jenis produksi
-        if (item.produksiType === 'penjahit') {
-            item.hargaJahitPerPcs = selectedModel.hargaJahit || 0;
-        } else {
-            item.hargaMaklunPerPcs = selectedModel.hargaMaklun || 0;
-        }
+        // Mengisi otomatis Nama, Warna, dan Ukuran
+        uiState.modalData.nama = selectedModel.namaModel || '';
+        uiState.modalData.warna = selectedModel.warna || '';
+        uiState.modalData.varian = selectedModel.ukuran || '';
     } else {
-        // Mengosongkan properti jika model tidak dipilih
-        item.nama = '';
-        item.warna = '';
-        item.varian = '';
-        item.yardPerModel = null;
-        item.hargaJahitPerPcs = null;
-        item.hargaMaklunPerPcs = null;
+        // Mengosongkan field jika pilihan dihapus
+        uiState.modalData.nama = '';
+        uiState.modalData.warna = '';
+        uiState.modalData.varian = '';
     }
 }
 
@@ -8463,10 +8454,10 @@ watch(activePage, (newPage) => {
                     Buka Halaman Pengaturan &raquo;
                 </a>
             </div>
-            <select v-else v-model="uiState.modalData.modelId" @change="handleModelProdukChange(uiState.modalData)" id="product-model" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" required>
-                <option value="">-- Pilih Model --</option>
-                <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
-            </select>
+            <select v-else v-model="uiState.modalData.modelId" @change="handleModelProdukChange()" id="product-model" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" required>
+    <option value="">-- Pilih Model --</option>
+    <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
+</select>
         </div>
         
         <div>
