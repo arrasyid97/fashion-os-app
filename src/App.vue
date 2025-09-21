@@ -5004,10 +5004,20 @@ function handleModelProdukChange(item) {
         // Mengisi data warna dan ukuran ke dalam form modal
         uiState.modalData.warna = selectedModel.warna || '';
         uiState.modalData.varian = selectedModel.ukuran || '';
+        
+        // BARIS BARU: Mengisi harga jasa secara otomatis
+        // Asumsi `uiState.modalData.produksiType` sudah terisi
+        if (uiState.modalData.produksiType === 'penjahit') {
+            uiState.modalData.hargaJahitPerPcs = selectedModel.hargaJahit || 0;
+        } else {
+            uiState.modalData.hargaMaklunPerPcs = selectedModel.hargaMaklun || 0;
+        }
     } else {
         // Mengosongkan field jika pilihan dibatalkan
         uiState.modalData.warna = '';
         uiState.modalData.varian = '';
+        uiState.modalData.hargaJahitPerPcs = 0;
+        uiState.modalData.hargaMaklunPerPcs = 0;
     }
 }
 
