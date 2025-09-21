@@ -4595,9 +4595,11 @@ async function addModelProduk() {
     const newModel = {
         id: `MODEL-${Date.now()}`,
         namaModel: 'Model Baru',
+        warna: '',
+        ukuran: '',
         yardPerModel: 0,
         hargaMaklun: 0,
-        hargaJahit: 0, // Tambahkan properti ini
+        hargaJahit: 0,
     };
     state.settings.modelProduk.push(newModel);
     await saveData();
@@ -4621,7 +4623,6 @@ async function saveModelProdukEdit() {
     const editedModel = uiState.modalData;
     const index = state.settings.modelProduk.findIndex(model => model.id === editedModel.id);
     if (index !== -1) {
-        // Pastikan properti hargaJahit juga tersimpan
         state.settings.modelProduk[index] = { ...editedModel, hargaJahit: editedModel.hargaJahit || 0 };
     }
     await saveData();
@@ -9435,38 +9436,40 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'editModelProduk'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[55vh] flex flex-col">
-    <h3 class="text-xl font-bold mb-4">Edit Model Produk</h3>
-    <form @submit.prevent="saveModelProdukEdit" class="space-y-4">
-    <div>
-        <label class="block text-sm font-medium text-slate-700">Nama Model</label>
-        <input type="text" v-model="uiState.modalData.namaModel" class="mt-1 w-full p-2 border rounded-md">
+<div v-if="uiState.modalType === 'editModelProduk' || uiState.modalType === 'addModelProduk'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
+    <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[85vh] flex flex-col">
+        <h3 class="text-xl font-bold mb-4">{{ uiState.modalType === 'addModelProduk' ? 'Tambah Model Produk Baru' : 'Edit Model Produk' }}</h3>
+        <form @submit.prevent="uiState.modalType === 'addModelProduk' ? addModelProduk() : saveModelProdukEdit()" class="space-y-4 overflow-y-auto pr-2">
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Nama Model</label>
+                <input type="text" v-model="uiState.modalData.namaModel" class="mt-1 w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Warna</label>
+                <input type="text" v-model="uiState.modalData.warna" class="mt-1 w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Ukuran</label>
+                <input type="text" v-model="uiState.modalData.ukuran" class="mt-1 w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Kebutuhan Kain (Yard/Model)</label>
+                <input type="number" step="0.1" v-model.number="uiState.modalData.yardPerModel" class="mt-1 w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Harga Jasa Maklun (Rp)</label>
+                <input type="number" v-model.number="uiState.modalData.hargaMaklun" class="mt-1 w-full p-2 border rounded-md">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Harga Jasa Jahit (Rp)</label>
+                <input type="number" v-model.number="uiState.modalData.hargaJahit" class="mt-1 w-full p-2 border rounded-md">
+            </div>
+            <div class="flex justify-end gap-3 pt-6 border-t mt-6">
+                <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Simpan Perubahan</button>
+            </div>
+        </form>
     </div>
-    <div>
-        <label class="block text-sm font-medium text-slate-700">Warna</label>
-        <input type="text" v-model="uiState.modalData.warna" class="mt-1 w-full p-2 border rounded-md">
-    </div>
-    <div>
-        <label class="block text-sm font-medium text-slate-700">Ukuran</label>
-        <input type="text" v-model="uiState.modalData.ukuran" class="mt-1 w-full p-2 border rounded-md">
-    </div>
-    <div>
-        <label class="block text-sm font-medium text-slate-700">Kebutuhan Kain (Yard/Model)</label>
-        <input type="number" step="0.1" v-model.number="uiState.modalData.yardPerModel" class="mt-1 w-full p-2 border rounded-md">
-    </div>
-    <div>
-        <label class="block text-sm font-medium text-slate-700">Harga Jasa Maklun (Rp)</label>
-        <input type="number" v-model.number="uiState.modalData.hargaMaklun" class="mt-1 w-full p-2 border rounded-md">
-    </div>
-    <div>
-        <label class="block text-sm font-medium text-slate-700">Harga Jasa Jahit (Rp)</label>
-        <input type="number" v-model.number="uiState.modalData.hargaJahit" class="mt-1 w-full p-2 border rounded-md">
-    </div>
-    <div class="flex justify-end gap-3 pt-6 border-t">
-        <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-        <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Simpan Perubahan</button>
-    </div>
-</form>
 </div>
 
 
