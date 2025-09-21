@@ -564,6 +564,21 @@ async function verifyCashoutRequest() {
     }
 }
 
+function handleProduksiModelChange(item) {
+    const selectedModel = state.settings.modelProduk.find(m => m.id === item.modelProdukId);
+    
+    if (selectedModel) {
+        // Cek jenis jasa mana yang sedang aktif di form
+        if (uiState.newProduksiBatch.produksiType === 'penjahit') {
+            item.hargaJahitPerPcs = selectedModel.hargaJahit || 0;
+            item.hargaMaklunPerPcs = null; // Pastikan kolom lain kosong
+        } else { // Asumsinya 'pemaklun'
+            item.hargaMaklunPerPcs = selectedModel.hargaMaklun || 0;
+            item.hargaJahitPerPcs = null; // Pastikan kolom lain kosong
+        }
+    }
+}
+
 function showInvestorPaymentDetail(p) {
     // 'p' adalah objek data dari `filteredInvestorPayments` yang berisi semua detail
     const reportResult = {
@@ -5026,12 +5041,29 @@ function handleModelProdukChange() {
 function handleProductSkuChange(item) {
     const selectedProduct = state.produk.find(p => p.sku === item.sku);
     if (selectedProduct) {
-        
+        // --- Logika yang sudah ada ---
         item.warnaKain = selectedProduct.warna;
         item.ukuran = selectedProduct.varian;
         item.modelProdukId = selectedProduct.model_id;
+
+        // --- LOGIKA BARU UNTUK HARGA OTOMATIS ---
+        const selectedModel = state.settings.modelProduk.find(m => m.id === selectedProduct.model_id);
+        if (selectedModel) {
+            // Cek jenis jasa yang dipilih di form utama
+            const batchType = uiState.modalType === 'addProduksi' ? uiState.newProduksiBatch.produksiType : uiState.editProduksiBatch.produksiType;
+
+            if (batchType === 'penjahit') {
+                item.hargaJahitPerPcs = selectedModel.hargaJahit || 0;
+                item.hargaMaklunPerPcs = null; // Kosongkan harga maklun
+            } else { // 'pemaklun'
+                item.hargaMaklunPerPcs = selectedModel.hargaMaklun || 0;
+                item.hargaJahitPerPcs = null; // Kosongkan harga jahit
+            }
+        }
+        // --- AKHIR DARI LOGIKA BARU ---
     }
 }
+
 function addKainBahanItem(batch) {
     if (!batch.kainBahan) {
         batch.kainBahan = [];
