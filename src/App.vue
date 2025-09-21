@@ -8120,7 +8120,7 @@ watch(activePage, (newPage) => {
     <div class="flex-1 overflow-y-auto py-4 pr-2">
         <div class="space-y-6 text-slate-700 leading-relaxed">
             
-            <div class="p-4 bg-slate-50 rounded-lg">
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <h4 class="font-semibold text-lg text-indigo-700">Aturan Pengisian Nama Model</h4>
                 <p class="mt-1">
                     Silakan klik **"+ Tambah Model"**, lalu edit. Pastikan untuk mengisi **Nama Model** dengan format: <strong>NAMA WARNA UKURAN</strong> jika model tersebut memiliki banyak varian warna dan ukuran.
@@ -8141,11 +8141,19 @@ watch(activePage, (newPage) => {
                     Pastikan Anda memasukkan data yard dengan benar, karena angka ini akan sangat memengaruhi perhitungan di Halaman Produksi.
                 </p>
                 <p class="mt-2 text-sm">
-                    Kalkulasi **Target Qty** di dalam form "Buat Batch Produksi" dan "Edit Batch Produksi" dihitung secara otomatis berdasarkan rumus:
+                    Kalkulasi **Target Qty** di dalam form "Buat Batch Produksi" dihitung secara otomatis berdasarkan rumus:
                 </p>
                 <div class="mt-2 p-2 bg-white text-center font-mono text-slate-800 rounded">
                     Target Qty = Total Yard Kain / Yard per Model
                 </div>
+            </div>
+
+            <div class="p-4 bg-cyan-50 border border-cyan-200 rounded-lg">
+                <h4 class="font-semibold text-lg text-cyan-800">Aturan Pengisian Harga Jasa</h4>
+                <ul class="list-disc list-inside mt-2 space-y-2 text-sm">
+                    <li><strong>Harga Maklun:</strong> Silakan isi dengan harga jasa maklun. Harga ini akan otomatis terisi saat Anda membuat batch produksi baru dengan jenis jasa "Pemaklun".</li>
+                    <li><strong>Harga Jahit:</strong> Silakan isi dengan harga jahit yang sudah disepakati langsung dengan penjahit. Harga ini akan otomatis terisi saat Anda memilih jenis jasa "Penjahit" di form batch produksi.</li>
+                </ul>
             </div>
 
         </div>
