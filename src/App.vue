@@ -564,20 +564,7 @@ async function verifyCashoutRequest() {
     }
 }
 
-function handleProduksiModelChange(item) {
-    const selectedModel = state.settings.modelProduk.find(m => m.id === item.modelProdukId);
-    
-    if (selectedModel) {
-        // Cek jenis jasa mana yang sedang aktif di form
-        if (uiState.newProduksiBatch.produksiType === 'penjahit') {
-            item.hargaJahitPerPcs = selectedModel.hargaJahit || 0;
-            item.hargaMaklunPerPcs = null; // Pastikan kolom lain kosong
-        } else { // Asumsinya 'pemaklun'
-            item.hargaMaklunPerPcs = selectedModel.hargaMaklun || 0;
-            item.hargaJahitPerPcs = null; // Pastikan kolom lain kosong
-        }
-    }
-}
+
 
 function showInvestorPaymentDetail(p) {
     // 'p' adalah objek data dari `filteredInvestorPayments` yang berisi semua detail
