@@ -7520,7 +7520,15 @@ watch(activePage, (newPage) => {
                     
                     <div v-if="uiState.pengaturanTab === 'modelproduk'" class="animate-fade-in">
     <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-bold text-slate-800">Daftar Model Produk</h3>
+        <div class="flex items-center gap-4">
+    <h3 class="text-xl font-bold text-slate-800">Daftar Model Produk</h3>
+    <button @click="showModal('modelProdukInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-1 px-3 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+        </svg>
+        Informasi
+    </button>
+</div>
         <button @click="addModelProduk" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">+ Tambah Model</button>
     </div>
     <div class="mb-4">
@@ -8056,7 +8064,51 @@ watch(activePage, (newPage) => {
     <!-- Modal System -->
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
-       
+   
+<div v-if="uiState.modalType === 'modelProdukInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full max-h-[90vh] flex flex-col">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Panduan Pengisian Data Model Produk</h3>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto py-4 pr-2">
+        <div class="space-y-6 text-slate-700 leading-relaxed">
+            
+            <div class="p-4 bg-slate-50 rounded-lg">
+                <h4 class="font-semibold text-lg text-indigo-700">Aturan Pengisian Nama Model</h4>
+                <p class="mt-1">
+                    Silakan klik **"+ Tambah Model"**, lalu edit. Pastikan untuk mengisi **Nama Model** dengan format: <strong>NAMA WARNA UKURAN</strong> jika model tersebut memiliki banyak varian warna dan ukuran.
+                </p>
+                <div class="mt-3 p-3 bg-indigo-100 border border-indigo-200 rounded-md">
+                    <p class="font-semibold">Contoh Pengisian:</p>
+                    <ul class="list-disc list-inside mt-1 text-sm">
+                        <li><strong>Nama Model:</strong> <code>MADINA HITAM M</code></li>
+                        <li><strong>Kolom Warna:</strong> <code>HITAM</code></li>
+                        <li><strong>Kolom Ukuran:</strong> <code>M</code></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
+                <h4 class="font-semibold text-lg text-yellow-800">Perhatian untuk Kebutuhan Kain (Yard/Model)</h4>
+                <p class="mt-1">
+                    Pastikan Anda memasukkan data yard dengan benar, karena angka ini akan sangat memengaruhi perhitungan di Halaman Produksi.
+                </p>
+                <p class="mt-2 text-sm">
+                    Kalkulasi **Target Qty** di dalam form "Buat Batch Produksi" dan "Edit Batch Produksi" dihitung secara otomatis berdasarkan rumus:
+                </p>
+                <div class="mt-2 p-2 bg-white text-center font-mono text-slate-800 rounded">
+                    Target Qty = Total Yard Kain / Yard per Model
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+    </div>
+</div>        
+
 <div v-if="uiState.modalType === 'panduanPromosi'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Panduan Manajemen Promosi & Voucher</h3>
