@@ -2299,15 +2299,15 @@ const filteredMarketplaces = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const filteredModelProduk = computed(() => {
-    // Memberikan nilai default array kosong jika state.settings.modelProduk undefined
     const modelProdukData = state.settings.modelProduk || [];
     const query = uiState.pengaturanModelProdukSearch.toLowerCase();
-    if (!query) {
-        return modelProdukData;
-    }
-    return modelProdukData.filter(model => 
+
+    const filteredModels = modelProdukData.filter(model =>
         (model.namaModel || '').toLowerCase().includes(query)
     );
+    
+    // Kita tidak lagi menggabungkan data produk, hanya menampilkan model itu sendiri
+    return filteredModels;
 });
 
 const filteredProduksiBatches = computed(() => {
@@ -7524,10 +7524,12 @@ watch(activePage, (newPage) => {
                                 <thead class="text-left text-slate-500">
                                     <tr>
                                         <th class="p-2 font-medium">NAMA MODEL</th>
-                                        <th class="p-2 font-medium">YARD/MODEL</th>
-                                        <th class="p-2 font-medium">HARGA MAKLUN</th>
-                                        <th class="p-2 font-medium">HARGA JAHIT</th>
-                                        <th class="p-2 font-medium text-right">AKSI</th>
+<th class="p-2 font-medium">WARNA</th>
+<th class="p-2 font-medium">UKURAN</th>
+<th class="p-2 font-medium">YARD/MODEL</th>
+<th class="p-2 font-medium">HARGA MAKLUN</th>
+<th class="p-2 font-medium">HARGA JAHIT</th>
+<th class="p-2 font-medium text-right">AKSI</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200">
@@ -7536,15 +7538,17 @@ watch(activePage, (newPage) => {
                                     </tr>
                                     <tr v-for="model in filteredModelProduk" :key="model.id">
                                         <td class="p-3 font-semibold text-slate-700">{{ model.namaModel }}</td>
-                                        <td class="p-3">{{ model.yardPerModel || 0 }} m</td>
-                                        <td class="p-3">{{ formatCurrency(model.hargaMaklun || 0) }}</td>
-                                        <td class="p-3">{{ formatCurrency(model.hargaJahit || 0) }}</td>
-                                        <td class="p-3 text-right space-x-4">
-                                            <button @click="showModal('editModelProduk', JSON.parse(JSON.stringify(model)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                                            <button @click="removeModelProduk(model.id)" class="text-red-500 hover:text-red-700">
-                                                <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                            </button>
-                                        </td>
+<td class="p-3">{{ model.warna }}</td>
+<td class="p-3">{{ model.ukuran }}</td>
+<td class="p-3">{{ model.yardPerModel || 0 }} m</td>
+<td class="p-3">{{ formatCurrency(model.hargaMaklun || 0) }}</td>
+<td class="p-3">{{ formatCurrency(model.hargaJahit || 0) }}</td>
+<td class="p-3 text-right space-x-4">
+    <button @click="showModal('editModelProduk', JSON.parse(JSON.stringify(model)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+    <button @click="removeModelProduk(model.id)" class="text-red-500 hover:text-red-700">
+        <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+    </button>
+</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -9434,27 +9438,35 @@ watch(activePage, (newPage) => {
 <div v-if="uiState.modalType === 'editModelProduk'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[55vh] flex flex-col">
     <h3 class="text-xl font-bold mb-4">Edit Model Produk</h3>
     <form @submit.prevent="saveModelProdukEdit" class="space-y-4">
-        <div>
-            <label class="block text-sm font-medium text-slate-700">Nama Model</label>
-            <input type="text" v-model="uiState.modalData.namaModel" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-slate-700">Kebutuhan Kain (Yard/Model)</label>
-            <input type="number" step="0.1" v-model.number="uiState.modalData.yardPerModel" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-slate-700">Harga Jasa Maklun (Rp)</label>
-            <input type="number" v-model.number="uiState.modalData.hargaMaklun" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-slate-700">Harga Jasa Jahit (Rp)</label>
-            <input type="number" v-model.number="uiState.modalData.hargaJahit" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div class="flex justify-end gap-3 pt-6 border-t">
-            <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-            <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Simpan Perubahan</button>
-        </div>
-    </form>
+    <div>
+        <label class="block text-sm font-medium text-slate-700">Nama Model</label>
+        <input type="text" v-model="uiState.modalData.namaModel" class="mt-1 w-full p-2 border rounded-md">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700">Warna</label>
+        <input type="text" v-model="uiState.modalData.warna" class="mt-1 w-full p-2 border rounded-md">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700">Ukuran</label>
+        <input type="text" v-model="uiState.modalData.ukuran" class="mt-1 w-full p-2 border rounded-md">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700">Kebutuhan Kain (Yard/Model)</label>
+        <input type="number" step="0.1" v-model.number="uiState.modalData.yardPerModel" class="mt-1 w-full p-2 border rounded-md">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700">Harga Jasa Maklun (Rp)</label>
+        <input type="number" v-model.number="uiState.modalData.hargaMaklun" class="mt-1 w-full p-2 border rounded-md">
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700">Harga Jasa Jahit (Rp)</label>
+        <input type="number" v-model.number="uiState.modalData.hargaJahit" class="mt-1 w-full p-2 border rounded-md">
+    </div>
+    <div class="flex justify-end gap-3 pt-6 border-t">
+        <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+        <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Simpan Perubahan</button>
+    </div>
+</form>
 </div>
 
 
