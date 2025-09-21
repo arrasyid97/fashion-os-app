@@ -7673,14 +7673,43 @@ watch(activePage, (newPage) => {
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
-                    <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
-                        <option value="all_time">Semua</option>
-                        <option value="last_30_days">1 Bulan Terakhir</option>
-                        <option value="this_year">1 Tahun Terakhir</option>
-                    </select>
-                </div>
-                <button @click="exportAllDataForUser(uiState.selectedUserForExport?.uid, uiState.selectedUserForExport?.email, uiState.exportFilter)" :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
+    <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
+    <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
+        <option value="today">Hari Ini</option>
+        <option value="last_7_days">7 Hari Terakhir</option>
+        <option value="last_30_days">30 Hari Terakhir</option>
+        <option value="this_year">Tahun Ini</option>
+        <option value="by_date_range">Rentang Tanggal</option>
+        <option value="by_month_range">Rentang Bulan</option>
+        <option value="by_year_range">Rentang Tahun</option>
+        <option value="all_time">Semua</option>
+    </select>
+</div>
+<div v-if="uiState.exportFilter === 'by_date_range'" class="mt-2 grid grid-cols-2 gap-2 animate-fade-in">
+    <div><label class="block text-xs font-medium mb-1">Dari Tanggal</label><input type="date" v-model="uiState.exportStartDate" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+    <div><label class="block text-xs font-medium mb-1">Sampai Tanggal</label><input type="date" v-model="uiState.exportEndDate" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+</div>
+<div v-if="uiState.exportFilter === 'by_month_range'" class="mt-2 grid grid-cols-4 gap-2 animate-fade-in">
+    <div><label class="block text-xs font-medium">Dari</label><select v-model.number="uiState.exportStartMonth" class="w-full p-2 border rounded-md bg-white shadow-sm"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select></div>
+    <div><label class="block text-xs font-medium">Tahun</label><input type="number" v-model.number="uiState.exportStartYear" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+    <div><label class="block text-xs font-medium">Sampai</label><select v-model.number="uiState.exportEndMonth" class="w-full p-2 border rounded-md bg-white shadow-sm"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select></div>
+    <div><label class="block text-xs font-medium">Tahun</label><input type="number" v-model.number="uiState.exportEndYear" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+</div>
+<div v-if="uiState.exportFilter === 'by_year_range'" class="mt-2 grid grid-cols-2 gap-2 animate-fade-in">
+    <div><label class="block text-xs font-medium mb-1">Dari Tahun</label><input type="number" v-model.number="uiState.exportStartYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+    <div><label class="block text-xs font-medium mb-1">Sampai Tahun</label><input type="number" v-model.number="uiState.exportEndYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+</div>
+                <button @click="exportAllDataForUser(
+    uiState.selectedUserForExport?.uid, 
+    uiState.selectedUserForExport?.email, 
+    uiState.exportFilter, 
+    uiState.exportStartDate, 
+    uiState.exportEndDate, 
+    uiState.exportStartMonth, 
+    uiState.exportEndMonth, 
+    uiState.exportStartYear, 
+    uiState.exportEndYear
+)" :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
                     <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
                     <span v-else>Export Data Pelanggan</span>
                 </button>
