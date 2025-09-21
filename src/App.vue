@@ -3717,6 +3717,9 @@ async function submitEditProduksiBatch() {
         alert("Gagal memperbarui data di database.");
     }
 }
+
+// KODE BARU
+
 async function updateProductionInventoryStatus(batchId, itemIndex) {
     if (!currentUser.value) {
         alert("Anda harus login untuk mengelola inventaris.");
@@ -3725,26 +3728,24 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
     if (!confirm("Anda yakin ingin menandai item ini sebagai sudah masuk inventaris? Stok master akan bertambah.")) {
         return;
     }
-    
-    const originalBatch = uiState.laporanData.laporanPerStatus.find(b => b.id === batchId);
+
+    const originalBatch = state.produksi.find(b => b.id === batchId);
     if (!originalBatch) {
         alert("Batch tidak ditemukan.");
         return;
     }
     const itemToUpdate = originalBatch.kainBahan[itemIndex];
-    
+
     try {
         const batch = writeBatch(db);
         const batchRef = doc(db, "production_batches", batchId);
-        
+
         const matchingProduct = getProductBySku(itemToUpdate.sku);
 
         if (matchingProduct) {
-            // --- PERBAIKAN UTAMA DI SINI ---
-            // Gunakan `matchingProduct.docId` (ID Dokumen asli) bukan `matchingProduct.sku`
             const productRef = doc(db, "products", matchingProduct.docId);
             const allocationRef = doc(db, "stock_allocations", matchingProduct.docId);
-            
+
             const newStock = (matchingProduct.stokFisik || 0) + (itemToUpdate.aktualJadi || 0);
 
             const newKainBahan = JSON.parse(JSON.stringify(originalBatch.kainBahan));
@@ -3752,8 +3753,10 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
             batch.update(batchRef, { kainBahan: newKainBahan });
 
             batch.update(productRef, { physical_stock: newStock });
-            
-            const newAlokasi = {};
+
+            const newAlokasi = {
+                userId: currentUser.value.uid
+            };
             state.settings.marketplaces.forEach(mp => {
                 newAlokasi[mp.id] = (matchingProduct.stokAlokasi[mp.id] || 0);
             });
@@ -3767,7 +3770,7 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
             }
 
             alert("Stok berhasil ditambahkan ke inventaris!");
-            
+
         } else {
             throw new Error("Produk yang cocok tidak ditemukan di Inventaris. Harap tambahkan produk ini secara manual di halaman Manajemen Inventaris terlebih dahulu.");
         }
