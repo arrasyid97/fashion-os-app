@@ -6043,10 +6043,16 @@ watch(activePage, (newPage) => {
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
                 
                 <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
-                    <div>
-                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Inventaris</h2>
-                        <p class="text-slate-500 mt-1">Kelola semua produk, varian, dan stok Anda secara terpusat.</p>
-                    </div>
+                    <div class="flex items-center gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Manajemen Inventaris</h2>
+        <p class="text-slate-500 mt-1">Kelola semua produk, varian, dan stok Anda secara terpusat.</p>
+    </div>
+    <button @click="showModal('inventarisInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2 flex-shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+        Informasi
+    </button>
+</div>
                     <div class="flex flex-wrap items-center gap-3">
                         <button @click="showModal('addStockIn', { sku: '', qty: null, tipe: 'penambahan', alasan: 'Penyesuaian Inventaris' })" class="bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow">Penyesuaian Stok</button>
                         <button @click="showModal('addProduct', { sku: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors shadow">+ Tambah Produk Baru</button>
@@ -8117,6 +8123,61 @@ watch(activePage, (newPage) => {
     <!-- Modal System -->
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
+
+<div v-if="uiState.modalType === 'inventarisInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Panduan Manajemen Inventaris</h3>
+        <p class="text-slate-500 mt-1">Pusat kendali untuk semua data produk dan stok Anda.</p>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto py-4 pr-2">
+        <div class="space-y-6 text-slate-700 leading-relaxed">
+            
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 class="font-semibold text-lg text-indigo-700">Konsep Kunci: Stok Fisik vs. Alokasi Stok</h4>
+                <p class="mt-1 text-sm">
+                    Untuk mencegah *overselling* (menjual barang yang stoknya habis), sistem ini membedakan dua jenis stok:
+                </p>
+                <ul class="list-disc list-inside ml-4 mt-2 space-y-3 text-sm">
+                    <li>
+                        <strong>Stok Fisik:</strong> Ini adalah **sumber kebenaran utama**. Angka ini menunjukkan jumlah total produk yang secara nyata ada di gudang Anda. Stok ini hanya berubah saat ada penjualan, retur, atau penyesuaian manual.
+                        <br>
+                        <em>Analogi: Total air di dalam sebuah tandon utama.</em>
+                    </li>
+                    <li>
+                        <strong>Alokasi Stok:</strong> Ini adalah "jatah" stok yang Anda putuskan untuk **ditampilkan** di setiap marketplace. Anda bisa mengalokasikan stok secara berbeda untuk setiap toko.
+                        <br>
+                        <em>Analogi: Jumlah air yang Anda tuang dari tandon utama ke dalam botol-botol terpisah (Botol Shopee, Botol Tokopedia, dll). Total air di semua botol tidak bisa melebihi air di tandon.</em>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 class="font-semibold text-lg text-indigo-700">Fungsi Tombol Utama</h4>
+                 <ul class="list-disc list-inside ml-4 mt-2 space-y-2 text-sm">
+                    <li><strong>+ Tambah Produk Baru:</strong> Gunakan tombol ini untuk mendaftarkan produk atau varian baru ke dalam sistem untuk **pertama kalinya**. Produk yang baru dibuat akan memiliki stok awal 0.</li>
+                    <li><strong>Penyesuaian Stok:</strong> Gunakan tombol ini untuk mengubah jumlah stok secara manual di luar transaksi normal. Ini penting untuk:
+                        <ul>
+                            <li>- Mencatat stok awal saat pertama kali input produk.</li>
+                            <li>- Menyesuaikan stok setelah melakukan stok opname.</li>
+                            <li>- Mencatat barang hilang atau rusak (pengurangan stok).</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+             <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 class="font-semibold text-lg text-indigo-700">Filter & Pencarian</h4>
+                <p class="mt-1 text-sm">
+                    Gunakan panel filter untuk menemukan produk dengan cepat berdasarkan **Nama Produk** atau **Status Stok** (Aman, Menipis, Habis) yang batasnya Anda atur sendiri di halaman Pengaturan.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+    </div>
+</div>
 
 <div v-if="uiState.modalType === 'produksiInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
