@@ -6336,10 +6336,16 @@ watch(activePage, (newPage) => {
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
                 
                 <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
-                    <div>
-                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Produksi</h2>
-                        <p class="text-slate-500 mt-1">Lacak semua batch produksi, mulai dari bahan baku hingga produk jadi.</p>
-                    </div>
+                    <div class="flex items-center gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Manajemen Produksi</h2>
+        <p class="text-slate-500 mt-1">Lacak semua batch produksi, mulai dari bahan baku hingga produk jadi.</p>
+    </div>
+    <button @click="showModal('produksiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2 flex-shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+        Informasi
+    </button>
+</div>
                     <button @click="showModal('addProduksi')" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
                         + Buat Batch Produksi
                     </button>
@@ -8111,7 +8117,48 @@ watch(activePage, (newPage) => {
     <!-- Modal System -->
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
-   
+
+<div v-if="uiState.modalType === 'produksiInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] flex flex-col">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Panduan Halaman Manajemen Produksi</h3>
+        <p class="text-slate-500 mt-1">Pusat kendali untuk melacak, menganalisis, dan mengelola seluruh alur kerja produksi Anda.</p>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto py-4 pr-2">
+        <div class="space-y-6 text-slate-700 leading-relaxed">
+            
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 class="font-semibold text-lg text-indigo-700">Laporan & Analisis</h4>
+                <p class="mt-1 text-sm">
+                    Ini adalah pusat intelijen bisnis untuk operasional produksi Anda. Setiap tombol di sini menyajikan data dari sudut pandang yang berbeda untuk membantu Anda mengambil keputusan yang lebih baik.
+                </p>
+                <ul class="list-disc list-inside ml-4 mt-2 space-y-3 text-sm">
+                    <li><strong>Analisis Model:</strong> Alat paling kuat untuk mengukur efisiensi. Fitur ini membandingkan **Target Kuantitas** (berdasarkan standar yard) dengan **Aktual Jadi** untuk setiap item produksi, lalu menyorot mana yang paling untung (selisih positif) dan mana yang paling rugi (selisih negatif). Gunakan ini untuk mengevaluasi kinerja pemaklun atau penjahit.</li>
+                    <li><strong>Ringkasan Jadi:</strong> Menampilkan rekapitulasi total kuantitas produk yang sudah jadi, dikelompokkan berdasarkan model, kain, warna, dan ukuran. Cocok untuk melihat ringkasan cepat hasil produksi.</li>
+                    <li><strong>Laporan per Status:</strong> Memungkinkan Anda memfilter dan melihat semua batch produksi berdasarkan statusnya (misal, tampilkan semua yang "Selesai" untuk proses pembayaran, atau semua yang "Dalam Proses" untuk pemantauan).</li>
+                    <li><strong>Laporan Semuanya:</strong> Tampilan master yang menggabungkan semua detail dari setiap item di semua batch produksi ke dalam satu tabel besar. Ini adalah sumber data utama untuk ekspor ke Excel dan analisis mendalam.</li>
+                </ul>
+            </div>
+
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 class="font-semibold text-lg text-indigo-700">Filter & Pencarian</h4>
+                <p class="mt-1 text-sm">
+                    Gunakan panel ini untuk menemukan batch produksi spesifik dengan cepat.
+                </p>
+                 <ul class="list-disc list-inside ml-4 mt-2 space-y-1 text-sm">
+                    <li><strong>Kolom Cari:</strong> Masukkan ID Batch, kode unik item (misal: 12ABC), nama pemaklun/penjahit, atau nama bahan untuk menemukan data yang relevan.</li>
+                    <li><strong>Filter Jenis & Status:</strong> Persempit pencarian Anda berdasarkan jenis jasa (Pemaklun/Penjahit) dan status proses produksi saat ini.</li>
+                </ul>
+            </div>
+            
+        </div>
+    </div>
+
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+    </div>
+</div>        
+
 <div v-if="uiState.modalType === 'modelProdukInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Panduan Pengisian Data Model Produk</h3>
