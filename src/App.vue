@@ -32,6 +32,7 @@ const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengatura
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
+const nomorWhatsAppAdmin = ref('6285691803476');
 const activationCodeInput = ref('');
 const activationCodeMessage = ref('');
 const commissionPayouts = ref([]);
@@ -7220,10 +7221,16 @@ watch(activePage, (newPage) => {
         </div>
         
         <div v-else-if="currentUser && currentUser.isPartner" class="max-w-7xl mx-auto">
-            <div class="mb-8 animate-fade-in-up">
-                <h2 class="text-3xl font-bold text-slate-800">Dashboard Mitra</h2>
-                <p class="text-slate-500 mt-1">Pantau kinerja dan penghasilan Anda di sini.</p>
-            </div>
+            <div class="flex justify-between items-center mb-8 animate-fade-in-up">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Dashboard Mitra</h2>
+        <p class="text-slate-500 mt-1">Pantau kinerja dan penghasilan Anda di sini.</p>
+    </div>
+    <a :href="`https://wa.me/${nomorWhatsAppAdmin}`" target="_blank" class="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-colors shadow-lg flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.487 5.235 3.487 8.413 0 6.557-5.338 11.892-11.894 11.892-1.99 0-3.903-.52-5.687-1.475L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.886-.001 2.267.655 4.398 1.905 6.344l-1.332 4.869 4.869-1.332z"/></svg>
+        Hubungi Admin
+    </a>
+</div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                 <!-- Kolom Kode Rujukan -->
