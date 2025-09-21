@@ -8557,7 +8557,7 @@ watch(activePage, (newPage) => {
             <input type="text" v-model="uiState.modalData.varian" id="product-variant" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: M, L, XL" required>
         </div>
         
-        <div class="flex justify-end gap-3 mt-2">
+        <div class="flex justify-end gap-3 mt-15">
             <button type="button" @click="hideModal" class="bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-400">Batal</button>
             <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Tambah Produk</button>
         </div>
