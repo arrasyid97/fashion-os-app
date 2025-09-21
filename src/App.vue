@@ -883,8 +883,9 @@ const discountedYearlyPrice = ref(6000);
 
 async function submitAddProduct() {
     const form = uiState.modalData;
-    if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian || !form.hpp || !form.hargaJualDefault) {
-        alert('SKU, Nama, Model produk, Warna, Varian, HPP, dan Harga Jual Default wajib diisi.');
+    // HPP & Harga Jual Default dihapus dari validasi
+    if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian) {
+        alert('SKU, Nama, Model produk, Warna, dan Varian wajib diisi.');
         return;
     }
 
@@ -892,7 +893,6 @@ async function submitAddProduct() {
     const userId = currentUser.value.uid;
 
     try {
-        // PERUBAHAN 1: Cek duplikat SKU HANYA untuk pengguna ini
         const productsCollection = collection(db, "products");
         const q = query(productsCollection, where("sku", "==", skuFormatted), where("userId", "==", userId));
         const querySnapshot = await getDocs(q);
@@ -901,7 +901,6 @@ async function submitAddProduct() {
             throw new Error(`Produk dengan SKU "${skuFormatted}" sudah terdaftar untuk akun Anda.`);
         }
         
-        // PERUBAHAN 2: Biarkan Firestore membuat ID dokumen unik secara otomatis
         const newProductRef = doc(collection(db, "products")); 
 
         const productData = {
@@ -911,9 +910,9 @@ async function submitAddProduct() {
             color: form.warna || '',
             variant: form.varian || '',
             physical_stock: 0,
-            hpp: form.hpp,
+            hpp: 0, // <-- Diubah menjadi 0
             userId: userId,
-            sku: skuFormatted // <-- Simpan SKU asli sebagai field data
+            sku: skuFormatted
         };
 
         const batch = writeBatch(db);
@@ -923,10 +922,10 @@ async function submitAddProduct() {
             const priceDocId = `${newProductRef.id}-${channel.id}`;
             const priceRef = doc(db, "product_prices", priceDocId);
             batch.set(priceRef, {
-                product_id: newProductRef.id, // Referensi ke ID produk baru
+                product_id: newProductRef.id,
                 product_sku: skuFormatted,
                 marketplace_id: channel.id,
-                price: form.hargaJualDefault,
+                price: 0, // <-- Diubah menjadi 0
                 userId: userId
             });
         });
@@ -8557,14 +8556,7 @@ watch(activePage, (newPage) => {
             <label for="product-variant" class="block text-sm font-medium text-slate-700">Varian (Ukuran/Model)</label>
             <input type="text" v-model="uiState.modalData.varian" id="product-variant" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: M, L, XL" required>
         </div>
-        <div>
-            <label for="product-hpp" class="block text-sm font-medium text-slate-700">Harga Pokok Produksi (HPP)</label>
-            <input type="number" v-model.number="uiState.modalData.hpp" id="product-hpp" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: 55000" required>
-        </div>
-        <div>
-            <label for="product-harga-jual" class="block text-sm font-medium text-slate-700">Harga Jual Default</label>
-            <input type="number" v-model.number="uiState.modalData.hargaJualDefault" id="product-harga-jual" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: 120000" required>
-        </div>
+        
         <div class="flex justify-end gap-3 mt-6">
             <button type="button" @click="hideModal" class="bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-400">Batal</button>
             <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Tambah Produk</button>
