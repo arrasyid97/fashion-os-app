@@ -33,7 +33,6 @@ export default async function handler(request, response) {
         const partnerEmail = decodedToken.email;
 
         const { amountToWithdraw, withdrawalId, referralCode } = request.body;
-console.log('Jumlah yang diterima dari frontend:', amountToWithdraw);
         if (!amountToWithdraw || !withdrawalId || !referralCode) {
             return response.status(400).json({ message: 'Missing required data.' });
         }
