@@ -5313,41 +5313,42 @@ onMounted(() => {
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
                     // --- AWAL PERUBAHAN LOGIKA ---
-                    if (isSubscriptionValid) {
-                        // Jika langganan valid, muat semua data seperti biasa
-                        if (!hasLoadedInitialData.value) {
-                            await loadAllDataFromFirebase();
-                            hasLoadedInitialData.value = true;
-                            changePage(activePage.value);
-                            
-                            if (currentUser.value.isPartner) {
-                                const commissionsQuery = query(
-                                    collection(db, 'commissions'),
-                                    where('partnerId', '==', currentUser.value.uid)
-                                );
-                                commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                    commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                                });
-                            }
+                    const shouldLoadData = isSubscriptionValid.value || currentUser.value.isPartner;
 
-                            if (activePage.value === 'login') {
-                                const storedPage = localStorage.getItem('lastActivePage');
-                                const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                                changePage(pageToLoad);
-                            }
-                        }
-                    } else if (
-                        activePage.value !== 'mitra' && 
-                        activePage.value !== 'pengaturan' && 
-                        activePage.value !== 'langganan' &&
-                        activePage.value !== 'tentang' &&
-                        activePage.value !== 'panduan'
-                    ) {
-                        // Jika langganan TIDAK valid DAN halaman BUKAN halaman yang diizinkan,
-                        // baru alihkan ke halaman langganan.
-                        activePage.value = 'langganan';
-                        hasLoadedInitialData.value = false;
-                    }
+// Langkah 2: Muat data jika diperlukan dan belum pernah dimuat sebelumnya.
+if (shouldLoadData && !hasLoadedInitialData.value) {
+    await loadAllDataFromFirebase();
+    hasLoadedInitialData.value = true;
+    changePage(activePage.value);
+    
+    if (currentUser.value.isPartner) {
+        const commissionsQuery = query(
+            collection(db, 'commissions'),
+            where('partnerId', '==', currentUser.value.uid)
+        );
+        commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+            commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        });
+    }
+
+    if (activePage.value === 'login') {
+        const storedPage = localStorage.getItem('lastActivePage');
+        const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
+        changePage(pageToLoad);
+    }
+}
+
+// Langkah 3: Tentukan apakah pengguna perlu dialihkan (logika ini tetap sama).
+if (!isSubscriptionValid.value && 
+    activePage.value !== 'mitra' && 
+    activePage.value !== 'pengaturan' && 
+    activePage.value !== 'langganan' &&
+    activePage.value !== 'tentang' &&
+    activePage.value !== 'panduan'
+) {
+    activePage.value = 'langganan';
+    hasLoadedInitialData.value = false;
+}
                     // --- AKHIR PERUBAHAN LOGIKA ---
 
                 } else {
