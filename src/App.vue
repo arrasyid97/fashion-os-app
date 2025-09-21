@@ -4623,7 +4623,13 @@ async function saveModelProdukEdit() {
     const editedModel = uiState.modalData;
     const index = state.settings.modelProduk.findIndex(model => model.id === editedModel.id);
     if (index !== -1) {
-        state.settings.modelProduk[index] = { ...editedModel, hargaJahit: editedModel.hargaJahit || 0 };
+        // PERBAIKAN: Pastikan semua properti diperbarui
+        state.settings.modelProduk[index] = { 
+            ...editedModel, 
+            hargaJahit: editedModel.hargaJahit || 0,
+            warna: editedModel.warna || '', // Tambahkan ini
+            ukuran: editedModel.ukuran || '' // Tambahkan ini
+        };
     }
     await saveData();
     hideModal();
