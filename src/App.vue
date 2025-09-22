@@ -1365,14 +1365,7 @@ const voucherProdukComputed = (modelName, channelId) => computed({
         state.promotions.perModel[modelName][channelId].voucherProduk = parsePercentageInput(newValue);
     }
 });
-const tieredMinComputed = (tier) => computed({
-    get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
-    set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
-});
-const tieredDiskonComputed = (tier) => computed({
-    get() { return tier.diskon ? tier.diskon + '%' : ''; },
-    set(newValue) { tier.diskon = parsePercentageInput(newValue); }
-});
+
 
 async function applyReferralCode() {
     if (currentUser.value?.userData?.referredBy) {
@@ -3260,19 +3253,13 @@ function calculateBestDiscount(cart, channelId) {
         });
     }
 
-    if (channelPromos.voucherSemuaProduk && Array.isArray(channelPromos.voucherSemuaProduk)) {
-        const sortedTiers = [...channelPromos.voucherSemuaProduk].sort((a, b) => b.min - a.min);
-        for (const tier of sortedTiers) {
-            if (cartSubtotal >= tier.min) {
-                promotions.push({
-                    totalDiscount: (tier.diskon / 100) * cartSubtotal,
-                    description: `Voucher Belanja (${tier.diskon}%)`,
-                    rate: tier.diskon
-                });
-                break;
-            }
-        }
-    }
+    if (channelPromos.voucherSemuaProduk > 0) {
+  promotions.push({
+    totalDiscount: (channelPromos.voucherSemuaProduk / 100) * cartSubtotal,
+    description: `Voucher Semua Produk (${channelPromos.voucherSemuaProduk}%)`,
+    rate: channelPromos.voucherSemuaProduk
+  });
+}
     
     const allModelPromos = state.promotions.perModel || {};
     const itemsByModel = cart.reduce((acc, item) => {
@@ -6296,15 +6283,8 @@ watch(activePage, (newPage) => {
                                     <input type="text" placeholder="Contoh: 5%" v-model="voucherTokoComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
                                 </div>
                                 <div>
-    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (Bertingkat)</label>
-    <div class="space-y-2 mt-1">
-        <div v-for="(tier, index) in state.promotions.perChannel[channel.id].voucherSemuaProduk" :key="index" class="flex items-center gap-2">
-            <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-            <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-            <button @click="removeChannelTier(channel, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">&times;</button>
-        </div>
-    </div>
-    <button @click="addChannelTier(channel)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
+    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (%)</label>
+    <input type="text" placeholder="Contoh: 10%" v-model="state.promotions.perChannel[channel.id].voucherSemuaProduk" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
 </div>
                             </div>
                         </div>
