@@ -1352,15 +1352,7 @@ const voucherTokoComputed = (channel) => computed({
         state.promotions.perChannel[channel.id].voucherToko = parsePercentageInput(newValue);
     }
 });
-const voucherSemuaProdukComputed = (channel) => computed({
-    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk ? state.promotions.perChannel[channel.id].voucherSemuaProduk + '%' : ''; },
-    set(newValue) {
-        if (!state.promotions.perChannel[channel.id]) {
-            state.promotions.perChannel[channel.id] = {};
-        }
-        state.promotions.perChannel[channel.id].voucherSemuaProduk = parsePercentageInput(newValue);
-    }
-});
+
 const voucherProdukComputed = (modelName, channelId) => computed({
     get() { return state.promotions.perModel[modelName]?.[channelId]?.voucherProduk ? state.promotions.perModel[modelName][channelId].voucherProduk + '%' : ''; },
     set(newValue) {
