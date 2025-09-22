@@ -1330,22 +1330,39 @@ async function handleSubscriptionMayar(plan) {
     }
 }
 
-const voucherTokoComputed = (channel) => computed({
-    get() { return state.promotions.perChannel[channel.id]?.voucherToko ? state.promotions.perChannel[channel.id].voucherToko + '%' : ''; },
+const voucherTokoMinBelanjaComputed = (channel) => computed({
+    get() { return state.promotions.perChannel[channel.id]?.voucherToko?.minBelanja ? 'Rp ' + formatInputNumber(state.promotions.perChannel[channel.id].voucherToko.minBelanja) : ''; },
     set(newValue) {
-        if (!state.promotions.perChannel[channel.id]) {
-            state.promotions.perChannel[channel.id] = {};
-        }
-        state.promotions.perChannel[channel.id].voucherToko = parsePercentageInput(newValue);
+        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
+        if (!state.promotions.perChannel[channel.id].voucherToko) state.promotions.perChannel[channel.id].voucherToko = {};
+        state.promotions.perChannel[channel.id].voucherToko.minBelanja = parseInputNumber(newValue);
     }
 });
-const voucherSemuaProdukComputed = (channel) => computed({
-    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk ? state.promotions.perChannel[channel.id].voucherSemuaProduk + '%' : ''; },
+
+const voucherTokoDiskonRateComputed = (channel) => computed({
+    get() { return state.promotions.perChannel[channel.id]?.voucherToko?.diskonRate ? state.promotions.perChannel[channel.id].voucherToko.diskonRate + '%' : ''; },
     set(newValue) {
-        if (!state.promotions.perChannel[channel.id]) {
-            state.promotions.perChannel[channel.id] = {};
-        }
-        state.promotions.perChannel[channel.id].voucherSemuaProduk = parsePercentageInput(newValue);
+        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
+        if (!state.promotions.perChannel[channel.id].voucherToko) state.promotions.perChannel[channel.id].voucherToko = {};
+        state.promotions.perChannel[channel.id].voucherToko.diskonRate = parsePercentageInput(newValue);
+    }
+});
+
+const voucherSemuaProdukMinBelanjaComputed = (channel) => computed({
+    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk?.minBelanja ? 'Rp ' + formatInputNumber(state.promotions.perChannel[channel.id].voucherSemuaProduk.minBelanja) : ''; },
+    set(newValue) {
+        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
+        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+        state.promotions.perChannel[channel.id].voucherSemuaProduk.minBelanja = parseInputNumber(newValue);
+    }
+});
+
+const voucherSemuaProdukDiskonRateComputed = (channel) => computed({
+    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk?.diskonRate ? state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonRate + '%' : ''; },
+    set(newValue) {
+        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
+        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+        state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonRate = parsePercentageInput(newValue);
     }
 });
 
@@ -3263,22 +3280,26 @@ function calculateBestDiscount(cart, channelId) {
 
     // 1. Kumpulkan promosi per channel (yang berlaku untuk seluruh keranjang)
     const channelPromos = state.promotions.perChannel[channelId] || {};
-    if (channelPromos.voucherToko > 0) {
-        eligiblePromotions.push({
-            totalDiscount: (channelPromos.voucherToko / 100) * totalCartSubtotal,
-            description: `Voucher Ikuti Toko (${channelPromos.voucherToko}%)`,
-            rate: channelPromos.voucherToko,
-            appliesTo: 'cart'
-        });
-    }
-    if (channelPromos.voucherSemuaProduk > 0) {
-        eligiblePromotions.push({
-            totalDiscount: (channelPromos.voucherSemuaProduk / 100) * totalCartSubtotal,
-            description: `Voucher Semua Produk (${channelPromos.voucherSemuaProduk}%)`,
-            rate: channelPromos.voucherSemuaProduk,
-            appliesTo: 'cart'
-        });
-    }
+
+// Periksa Voucher Ikuti Toko
+if (channelPromos.voucherToko?.diskonRate > 0 && totalCartSubtotal >= (channelPromos.voucherToko?.minBelanja || 0)) {
+    eligiblePromotions.push({
+        totalDiscount: (channelPromos.voucherToko.diskonRate / 100) * totalCartSubtotal,
+        description: `Voucher Ikuti Toko (${channelPromos.voucherToko.diskonRate}%)`,
+        rate: channelPromos.voucherToko.diskonRate,
+        appliesTo: 'cart',
+    });
+}
+
+// Periksa Voucher Semua Produk
+if (channelPromos.voucherSemuaProduk?.diskonRate > 0 && totalCartSubtotal >= (channelPromos.voucherSemuaProduk?.minBelanja || 0)) {
+    eligiblePromotions.push({
+        totalDiscount: (channelPromos.voucherSemuaProduk.diskonRate / 100) * totalCartSubtotal,
+        description: `Voucher Semua Produk (${channelPromos.voucherSemuaProduk.diskonRate}%)`,
+        rate: channelPromos.voucherSemuaProduk.diskonRate,
+        appliesTo: 'cart',
+    });
+}
 
     // 2. Kumpulkan promosi per model produk
     const allModelPromos = state.promotions.perModel || {};
@@ -6317,18 +6338,24 @@ watch(activePage, (newPage) => {
                     <p class="text-sm text-slate-500 mb-4">Voucher ini berlaku untuk semua produk yang dijual di akun yang bersangkutan.</p>
                     <div class="space-y-4">
                         <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-slate-50/50">
-                            <p class="font-semibold text-slate-700">{{ channel.name }}</p>
-                            <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko (%)</label>
-                                    <input type="text" placeholder="Contoh: 5%" v-model="voucherTokoComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (%)</label>
-                                    <input type="text" placeholder="Contoh: 10%" v-model="voucherSemuaProdukComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                </div>
-                            </div>
-                        </div>
+    <p class="font-semibold text-slate-700">{{ channel.name }}</p>
+    <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
+            <div class="mt-1 grid grid-cols-2 gap-2">
+                <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
+            <div class="mt-1 grid grid-cols-2 gap-2">
+                <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+            </div>
+        </div>
+    </div>
+</div>
                     </div>
                 </div>
 
