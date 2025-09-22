@@ -3255,7 +3255,7 @@ async function executeCompleteTransaction() {
 
 function calculateBestDiscount(cart, channelId) {
     if (!cart || cart.length === 0) {
-        return { totalDiscount: 0, description: '', rate: 0 };
+        return { totalDiscount: 0, description: 'Tidak ada diskon yang berlaku', rate: 0 };
     }
 
     const eligiblePromotions = [];
@@ -3268,6 +3268,7 @@ function calculateBestDiscount(cart, channelId) {
             totalDiscount: (channelPromos.voucherToko / 100) * totalCartSubtotal,
             description: `Voucher Ikuti Toko (${channelPromos.voucherToko}%)`,
             rate: channelPromos.voucherToko,
+            appliesTo: 'cart'
         });
     }
     if (channelPromos.voucherSemuaProduk > 0) {
@@ -3275,6 +3276,7 @@ function calculateBestDiscount(cart, channelId) {
             totalDiscount: (channelPromos.voucherSemuaProduk / 100) * totalCartSubtotal,
             description: `Voucher Semua Produk (${channelPromos.voucherSemuaProduk}%)`,
             rate: channelPromos.voucherSemuaProduk,
+            appliesTo: 'cart'
         });
     }
 
@@ -3300,35 +3302,49 @@ function calculateBestDiscount(cart, channelId) {
                 totalDiscount: (modelPromosForChannel.diskonRate / 100) * modelData.subtotal,
                 description: `Voucher ${modelName} (${modelPromosForChannel.diskonRate}%)`,
                 rate: modelPromosForChannel.diskonRate,
+                appliesTo: 'model'
             });
         }
         
         // Cek semua tingkatan di 'Diskon Minimal Belanja Bertingkat'
         if (modelPromosForChannel.diskonBertingkat && modelPromosForChannel.diskonBertingkat.length > 0) {
-            const sortedTiers = [...modelPromosForChannel.diskonBertingkat].sort((a, b) => b.min - a.min);
-            for (const tier of sortedTiers) {
+            // Sort tiers by discount percentage descending, so we check highest percentage first.
+            const sortedTiersByRate = [...modelPromosForChannel.diskonBertingkat].sort((a, b) => b.diskon - a.diskon);
+            
+            for (const tier of sortedTiersByRate) {
                 if (modelData.subtotal >= tier.min) {
                     eligiblePromotions.push({
                         totalDiscount: (tier.diskon / 100) * modelData.subtotal,
                         description: `Diskon Bertingkat ${modelName} (${tier.diskon}%)`,
                         rate: tier.diskon,
+                        appliesTo: 'model'
                     });
-                    // Penting: Hentikan loop setelah menemukan tingkatan tertinggi yang memenuhi syarat
-                    break;
+                    // Kita tidak perlu break di sini, kita akan membiarkan semua yang eligible masuk
+                    // dan baru memilih yang terbaik di akhir.
                 }
             }
         }
     }
 
-    // 3. Cari diskon terbaik dari semua promosi yang memenuhi syarat
+    // 3. Cari promosi terbaik dari semua yang terkumpul
     if (eligiblePromotions.length === 0) {
         return { totalDiscount: 0, description: 'Tidak ada diskon yang berlaku', rate: 0 };
     }
     
-    // Gunakan .reduce untuk menemukan promosi dengan nilai diskon absolut terbesar
-    return eligiblePromotions.reduce((best, current) => {
-        return current.totalDiscount > best.totalDiscount ? current : best;
+    // Perbaikan utama: Gunakan .reduce untuk menemukan promosi dengan persentase diskon tertinggi
+    const bestPromo = eligiblePromotions.reduce((best, current) => {
+        // Jika persentase saat ini lebih tinggi, pilih yang ini.
+        if (current.rate > best.rate) {
+            return current;
+        }
+        // Jika persentase sama, pilih yang memberikan nilai rupiah lebih besar.
+        if (current.rate === best.rate && current.totalDiscount > best.totalDiscount) {
+            return current;
+        }
+        return best;
     }, { totalDiscount: 0, description: '', rate: 0 });
+    
+    return bestPromo;
 }
 
 function calculateSellingPrice() {
