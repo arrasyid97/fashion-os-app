@@ -1238,18 +1238,7 @@ function generateUniqueCode() {
     return `${numbers}${result}`;
 }
 
-function addChannelTier(channel) {
-    if (!state.promotions.perChannel[channel.id].voucherSemuaProduk || !Array.isArray(state.promotions.perChannel[channel.id].voucherSemuaProduk)) {
-        state.promotions.perChannel[channel.id].voucherSemuaProduk = [];
-    }
-    state.promotions.perChannel[channel.id].voucherSemuaProduk.push({ min: 0, diskon: 0 });
-}
 
-function removeChannelTier(channel, tierIndex) {
-    if (state.promotions.perChannel[channel.id]?.voucherSemuaProduk) {
-        state.promotions.perChannel[channel.id].voucherSemuaProduk.splice(tierIndex, 1);
-    }
-}
 
 async function findTransactionForReturn() {
     const orderId = uiState.modalData.transactionIdSearch.trim();
