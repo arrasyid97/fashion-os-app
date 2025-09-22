@@ -6323,8 +6323,8 @@ watch(activePage, (newPage) => {
                         <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (Bertingkat)</label>
                         <div class="space-y-2 mt-1">
                             <div v-for="(tier, index) in state.promotions.perChannel[channel.id].voucherSemuaProduk" :key="index" class="flex items-center gap-2">
-                                <input type="text" v-model="channelTierMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                <input type="text" v-model="channelTierDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                <input type="text" v-model="promoTierMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                <input type="text" v-model="promoTierDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                 <button @click="removeChannelTier(channel, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">&times;</button>
                             </div>
                         </div>
@@ -6360,8 +6360,8 @@ watch(activePage, (newPage) => {
                         <label class="block text-xs font-medium text-slate-600">Voucher Paket Diskon Bertingkat</label>
                         <div class="space-y-2 mt-1">
                             <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].diskonBertingkat" :key="index" class="flex items-center gap-2">
-                                <input type="text" v-model="modelTierMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                <input type="text" v-model="modelTierDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                <input type="text" v-model="promoTierMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                <input type="text" v-model="promoTierDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                 <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">&times;</button>
                             </div>
                         </div>
