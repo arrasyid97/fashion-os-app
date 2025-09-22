@@ -3254,23 +3254,37 @@ async function executeCompleteTransaction() {
 }
 
 function calculateBestDiscount(cart, channelId) {
-    if (!cart || cart.length === 0) return { totalDiscount: 0, description: '', rate: 0 };
-    
+    if (!cart || cart.length === 0) {
+        return { totalDiscount: 0, description: '', rate: 0 };
+    }
+
     const promotions = [];
-    const cartSubtotal = cart.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
+    let allCartSubtotal = 0;
+    const itemsByModel = {};
+
+    // Kumpulkan subtotal dan kelompokkan item per model untuk perhitungan promosi
+    cart.forEach(item => {
+        allCartSubtotal += (item.hargaJualAktual * item.qty);
+        const modelName = state.settings.modelProduk.find(m => m.id === item.model_id)?.namaModel || item.nama;
+        if (!itemsByModel[modelName]) {
+            itemsByModel[modelName] = { subtotal: 0, qty: 0 };
+        }
+        itemsByModel[modelName].subtotal += item.hargaJualAktual * item.qty;
+        itemsByModel[modelName].qty += item.qty;
+    });
 
     // 1. Ambil semua promosi per-channel (Voucher Ikuti Toko, dll)
     const channelPromos = state.promotions.perChannel[channelId] || {};
     if (channelPromos.voucherToko > 0) {
         promotions.push({
-            totalDiscount: (channelPromos.voucherToko / 100) * cartSubtotal,
+            totalDiscount: (channelPromos.voucherToko / 100) * allCartSubtotal,
             description: `Voucher Ikuti Toko (${channelPromos.voucherToko}%)`,
             rate: channelPromos.voucherToko
         });
     }
     if (channelPromos.voucherSemuaProduk > 0) {
         promotions.push({
-            totalDiscount: (channelPromos.voucherSemuaProduk / 100) * cartSubtotal,
+            totalDiscount: (channelPromos.voucherSemuaProduk / 100) * allCartSubtotal,
             description: `Voucher Semua Produk (${channelPromos.voucherSemuaProduk}%)`,
             rate: channelPromos.voucherSemuaProduk
         });
@@ -3278,20 +3292,11 @@ function calculateBestDiscount(cart, channelId) {
 
     // 2. Ambil semua promosi per-model produk
     const allModelPromos = state.promotions.perModel || {};
-    const itemsByModel = cart.reduce((acc, item) => {
-        if (!acc[item.nama]) {
-            acc[item.nama] = { subtotal: 0, qty: 0 };
-        }
-        acc[item.nama].subtotal += item.hargaJualAktual * item.qty;
-        acc[item.nama].qty += item.qty;
-        return acc;
-    }, {});
-
     for (const modelName in itemsByModel) {
         const modelData = itemsByModel[modelName];
         const modelPromosForChannel = (allModelPromos[modelName] || {})[channelId] || {};
 
-        // Tambahkan Voucher Produk Tertentu jika memenuhi minimal belanja
+        // Tambahkan Voucher Produk Tertentu jika memenuhi syarat
         if (modelPromosForChannel.minBelanja > 0 && modelPromosForChannel.diskonRate > 0 && modelData.subtotal >= modelPromosForChannel.minBelanja) {
             promotions.push({
                 totalDiscount: (modelPromosForChannel.diskonRate / 100) * modelData.subtotal,
@@ -3300,7 +3305,7 @@ function calculateBestDiscount(cart, channelId) {
             });
         }
         
-        // Tambahkan Diskon Bertingkat jika memenuhi minimal belanja
+        // Tambahkan Diskon Bertingkat jika memenuhi syarat
         if (modelPromosForChannel.diskonBertingkat && modelPromosForChannel.diskonBertingkat.length > 0) {
             const sortedTiers = [...modelPromosForChannel.diskonBertingkat].sort((a, b) => b.min - a.min);
             for (const tier of sortedTiers) {
@@ -3310,22 +3315,21 @@ function calculateBestDiscount(cart, channelId) {
                         description: `Diskon Bertingkat ${modelName} (${tier.diskon}%)`,
                         rate: tier.diskon
                     });
-                    break; 
+                    // Penting: Hentikan loop setelah menemukan tingkatan tertinggi yang memenuhi syarat
+                    break;
                 }
             }
         }
     }
 
-    // 3. Pilih promosi terbaik dari semua yang terkumpul
+    // 3. Cari promosi terbaik dari semua yang terkumpul
     if (promotions.length === 0) {
-        return { totalDiscount: 0, description: '', rate: 0 };
+        return { totalDiscount: 0, description: 'Tidak ada diskon yang berlaku', rate: 0 };
     }
     
-    // Cari promo dengan diskon terbesar
     const bestPromo = promotions.reduce((best, current) => {
-        // Membandingkan nilai diskon absolut
         return current.totalDiscount > best.totalDiscount ? current : best;
-    }, { totalDiscount: 0, description: '', rate: 0 });
+    }, { totalDiscount: 0, description: 'Tidak ada diskon yang berlaku', rate: 0 });
     
     return bestPromo;
 }
