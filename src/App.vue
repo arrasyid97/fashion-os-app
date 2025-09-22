@@ -1353,7 +1353,18 @@ const voucherTokoComputed = (channel) => computed({
     }
 });
 
-
+const voucherProdukComputed = (modelName, channelId) => computed({
+    get() { return state.promotions.perModel[modelName]?.[channelId]?.voucherProduk ? state.promotions.perModel[modelName][channelId].voucherProduk + '%' : ''; },
+    set(newValue) {
+        if (!state.promotions.perModel[modelName]) {
+            state.promotions.perModel[modelName] = {};
+        }
+        if (!state.promotions.perModel[modelName][channelId]) {
+            state.promotions.perModel[modelName][channelId] = {};
+        }
+        state.promotions.perModel[modelName][channelId].voucherProduk = parsePercentageInput(newValue);
+    }
+});
 const tieredMinComputed = (tier) => computed({
     get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
     set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
@@ -2340,31 +2351,7 @@ const filteredProduksiBatches = computed(() => {
     return filteredData;
 });
 
-const modelPromoMinComputed = (modelName, channelId) => computed({
-    get() {
-        const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
-        return promo?.min ? 'Rp ' + formatInputNumber(promo.min) : '';
-    },
-    set(newValue) {
-        const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
-        if (promo) {
-            promo.min = parseInputNumber(newValue) || 0;
-        }
-    }
-});
 
-const modelPromoDiskonComputed = (modelName, channelId) => computed({
-    get() {
-        const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
-        return promo?.diskon ? promo.diskon + '%' : '';
-    },
-    set(newValue) {
-        const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
-        if (promo) {
-            promo.diskon = parsePercentageInput(newValue);
-        }
-    }
-});
 
 const hargaHppProductNames = computed(() => {
     return [...new Set(state.produk.map(p => p.nama))];
@@ -3301,20 +3288,14 @@ function calculateBestDiscount(cart, channelId) {
         const modelData = itemsByModel[modelName];
         const modelPromosForChannel = (allModelPromos[modelName] || {})[channelId] || {};
 
-        // --- LOGIKA BARU UNTUK VOUCHER PRODUK 1 TINGKAT ---
-        if (modelPromosForChannel.voucherProduk && modelData.subtotal >= (modelPromosForChannel.voucherProduk.min || 0)) {
-            const diskon = modelPromosForChannel.voucherProduk.diskon || 0;
-            if (diskon > 0) {
-                promotions.push({
-                    totalDiscount: (diskon / 100) * modelData.subtotal,
-                    description: `Voucher ${modelName} (${diskon}%)`,
-                    rate: diskon
-                });
-            }
+        if (modelPromosForChannel.voucherProduk > 0) {
+            promotions.push({
+                totalDiscount: (modelPromosForChannel.voucherProduk / 100) * modelData.subtotal,
+                description: `Voucher ${modelName} (${modelPromosForChannel.voucherProduk}%)`,
+                rate: modelPromosForChannel.voucherProduk
+            });
         }
-        // --- AKHIR LOGIKA BARU ---
 
-        // Logika untuk diskon bertingkat (TETAP SAMA, TIDAK DIUBAH)
         if (modelPromosForChannel.diskonBertingkat && modelPromosForChannel.diskonBertingkat.length > 0) {
             const sortedTiers = [...modelPromosForChannel.diskonBertingkat].sort((a, b) => b.min - a.min);
             for (const tier of sortedTiers) {
@@ -5193,11 +5174,7 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
         }
         state.settings.marketplaces.forEach(channel => {
             if (!state.promotions.perModel[newModel][channel.id]) {
-                // 'voucherProduk' diubah menjadi objek, 'diskonBertingkat' tetap ada
-                state.promotions.perModel[newModel][channel.id] = { 
-                    voucherProduk: { min: null, diskon: null }, 
-                    diskonBertingkat: [] 
-                };
+                state.promotions.perModel[newModel][channel.id] = { voucherProduk: null, diskonBertingkat: [] };
             }
         });
     }
@@ -6354,14 +6331,11 @@ watch(activePage, (newPage) => {
                             <p class="font-semibold text-slate-700">{{ channel.name }}</p>
                             <div class="mt-2 space-y-3">
                                 <div>
-    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
-    <div class="flex items-center gap-2 mt-1">
-        <input type="text" v-model="modelPromoMinComputed(uiState.promosiSelectedModel, channel.id).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-        <input type="text" v-model="modelPromoDiskonComputed(uiState.promosiSelectedModel, channel.id).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-    </div>
-</div>
+                                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu (%)</label>
+                                    <input type="text" placeholder="Contoh: 10%" v-model="voucherProdukComputed(uiState.promosiSelectedModel, channel.id).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-slate-600">Voucher Paket Diskon Bertingkat</label>
+                                    <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
                                     <div class="space-y-2 mt-1">
                                         <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].diskonBertingkat" :key="index" class="flex items-center gap-2">
                                             <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
