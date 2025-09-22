@@ -6096,21 +6096,51 @@ watch(activePage, (newPage) => {
                     </div>
 
                     <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-                            <h3 class="text-xl font-semibold text-slate-800">Riwayat Transaksi</h3>
-                            <div class="flex items-start gap-2">
-                                <select v-model="uiState.posDateFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                                    <option value="today">hari ini</option>
-                                    <option value="last_7_days">1 minggu terakhir</option>
-                                    <option value="all_time">semua</option>
-                                </select>
-                                <select v-model="uiState.posChannelFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                                    <option value="all">Semua Channel</option>
-                                    <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
-                                </select>
-                                <button @click="exportTransactionsToExcel" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px] flex-shrink-0">Export</button>
-                            </div>
-                        </div>
+                        <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+    <div class="flex flex-wrap justify-between items-center mb-4 pb-4 border-b border-slate-200/80">
+        <h3 class="text-xl font-semibold text-slate-800">Riwayat Transaksi</h3>
+        <div class="flex items-center gap-2">
+            <select v-model="uiState.posDateFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                <option value="today">hari ini</option>
+                <option value="last_7_days">7 hari terakhir</option>
+                <option value="last_30_days">30 hari terakhir</option>
+                <option value="this_year">tahun ini</option>
+                <option value="by_date_range">rentang tanggal</option>
+                <option value="by_month_range">rentang bulan</option>
+                <option value="by_year_range">rentang tahun</option>
+                <option value="all_time">semua</option>
+            </select>
+            <select v-model="uiState.posChannelFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                <option value="all">Semua Channel</option>
+                <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
+            </select>
+            <button @click="exportTransactionsToExcel" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px] flex-shrink-0">Export</button>
+        </div>
+    </div>
+    <div class="mb-4 space-y-2">
+        <div v-if="uiState.posDateFilter === 'by_date_range'" class="flex items-center gap-2 animate-fade-in">
+            <input type="date" v-model="uiState.posStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+            <span>s/d</span>
+            <input type="date" v-model="uiState.posEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+        </div>
+        <div v-if="uiState.posDateFilter === 'by_month_range'" class="flex items-center gap-2 animate-fade-in">
+            <select v-model.number="uiState.posStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
+            </select>
+            <input type="number" v-model.number="uiState.posStartYear" placeholder="Tahun" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+            <span>s/d</span>
+            <select v-model.number="uiState.posEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
+            </select>
+            <input type="number" v-model.number="uiState.posEndYear" placeholder="Tahun" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+        </div>
+        <div v-if="uiState.posDateFilter === 'by_year_range'" class="flex items-center gap-2 animate-fade-in">
+            <input type="number" v-model.number="uiState.posStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+            <span>s/d</span>
+            <input type="number" v-model.number="uiState.posEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+        </div>
+    </div>
+</div>
                         <div class="overflow-x-auto max-h-96">
                             <table class="w-full text-sm text-left text-slate-500">
                                 <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
