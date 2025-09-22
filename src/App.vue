@@ -64,6 +64,7 @@ const state = reactive({
     specialPrices: {},
     produksi: [],    // --- START: KODE BARU UNTUK STOK KAIN ---
     gudangKain: [],
+    voucherNotes: [],
     investor: [],
     bankAccounts: [],
     // --- END: KODE BARU UNTUK STOK KAIN ---
@@ -75,6 +76,7 @@ const state = reactive({
             investmentPage: true,
         }
 });
+
 
 const uiState = reactive({
     activeAccordion: null,
@@ -156,7 +158,16 @@ const uiState = reactive({
         tanggalPembayaran: '',
         catatan: '',
         orangMemproses: '',
+        
     },
+
+    notesModalVisible: false,
+    notesData: {},
+    notesSearch: '',
+    notesFilterType: 'all', // 'all', 'model', 'channel'
+    notesFilterModel: '',
+    notesFilterChannel: '',
+    notesSortBy: 'endDate-asc',
 
     exportFilter: 'all_time',
     exportStartDate: '',
@@ -877,6 +888,43 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
     }
 }
 
+const filteredVoucherNotes = computed(() => {
+    let filtered = state.voucherNotes;
+
+    // Filter berdasarkan tipe (model/channel)
+    if (uiState.notesFilterType !== 'all') {
+        filtered = filtered.filter(note => note.type === uiState.notesFilterType);
+    }
+
+    // Filter berdasarkan model produk
+    if (uiState.notesFilterModel) {
+        filtered = filtered.filter(note => note.modelName === uiState.notesFilterModel);
+    }
+
+    // Filter berdasarkan channel
+    if (uiState.notesFilterChannel) {
+        filtered = filtered.filter(note => note.channelId === uiState.notesFilterChannel);
+    }
+
+    // Filter berdasarkan pencarian
+    const searchQuery = uiState.notesSearch.toLowerCase();
+    if (searchQuery) {
+        filtered = filtered.filter(note =>
+            note.title.toLowerCase().includes(searchQuery) ||
+            note.modelName?.toLowerCase().includes(searchQuery) ||
+            note.channelName?.toLowerCase().includes(searchQuery)
+        );
+    }
+
+    // Mengurutkan berdasarkan tanggal berakhir (semakin dekat, semakin di atas)
+    return filtered.sort((a, b) => {
+        if (uiState.notesSortBy === 'endDate-asc') {
+            return a.endDate.getTime() - b.endDate.getTime();
+        }
+        // Tambahkan logika pengurutan lain jika diperlukan
+        return 0;
+    });
+});
 
 const monthlyPrice = ref(350000);
 const yearlyPrice = ref(4200000);
@@ -1236,6 +1284,68 @@ function generateUniqueCode() {
         result += letters.charAt(Math.floor(Math.random() * letters.length));
     }
     return `${numbers}${result}`;
+}
+
+function showNotesModal() {
+    uiState.notesModalVisible = true;
+    // Reset form data setiap kali modal dibuka
+    uiState.notesData = {
+        type: 'model', // default
+        title: '',
+        endDate: '',
+        endHour: '23',
+        endMinute: '59',
+        modelName: '',
+        channelId: ''
+    };
+}
+
+function hideNotesModal() {
+    uiState.notesModalVisible = false;
+}
+
+async function submitVoucherNote() {
+    if (!currentUser.value) return alert("Anda harus login.");
+    const form = uiState.notesData;
+
+    if (!form.title || !form.endDate || !form.channelId || (form.type === 'model' && !form.modelName)) {
+        return alert("Semua kolom wajib diisi.");
+    }
+
+    const endDateTime = new Date(`${form.endDate}T${form.endHour}:${form.endMinute}:00`);
+
+    const dataToSave = {
+        title: form.title,
+        type: form.type,
+        modelName: form.modelName || null,
+        channelId: form.channelId,
+        channelName: state.settings.marketplaces.find(c => c.id === form.channelId)?.name || 'N/A',
+        endDate: endDateTime,
+        createdAt: new Date(),
+        userId: currentUser.value.uid,
+    };
+
+    try {
+        const docRef = await addDoc(collection(db, "voucher_notes"), dataToSave);
+        state.voucherNotes.push({ id: docRef.id, ...dataToSave });
+        alert("Catatan voucher berhasil disimpan!");
+        hideNotesModal();
+    } catch (error) {
+        console.error("Gagal menyimpan catatan:", error);
+        alert("Gagal menyimpan catatan. Silakan coba lagi.");
+    }
+}
+
+async function deleteVoucherNote(noteId) {
+    if (!confirm("Anda yakin ingin menghapus catatan ini?")) return;
+    try {
+        await deleteDoc(doc(db, "voucher_notes", noteId));
+        state.voucherNotes = state.voucherNotes.filter(note => note.id !== noteId);
+        alert("Catatan berhasil dihapus.");
+    } catch (error) {
+        console.error("Gagal menghapus catatan:", error);
+        alert("Gagal menghapus catatan.");
+    }
 }
 
 async function findTransactionForReturn() {
@@ -5296,122 +5406,142 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 });
 
 async function loadAllDataFromFirebase() {
-    isLoading.value = true;
-    const userId = currentUser.value?.uid;
-    
-    if (!userId) {
-        isLoading.value = false;
-        return;
-    }
-    try {
-        const collectionsToFetch = [
-            getDoc(doc(db, "settings", userId)),
-            getDoc(doc(db, "promotions", userId)),
-            getDocs(query(collection(db, "products"), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
-            getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "categories"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId)))
-        ];
+    isLoading.value = true;
+    const userId = currentUser.value?.uid;
+    
+    if (!userId) {
+        isLoading.value = false;
+        return;
+    }
+    try {
+        const collectionsToFetch = [
+            getDoc(doc(db, "settings", userId)),
+            getDoc(doc(db, "promotions", userId)),
+            getDocs(query(collection(db, "products"), where("userId", "==", userId))),
+            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
+            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
+            getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "categories"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))), // BARIS BARU UNTUK CATATAN VOUCHER
+        ];
 
-        const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
-        
-        const firstError = results.find(res => res instanceof Error);
-        if (firstError) {
-            console.error("Salah satu kueri data gagal:", firstError);
-            throw new Error("Gagal mengambil data. Periksa aturan keamanan Firestore Anda.");
-        }
-        
-        const [
-            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
-            transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
-            categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap
-        ] = results;
-
-        if (settingsSnap.exists()) {
-            Object.assign(state.settings, settingsSnap.data());
-            if (!state.settings.pinProtection) {
-                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
-            }
-        }
-        
-        const userDocRef = doc(db, "users", userId);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            state.settings.inflowCategories = userData.inflowCategories || [];
-        }
-        if (promotionsSnap.exists()) {
-    const promoData = promotionsSnap.data();
-    // Pastikan perChannel ada
-    state.promotions.perChannel = promoData.perChannel || {};
-    // Periksa setiap channel dan pastikan objek voucher ada
-    state.settings.marketplaces.forEach(channel => {
-        if (!state.promotions.perChannel[channel.id]) {
-            state.promotions.perChannel[channel.id] = {};
+        const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
+        
+        const firstError = results.find(res => res instanceof Error);
+        if (firstError) {
+            console.error("Salah satu kueri data gagal:", firstError);
+            throw new Error("Gagal mengambil data. Periksa aturan keamanan Firestore Anda.");
         }
-        if (!state.promotions.perChannel[channel.id].voucherToko) {
-            state.promotions.perChannel[channel.id].voucherToko = {};
-        }
-        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) {
-            state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
-        }
-    });
-    state.promotions.perModel = promoData.perModel || {};
-}
+        
+        const [
+            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
+            transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
+            categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap,
+            notesSnap // TAMBAHKAN NOTES SNAP
+        ] = results;
 
-        const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
-        
-        state.produk = productsSnap.docs.map(docSnap => {
-            const p = { id: docSnap.id, ...docSnap.data() };
-            const hargaJual = {};
-            const stokAlokasi = {};
-            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
-            (state.settings.marketplaces || []).forEach(mp => {
-                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-            });
-            return {
-                docId: p.id,
-                sku: p.sku,
-                nama: p.product_name,
-                model_id: p.model_id,
-                warna: p.color,
-                varian: p.variant,
-                stokFisik: p.physical_stock,
-                hpp: p.hpp,
-                hargaJual,
-                stokAlokasi,
-                userId: p.userId
-            };
-        });
-        
-        state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
-        state.bankAccounts = bankAccountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.investorPayments = investorPaymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), paymentDate: doc.data().paymentDate?.toDate() }));
-        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
-        state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (settingsSnap.exists()) {
+            const settingsData = settingsSnap.data();
+            Object.assign(state.settings, settingsData);
+            if (!state.settings.pinProtection) {
+                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
+            }
+        }
+        
+        const userDocRef = doc(db, "users", userId);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            state.settings.inflowCategories = userData.inflowCategories || [];
+        }
 
-    } catch (error) {
-        console.error("Error besar saat memuat data dari Firebase:", error);
-        alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
-        handleLogout();
-    } finally {
-        isLoading.value = false;
-    }
+        if (promotionsSnap.exists()) {
+            const promoData = promotionsSnap.data();
+            // Pastikan objek dasar promosi ada
+            state.promotions.perChannel = promoData.perChannel || {};
+            state.promotions.perModel = promoData.perModel || {};
+
+            // Periksa setiap channel dan pastikan objek voucher ada
+            state.settings.marketplaces.forEach(channel => {
+                if (!state.promotions.perChannel[channel.id]) {
+                    state.promotions.perChannel[channel.id] = {};
+                }
+                if (!state.promotions.perChannel[channel.id].voucherToko) {
+                    state.promotions.perChannel[channel.id].voucherToko = {};
+                }
+                if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) {
+                    state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+                }
+            });
+
+            if (uiState.promosiSelectedModel) {
+                if (!state.promotions.perModel[uiState.promosiSelectedModel]) {
+                    state.promotions.perModel[uiState.promosiSelectedModel] = {};
+                }
+                state.settings.marketplaces.forEach(channel => {
+                    if (!state.promotions.perModel[uiState.promosiSelectedModel][channel.id]) {
+                        state.promotions.perModel[uiState.promosiSelectedModel][channel.id] = { minBelanja: null, diskonRate: null, diskonBertingkat: [] };
+                    }
+                });
+            }
+        } else {
+            state.promotions.perChannel = {};
+            state.promotions.perModel = {};
+        }
+
+        const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
+        
+        state.produk = productsSnap.docs.map(docSnap => {
+            const p = { id: docSnap.id, ...docSnap.data() };
+            const hargaJual = {};
+            const stokAlokasi = {};
+            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
+            (state.settings.marketplaces || []).forEach(mp => {
+                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
+                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+            });
+            return {
+                docId: p.id,
+                sku: p.sku,
+                nama: p.product_name,
+                model_id: p.model_id,
+                warna: p.color,
+                varian: p.variant,
+                stokFisik: p.physical_stock,
+                hpp: p.hpp,
+                hargaJual,
+                stokAlokasi,
+                userId: p.userId
+            };
+        });
+        
+        state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
+        state.bankAccounts = bankAccountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        state.investorPayments = investorPaymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), paymentDate: doc.data().paymentDate?.toDate() }));
+        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
+        state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        state.voucherNotes = notesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), endDate: doc.data().endDate?.toDate() })); // BARIS BARU UNTUK MENGISI NOTES
+        
+    } catch (error) {
+        console.error("Error besar saat memuat data dari Firebase:", error);
+        alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
+        handleLogout();
+    } finally {
+        isLoading.value = false;
+    }
 }
 
 onMounted(() => {
@@ -6352,9 +6482,12 @@ watch(activePage, (newPage) => {
         <div class="max-w-7xl mx-auto">
 
             <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
-                <div>
+                <div class="flex items-center gap-4">
                     <h2 class="text-3xl font-bold text-slate-800">Manajemen Promosi & Voucher</h2>
-                    <p class="text-slate-500 mt-1">Atur semua strategi diskon dan promosi Anda di sini.</p>
+                    <button @click="showNotesModal" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h-2a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2a1 1 0 01-1-1V2a1 1 0 10-2 0v1H9a1 1 0 00-1 1v1H6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd" /></svg>
+                        Catatan
+                    </button>
                 </div>
                 <div class="flex items-center gap-3">
                     <button @click="showModal('panduanPromosi')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
@@ -6369,30 +6502,30 @@ watch(activePage, (newPage) => {
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-                
+
                 <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
                     <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Promosi per Akun Penjualan</h3>
                     <p class="text-sm text-slate-500 mb-4">Voucher ini berlaku untuk semua produk yang dijual di akun yang bersangkutan.</p>
                     <div class="space-y-4">
                         <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-slate-50/50">
-    <p class="font-semibold text-slate-700">{{ channel.name }}</p>
-    <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-            <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
-            <div class="mt-1 grid grid-cols-2 gap-2">
-                <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-            </div>
-        </div>
-        <div>
-            <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
-            <div class="mt-1 grid grid-cols-2 gap-2">
-                <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-            </div>
-        </div>
-    </div>
-</div>
+                            <p class="font-semibold text-slate-700">{{ channel.name }}</p>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
+                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                        <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
+                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                        <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -6416,23 +6549,23 @@ watch(activePage, (newPage) => {
                             <p class="font-semibold text-slate-700">{{ channel.name }}</p>
                             <div class="mt-2 space-y-3">
                                 <div>
-    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
-    <div class="mt-1 grid grid-cols-2 gap-2">
-        <div>
-            <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(uiState.promosiSelectedModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-        </div>
-        <div>
-            <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(uiState.promosiSelectedModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-        </div>
-    </div>
-</div>
+                                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
+                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                        <div>
+                                            <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(uiState.promosiSelectedModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                        </div>
+                                        <div>
+                                            <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(uiState.promosiSelectedModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                        </div>
+                                    </div>
+                                </div>
                                 <div>
                                     <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
                                     <div class="space-y-2 mt-1">
                                         <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].diskonBertingkat" :key="index" class="flex items-center gap-2">
                                             <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                             <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                            <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">&times;</button>
+                                            <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">×</button>
                                         </div>
                                     </div>
                                     <button @click="addPromotionTier(uiState.promosiSelectedModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
@@ -10952,6 +11085,136 @@ watch(activePage, (newPage) => {
             </form>
         </div>
     </div>
+
+<div v-if="uiState.notesModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full max-h-[90vh] flex flex-col">
+        <div class="flex-shrink-0 pb-4 border-b">
+            <h3 class="text-2xl font-bold text-slate-800">Catatan Masa Berakhir Voucher</h3>
+            <p class="text-slate-500 mt-1">Lacak masa berlaku voucher agar promosi tidak terlewat.</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto py-4 pr-2 space-y-6">
+            <div class="p-4 bg-slate-50 rounded-lg border">
+                <form @submit.prevent="submitVoucherNote" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <h4 class="col-span-full font-semibold text-lg text-indigo-700">Tambah Catatan Baru</h4>
+
+                    <div>
+                        <label class="block text-sm font-medium">Tipe Voucher</label>
+                        <select v-model="uiState.notesData.type" class="mt-1 w-full p-2 border rounded-md">
+                            <option value="model">Per Model Produk</option>
+                            <option value="channel">Per Akun Penjualan</option>
+                        </select>
+                    </div>
+
+                    <div v-if="uiState.notesData.type === 'model'">
+                        <label class="block text-sm font-medium">Pilih Model Produk</label>
+                        <select v-model="uiState.notesData.modelName" class="mt-1 w-full p-2 border rounded-md" required>
+                            <option value="">-- Pilih Model --</option>
+                            <option v-for="model in promosiProductModels" :key="model" :value="model">{{ model }}</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium">Nama Voucher</label>
+                        <input type="text" v-model="uiState.notesData.title" class="mt-1 w-full p-2 border rounded-md" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium">Pilih Akun Penjualan</label>
+                        <select v-model="uiState.notesData.channelId" class="mt-1 w-full p-2 border rounded-md" required>
+                            <option value="">-- Pilih Channel --</option>
+                            <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.id">{{ channel.name }}</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 col-span-full">
+                        <div>
+                            <label class="block text-sm font-medium">Tgl Berakhir</label>
+                            <input type="date" v-model="uiState.notesData.endDate" class="mt-1 w-full p-2 border rounded-md" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium">Jam</label>
+                            <input type="number" v-model.number="uiState.notesData.endHour" min="0" max="23" class="mt-1 w-full p-2 border rounded-md" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium">Menit</label>
+                            <input type="number" v-model.number="uiState.notesData.endMinute" min="0" max="59" class="mt-1 w-full p-2 border rounded-md" required>
+                        </div>
+                    </div>
+
+                    <div class="col-span-full flex justify-end">
+                        <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Simpan Catatan</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="p-4 bg-white rounded-lg border">
+                <h4 class="font-semibold text-lg text-slate-800 mb-4">Daftar Catatan Voucher</h4>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium">Cari</label>
+                        <input type="text" v-model="uiState.notesSearch" placeholder="Cari model/channel..." class="mt-1 w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Filter Tipe</label>
+                        <select v-model="uiState.notesFilterType" class="mt-1 w-full p-2 border rounded-md">
+                            <option value="all">Semua Tipe</option>
+                            <option value="model">Per Model</option>
+                            <option value="channel">Per Akun</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Filter Model</label>
+                        <select v-model="uiState.notesFilterModel" class="mt-1 w-full p-2 border rounded-md">
+                            <option value="">Semua Model</option>
+                            <option v-for="model in promosiProductModels" :key="model" :value="model">{{ model }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Filter Akun</label>
+                        <select v-model="uiState.notesFilterChannel" class="mt-1 w-full p-2 border rounded-md">
+                            <option value="">Semua Akun</option>
+                            <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.id">{{ channel.name }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto max-h-[40vh]">
+                    <table class="min-w-full text-sm text-left text-slate-500">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3">Voucher</th>
+                                <th class="px-4 py-3">Berakhir pada</th>
+                                <th class="px-4 py-3">Tipe</th>
+                                <th class="px-4 py-3">Detail</th>
+                                <th class="px-4 py-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200/50">
+                            <tr v-if="filteredVoucherNotes.length === 0">
+                                <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada catatan voucher.</td>
+                            </tr>
+                            <tr v-for="note in filteredVoucherNotes" :key="note.id" class="hover:bg-slate-50/50">
+                                <td class="px-4 py-3 font-semibold text-slate-800">{{ note.title }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap">{{ new Date(note.endDate).toLocaleString('id-ID') }}</td>
+                                <td class="px-4 py-3 capitalize">{{ note.type }}</td>
+                                <td class="px-4 py-3">{{ note.modelName || note.channelName }}</td>
+                                <td class="px-4 py-3 text-center">
+                                    <button @click="deleteVoucherNote(note.id)" class="text-red-500 hover:underline text-xs font-bold">Hapus</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+            <button @click="hideNotesModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+        </div>
+    </div>
+</div>
 
 </template>
 
