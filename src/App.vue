@@ -1353,18 +1353,7 @@ const voucherTokoComputed = (channel) => computed({
     }
 });
 
-const voucherProdukComputed = (modelName, channelId) => computed({
-    get() { return state.promotions.perModel[modelName]?.[channelId]?.voucherProduk ? state.promotions.perModel[modelName][channelId].voucherProduk + '%' : ''; },
-    set(newValue) {
-        if (!state.promotions.perModel[modelName]) {
-            state.promotions.perModel[modelName] = {};
-        }
-        if (!state.promotions.perModel[modelName][channelId]) {
-            state.promotions.perModel[modelName][channelId] = {};
-        }
-        state.promotions.perModel[modelName][channelId].voucherProduk = parsePercentageInput(newValue);
-    }
-});
+
 const tieredMinComputed = (tier) => computed({
     get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
     set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
