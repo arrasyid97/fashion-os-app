@@ -3819,7 +3819,6 @@ function calculateRowSummary(item, batchType) {
     const selisih = aktualFinal - targetQty;
     const totalBiayaProduksi = totalBiayaKain + totalBiayaJasa + totalBiayaAlat;
     
-    // --- KALKULASI BARU DIMULAI DI SINI ---
     const hpp = totalBiayaProduksi / (aktualFinal || 1);
     const hppIdeal = targetQty > 0 ? totalBiayaProduksi / targetQty : hpp;
     const kerugianPerPcs = selisih < 0 && aktualFinal > 0 ? hpp - hppIdeal : 0;
@@ -3830,9 +3829,10 @@ function calculateRowSummary(item, batchType) {
         totalBiayaKain,
         totalBiayaJasa,
         totalBiayaAlat,
+        totalBiayaProduksi, // <-- DATA BARU UNTUK DITAMPILKAN
         hpp,
-        hppIdeal,       // <-- Data baru untuk ditampilkan
-        kerugianPerPcs  // <-- Data baru untuk ditampilkan
+        hppIdeal,
+        kerugianPerPcs
     };
 }
 
@@ -9900,52 +9900,56 @@ watch(activePage, (newPage) => {
                         </div>
                         <div>
                             <div class="p-4 bg-white rounded-lg space-y-2 text-sm h-full border sticky top-0">
-                                <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
-                                <div class="flex justify-between mt-2">
-                                    <span class="text-slate-600">Target Qty:</span>
-                                    <span class="font-medium">{{ calculateRowSummary(item, 'new')?.targetQty || 0 }} pcs</span>
-                                </div>
-                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'new')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
-                                    <span>Selisih (Aktual - Target):</span>
-                                    <span>{{ (calculateRowSummary(item, 'new')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'new')?.selisih || 0) }} pcs</span>
-                                </div>
-                                <hr class="my-2">
-                                <div class="flex justify-between">
-                                    <span class="text-slate-600">Total Biaya Kain:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaKain || 0) }}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-slate-600">Total Biaya {{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaJasa || 0) }}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-slate-600">Total Biaya Alat:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaAlat || 0) }}</span>
-                                </div>
-                                <div class="border-t pt-2 mt-2 space-y-1">
-    <div class="flex justify-between text-sm">
-        <span class="flex items-center gap-1 text-slate-600">
-            HPP Ideal/Pcs
-            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'ideal' })" type="button" class="help-icon-button-sm">?</button>
-        </span>
-        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.hppIdeal || 0) }}</span>
+    <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
+    <div class="flex justify-between mt-2">
+        <span class="text-slate-600">Target Qty:</span>
+        <span class="font-medium">{{ calculateRowSummary(item, 'new')?.targetQty || 0 }} pcs</span>
     </div>
-    <div class="flex justify-between text-sm" v-if="calculateRowSummary(item, 'new')?.selisih < 0">
-        <span class="flex items-center gap-1 text-slate-600">
-            Kerugian/Pcs
-            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'loss' })" type="button" class="help-icon-button-sm">?</button>
-        </span>
-        <span class="font-medium text-red-500">+ {{ formatCurrency(calculateRowSummary(item, 'new')?.kerugianPerPcs || 0) }}</span>
+    <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'new')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
+        <span>Selisih (Aktual - Target):</span>
+        <span>{{ (calculateRowSummary(item, 'new')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'new')?.selisih || 0) }} pcs</span>
     </div>
-    <div class="flex justify-between font-bold text-base text-red-600 border-t pt-1 mt-1">
-        <span class="flex items-center gap-1">
-            HPP Final/Pcs
-            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'final' })" type="button" class="help-icon-button-sm">?</button>
-        </span>
-        <span>{{ formatCurrency(calculateRowSummary(item, 'new')?.hpp || 0) }}</span>
+    <hr class="my-2">
+    <div class="flex justify-between">
+        <span class="text-slate-600">Total Biaya Kain:</span>
+        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaKain || 0) }}</span>
+    </div>
+    <div class="flex justify-between">
+        <span class="text-slate-600">Total Biaya {{ uiState.newProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
+        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaJasa || 0) }}</span>
+    </div>
+    <div class="flex justify-between">
+        <span class="text-slate-600">Total Biaya Alat:</span>
+        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaAlat || 0) }}</span>
+    </div>
+    <div class="flex justify-between font-bold text-slate-800 border-t pt-1 mt-1">
+        <span>Total Biaya Produksi:</span>
+        <span>{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaProduksi || 0) }}</span>
+    </div>
+    <div class="border-t pt-2 mt-2 space-y-1">
+        <div class="flex justify-between text-sm">
+            <span class="flex items-center gap-1 text-slate-600">
+                HPP Ideal/Pcs
+                <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'ideal' })" type="button" class="help-icon-button-sm">?</button>
+            </span>
+            <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.hppIdeal || 0) }}</span>
+        </div>
+        <div class="flex justify-between text-sm" v-if="calculateRowSummary(item, 'new')?.selisih < 0">
+            <span class="flex items-center gap-1 text-slate-600">
+                Kerugian/Pcs
+                <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'loss' })" type="button" class="help-icon-button-sm">?</button>
+            </span>
+            <span class="font-medium text-red-500">+ {{ formatCurrency(calculateRowSummary(item, 'new')?.kerugianPerPcs || 0) }}</span>
+        </div>
+        <div class="flex justify-between font-bold text-base text-red-600 border-t pt-1 mt-1">
+            <span class="flex items-center gap-1">
+                HPP Final/Pcs
+                <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'final' })" type="button" class="help-icon-button-sm">?</button>
+            </span>
+            <span>{{ formatCurrency(calculateRowSummary(item, 'new')?.hpp || 0) }}</span>
+        </div>
     </div>
 </div>
-                            </div>
                         </div>
                     </div>
                     <button v-if="uiState.newProduksiBatch.kainBahan && uiState.newProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.newProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
@@ -10059,52 +10063,56 @@ watch(activePage, (newPage) => {
                         </div>
                         <div>
                            <div class="p-4 bg-white rounded-lg space-y-2 text-sm h-full border sticky top-0">
-                                <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
-                                <div class="flex justify-between mt-2">
-                                    <span class="text-slate-600">Target Qty:</span>
-                                    <span class="font-medium">{{ calculateRowSummary(item, 'edit')?.targetQty || 0 }} pcs</span>
-                                </div>
-                                <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'edit')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
-                                    <span>Selisih (Aktual - Target):</span>
-                                    <span>{{ (calculateRowSummary(item, 'edit')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'edit')?.selisih || 0) }} pcs</span>
-                                </div>
-                                <hr class="my-2">
-                                <div class="flex justify-between">
-                                    <span class="text-slate-600">Total Biaya Kain:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaKain || 0) }}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-slate-600">Total Biaya {{ uiState.editProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaJasa || 0) }}</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span class="text-slate-600">Total Biaya Alat:</span>
-                                    <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaAlat || 0) }}</span>
-                                </div>
-                                <div class="border-t pt-2 mt-2 space-y-1">
-    <div class="flex justify-between text-sm">
-        <span class="flex items-center gap-1 text-slate-600">
-            HPP Ideal/Pcs
-            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'ideal' })" type="button" class="help-icon-button-sm">?</button>
-        </span>
-        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.hppIdeal || 0) }}</span>
+    <h5 class="font-semibold mb-2 text-center">Ringkasan Biaya Baris Ini</h5>
+    <div class="flex justify-between mt-2">
+        <span class="text-slate-600">Target Qty:</span>
+        <span class="font-medium">{{ calculateRowSummary(item, 'edit')?.targetQty || 0 }} pcs</span>
     </div>
-    <div class="flex justify-between text-sm" v-if="calculateRowSummary(item, 'edit')?.selisih < 0">
-        <span class="flex items-center gap-1 text-slate-600">
-            Kerugian/Pcs
-            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'loss' })" type="button" class="help-icon-button-sm">?</button>
-        </span>
-        <span class="font-medium text-red-500">+ {{ formatCurrency(calculateRowSummary(item, 'edit')?.kerugianPerPcs || 0) }}</span>
+    <div class="flex justify-between font-bold" :class="calculateRowSummary(item, 'edit')?.selisih < 0 ? 'text-red-500' : 'text-emerald-600'">
+        <span>Selisih (Aktual - Target):</span>
+        <span>{{ (calculateRowSummary(item, 'edit')?.selisih >= 0 ? '+' : '') + (calculateRowSummary(item, 'edit')?.selisih || 0) }} pcs</span>
     </div>
-    <div class="flex justify-between font-bold text-base text-red-600 border-t pt-1 mt-1">
-        <span class="flex items-center gap-1">
-            HPP Final/Pcs
-            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'final' })" type="button" class="help-icon-button-sm">?</button>
-        </span>
-        <span>{{ formatCurrency(calculateRowSummary(item, 'edit')?.hpp || 0) }}</span>
+    <hr class="my-2">
+    <div class="flex justify-between">
+        <span class="text-slate-600">Total Biaya Kain:</span>
+        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaKain || 0) }}</span>
+    </div>
+    <div class="flex justify-between">
+        <span class="text-slate-600">Total Biaya {{ uiState.editProduksiBatch.produksiType === 'penjahit' ? 'Jahit' : 'Maklun' }}:</span>
+        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaJasa || 0) }}</span>
+    </div>
+    <div class="flex justify-between">
+        <span class="text-slate-600">Total Biaya Alat:</span>
+        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaAlat || 0) }}</span>
+    </div>
+    <div class="flex justify-between font-bold text-slate-800 border-t pt-1 mt-1">
+        <span>Total Biaya Produksi:</span>
+        <span>{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaProduksi || 0) }}</span>
+    </div>
+    <div class="border-t pt-2 mt-2 space-y-1">
+        <div class="flex justify-between text-sm">
+            <span class="flex items-center gap-1 text-slate-600">
+                HPP Ideal/Pcs
+                <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'ideal' })" type="button" class="help-icon-button-sm">?</button>
+            </span>
+            <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.hppIdeal || 0) }}</span>
+        </div>
+        <div class="flex justify-between text-sm" v-if="calculateRowSummary(item, 'edit')?.selisih < 0">
+            <span class="flex items-center gap-1 text-slate-600">
+                Kerugian/Pcs
+                <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'loss' })" type="button" class="help-icon-button-sm">?</button>
+            </span>
+            <span class="font-medium text-red-500">+ {{ formatCurrency(calculateRowSummary(item, 'edit')?.kerugianPerPcs || 0) }}</span>
+        </div>
+        <div class="flex justify-between font-bold text-base text-red-600 border-t pt-1 mt-1">
+            <span class="flex items-center gap-1">
+                HPP Final/Pcs
+                <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'final' })" type="button" class="help-icon-button-sm">?</button>
+            </span>
+            <span>{{ formatCurrency(calculateRowSummary(item, 'edit')?.hpp || 0) }}</span>
+        </div>
     </div>
 </div>
-                            </div>
                         </div>
                     </div>
                     <button v-if="uiState.editProduksiBatch.kainBahan.length > 1" @click="removeKainBahanItem(uiState.editProduksiBatch, index)" type="button" class="absolute top-2 right-2 bg-red-500 text-white rounded-full h-5 w-5 text-xs flex items-center justify-center font-bold">×</button>
