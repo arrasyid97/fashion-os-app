@@ -2321,15 +2321,6 @@ const filteredProduksiBatches = computed(() => {
 });
 
 
-const promoTierMinComputed = (tier) => computed({
-    get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
-    set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
-});
-const promoTierDiskonComputed = (tier) => computed({
-    get() { return tier.diskon ? tier.diskon + '%' : ''; },
-    set(newValue) { tier.diskon = parsePercentageInput(newValue); }
-});
-
 const modelPromoMinComputed = (modelName, channelId) => computed({
     get() {
         const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
@@ -2342,6 +2333,7 @@ const modelPromoMinComputed = (modelName, channelId) => computed({
         }
     }
 });
+
 const modelPromoDiskonComputed = (modelName, channelId) => computed({
     get() {
         const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
