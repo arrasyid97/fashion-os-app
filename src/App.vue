@@ -427,7 +427,7 @@ async function deleteActivationCode(codeId) {
     }
 }
 
-// Fungsi untuk membuat kode aktivasi baru
+// Fungsii untuk membuat kode aktivasi baru
 async function createActivationCode() {
     if (!isAdmin.value) return;
     
