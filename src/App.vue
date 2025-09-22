@@ -3255,9 +3255,11 @@ async function executeCompleteTransaction() {
 
 function calculateBestDiscount(cart, channelId) {
     if (!cart || cart.length === 0) return { totalDiscount: 0, description: '', rate: 0 };
+    
     const promotions = [];
     const cartSubtotal = cart.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
 
+    // 1. Ambil semua promosi per-channel (Voucher Ikuti Toko, dll)
     const channelPromos = state.promotions.perChannel[channelId] || {};
     if (channelPromos.voucherToko > 0) {
         promotions.push({
@@ -3274,6 +3276,7 @@ function calculateBestDiscount(cart, channelId) {
         });
     }
 
+    // 2. Ambil semua promosi per-model produk
     const allModelPromos = state.promotions.perModel || {};
     const itemsByModel = cart.reduce((acc, item) => {
         if (!acc[item.nama]) {
@@ -3288,42 +3291,43 @@ function calculateBestDiscount(cart, channelId) {
         const modelData = itemsByModel[modelName];
         const modelPromosForChannel = (allModelPromos[modelName] || {})[channelId] || {};
 
-        // --- HAPUS BLOK INI ---
-        // if (modelPromosForChannel.voucherProduk > 0) {
-        //     promotions.push({
-        //         totalDiscount: (modelPromosForChannel.voucherProduk / 100) * modelData.subtotal,
-        //         description: `Voucher ${modelName} (${modelPromosForChannel.voucherProduk}%)`,
-        //         rate: modelPromosForChannel.voucherProduk
-        //     });
-        // }
-if (modelPromosForChannel.minBelanja > 0 && modelPromosForChannel.diskonRate > 0 && modelData.subtotal >= modelPromosForChannel.minBelanja) {
-    promotions.push({
-        totalDiscount: (modelPromosForChannel.diskonRate / 100) * modelData.subtotal,
-        description: `Voucher ${modelName} (${modelPromosForChannel.diskonRate}%)`,
-        rate: modelPromosForChannel.diskonRate
-    });
-}
+        // Tambahkan Voucher Produk Tertentu jika memenuhi minimal belanja
+        if (modelPromosForChannel.minBelanja > 0 && modelPromosForChannel.diskonRate > 0 && modelData.subtotal >= modelPromosForChannel.minBelanja) {
+            promotions.push({
+                totalDiscount: (modelPromosForChannel.diskonRate / 100) * modelData.subtotal,
+                description: `Voucher ${modelName} (${modelPromosForChannel.diskonRate}%)`,
+                rate: modelPromosForChannel.diskonRate
+            });
+        }
+        
+        // Tambahkan Diskon Bertingkat jika memenuhi minimal belanja
         if (modelPromosForChannel.diskonBertingkat && modelPromosForChannel.diskonBertingkat.length > 0) {
             const sortedTiers = [...modelPromosForChannel.diskonBertingkat].sort((a, b) => b.min - a.min);
             for (const tier of sortedTiers) {
                 if (modelData.subtotal >= tier.min) {
                     promotions.push({
                         totalDiscount: (tier.diskon / 100) * modelData.subtotal,
-                        description: `Diskon ${modelName} ${tier.diskon}%`,
+                        description: `Diskon Bertingkat ${modelName} (${tier.diskon}%)`,
                         rate: tier.diskon
                     });
-                    break;
+                    break; 
                 }
             }
         }
     }
 
+    // 3. Pilih promosi terbaik dari semua yang terkumpul
     if (promotions.length === 0) {
         return { totalDiscount: 0, description: '', rate: 0 };
     }
-    return promotions.reduce((best, current) => {
+    
+    // Cari promo dengan diskon terbesar
+    const bestPromo = promotions.reduce((best, current) => {
+        // Membandingkan nilai diskon absolut
         return current.totalDiscount > best.totalDiscount ? current : best;
     }, { totalDiscount: 0, description: '', rate: 0 });
+    
+    return bestPromo;
 }
 
 function calculateSellingPrice() {
