@@ -6330,14 +6330,14 @@ watch(activePage, (newPage) => {
                             <p class="font-semibold text-slate-700">{{ channel.name }}</p>
                             <div class="mt-2 space-y-3">
                                 <div>
-    <label class="block text-xs font-medium text-slate-600">Voucher Produk (1 Tingkat)</label>
+    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
     <div class="flex items-center gap-2 mt-1">
         <input type="text" v-model="tieredMinComputed(state.promotions.perModel[uiState.promosiSelectedModel][channel.id].voucherProduk).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
         <input type="text" v-model="tieredDiskonComputed(state.promotions.perModel[uiState.promosiSelectedModel][channel.id].voucherProduk).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
     </div>
 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
+                                    <label class="block text-xs font-medium text-slate-600">Voucher Paket Diskon Bertingkat</label>
                                     <div class="space-y-2 mt-1">
                                         <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].diskonBertingkat" :key="index" class="flex items-center gap-2">
                                             <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
