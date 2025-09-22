@@ -890,7 +890,7 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
 
 const filteredVoucherNotes = computed(() => {
     let filtered = state.voucherNotes;
-
+    
     // Filter berdasarkan tipe (model/channel)
     if (uiState.notesFilterType !== 'all') {
         filtered = filtered.filter(note => note.type === uiState.notesFilterType);
@@ -912,8 +912,14 @@ const filteredVoucherNotes = computed(() => {
         filtered = filtered.filter(note =>
             note.title.toLowerCase().includes(searchQuery) ||
             note.modelName?.toLowerCase().includes(searchQuery) ||
-            note.channelName?.toLowerCase().includes(searchQuery)
+            note.channelName?.toLowerCase().includes(searchQuery) ||
+            note.voucherType.toLowerCase().includes(searchQuery) // BARIS BARU UNTUK PENCARIAN
         );
+    }
+    
+    // Filter berdasarkan jenis voucher yang dipilih di form Tambah Catatan
+    if (uiState.notesData.voucherType) {
+        filtered = filtered.filter(note => note.voucherType === uiState.notesData.voucherType);
     }
 
     // Mengurutkan berdasarkan tanggal berakhir (semakin dekat, semakin di atas)
@@ -1291,6 +1297,7 @@ function showNotesModal() {
     // Reset form data setiap kali modal dibuka
     uiState.notesData = {
         type: 'model', // default
+        voucherType: '',
         title: '',
         endDate: '',
         endHour: '23',
@@ -1308,8 +1315,14 @@ async function submitVoucherNote() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.notesData;
 
-    if (!form.title || !form.endDate || !form.channelId || (form.type === 'model' && !form.modelName)) {
+    // Perbarui validasi untuk menyertakan voucherType
+    if (!form.title || !form.endDate || !form.channelId || !form.voucherType) {
         return alert("Semua kolom wajib diisi.");
+    }
+
+    // Logika untuk validasi spesifik model
+    if (form.type === 'model' && !form.modelName) {
+        return alert("Nama model produk wajib diisi.");
     }
 
     const endDateTime = new Date(`${form.endDate}T${form.endHour}:${form.endMinute}:00`);
@@ -1317,6 +1330,7 @@ async function submitVoucherNote() {
     const dataToSave = {
         title: form.title,
         type: form.type,
+        voucherType: form.voucherType, // BARIS BARU: simpan jenis voucher
         modelName: form.modelName || null,
         channelId: form.channelId,
         channelName: state.settings.marketplaces.find(c => c.id === form.channelId)?.name || 'N/A',
@@ -1327,7 +1341,7 @@ async function submitVoucherNote() {
 
     try {
         const docRef = await addDoc(collection(db, "voucher_notes"), dataToSave);
-        state.voucherNotes.push({ id: docRef.id, ...dataToSave });
+        state.voucherNotes.push({ id: docRef.id, ...dataToSave, endDate: dataToSave.endDate });
         alert("Catatan voucher berhasil disimpan!");
         hideNotesModal();
     } catch (error) {
@@ -11105,8 +11119,19 @@ watch(activePage, (newPage) => {
                             <option value="channel">Per Akun Penjualan</option>
                         </select>
                     </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium">Jenis Voucher</label>
+                        <select v-model="uiState.notesData.voucherType" class="mt-1 w-full p-2 border rounded-md" required>
+                            <option value="" disabled>-- Pilih Jenis Voucher --</option>
+                            <option value="Voucher Ikuti Toko">Voucher Ikuti Toko</option>
+                            <option value="Voucher Semua Produk">Voucher Semua Produk</option>
+                            <option value="Voucher Produk Tertentu">Voucher Produk Tertentu</option>
+                            <option value="Diskon Minimal Belanja Bertingkat">Diskon Minimal Belanja Bertingkat</option>
+                        </select>
+                    </div>
 
-                    <div v-if="uiState.notesData.type === 'model'">
+                    <div v-if="uiState.notesData.type === 'model' && (uiState.notesData.voucherType === 'Voucher Produk Tertentu' || uiState.notesData.voucherType === 'Diskon Minimal Belanja Bertingkat')">
                         <label class="block text-sm font-medium">Pilih Model Produk</label>
                         <select v-model="uiState.notesData.modelName" class="mt-1 w-full p-2 border rounded-md" required>
                             <option value="">-- Pilih Model --</option>
@@ -11114,17 +11139,17 @@ watch(activePage, (newPage) => {
                         </select>
                     </div>
 
-                    <div>
-                        <label class="block text-sm font-medium">Nama Voucher</label>
-                        <input type="text" v-model="uiState.notesData.title" class="mt-1 w-full p-2 border rounded-md" required>
-                    </div>
-
-                    <div>
+                    <div v-if="uiState.notesData.type === 'channel' && (uiState.notesData.voucherType === 'Voucher Ikuti Toko' || uiState.notesData.voucherType === 'Voucher Semua Produk')">
                         <label class="block text-sm font-medium">Pilih Akun Penjualan</label>
                         <select v-model="uiState.notesData.channelId" class="mt-1 w-full p-2 border rounded-md" required>
                             <option value="">-- Pilih Channel --</option>
                             <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.id">{{ channel.name }}</option>
                         </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium">Nama Voucher</label>
+                        <input type="text" v-model="uiState.notesData.title" class="mt-1 w-full p-2 border rounded-md" required>
                     </div>
 
                     <div class="grid grid-cols-3 gap-2 col-span-full">
@@ -11150,7 +11175,7 @@ watch(activePage, (newPage) => {
 
             <div class="p-4 bg-white rounded-lg border">
                 <h4 class="font-semibold text-lg text-slate-800 mb-4">Daftar Catatan Voucher</h4>
-
+                
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div>
                         <label class="block text-sm font-medium">Cari</label>
@@ -11179,7 +11204,7 @@ watch(activePage, (newPage) => {
                         </select>
                     </div>
                 </div>
-
+                
                 <div class="overflow-x-auto max-h-[40vh]">
                     <table class="min-w-full text-sm text-left text-slate-500">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
