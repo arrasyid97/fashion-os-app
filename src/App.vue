@@ -8121,24 +8121,26 @@ watch(activePage, (newPage) => {
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
 
-<div v-if="uiState.modalType === 'hppCalculationInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
-    <div v-if="uiState.modalData.topic === 'ideal'">
-        <h3 class="text-lg font-bold text-slate-800 mb-2">Apa itu HPP Ideal/Pcs?</h3>
-        <p class="text-sm text-slate-600">Ini adalah biaya modal per produk jika hasil produksi **sesuai dengan target** (tidak ada selisih).</p>
-        <p class="font-mono text-xs mt-2 bg-slate-100 p-2 rounded">Rumus: Total Biaya Produksi / Target Qty</p>
-    </div>
-    <div v-if="uiState.modalData.topic === 'loss'">
-        <h3 class="text-lg font-bold text-slate-800 mb-2">Apa itu Kerugian/Pcs?</h3>
-        <p class="text-sm text-slate-600">Ini adalah **tambahan biaya modal** yang dibebankan ke setiap produk jadi karena adanya selisih (hasil produksi lebih sedikit dari target). Biaya dari produk yang gagal dibuat "ditanggung" oleh produk yang berhasil dibuat.</p>
-        <p class="font-mono text-xs mt-2 bg-slate-100 p-2 rounded">Rumus: HPP Final - HPP Ideal</p>
-    </div>
-    <div v-if="uiState.modalData.topic === 'final'">
-        <h3 class="text-lg font-bold text-slate-800 mb-2">Apa itu HPP Final/Pcs?</h3>
-        <p class="text-sm text-slate-600">Ini adalah **biaya modal riil** untuk setiap produk yang berhasil dibuat, sudah termasuk menanggung biaya kerugian dari produk yang gagal diproduksi.</p>
-        <p class="font-mono text-xs mt-2 bg-slate-100 p-2 rounded">Rumus: Total Biaya Produksi / Aktual Jadi</p>
-    </div>
-    <div class="flex justify-end mt-4 pt-4 border-t">
-        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+<div v-if="uiState.nestedModalType === 'hppCalculationInfo'" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
+        <div v-if="uiState.nestedModalData.topic === 'ideal'">
+            <h3 class="text-lg font-bold text-slate-800 mb-2">Apa itu HPP Ideal/Pcs?</h3>
+            <p class="text-sm text-slate-600">Ini adalah biaya modal per produk jika hasil produksi **sesuai dengan target** (tidak ada selisih).</p>
+            <p class="font-mono text-xs mt-2 bg-slate-100 p-2 rounded">Rumus: Total Biaya Produksi / Target Qty</p>
+        </div>
+        <div v-if="uiState.nestedModalData.topic === 'loss'">
+            <h3 class="text-lg font-bold text-slate-800 mb-2">Apa itu Kerugian/Pcs?</h3>
+            <p class="text-sm text-slate-600">Ini adalah **tambahan biaya modal** yang dibebankan ke setiap produk jadi karena adanya selisih (hasil produksi lebih sedikit dari target). Biaya dari produk yang gagal dibuat "ditanggung" oleh produk yang berhasil dibuat.</p>
+            <p class="font-mono text-xs mt-2 bg-slate-100 p-2 rounded">Rumus: HPP Final - HPP Ideal</p>
+        </div>
+        <div v-if="uiState.nestedModalData.topic === 'final'">
+            <h3 class="text-lg font-bold text-slate-800 mb-2">Apa itu HPP Final/Pcs?</h3>
+            <p class="text-sm text-slate-600">Ini adalah **biaya modal riil** untuk setiap produk yang berhasil dibuat, sudah termasuk menanggung biaya kerugian dari produk yang gagal diproduksi.</p>
+            <p class="font-mono text-xs mt-2 bg-slate-100 p-2 rounded">Rumus: Total Biaya Produksi / Aktual Jadi</p>
+        </div>
+        <div class="flex justify-end mt-4 pt-4 border-t">
+            <button @click="hideNestedModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+        </div>
     </div>
 </div>
 
@@ -9924,21 +9926,21 @@ watch(activePage, (newPage) => {
     <div class="flex justify-between text-sm">
         <span class="flex items-center gap-1 text-slate-600">
             HPP Ideal/Pcs
-            <button @click.stop="showModal('hppCalculationInfo', { topic: 'ideal' })" type="button" class="help-icon-button-sm">?</button>
+            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'ideal' })" type="button" class="help-icon-button-sm">?</button>
         </span>
         <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.hppIdeal || 0) }}</span>
     </div>
     <div class="flex justify-between text-sm" v-if="calculateRowSummary(item, 'new')?.selisih < 0">
         <span class="flex items-center gap-1 text-slate-600">
             Kerugian/Pcs
-            <button @click.stop="showModal('hppCalculationInfo', { topic: 'loss' })" type="button" class="help-icon-button-sm">?</button>
+            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'loss' })" type="button" class="help-icon-button-sm">?</button>
         </span>
         <span class="font-medium text-red-500">+ {{ formatCurrency(calculateRowSummary(item, 'new')?.kerugianPerPcs || 0) }}</span>
     </div>
     <div class="flex justify-between font-bold text-base text-red-600 border-t pt-1 mt-1">
         <span class="flex items-center gap-1">
             HPP Final/Pcs
-            <button @click.stop="showModal('hppCalculationInfo', { topic: 'final' })" type="button" class="help-icon-button-sm">?</button>
+            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'final' })" type="button" class="help-icon-button-sm">?</button>
         </span>
         <span>{{ formatCurrency(calculateRowSummary(item, 'new')?.hpp || 0) }}</span>
     </div>
@@ -10083,21 +10085,21 @@ watch(activePage, (newPage) => {
     <div class="flex justify-between text-sm">
         <span class="flex items-center gap-1 text-slate-600">
             HPP Ideal/Pcs
-            <button @click.stop="showModal('hppCalculationInfo', { topic: 'ideal' })" type="button" class="help-icon-button-sm">?</button>
+            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'ideal' })" type="button" class="help-icon-button-sm">?</button>
         </span>
         <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.hppIdeal || 0) }}</span>
     </div>
     <div class="flex justify-between text-sm" v-if="calculateRowSummary(item, 'edit')?.selisih < 0">
         <span class="flex items-center gap-1 text-slate-600">
             Kerugian/Pcs
-            <button @click.stop="showModal('hppCalculationInfo', { topic: 'loss' })" type="button" class="help-icon-button-sm">?</button>
+            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'loss' })" type="button" class="help-icon-button-sm">?</button>
         </span>
         <span class="font-medium text-red-500">+ {{ formatCurrency(calculateRowSummary(item, 'edit')?.kerugianPerPcs || 0) }}</span>
     </div>
     <div class="flex justify-between font-bold text-base text-red-600 border-t pt-1 mt-1">
         <span class="flex items-center gap-1">
             HPP Final/Pcs
-            <button @click.stop="showModal('hppCalculationInfo', { topic: 'final' })" type="button" class="help-icon-button-sm">?</button>
+            <button @click.stop="showNestedModal('hppCalculationInfo', { topic: 'final' })" type="button" class="help-icon-button-sm">?</button>
         </span>
         <span>{{ formatCurrency(calculateRowSummary(item, 'edit')?.hpp || 0) }}</span>
     </div>
