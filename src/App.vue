@@ -2616,12 +2616,12 @@ async function saveData() {
         batch.set(settingsRef, settingsData);
 
         const promotionsRef = doc(db, "promotions", userId);
-        const promotionsData = {
-            perChannel: state.promotions.perChannel || {},
-            perModel: state.promotions.perModel || {},
-            userId: userId
-        };
-        batch.set(promotionsRef, JSON.parse(JSON.stringify(promotionsData)));
+const promotionsData = {
+    perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
+    perModel: JSON.parse(JSON.stringify(state.promotions.perModel)),
+    userId: userId
+};
+batch.set(promotionsRef, promotionsData);
 
         // ▼▼▼ PERUBAHAN KUNCI ADA DI SINI ▼▼▼
         // HANYA jalankan penyimpanan konfigurasi komisi JIKA pengguna adalah Admin
