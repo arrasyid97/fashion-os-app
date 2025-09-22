@@ -1331,37 +1331,57 @@ async function handleSubscriptionMayar(plan) {
 }
 
 const voucherTokoMinBelanjaComputed = (channel) => computed({
-    get() { return state.promotions.perChannel[channel.id]?.voucherToko?.minBelanja ? 'Rp ' + formatInputNumber(state.promotions.perChannel[channel.id].voucherToko.minBelanja) : ''; },
+    get() { 
+        const promo = state.promotions.perChannel[channel.id]?.voucherToko;
+        return promo?.minBelanja ? 'Rp ' + formatInputNumber(promo.minBelanja) : '';
+    },
     set(newValue) {
         if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
-        if (!state.promotions.perChannel[channel.id].voucherToko) state.promotions.perChannel[channel.id].voucherToko = {};
+        if (!state.promotions.perChannel[channel.id].voucherToko || typeof state.promotions.perChannel[channel.id].voucherToko !== 'object') {
+            state.promotions.perChannel[channel.id].voucherToko = {};
+        }
         state.promotions.perChannel[channel.id].voucherToko.minBelanja = parseInputNumber(newValue);
     }
 });
 
 const voucherTokoDiskonRateComputed = (channel) => computed({
-    get() { return state.promotions.perChannel[channel.id]?.voucherToko?.diskonRate ? state.promotions.perChannel[channel.id].voucherToko.diskonRate + '%' : ''; },
+    get() {
+        const promo = state.promotions.perChannel[channel.id]?.voucherToko;
+        return promo?.diskonRate ? promo.diskonRate + '%' : '';
+    },
     set(newValue) {
         if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
-        if (!state.promotions.perChannel[channel.id].voucherToko) state.promotions.perChannel[channel.id].voucherToko = {};
+        if (!state.promotions.perChannel[channel.id].voucherToko || typeof state.promotions.perChannel[channel.id].voucherToko !== 'object') {
+            state.promotions.perChannel[channel.id].voucherToko = {};
+        }
         state.promotions.perChannel[channel.id].voucherToko.diskonRate = parsePercentageInput(newValue);
     }
 });
 
 const voucherSemuaProdukMinBelanjaComputed = (channel) => computed({
-    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk?.minBelanja ? 'Rp ' + formatInputNumber(state.promotions.perChannel[channel.id].voucherSemuaProduk.minBelanja) : ''; },
+    get() { 
+        const promo = state.promotions.perChannel[channel.id]?.voucherSemuaProduk;
+        return promo?.minBelanja ? 'Rp ' + formatInputNumber(promo.minBelanja) : '';
+    },
     set(newValue) {
         if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
-        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk || typeof state.promotions.perChannel[channel.id].voucherSemuaProduk !== 'object') {
+            state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+        }
         state.promotions.perChannel[channel.id].voucherSemuaProduk.minBelanja = parseInputNumber(newValue);
     }
 });
 
 const voucherSemuaProdukDiskonRateComputed = (channel) => computed({
-    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk?.diskonRate ? state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonRate + '%' : ''; },
+    get() {
+        const promo = state.promotions.perChannel[channel.id]?.voucherSemuaProduk;
+        return promo?.diskonRate ? promo.diskonRate + '%' : '';
+    },
     set(newValue) {
         if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
-        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk || typeof state.promotions.perChannel[channel.id].voucherSemuaProduk !== 'object') {
+            state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+        }
         state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonRate = parsePercentageInput(newValue);
     }
 });
@@ -3282,22 +3302,24 @@ function calculateBestDiscount(cart, channelId) {
     const channelPromos = state.promotions.perChannel[channelId] || {};
 
 // Periksa Voucher Ikuti Toko
-if (channelPromos.voucherToko?.diskonRate > 0 && totalCartSubtotal >= (channelPromos.voucherToko?.minBelanja || 0)) {
+const voucherToko = channelPromos.voucherToko;
+if (voucherToko?.diskonRate > 0 && totalCartSubtotal >= (voucherToko?.minBelanja || 0)) {
     eligiblePromotions.push({
-        totalDiscount: (channelPromos.voucherToko.diskonRate / 100) * totalCartSubtotal,
-        description: `Voucher Ikuti Toko (${channelPromos.voucherToko.diskonRate}%)`,
-        rate: channelPromos.voucherToko.diskonRate,
-        appliesTo: 'cart',
+        totalDiscount: (voucherToko.diskonRate / 100) * totalCartSubtotal,
+        description: `Voucher Ikuti Toko (${voucherToko.diskonRate}%)`,
+        rate: voucherToko.diskonRate,
+        appliesTo: 'cart'
     });
 }
 
 // Periksa Voucher Semua Produk
-if (channelPromos.voucherSemuaProduk?.diskonRate > 0 && totalCartSubtotal >= (channelPromos.voucherSemuaProduk?.minBelanja || 0)) {
+const voucherSemuaProduk = channelPromos.voucherSemuaProduk;
+if (voucherSemuaProduk?.diskonRate > 0 && totalCartSubtotal >= (voucherSemuaProduk?.minBelanja || 0)) {
     eligiblePromotions.push({
-        totalDiscount: (channelPromos.voucherSemuaProduk.diskonRate / 100) * totalCartSubtotal,
-        description: `Voucher Semua Produk (${channelPromos.voucherSemuaProduk.diskonRate}%)`,
-        rate: channelPromos.voucherSemuaProduk.diskonRate,
-        appliesTo: 'cart',
+        totalDiscount: (voucherSemuaProduk.diskonRate / 100) * totalCartSubtotal,
+        description: `Voucher Semua Produk (${voucherSemuaProduk.diskonRate}%)`,
+        rate: voucherSemuaProduk.diskonRate,
+        appliesTo: 'cart'
     });
 }
 
@@ -5327,8 +5349,23 @@ async function loadAllDataFromFirebase() {
             state.settings.inflowCategories = userData.inflowCategories || [];
         }
         if (promotionsSnap.exists()) {
-            Object.assign(state.promotions, promotionsSnap.data());
-        }
+    const promoData = promotionsSnap.data();
+    // Pastikan perChannel ada
+    state.promotions.perChannel = promoData.perChannel || {};
+    // Periksa setiap channel dan pastikan objek voucher ada
+    state.settings.marketplaces.forEach(channel => {
+        if (!state.promotions.perChannel[channel.id]) {
+            state.promotions.perChannel[channel.id] = {};
+        }
+        if (!state.promotions.perChannel[channel.id].voucherToko) {
+            state.promotions.perChannel[channel.id].voucherToko = {};
+        }
+        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) {
+            state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+        }
+    });
+    state.promotions.perModel = promoData.perModel || {};
+}
 
         const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
