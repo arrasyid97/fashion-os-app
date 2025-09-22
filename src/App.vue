@@ -1238,6 +1238,19 @@ function generateUniqueCode() {
     return `${numbers}${result}`;
 }
 
+function addChannelTier(channel) {
+    if (!state.promotions.perChannel[channel.id].voucherSemuaProduk || !Array.isArray(state.promotions.perChannel[channel.id].voucherSemuaProduk)) {
+        state.promotions.perChannel[channel.id].voucherSemuaProduk = [];
+    }
+    state.promotions.perChannel[channel.id].voucherSemuaProduk.push({ min: 0, diskon: 0 });
+}
+
+function removeChannelTier(channel, tierIndex) {
+    if (state.promotions.perChannel[channel.id]?.voucherSemuaProduk) {
+        state.promotions.perChannel[channel.id].voucherSemuaProduk.splice(tierIndex, 1);
+    }
+}
+
 async function findTransactionForReturn() {
     const orderId = uiState.modalData.transactionIdSearch.trim();
     if (!orderId) {
@@ -3245,8 +3258,8 @@ function calculateBestDiscount(cart, channelId) {
     const promotions = [];
     const cartSubtotal = cart.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
 
-    // 1. Kumpulkan semua promosi per-channel (Voucher Ikuti Toko, dll)
     const channelPromos = state.promotions.perChannel[channelId] || {};
+    
     if (channelPromos.voucherToko > 0) {
         promotions.push({
             totalDiscount: (channelPromos.voucherToko / 100) * cartSubtotal,
@@ -3255,7 +3268,20 @@ function calculateBestDiscount(cart, channelId) {
         });
     }
 
-    // 2. Kumpulkan semua promosi per-model produk
+    if (channelPromos.voucherSemuaProduk && Array.isArray(channelPromos.voucherSemuaProduk)) {
+        const sortedTiers = [...channelPromos.voucherSemuaProduk].sort((a, b) => b.min - a.min);
+        for (const tier of sortedTiers) {
+            if (cartSubtotal >= tier.min) {
+                promotions.push({
+                    totalDiscount: (tier.diskon / 100) * cartSubtotal,
+                    description: `Voucher Belanja (${tier.diskon}%)`,
+                    rate: tier.diskon
+                });
+                break;
+            }
+        }
+    }
+    
     const allModelPromos = state.promotions.perModel || {};
     const itemsByModel = cart.reduce((acc, item) => {
         if (!acc[item.nama]) {
@@ -3266,7 +3292,7 @@ function calculateBestDiscount(cart, channelId) {
         return acc;
     }, {});
 
-    for (const modelName in itemsByModel) { // <-- PERHATIKAN PEMBUKA { INI
+    for (const modelName in itemsByModel) {
         const modelData = itemsByModel[modelName];
         const modelPromosForChannel = (allModelPromos[modelName] || {})[channelId] || {};
 
@@ -3291,9 +3317,8 @@ function calculateBestDiscount(cart, channelId) {
                 }
             }
         }
-    } // <-- DAN PASTIKAN PENUTUP } INI ADA
+    }
 
-    // 3. Cari promosi terbaik dari semua yang terkumpul
     if (promotions.length === 0) {
         return { totalDiscount: 0, description: '', rate: 0 };
     }
@@ -6279,9 +6304,16 @@ watch(activePage, (newPage) => {
                                     <input type="text" placeholder="Contoh: 5%" v-model="voucherTokoComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (%)</label>
-                                    <input type="text" placeholder="Contoh: 10%" v-model="voucherSemuaProdukComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                </div>
+    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (Bertingkat)</label>
+    <div class="space-y-2 mt-1">
+        <div v-for="(tier, index) in state.promotions.perChannel[channel.id].voucherSemuaProduk" :key="index" class="flex items-center gap-2">
+            <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+            <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+            <button @click="removeChannelTier(channel, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">&times;</button>
+        </div>
+    </div>
+    <button @click="addChannelTier(channel)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
+</div>
                             </div>
                         </div>
                     </div>
