@@ -3791,7 +3791,6 @@ function calculateRowSummary(item, batchType) {
         return { totalBiayaJasa: 0, totalBiayaAlat: 0 };
     }
     
-    // Pastikan item memiliki properti yang relevan
     const modelInfo = state.settings.modelProduk.find(m => m.id === item.modelProdukId) || {};
     const totalYard = parseFloat(item.totalYard) || 0;
     const hargaKainPerYard = parseFloat(item.hargaKainPerYard) || 0;
@@ -3799,7 +3798,7 @@ function calculateRowSummary(item, batchType) {
     const aktualJadiKombinasi = parseFloat(item.aktualJadiKombinasi) || 0;
     const hargaJahitPerPcs = parseFloat(item.hargaJahitPerPcs) || 0;
     const hargaMaklunPerPcs = parseFloat(item.hargaMaklunPerPcs) || 0;
-    const biayaAlatInput = parseFloat(item.biayaAlat) || 0; // Ambil nilai asli dari input
+    const biayaAlatInput = parseFloat(item.biayaAlat) || 0;
     const yardPerModel = parseFloat(item.yardPerModel) || (modelInfo.yardPerModel || 1);
 
     const totalBiayaKain = totalYard * hargaKainPerYard;
@@ -3811,31 +3810,29 @@ function calculateRowSummary(item, batchType) {
         hargaJasa = hargaMaklunPerPcs;
     }
 
-    const targetQty = Math.floor(totalYard / yardPerModel);
+    const targetQty = yardPerModel > 0 ? Math.floor(totalYard / yardPerModel) : 0;
     
-    let aktualFinal = 0;
-    if (aktualJadi > 0) {
-        aktualFinal = aktualJadi;
-    } else if (aktualJadiKombinasi > 0) {
-        aktualFinal = aktualJadiKombinasi;
-    }
+    let aktualFinal = aktualJadi > 0 ? aktualJadi : aktualJadiKombinasi;
 
     const totalBiayaJasa = aktualJadi * hargaJasa;
-    
-    // [PERBAIKAN KUNCI DI SINI] Biaya Alat sekarang juga hanya dihitung berdasarkan 'aktualJadi'
     const totalBiayaAlat = aktualJadi > 0 ? biayaAlatInput : 0;
-
     const selisih = aktualFinal - targetQty;
     const totalBiayaProduksi = totalBiayaKain + totalBiayaJasa + totalBiayaAlat;
-    const hpp = totalBiayaProduksi / (aktualFinal || 1);
     
+    // --- KALKULASI BARU DIMULAI DI SINI ---
+    const hpp = totalBiayaProduksi / (aktualFinal || 1);
+    const hppIdeal = targetQty > 0 ? totalBiayaProduksi / targetQty : hpp;
+    const kerugianPerPcs = selisih < 0 && aktualFinal > 0 ? hpp - hppIdeal : 0;
+
     return {
         targetQty,
         selisih,
         totalBiayaKain,
         totalBiayaJasa,
         totalBiayaAlat,
-        hpp
+        hpp,
+        hppIdeal,       // <-- Data baru untuk ditampilkan
+        kerugianPerPcs  // <-- Data baru untuk ditampilkan
     };
 }
 
@@ -9902,10 +9899,20 @@ watch(activePage, (newPage) => {
                                     <span class="text-slate-600">Total Biaya Alat:</span>
                                     <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.totalBiayaAlat || 0) }}</span>
                                 </div>
-                                <div class="flex justify-between font-bold text-base text-red-600 border-t pt-2 mt-2">
-                                    <span>HPP/Pcs (sudah include kerugian):</span>
-                                    <span>{{ formatCurrency(calculateRowSummary(item, 'new')?.hpp || 0) }}</span>
-                                </div>
+                                <div class="border-t pt-2 mt-2 space-y-1">
+    <div class="flex justify-between text-sm">
+        <span class="text-slate-600">HPP Ideal/Pcs (jika sesuai target):</span>
+        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'new')?.hppIdeal || 0) }}</span>
+    </div>
+    <div class="flex justify-between text-sm" v-if="calculateRowSummary(item, 'new')?.selisih < 0">
+        <span class="text-slate-600">Kerugian/Pcs (karena selisih):</span>
+        <span class="font-medium text-red-500">+ {{ formatCurrency(calculateRowSummary(item, 'new')?.kerugianPerPcs || 0) }}</span>
+    </div>
+    <div class="flex justify-between font-bold text-base text-red-600 border-t pt-1 mt-1">
+        <span>HPP Final/Pcs:</span>
+        <span>{{ formatCurrency(calculateRowSummary(item, 'new')?.hpp || 0) }}</span>
+    </div>
+</div>
                             </div>
                         </div>
                     </div>
@@ -10042,10 +10049,20 @@ watch(activePage, (newPage) => {
                                     <span class="text-slate-600">Total Biaya Alat:</span>
                                     <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.totalBiayaAlat || 0) }}</span>
                                 </div>
-                                <div class="flex justify-between font-bold text-base text-red-600 border-t pt-2 mt-2">
-                                    <span>HPP/Pcs (sudah include kerugian):</span>
-                                    <span>{{ formatCurrency(calculateRowSummary(item, 'edit')?.hpp || 0) }}</span>
-                                </div>
+                                <div class="border-t pt-2 mt-2 space-y-1">
+    <div class="flex justify-between text-sm">
+        <span class="text-slate-600">HPP Ideal/Pcs (jika sesuai target):</span>
+        <span class="font-medium">{{ formatCurrency(calculateRowSummary(item, 'edit')?.hppIdeal || 0) }}</span>
+    </div>
+    <div class="flex justify-between text-sm" v-if="calculateRowSummary(item, 'edit')?.selisih < 0">
+        <span class="text-slate-600">Kerugian/Pcs (karena selisih):</span>
+        <span class="font-medium text-red-500">+ {{ formatCurrency(calculateRowSummary(item, 'edit')?.kerugianPerPcs || 0) }}</span>
+    </div>
+    <div class="flex justify-between font-bold text-base text-red-600 border-t pt-1 mt-1">
+        <span>HPP Final/Pcs:</span>
+        <span>{{ formatCurrency(calculateRowSummary(item, 'edit')?.hpp || 0) }}</span>
+    </div>
+</div>
                             </div>
                         </div>
                     </div>
