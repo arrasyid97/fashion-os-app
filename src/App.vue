@@ -2340,7 +2340,31 @@ const filteredProduksiBatches = computed(() => {
     return filteredData;
 });
 
+const modelPromoMinComputed = (modelName, channelId) => computed({
+    get() {
+        const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
+        return promo?.min ? 'Rp ' + formatInputNumber(promo.min) : '';
+    },
+    set(newValue) {
+        const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
+        if (promo) {
+            promo.min = parseInputNumber(newValue) || 0;
+        }
+    }
+});
 
+const modelPromoDiskonComputed = (modelName, channelId) => computed({
+    get() {
+        const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
+        return promo?.diskon ? promo.diskon + '%' : '';
+    },
+    set(newValue) {
+        const promo = state.promotions.perModel[modelName]?.[channelId]?.voucherProduk;
+        if (promo) {
+            promo.diskon = parsePercentageInput(newValue);
+        }
+    }
+});
 
 const hargaHppProductNames = computed(() => {
     return [...new Set(state.produk.map(p => p.nama))];
@@ -6332,8 +6356,8 @@ watch(activePage, (newPage) => {
                                 <div>
     <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
     <div class="flex items-center gap-2 mt-1">
-        <input type="text" v-model="tieredMinComputed(state.promotions.perModel[uiState.promosiSelectedModel][channel.id].voucherProduk).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-        <input type="text" v-model="tieredDiskonComputed(state.promotions.perModel[uiState.promosiSelectedModel][channel.id].voucherProduk).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+        <input type="text" v-model="modelPromoMinComputed(uiState.promosiSelectedModel, channel.id).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+        <input type="text" v-model="modelPromoDiskonComputed(uiState.promosiSelectedModel, channel.id).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
     </div>
 </div>
                                 <div>
