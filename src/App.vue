@@ -3560,15 +3560,18 @@ function exportTransactionsToExcel() {
     XLSX.writeFile(workbook, `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
-function addPromotionTier(modelName, channelId) {
-    if (!state.promotions.perModel[modelName]) state.promotions.perModel[modelName] = {};
-    if (!state.promotions.perModel[modelName][channelId]) state.promotions.perModel[modelName][channelId] = {};
-    if (!state.promotions.perModel[modelName][channelId].diskonBertingkat) state.promotions.perModel[modelName][channelId].diskonBertingkat = [];
-    state.promotions.perModel[modelName][channelId].diskonBertingkat.push({ min: 0, diskon: 0 });
+function addPromotionTier(modelName, channelId, tierType) {
+    const promotion = state.promotions.perModel[modelName]?.[channelId];
+    if (promotion && promotion[tierType]) {
+        promotion[tierType].push({ min: 0, diskon: 0 });
+    }
 }
-function removePromotionTier(modelName, channelId, tierIndex) {
-    if (state.promotions.perModel[modelName]?.[channelId]?.diskonBertingkat) {
-        state.promotions.perModel[modelName][channelId].diskonBertingkat.splice(tierIndex, 1);
+
+// GANTI FUNGSI LAMA removePromotionTier DENGAN INI
+function removePromotionTier(modelName, channelId, tierIndex, tierType) {
+    const promotion = state.promotions.perModel[modelName]?.[channelId];
+    if (promotion && promotion[tierType]) {
+        promotion[tierType].splice(tierIndex, 1);
     }
 }
 
@@ -6337,10 +6340,10 @@ watch(activePage, (newPage) => {
                         <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].diskonBertingkat" :key="index" class="flex items-center gap-2">
                             <input type="text" v-model="modelTierMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                             <input type="text" v-model="modelTierDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                            <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">&times;</button>
+                            <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index, 'diskonBertingkat')" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">&times;</button>
                         </div>
                     </div>
-                    <button @click="addPromotionTier(uiState.promosiSelectedModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
+                    <button @click="addPromotionTier(uiState.promosiSelectedModel, channel.id, 'diskonBertingkat')" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
                 </div>
 
                 <div>
@@ -6349,10 +6352,10 @@ watch(activePage, (newPage) => {
                         <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].voucherSemuaProduk" :key="index" class="flex items-center gap-2">
                             <input type="text" v-model="channelTierMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                             <input type="text" v-model="channelTierDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                            <button @click="removeChannelTier(uiState.promosiSelectedModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">&times;</button>
+                            <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index, 'voucherSemuaProduk')" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold flex-shrink-0">&times;</button>
                         </div>
                     </div>
-                    <button @click="addChannelTier(uiState.promosiSelectedModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
+                    <button @click="addPromotionTier(uiState.promosiSelectedModel, channel.id, 'voucherSemuaProduk')" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
                 </div>
                 
             </div>
