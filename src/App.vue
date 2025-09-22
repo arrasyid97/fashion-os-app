@@ -8220,7 +8220,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>        
 
-<div v-if="uiState.modalType === 'modelProdukInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
+<div v-if="uiState.modalType === 'modelProdukInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Panduan Pengisian Data Model Produk</h3>
     </div>
@@ -8231,14 +8231,26 @@ watch(activePage, (newPage) => {
             <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <h4 class="font-semibold text-lg text-indigo-700">Aturan Pengisian Nama Model</h4>
                 <p class="mt-1">
-                    Silakan klik **"+ Tambah Model"**, lalu edit. Pastikan untuk mengisi **Nama Model** dengan format: <strong>NAMA WARNA UKURAN</strong> jika model tersebut memiliki banyak varian warna dan ukuran.
+                    Silakan klik **"+ Tambah Model"**, lalu edit. Pastikan untuk mengisi **Nama Model** dengan format yang konsisten.
                 </p>
+                <p class="mt-2 text-sm font-semibold">
+                    Mengisi data ini dengan benar akan sangat mempermudah Anda saat menambahkan produk baru di halaman **Inventaris**, karena Anda hanya perlu memilih model yang sudah ada dan beberapa kolom akan terisi otomatis.
+                </p>
+                
                 <div class="mt-3 p-3 bg-indigo-100 border border-indigo-200 rounded-md">
-                    <p class="font-semibold">Contoh Pengisian:</p>
+                    <p class="font-semibold">Contoh Pengisian: Format Size (Huruf)</p>
                     <ul class="list-disc list-inside mt-1 text-sm">
                         <li><strong>Nama Model:</strong> <code>MADINA HITAM M</code></li>
                         <li><strong>Kolom Warna:</strong> <code>HITAM</code></li>
                         <li><strong>Kolom Ukuran:</strong> <code>M</code></li>
+                    </ul>
+                </div>
+                <div class="mt-2 p-3 bg-indigo-100 border border-indigo-200 rounded-md">
+                    <p class="font-semibold">Contoh Pengisian: Format No. (Angka)</p>
+                    <ul class="list-disc list-inside mt-1 text-sm">
+                        <li><strong>Nama Model:</strong> <code>MADINA HITAM NO.6</code></li>
+                        <li><strong>Kolom Warna:</strong> <code>HITAM</code></li>
+                        <li><strong>Kolom Ukuran:</strong> <code>NO.6</code></li>
                     </ul>
                 </div>
             </div>
