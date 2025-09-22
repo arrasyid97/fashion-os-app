@@ -1238,8 +1238,6 @@ function generateUniqueCode() {
     return `${numbers}${result}`;
 }
 
-
-
 async function findTransactionForReturn() {
     const orderId = uiState.modalData.transactionIdSearch.trim();
     if (!orderId) {
@@ -1341,7 +1339,15 @@ const voucherTokoComputed = (channel) => computed({
         state.promotions.perChannel[channel.id].voucherToko = parsePercentageInput(newValue);
     }
 });
-
+const voucherSemuaProdukComputed = (channel) => computed({
+    get() { return state.promotions.perChannel[channel.id]?.voucherSemuaProduk ? state.promotions.perChannel[channel.id].voucherSemuaProduk + '%' : ''; },
+    set(newValue) {
+        if (!state.promotions.perChannel[channel.id]) {
+            state.promotions.perChannel[channel.id] = {};
+        }
+        state.promotions.perChannel[channel.id].voucherSemuaProduk = parsePercentageInput(newValue);
+    }
+});
 const voucherProdukComputed = (modelName, channelId) => computed({
     get() { return state.promotions.perModel[modelName]?.[channelId]?.voucherProduk ? state.promotions.perModel[modelName][channelId].voucherProduk + '%' : ''; },
     set(newValue) {
@@ -1354,7 +1360,14 @@ const voucherProdukComputed = (modelName, channelId) => computed({
         state.promotions.perModel[modelName][channelId].voucherProduk = parsePercentageInput(newValue);
     }
 });
-
+const tieredMinComputed = (tier) => computed({
+    get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
+    set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
+});
+const tieredDiskonComputed = (tier) => computed({
+    get() { return tier.diskon ? tier.diskon + '%' : ''; },
+    set(newValue) { tier.diskon = parsePercentageInput(newValue); }
+});
 
 async function applyReferralCode() {
     if (currentUser.value?.userData?.referredBy) {
@@ -3232,8 +3245,8 @@ function calculateBestDiscount(cart, channelId) {
     const promotions = [];
     const cartSubtotal = cart.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
 
+    // 1. Kumpulkan semua promosi per-channel (Voucher Ikuti Toko, dll)
     const channelPromos = state.promotions.perChannel[channelId] || {};
-    
     if (channelPromos.voucherToko > 0) {
         promotions.push({
             totalDiscount: (channelPromos.voucherToko / 100) * cartSubtotal,
@@ -3242,14 +3255,7 @@ function calculateBestDiscount(cart, channelId) {
         });
     }
 
-    if (channelPromos.voucherSemuaProduk > 0) {
-  promotions.push({
-    totalDiscount: (channelPromos.voucherSemuaProduk / 100) * cartSubtotal,
-    description: `Voucher Semua Produk (${channelPromos.voucherSemuaProduk}%)`,
-    rate: channelPromos.voucherSemuaProduk
-  });
-}
-    
+    // 2. Kumpulkan semua promosi per-model produk
     const allModelPromos = state.promotions.perModel || {};
     const itemsByModel = cart.reduce((acc, item) => {
         if (!acc[item.nama]) {
@@ -3260,7 +3266,7 @@ function calculateBestDiscount(cart, channelId) {
         return acc;
     }, {});
 
-    for (const modelName in itemsByModel) {
+    for (const modelName in itemsByModel) { // <-- PERHATIKAN PEMBUKA { INI
         const modelData = itemsByModel[modelName];
         const modelPromosForChannel = (allModelPromos[modelName] || {})[channelId] || {};
 
@@ -3285,8 +3291,9 @@ function calculateBestDiscount(cart, channelId) {
                 }
             }
         }
-    }
+    } // <-- DAN PASTIKAN PENUTUP } INI ADA
 
+    // 3. Cari promosi terbaik dari semua yang terkumpul
     if (promotions.length === 0) {
         return { totalDiscount: 0, description: '', rate: 0 };
     }
@@ -6272,9 +6279,9 @@ watch(activePage, (newPage) => {
                                     <input type="text" placeholder="Contoh: 5%" v-model="voucherTokoComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
                                 </div>
                                 <div>
-    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (%)</label>
-    <input type="text" placeholder="Contoh: 10%" v-model="state.promotions.perChannel[channel.id].voucherSemuaProduk" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
-</div>
+                                    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk (%)</label>
+                                    <input type="text" placeholder="Contoh: 10%" v-model="voucherSemuaProdukComputed(channel).value" class="mt-1 w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                </div>
                             </div>
                         </div>
                     </div>
