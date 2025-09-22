@@ -9800,7 +9800,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'addProduksi'" class="bg-white rounded-lg shadow-xl p-6 max-w-7xl w-full h-full md:max-h-[90vh] flex flex-col">
+<div v-if="uiState.modalType === 'addProduksi'" class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full h-full md:max-h-[100vh] flex flex-col">
     <div class="flex items-center gap-4 mb-4">
         <h3 class="text-xl font-bold">Buat Batch Produksi Baru</h3>
         <button @click.stop="showNestedModal('panduanProduksi')" type="button" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
