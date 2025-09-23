@@ -3363,17 +3363,6 @@ async function removeSupplierProduct(supplierId, sku) {
     }
 }
 
-async function showManageSupplierProducts(supplierId) {
-    // Logika untuk memuat data supplier secara spesifik (jika perlu)
-    // Kemudian, arahkan ke halaman baru atau modal baru
-    // Di sini kita akan menggunakan modal baru
-    const supplier = state.suppliers.find(s => s.id === supplierId);
-    if (supplier) {
-        showModal('manageSupplierProducts', { ...supplier });
-    } else {
-        alert("Supplier tidak ditemukan.");
-    }
-}
 
 async function deleteKain(kainId) {
     if (confirm(`Anda yakin ingin menghapus data kain dengan ID: ${kainId}? Stok akan hilang permanen.`)) {
