@@ -171,6 +171,16 @@ const uiState = reactive({
     notesSortBy: 'endDate-asc',
 
     supplierModalData: {},
+    activeSupplierView: 'list', // 'list' atau 'form' <-- TAMBAHKAN BARIS INI
+    penerimaanBarangForm: { // <-- TAMBAHKAN OBJEK INI
+        supplierId: null,
+        supplierName: '',
+        tanggal: new Date().toISOString().split('T')[0],
+        produk: [],
+        statusProses: 'Dalam Proses',
+        statusPembayaran: 'Belum Dibayar',
+        catatan: '',
+    },
 
     exportFilter: 'all_time',
     exportStartDate: '',
@@ -1105,6 +1115,98 @@ async function saveSupplierProducts() {
     } catch (error) {
         console.error("Gagal menyimpan produk supplier:", error);
         alert("Gagal menyimpan produk supplier. Silakan coba lagi.");
+    }
+}
+
+function showPenerimaanBarangForm(supplier) {
+    uiState.penerimaanBarangForm.supplierId = supplier.id;
+    uiState.penerimaanBarangForm.supplierName = supplier.name;
+    uiState.penerimaanBarangForm.tanggal = new Date().toISOString().split('T')[0];
+    uiState.penerimaanBarangForm.produk = JSON.parse(JSON.stringify(supplier.products || []));
+    uiState.penerimaanBarangForm.produk = uiState.penerimaanBarangForm.produk.map(p => ({
+        ...p,
+        qty: null,
+        statusProses: 'Dalam Proses',
+        statusPembayaran: 'Belum Dibayar',
+        returReason: null,
+    }));
+    uiState.activeSupplierView = 'form';
+}
+
+function addProductToPenerimaanBarang() {
+    uiState.penerimaanBarangForm.produk.push({
+        id: `PROD-${Date.now()}`,
+        sku: '',
+        modelName: '',
+        color: '',
+        size: '',
+        hargaJual: null,
+        qty: null,
+        statusProses: 'Dalam Proses',
+        statusPembayaran: 'Belum Dibayar',
+        returReason: null,
+    });
+}
+
+function removeProductFromPenerimaanBarang(index) {
+    uiState.penerimaanBarangForm.produk.splice(index, 1);
+}
+
+function hidePenerimaanBarangForm() {
+    if (confirm('Yakin ingin membatalkan? Semua data yang belum disimpan akan hilang.')) {
+        uiState.activeSupplierView = 'list';
+    }
+}
+
+async function submitPenerimaanBarang() {
+    if (!currentUser.value) return alert("Anda harus login.");
+    const form = uiState.penerimaanBarangForm;
+
+    if (!form.supplierId || form.produk.length === 0) {
+        return alert("Nama supplier dan daftar produk tidak boleh kosong.");
+    }
+    
+    // Hitung total nilai kuantitas
+    let totalQtyValue = 0;
+    form.produk.forEach(p => {
+        totalQtyValue += (p.hargaJual || 0) * (p.qty || 0);
+    });
+
+    const dataToSave = {
+        ...form,
+        userId: currentUser.value.uid,
+        tanggal: new Date(form.tanggal),
+        totalQtyValue,
+        createdAt: new Date(),
+    };
+
+    try {
+        const docRef = await addDoc(collection(db, "purchase_orders"), dataToSave);
+        
+        // Perbarui state lokal jika perlu, atau cukup muat ulang
+        alert(`Penerimaan barang berhasil dicatat dengan ID: ${docRef.id}`);
+        uiState.activeSupplierView = 'list'; // Kembali ke daftar supplier
+    } catch (error) {
+        console.error("Gagal menyimpan penerimaan barang:", error);
+        alert("Gagal menyimpan penerimaan barang. Silakan coba lagi.");
+    }
+}
+
+
+const hitungTotalNilaiQty = (product) => {
+    return (product.hargaJual || 0) * (product.qty || 0);
+};
+
+// Tambahkan fetch untuk data Purchase Orders
+async function fetchPurchaseOrders() {
+    if (!currentUser.value) return;
+    try {
+        const purchaseOrdersCollection = collection(db, 'purchase_orders');
+        const q = query(purchaseOrdersCollection, where('userId', '==', currentUser.value.uid));
+        const snapshot = await getDocs(q);
+        // Anda bisa simpan data ini jika diperlukan, misalnya untuk riwayat
+    } catch (error) {
+        console.error("Gagal mengambil data pesanan pembelian:", error);
     }
 }
 
@@ -5555,6 +5657,7 @@ async function loadAllDataFromFirebase() {
             getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
             getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))),
             getDocs(query(collection(db, "suppliers"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "purchase_orders"), where("userId", "==", userId))),
         ];
 
         const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
@@ -5570,6 +5673,7 @@ async function loadAllDataFromFirebase() {
             transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
             categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap,
             suppliersSnap,
+            purchaseOrdersSnap,
             notesSnap // TAMBAHKAN NOTES SNAP
         ] = results;
 
@@ -5660,6 +5764,7 @@ async function loadAllDataFromFirebase() {
         state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
         state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        state.purchaseOrders = purchaseOrdersSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.voucherNotes = notesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), endDate: doc.data().endDate?.toDate() })); // BARIS BARU UNTUK MENGISI NOTES
         
     } catch (error) {
@@ -8400,45 +8505,142 @@ watch(activePage, (newPage) => {
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
 
-            <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
-                <div>
-                    <h2 class="text-3xl font-bold text-slate-800">Manajemen Supplier</h2>
-                    <p class="text-slate-500 mt-1">Kelola data supplier dan produk yang mereka sediakan.</p>
+            <div v-if="uiState.activeSupplierView === 'list'" class="animate-fade-in-up">
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-8">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Supplier</h2>
+                        <p class="text-slate-500 mt-1">Kelola data supplier dan produk yang mereka sediakan.</p>
+                    </div>
+                    <button @click="showModal('addSupplier', { name: '', contact: '', products: [] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
+                        + Tambah Supplier Baru
+                    </button>
                 </div>
-                <button @click="showModal('addSupplier', { name: '', contact: '', products: [] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
-                    + Tambah Supplier Baru
-                </button>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                                <tr>
+                                    <th class="px-6 py-3">Nama Supplier</th>
+                                    <th class="px-6 py-3">Kontak</th>
+                                    <th class="px-6 py-3 text-center">Jumlah Produk</th>
+                                    <th class="px-6 py-3 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/50">
+                                <tr v-if="state.suppliers.length === 0">
+                                    <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada data supplier.</td>
+                                </tr>
+                                <tr v-for="supplier in state.suppliers" :key="supplier.id" class="hover:bg-slate-50/50">
+                                    <td class="px-6 py-4 font-semibold text-slate-800">{{ supplier.name }}</td>
+                                    <td class="px-6 py-4">{{ supplier.contact || '-' }}</td>
+                                    <td class="px-6 py-4 text-center">{{ supplier.products?.length || 0 }}</td>
+                                    <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap">
+                                        <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline">Buat Pesanan</button>
+                                        <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+                                        <button @click="showModal('manageSupplierProducts', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-indigo-500 hover:underline">Kelola Produk</button>
+                                        <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700">
+                                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
-            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left text-slate-500">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                            <tr>
-                                <th class="px-6 py-3">Nama Supplier</th>
-                                <th class="px-6 py-3">Kontak</th>
-                                <th class="px-6 py-3 text-center">Jumlah Produk</th>
-                                <th class="px-6 py-3 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="state.suppliers.length === 0">
-                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada data supplier.</td>
-                            </tr>
-                            <tr v-for="supplier in state.suppliers" :key="supplier.id" class="hover:bg-slate-50/50">
-                                <td class="px-6 py-4 font-semibold text-slate-800">{{ supplier.name }}</td>
-                                <td class="px-6 py-4">{{ supplier.contact || '-' }}</td>
-                                <td class="px-6 py-4 text-center">{{ supplier.products?.length || 0 }}</td>
-                                <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap">
-                                    <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                                    <button @click="showModal('manageSupplierProducts', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-indigo-500 hover:underline">Kelola Produk</button>
-                                    <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700">
-                                        <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div v-if="uiState.activeSupplierView === 'form'" class="animate-fade-in-up">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800">Penerimaan Barang</h2>
+                        <p class="text-slate-500 mt-1">Buat pesanan baru dari supplier: <span class="font-semibold">{{ uiState.penerimaanBarangForm.supplierName }}</span></p>
+                    </div>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+                    <form @submit.prevent="submitPenerimaanBarang" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium">Tanggal</label>
+                                <input type="date" v-model="uiState.penerimaanBarangForm.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium">Catatan</label>
+                                <input type="text" v-model="uiState.penerimaanBarangForm.catatan" class="mt-1 w-full p-2 border rounded-md">
+                            </div>
+                        </div>
+
+                        <div class="mt-8">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="text-lg font-bold">Daftar Produk Pesanan</h4>
+                                <button @click="addProductToPenerimaanBarang" type="button" class="text-sm text-blue-600 hover:underline">+ Tambah Produk</button>
+                            </div>
+                            <div class="overflow-x-auto max-h-96">
+                                <table class="w-full text-sm text-left text-slate-500">
+                                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                                        <tr>
+                                            <th class="px-4 py-3">Produk</th>
+                                            <th class="px-4 py-3 text-right">Harga Jual</th>
+                                            <th class="px-4 py-3 text-center">Qty</th>
+                                            <th class="px-4 py-3 text-right">Total</th>
+                                            <th class="px-4 py-3">Status Proses</th>
+                                            <th class="px-4 py-3">Status Bayar</th>
+                                            <th class="px-4 py-3">Retur</th>
+                                            <th class="px-4 py-3">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(p, index) in uiState.penerimaanBarangForm.produk" :key="p.id">
+                                            <td class="px-4 py-3">
+                                                <p class="font-semibold text-slate-800">{{ p.modelName }}</p>
+                                                <p class="text-xs">{{ p.sku }} ({{ p.color }} / {{ p.size }})</p>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <input type="number" v-model.number="p.hargaJual" class="w-full p-1 border rounded-md text-sm text-right">
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <input type="number" v-model.number="p.qty" class="w-20 p-1 border rounded-md text-sm text-center">
+                                            </td>
+                                            <td class="px-4 py-3 text-right font-bold text-indigo-600">
+                                                {{ formatCurrency(hitungTotalNilaiQty(p)) }}
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <select v-model="p.statusProses" class="w-full p-1 border rounded-md text-xs">
+                                                    <option>Dalam Proses</option>
+                                                    <option>Selesai</option>
+                                                    <option>Revisi</option>
+                                                    <option>Ditunda</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <select v-model="p.statusPembayaran" class="w-full p-1 border rounded-md text-xs">
+                                                    <option>Belum Dibayar</option>
+                                                    <option>Sudah Dibayar</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <select v-model="p.returReason" class="w-full p-1 border rounded-md text-xs">
+                                                    <option :value="null">Tidak Retur</option>
+                                                    <option>Cacat</option>
+                                                    <option>Salah Warna</option>
+                                                    <option>Salah Ukuran</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3 text-right">
+                                                <button @click="removeProductFromPenerimaanBarang(index)" type="button" class="text-red-500 hover:underline text-xs">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
+                            <button @click="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
