@@ -3298,12 +3298,19 @@ async function deleteSupplier(supplierId) {
     }
 }
 
-async function addSupplierProduct(supplierId) {
+async function addSupplierProduct() { // Fungsi tidak lagi menerima supplierId
     if (!currentUser.value) return alert("Anda harus login.");
-    const product = uiState.nestedModalData;
+    const product = uiState.modalData; // Menggunakan modalData, bukan nestedModalData
     if (!product.date || !product.sku || !product.name || !product.price || !product.stock) {
         return alert("Semua field produk wajib diisi.");
     }
+    
+    // Perbaikan: Lakukan validasi tambahan untuk supplierId
+    const supplierId = uiState.modalData.supplierId;
+    if (!supplierId) {
+        return alert("ID supplier tidak ditemukan. Batalkan dan coba lagi.");
+    }
+    
     try {
         const supplierRef = doc(db, "suppliers", supplierId);
         const productToSave = {
@@ -3323,7 +3330,7 @@ async function addSupplierProduct(supplierId) {
             supplierInState.products.push(productToSave);
         }
 
-        hideNestedModal();
+        hideModal(); // Panggil hideModal utama
         alert("Produk berhasil ditambahkan ke supplier!");
     } catch (error) {
         console.error("Gagal menambahkan produk supplier:", error);
@@ -3331,6 +3338,7 @@ async function addSupplierProduct(supplierId) {
     }
 }
 
+// Fungsi edit dan hapus tetap di dalam modal detail
 async function updateSupplierProduct(supplierId) {
     if (!currentUser.value) return alert("Anda harus login.");
     const editedProduct = uiState.nestedModalData;
@@ -3341,8 +3349,7 @@ async function updateSupplierProduct(supplierId) {
         const updatedProducts = supplierInState.products.map(p => {
             if (p.sku === editedProduct.originalSku) {
                 return {
-                    // Pastikan properti tanggal terupdate dengan benar
-                    date: new Date(editedProduct.date), 
+                    date: new Date(editedProduct.date),
                     sku: editedProduct.sku,
                     name: editedProduct.name,
                     price: editedProduct.price,
@@ -3355,9 +3362,7 @@ async function updateSupplierProduct(supplierId) {
         const supplierRef = doc(db, "suppliers", supplierId);
         await updateDoc(supplierRef, { products: updatedProducts });
 
-        // Perbaikan di sini: Perbarui array secara reaktif dengan menimpa seluruh array
         supplierInState.products = updatedProducts;
-
         hideNestedModal();
         alert("Produk supplier berhasil diperbarui!");
     } catch (error) {
@@ -3380,10 +3385,9 @@ async function removeSupplierProduct(supplierId, sku) {
 
         const supplierRef = doc(db, "suppliers", supplierId);
         await updateDoc(supplierRef, { products: arrayRemove(productToRemove) });
-
-        // Perbaikan di sini: Perbarui array secara reaktif
+        
         supplierInState.products = supplierInState.products.filter(p => p.sku !== sku);
-
+        
         alert("Produk supplier berhasil dihapus.");
     } catch (error) {
         console.error("Gagal menghapus produk supplier:", error);
