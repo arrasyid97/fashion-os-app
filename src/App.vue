@@ -3363,6 +3363,18 @@ async function removeSupplierProduct(supplierId, sku) {
     }
 }
 
+async function showManageSupplierProducts(supplierId) {
+    // Logika untuk memuat data supplier secara spesifik (jika perlu)
+    // Kemudian, arahkan ke halaman baru atau modal baru
+    // Di sini kita akan menggunakan modal baru
+    const supplier = state.suppliers.find(s => s.id === supplierId);
+    if (supplier) {
+        showModal('manageSupplierProducts', { ...supplier });
+    } else {
+        alert("Supplier tidak ditemukan.");
+    }
+}
+
 async function deleteKain(kainId) {
     if (confirm(`Anda yakin ingin menghapus data kain dengan ID: ${kainId}? Stok akan hilang permanen.`)) {
         try {
@@ -6888,9 +6900,14 @@ watch(activePage, (newPage) => {
                                 <h2 class="text-3xl font-bold text-slate-800">Manajemen Supplier</h2>
                                 <p class="text-slate-500 mt-1">Kelola data supplier dan stok barang jadi dari mereka.</p>
                             </div>
-                            <button @click="showModal('addSupplier', { name: '', contact: '', products: [] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
-                                + Tambah Supplier Baru
-                            </button>
+                            <div class="flex flex-wrap items-center gap-3">
+    <button @click="showModal('addSupplier', { name: '', contact: '' })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
+        + Tambah Supplier Baru
+    </button>
+    <button @click="showModal('addSupplierProduct', { supplierId: null, date: new Date().toISOString().split('T')[0], sku: '', name: '', price: null, stock: null })" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 shadow transition-colors">
+        + Tambah Produk Supplier
+    </button>
+</div>
                         </div>
                         <div class="mb-6">
                             <input type="text" v-model="uiState.supplierSearch" placeholder="Cari nama supplier..." class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
@@ -6914,10 +6931,10 @@ watch(activePage, (newPage) => {
                                         <td class="px-6 py-4">{{ supplier.contact }}</td>
                                         <td class="px-6 py-4 text-center">{{ supplier.products.length }}</td>
                                         <td class="px-6 py-4 text-right space-x-3">
-                                            <button @click="showModal('viewSupplier', supplier)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Detail</button>
-                                            <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="text-xs bg-indigo-100 text-indigo-700 font-bold py-1 px-2 rounded hover:bg-indigo-200">Edit</button>
-                                            <button @click="deleteSupplier(supplier.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
-                                        </td>
+    <button @click="showModal('viewSupplier', supplier)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Detail</button>
+    <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="text-xs bg-indigo-100 text-indigo-700 font-bold py-1 px-2 rounded hover:bg-indigo-200">Edit</button>
+    <button @click="deleteSupplier(supplier.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
+</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -10149,9 +10166,6 @@ watch(activePage, (newPage) => {
         <p class="text-sm text-slate-600 mb-4">Kontak: {{ uiState.modalData.contact }}</p>
         <div class="flex justify-between items-center mb-4">
             <h4 class="font-semibold">Daftar Produk Barang Jadi</h4>
-            <button @click="showModal('addSupplierProduct', { supplierId: uiState.modalData.id, sku: '', name: '', price: null, stock: null, date: new Date().toISOString().split('T')[0] })" class="bg-green-500 text-white font-bold py-1.5 px-3 rounded-md text-sm">
-    + Tambah Produk
-</button>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-left text-slate-500">
@@ -10176,9 +10190,9 @@ watch(activePage, (newPage) => {
                         <td class="px-6 py-4 text-right">{{ formatCurrency(product.price) }}</td>
                         <td class="px-6 py-4 text-center">{{ product.stock }}</td>
                         <td class="px-6 py-4 text-right space-x-3">
-                            <button @click="showNestedModal('editSupplierProduct', { ...product, originalSku: product.sku, supplierId: uiState.modalData.id, date: new Date(product.date?.seconds * 1000).toISOString().split('T')[0] })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
-                            <button @click="removeSupplierProduct(uiState.modalData.id, product.sku)" class="text-xs text-red-500 hover:underline">Hapus</button>
-                        </td>
+    <button @click="showModal('editSupplierProduct', { ...product, originalSku: product.sku, supplierId: uiState.modalData.id, date: new Date(product.date?.seconds * 1000).toISOString().split('T')[0] })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
+    <button @click="removeSupplierProduct(uiState.modalData.id, product.sku)" class="text-xs text-red-500 hover:underline">Hapus</button>
+</td>
                     </tr>
                 </tbody>
             </table>
@@ -10192,6 +10206,36 @@ watch(activePage, (newPage) => {
 <div v-if="uiState.modalType === 'addSupplierProduct'" class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
     <h3 class="text-xl font-bold mb-4">Tambah Produk Supplier</h3>
     <form @submit.prevent="addSupplierProduct(uiState.modalData.supplierId)" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium">Tanggal Masuk</label>
+            <input type="date" v-model="uiState.modalData.date" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">SKU Produk</label>
+            <input type="text" v-model="uiState.modalData.sku" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Nama Produk</label>
+            <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Harga Beli per Unit (Rp)</label>
+            <input type="number" v-model.number="uiState.modalData.price" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Stok Awal</label>
+            <input type="number" v-model.number="uiState.modalData.stock" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div class="flex justify-end gap-3 pt-4 border-t">
+            <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
+        </div>
+    </form>
+</div>
+
+<div v-if="uiState.modalType === 'editSupplierProduct'" class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+    <h3 class="text-xl font-bold mb-4">Edit Produk Supplier</h3>
+    <form @submit.prevent="updateSupplierProduct(uiState.modalData.supplierId)" class="space-y-4">
         <div>
             <label class="block text-sm font-medium">Tanggal Masuk</label>
             <input type="date" v-model="uiState.modalData.date" class="mt-1 w-full p-2 border rounded-md" required>
