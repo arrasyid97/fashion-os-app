@@ -8602,6 +8602,71 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
+<div v-if="uiState.modalType === 'addSupplier' || uiState.modalType === 'editSupplier'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
+    <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[50vh] flex flex-col">
+        <h3 class="text-xl font-bold mb-4">{{ uiState.modalType === 'addSupplier' ? 'Tambah Supplier Baru' : 'Edit Supplier' }}</h3>
+        <form @submit.prevent="uiState.modalType === 'addSupplier' ? addSupplier() : updateSupplier()" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium">Nama Supplier</label>
+                <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Kontak (Opsional)</label>
+                <input type="text" v-model="uiState.modalData.contact" class="mt-1 w-full p-2 border rounded-md" placeholder="Contoh: 0812xxxxxx">
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t mt-4">
+                <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div v-if="uiState.modalType === 'manageSupplierProducts'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
+    <div class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
+        <h3 class="text-xl font-bold mb-4">Kelola Produk Supplier: {{ uiState.modalData.name }}</h3>
+        <div class="flex-1 overflow-y-auto pr-2">
+            <table class="min-w-full text-sm text-left text-slate-500">
+                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                    <tr>
+                        <th class="px-4 py-3">SKU</th>
+                        <th class="px-4 py-3">Nama Model</th>
+                        <th class="px-4 py-3">Warna</th>
+                        <th class="px-4 py-3">Ukuran</th>
+                        <th class="px-4 py-3 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200/50">
+                    <tr v-for="(product, index) in uiState.modalData.products" :key="index">
+                        <td class="px-4 py-3">
+                            <input type="text" v-model="product.sku" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="SKU">
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="text" v-model="product.modelName" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Nama Model">
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="text" v-model="product.color" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Warna">
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="text" v-model="product.size" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Ukuran">
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button @click="removeSupplierProduct(uiState.modalData, index)" type="button" class="text-red-500 hover:underline">Hapus</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="flex justify-between items-center mt-4 pt-4 border-t">
+            <button @click="addSupplierProduct(uiState.modalData)" type="button" class="text-sm text-blue-600 hover:underline">+ Tambah Produk</button>
+            <div class="flex gap-3">
+                <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                <button type="button" @click="saveSupplierProducts" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Produk</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div v-if="uiState.modalType === 'inventarisInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Panduan Manajemen Inventaris</h3>
@@ -11432,67 +11497,6 @@ watch(activePage, (newPage) => {
 
         <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
             <button @click="hideNotesModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
-        </div>
-    </div>
-</div>
-
-<div v-if="uiState.modalType === 'addSupplier' || uiState.modalType === 'editSupplier'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[50vh] flex flex-col">
-    <h3 class="text-xl font-bold mb-4">{{ uiState.modalType === 'addSupplier' ? 'Tambah Supplier Baru' : 'Edit Supplier' }}</h3>
-    <form @submit.prevent="uiState.modalType === 'addSupplier' ? addSupplier() : updateSupplier()" class="space-y-4">
-        <div>
-            <label class="block text-sm font-medium">Nama Supplier</label>
-            <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium">Kontak (Opsional)</label>
-            <input type="text" v-model="uiState.modalData.contact" class="mt-1 w-full p-2 border rounded-md" placeholder="Contoh: 0812xxxxxx">
-        </div>
-        <div class="flex justify-end gap-3 pt-4 border-t mt-4">
-            <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
-        </div>
-    </form>
-</div>
-
-<div v-if="uiState.modalType === 'manageSupplierProducts'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
-    <h3 class="text-xl font-bold mb-4">Kelola Produk Supplier: {{ uiState.modalData.name }}</h3>
-    <div class="flex-1 overflow-y-auto pr-2">
-        <table class="min-w-full text-sm text-left text-slate-500">
-            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                <tr>
-                    <th class="px-4 py-3">SKU</th>
-                    <th class="px-4 py-3">Nama Model</th>
-                    <th class="px-4 py-3">Warna</th>
-                    <th class="px-4 py-3">Ukuran</th>
-                    <th class="px-4 py-3 text-right">Aksi</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200/50">
-                <tr v-for="(product, index) in uiState.modalData.products" :key="index">
-                    <td class="px-4 py-3">
-                        <input type="text" v-model="product.sku" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="SKU">
-                    </td>
-                    <td class="px-4 py-3">
-                        <input type="text" v-model="product.modelName" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Nama Model">
-                    </td>
-                    <td class="px-4 py-3">
-                        <input type="text" v-model="product.color" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Warna">
-                    </td>
-                    <td class="px-4 py-3">
-                        <input type="text" v-model="product.size" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Ukuran">
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <button @click="removeSupplierProduct(uiState.modalData, index)" type="button" class="text-red-500 hover:underline">Hapus</button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <div class="flex justify-between items-center mt-4 pt-4 border-t">
-        <button @click="addSupplierProduct(uiState.modalData)" type="button" class="text-sm text-blue-600 hover:underline">+ Tambah Produk</button>
-        <div class="flex gap-3">
-            <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-            <button type="button" @click="saveSupplierProducts" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Produk</button>
         </div>
     </div>
 </div>
