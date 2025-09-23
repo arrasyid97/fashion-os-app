@@ -8657,10 +8657,7 @@ watch(activePage, (newPage) => {
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
                     <form @submit.prevent="submitPenerimaanBarang" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium">Tanggal</label>
-                                <input type="date" v-model="uiState.penerimaanBarangForm.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
-                            </div>
+                            
                             <div>
                                 <label class="block text-sm font-medium">Catatan</label>
                                 <input type="text" v-model="uiState.penerimaanBarangForm.catatan" class="mt-1 w-full p-2 border rounded-md">
