@@ -3301,17 +3301,26 @@ async function deleteSupplier(supplierId) {
 async function addSupplierProduct(supplierId) {
     if (!currentUser.value) return alert("Anda harus login.");
     const product = uiState.nestedModalData;
-    if (!product.sku || !product.name || !product.price || !product.stock) {
+    if (!product.date || !product.sku || !product.name || !product.price || !product.stock) {
         return alert("Semua field produk wajib diisi.");
     }
     try {
         const supplierRef = doc(db, "suppliers", supplierId);
+        // Pastikan objek yang dikirim ke Firestore memiliki format yang sama dengan yang diharapkan
+        const productToSave = {
+            date: new Date(product.date),
+            sku: product.sku,
+            name: product.name,
+            price: product.price,
+            stock: product.stock,
+        };
         await updateDoc(supplierRef, {
-            products: arrayUnion(product)
+            products: arrayUnion(productToSave)
         });
+        // Perbarui state lokal dengan objek yang sudah diubah ke format Date
         const supplierInState = state.suppliers.find(s => s.id === supplierId);
         if (supplierInState) {
-            supplierInState.products.push(product);
+            supplierInState.products.push(productToSave);
         }
         hideNestedModal();
         alert("Produk berhasil ditambahkan ke supplier!");
@@ -3328,14 +3337,18 @@ async function updateSupplierProduct(supplierId) {
     if (!supplierInState) return;
 
     try {
-        const updatedProducts = supplierInState.products.map(p => 
-            p.sku === editedProduct.originalSku ? {
-                sku: editedProduct.sku,
-                name: editedProduct.name,
-                price: editedProduct.price,
-                stock: editedProduct.stock,
-            } : p
-        );
+        const updatedProducts = supplierInState.products.map(p => {
+            if (p.sku === editedProduct.originalSku) {
+                return {
+                    date: new Date(editedProduct.date), // Perbaikan: Simpan sebagai objek Date
+                    sku: editedProduct.sku,
+                    name: editedProduct.name,
+                    price: editedProduct.price,
+                    stock: editedProduct.stock,
+                };
+            }
+            return p;
+        });
 
         const supplierRef = doc(db, "suppliers", supplierId);
         await updateDoc(supplierRef, { products: updatedProducts });
@@ -3353,14 +3366,19 @@ function removeSupplierProduct(supplierId, sku) {
     if (!confirm("Anda yakin ingin menghapus produk ini?")) return;
     const supplierInState = state.suppliers.find(s => s.id === supplierId);
     if (!supplierInState) return;
-    
+
     try {
+        // Perbaikan: Ambil objek produk yang lengkap, termasuk tanggal
         const productToRemove = supplierInState.products.find(p => p.sku === sku);
-        if (!productToRemove) return;
+        if (!productToRemove) {
+            console.warn("Produk tidak ditemukan di state lokal.");
+            return;
+        }
 
         const supplierRef = doc(db, "suppliers", supplierId);
+        // Perbaikan: Gunakan objek yang lengkap untuk arrayRemove
         updateDoc(supplierRef, { products: arrayRemove(productToRemove) });
-        
+
         supplierInState.products = supplierInState.products.filter(p => p.sku !== sku);
         alert("Produk supplier berhasil dihapus.");
     } catch (error) {
@@ -10163,6 +10181,7 @@ watch(activePage, (newPage) => {
             <table class="w-full text-sm text-left text-slate-500">
                 <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
                     <tr>
+                        <th class="px-6 py-3">Tanggal</th>
                         <th class="px-6 py-3">SKU</th>
                         <th class="px-6 py-3">Nama Produk</th>
                         <th class="px-6 py-3 text-right">Harga Beli</th>
@@ -10172,15 +10191,16 @@ watch(activePage, (newPage) => {
                 </thead>
                 <tbody class="divide-y divide-slate-200/50">
                     <tr v-if="uiState.modalData.products?.length === 0">
-                        <td colspan="5" class="p-4 text-center text-slate-500">Belum ada produk dari supplier ini.</td>
+                        <td colspan="6" class="p-4 text-center text-slate-500">Belum ada produk dari supplier ini.</td>
                     </tr>
                     <tr v-for="product in uiState.modalData.products" :key="product.sku" class="hover:bg-slate-50/50">
+                        <td class="px-6 py-4">{{ new Date(product.date?.seconds * 1000).toLocaleDateString('id-ID') }}</td>
                         <td class="px-6 py-4">{{ product.sku }}</td>
                         <td class="px-6 py-4 font-semibold text-slate-800">{{ product.name }}</td>
                         <td class="px-6 py-4 text-right">{{ formatCurrency(product.price) }}</td>
                         <td class="px-6 py-4 text-center">{{ product.stock }}</td>
                         <td class="px-6 py-4 text-right space-x-3">
-                            <button @click="showNestedModal('editSupplierProduct', { ...product, originalSku: product.sku, supplierId: uiState.modalData.id })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
+                            <button @click="showNestedModal('editSupplierProduct', { ...product, originalSku: product.sku, supplierId: uiState.modalData.id, date: new Date(product.date?.seconds * 1000).toISOString().split('T')[0] })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
                             <button @click="removeSupplierProduct(uiState.modalData.id, product.sku)" class="text-xs text-red-500 hover:underline">Hapus</button>
                         </td>
                     </tr>
