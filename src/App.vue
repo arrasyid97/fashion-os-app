@@ -10177,9 +10177,9 @@ watch(activePage, (newPage) => {
         <p class="text-sm text-slate-600 mb-4">Kontak: {{ uiState.modalData.contact }}</p>
         <div class="flex justify-between items-center mb-4">
             <h4 class="font-semibold">Daftar Produk Barang Jadi</h4>
-            <button @click="showNestedModal('addSupplierProduct', { supplierId: uiState.modalData.id, sku: '', name: '', price: null, stock: null, date: new Date().toISOString().split('T')[0] })" class="bg-green-500 text-white font-bold py-1.5 px-3 rounded-md text-sm">
-                + Tambah Produk
-            </button>
+            <button @click="showModal('addSupplierProduct', { supplierId: uiState.modalData.id, sku: '', name: '', price: null, stock: null, date: new Date().toISOString().split('T')[0] })" class="bg-green-500 text-white font-bold py-1.5 px-3 rounded-md text-sm">
+    + Tambah Produk
+</button>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-left text-slate-500">
@@ -10217,36 +10217,34 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.nestedModalType === 'addSupplierProduct' || uiState.nestedModalType === 'editSupplierProduct'" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-        <h3 class="text-xl font-bold mb-4">{{ uiState.nestedModalType === 'addSupplierProduct' ? 'Tambah Produk Supplier' : 'Edit Produk Supplier' }}</h3>
-        <form @submit.prevent="uiState.nestedModalType === 'addSupplierProduct' ? addSupplierProduct(uiState.nestedModalData.supplierId) : updateSupplierProduct(uiState.nestedModalData.supplierId)" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium">Tanggal Masuk</label>
-                <input type="date" v-model="uiState.nestedModalData.date" class="mt-1 w-full p-2 border rounded-md" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium">SKU Produk</label>
-                <input type="text" v-model="uiState.nestedModalData.sku" class="mt-1 w-full p-2 border rounded-md" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium">Nama Produk</label>
-                <input type="text" v-model="uiState.nestedModalData.name" class="mt-1 w-full p-2 border rounded-md" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium">Harga Beli per Unit (Rp)</label>
-                <input type="number" v-model.number="uiState.nestedModalData.price" class="mt-1 w-full p-2 border rounded-md" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium">Stok Awal</label>
-                <input type="number" v-model.number="uiState.nestedModalData.stock" class="mt-1 w-full p-2 border rounded-md" required>
-            </div>
-            <div class="flex justify-end gap-3 pt-4 border-t">
-                <button type="button" @click="hideNestedModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
-            </div>
-        </form>
-    </div>
+<div v-if="uiState.modalType === 'addSupplierProduct'" class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+    <h3 class="text-xl font-bold mb-4">Tambah Produk Supplier</h3>
+    <form @submit.prevent="addSupplierProduct(uiState.modalData.supplierId)" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium">Tanggal Masuk</label>
+            <input type="date" v-model="uiState.modalData.date" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">SKU Produk</label>
+            <input type="text" v-model="uiState.modalData.sku" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Nama Produk</label>
+            <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Harga Beli per Unit (Rp)</label>
+            <input type="number" v-model.number="uiState.modalData.price" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Stok Awal</label>
+            <input type="number" v-model.number="uiState.modalData.stock" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div class="flex justify-end gap-3 pt-4 border-t">
+            <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
+        </div>
+    </form>
 </div>
 
 <div v-if="uiState.modalType === 'kelolaStok'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[60vh] flex flex-col">
