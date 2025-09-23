@@ -3306,7 +3306,7 @@ async function addSupplierProduct(supplierId) {
     }
     try {
         const supplierRef = doc(db, "suppliers", supplierId);
-        // Pastikan objek yang dikirim ke Firestore memiliki format yang sama dengan yang diharapkan
+        // Simpan tanggal sebagai objek Date yang valid
         const productToSave = {
             date: new Date(product.date),
             sku: product.sku,
@@ -3317,7 +3317,6 @@ async function addSupplierProduct(supplierId) {
         await updateDoc(supplierRef, {
             products: arrayUnion(productToSave)
         });
-        // Perbarui state lokal dengan objek yang sudah diubah ke format Date
         const supplierInState = state.suppliers.find(s => s.id === supplierId);
         if (supplierInState) {
             supplierInState.products.push(productToSave);
@@ -3340,7 +3339,8 @@ async function updateSupplierProduct(supplierId) {
         const updatedProducts = supplierInState.products.map(p => {
             if (p.sku === editedProduct.originalSku) {
                 return {
-                    date: new Date(editedProduct.date), // Perbaikan: Simpan sebagai objek Date
+                    // Pastikan tanggal selalu menjadi objek Date
+                    date: new Date(editedProduct.date),
                     sku: editedProduct.sku,
                     name: editedProduct.name,
                     price: editedProduct.price,
@@ -3368,7 +3368,6 @@ function removeSupplierProduct(supplierId, sku) {
     if (!supplierInState) return;
 
     try {
-        // Perbaikan: Ambil objek produk yang lengkap, termasuk tanggal
         const productToRemove = supplierInState.products.find(p => p.sku === sku);
         if (!productToRemove) {
             console.warn("Produk tidak ditemukan di state lokal.");
@@ -3376,7 +3375,6 @@ function removeSupplierProduct(supplierId, sku) {
         }
 
         const supplierRef = doc(db, "suppliers", supplierId);
-        // Perbaikan: Gunakan objek yang lengkap untuk arrayRemove
         updateDoc(supplierRef, { products: arrayRemove(productToRemove) });
 
         supplierInState.products = supplierInState.products.filter(p => p.sku !== sku);
