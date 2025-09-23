@@ -10155,7 +10155,7 @@ watch(activePage, (newPage) => {
         <p class="text-sm text-slate-600 mb-4">Kontak: {{ uiState.modalData.contact }}</p>
         <div class="flex justify-between items-center mb-4">
             <h4 class="font-semibold">Daftar Produk Barang Jadi</h4>
-            <button @click="showNestedModal('addSupplierProduct', { supplierId: uiState.modalData.id, sku: '', name: '', price: null, stock: null })" class="bg-green-500 text-white font-bold py-1.5 px-3 rounded-md text-sm">
+            <button @click="showNestedModal('addSupplierProduct', { supplierId: uiState.modalData.id, sku: '', name: '', price: null, stock: null, date: new Date().toISOString().split('T')[0] })" class="bg-green-500 text-white font-bold py-1.5 px-3 rounded-md text-sm">
                 + Tambah Produk
             </button>
         </div>
@@ -10197,6 +10197,10 @@ watch(activePage, (newPage) => {
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
         <h3 class="text-xl font-bold mb-4">{{ uiState.nestedModalType === 'addSupplierProduct' ? 'Tambah Produk Supplier' : 'Edit Produk Supplier' }}</h3>
         <form @submit.prevent="uiState.nestedModalType === 'addSupplierProduct' ? addSupplierProduct(uiState.nestedModalData.supplierId) : updateSupplierProduct(uiState.nestedModalData.supplierId)" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium">Tanggal Masuk</label>
+                <input type="date" v-model="uiState.nestedModalData.date" class="mt-1 w-full p-2 border rounded-md" required>
+            </div>
             <div>
                 <label class="block text-sm font-medium">SKU Produk</label>
                 <input type="text" v-model="uiState.nestedModalData.sku" class="mt-1 w-full p-2 border rounded-md" required>
