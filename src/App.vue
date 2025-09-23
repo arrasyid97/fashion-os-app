@@ -5809,7 +5809,7 @@ onMounted(() => {
                             
                             // 👇 BARIS UNTUK MEMPERBAIKI ERROR 'fetchSuppliers' is not used 👇
                             await fetchSuppliers();
-                            
+                            await fetchPurchaseOrders();
                             hasLoadedInitialData.value = true;
                             changePage(activePage.value);
                             
@@ -5873,9 +5873,10 @@ watch(activePage, (newPage) => {
         nextTick(renderCharts);
     }
     
-    // 👇 PANGGIL FUNGSI SAAT PINDAH KE HALAMAN SUPPLIER 👇
+    // --- TAMBAHKAN KODE INI DI SINI ---
     if (newPage === 'supplier') {
         fetchSuppliers();
+        fetchPurchaseOrders(); // <--- TAMBAHKAN BARIS INI
     }
 });
 
