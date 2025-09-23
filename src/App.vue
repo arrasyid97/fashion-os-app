@@ -8707,7 +8707,6 @@ watch(activePage, (newPage) => {
                                                     <option>Dalam Proses</option>
                                                     <option>Selesai</option>
                                                     <option>Revisi</option>
-                                                    <option>Ditunda</option>
                                                 </select>
                                             </td>
                                             <td class="px-4 py-3">
