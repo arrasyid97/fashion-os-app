@@ -10131,6 +10131,10 @@ watch(activePage, (newPage) => {
     <h3 class="text-xl font-bold mb-4">{{ uiState.modalType === 'addSupplier' ? 'Tambah Supplier Baru' : 'Edit Supplier' }}</h3>
     <form @submit.prevent="uiState.modalType === 'addSupplier' ? addSupplier() : editSupplier()" class="space-y-4">
         <div>
+            <label class="block text-sm font-medium">Tanggal Masuk</label>
+            <input type="date" v-model="uiState.modalData.date" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
             <label class="block text-sm font-medium">Nama Supplier</label>
             <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md" required>
         </div>
