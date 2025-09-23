@@ -3338,38 +3338,6 @@ async function addSupplierProduct() { // Fungsi tidak lagi menerima supplierId
     }
 }
 
-// Fungsi edit dan hapus tetap di dalam modal detail
-async function updateSupplierProduct(supplierId) {
-    if (!currentUser.value) return alert("Anda harus login.");
-    const editedProduct = uiState.nestedModalData;
-    const supplierInState = state.suppliers.find(s => s.id === supplierId);
-    if (!supplierInState) return;
-
-    try {
-        const updatedProducts = supplierInState.products.map(p => {
-            if (p.sku === editedProduct.originalSku) {
-                return {
-                    date: new Date(editedProduct.date),
-                    sku: editedProduct.sku,
-                    name: editedProduct.name,
-                    price: editedProduct.price,
-                    stock: editedProduct.stock,
-                };
-            }
-            return p;
-        });
-
-        const supplierRef = doc(db, "suppliers", supplierId);
-        await updateDoc(supplierRef, { products: updatedProducts });
-
-        supplierInState.products = updatedProducts;
-        hideNestedModal();
-        alert("Produk supplier berhasil diperbarui!");
-    } catch (error) {
-        console.error("Gagal memperbarui produk supplier:", error);
-        alert("Gagal memperbarui produk supplier.");
-    }
-}
 
 async function removeSupplierProduct(supplierId, sku) {
     if (!confirm("Anda yakin ingin menghapus produk ini?")) return;
