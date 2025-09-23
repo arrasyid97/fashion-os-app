@@ -1088,8 +1088,6 @@ function addSupplierProduct(supplier) {
         modelName: '', 
         color: '', 
         size: '',
-        hargaJual: null,
-        qty: null
     });
 }
 
@@ -8847,29 +8845,25 @@ watch(activePage, (newPage) => {
                         <th class="px-4 py-3">Nama Model</th>
                         <th class="px-4 py-3">Warna</th>
                         <th class="px-4 py-3">Ukuran</th>
-                        <th class="px-4 py-3 text-right">Harga Jual</th>
-                        <th class="px-4 py-3 text-center">QTY</th>
-                        <th class="px-4 py-3 text-right">Total Nilai QTY</th>
                         <th class="px-4 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200/50">
                     <tr v-if="!uiState.modalData.products || uiState.modalData.products.length === 0">
-                        <td colspan="8" class="p-4 text-center text-slate-500">Tidak ada produk yang terdaftar untuk supplier ini.</td>
+                        <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada produk yang terdaftar untuk supplier ini.</td>
                     </tr>
                     <tr v-for="(product, index) in uiState.modalData.products" :key="index">
-                        <td class="px-4 py-3"><input type="text" v-model="product.sku" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="SKU"></td>
-                        <td class="px-4 py-3"><input type="text" v-model="product.modelName" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Nama Model"></td>
-                        <td class="px-4 py-3"><input type="text" v-model="product.color" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Warna"></td>
-                        <td class="px-4 py-3"><input type="text" v-model="product.size" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Ukuran"></td>
                         <td class="px-4 py-3">
-                            <input type="number" v-model.number="product.hargaJual" class="w-full p-1 border rounded-md text-sm text-right text-slate-800" placeholder="Harga">
+                            <input type="text" v-model="product.sku" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="SKU">
                         </td>
                         <td class="px-4 py-3">
-                            <input type="number" v-model.number="product.qty" class="w-20 p-1 border rounded-md text-sm text-center text-slate-800" placeholder="Qty">
+                            <input type="text" v-model="product.modelName" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Nama Model">
                         </td>
-                        <td class="px-4 py-3 text-right font-semibold text-indigo-600">
-                            {{ formatCurrency(product.hargaJual * product.qty || 0) }}
+                        <td class="px-4 py-3">
+                            <input type="text" v-model="product.color" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Warna">
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="text" v-model="product.size" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Ukuran">
                         </td>
                         <td class="px-4 py-3 text-right">
                             <button @click="removeSupplierProduct(uiState.modalData, index)" type="button" class="text-red-500 hover:underline">Hapus</button>
