@@ -65,6 +65,7 @@ const state = reactive({
     produksi: [],    // --- START: KODE BARU UNTUK STOK KAIN ---
     gudangKain: [],
     voucherNotes: [],
+    suppliers: [],
     investor: [],
     bankAccounts: [],
     // --- END: KODE BARU UNTUK STOK KAIN ---
@@ -168,6 +169,8 @@ const uiState = reactive({
     notesFilterModel: '',
     notesFilterChannel: '',
     notesSortBy: 'endDate-asc',
+
+    supplierSearch: '',
 
     exportFilter: 'all_time',
     exportStartDate: '',
@@ -2521,7 +2524,17 @@ const filteredProduksiBatches = computed(() => {
     return filteredData;
 });
 
-
+const filteredSuppliers = computed(() => {
+    let filtered = state.suppliers;
+    const query = uiState.supplierSearch.toLowerCase();
+    if (query) {
+        filtered = filtered.filter(s => 
+            s.name.toLowerCase().includes(query) ||
+            s.contact.toLowerCase().includes(query)
+        );
+    }
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
+});
 
 const hargaHppProductNames = computed(() => {
     return [...new Set(state.produk.map(p => p.nama))];
@@ -3221,6 +3234,135 @@ async function submitKain(isEditing = false) {
     } catch (error) {
         console.error("Error menyimpan data kain:", error);
         alert("Gagal menyimpan data kain ke database.");
+    }
+}
+
+async function addSupplier() {
+    if (!currentUser.value) return alert("Anda harus login.");
+    const newSupplier = uiState.modalData;
+    if (!newSupplier.name || !newSupplier.contact) {
+        return alert("Nama dan kontak supplier wajib diisi.");
+    }
+    try {
+        const docRef = await addDoc(collection(db, "suppliers"), {
+            ...newSupplier,
+            userId: currentUser.value.uid,
+        });
+        state.suppliers.push({ id: docRef.id, ...newSupplier });
+        hideModal();
+        alert("Supplier baru berhasil ditambahkan!");
+    } catch (error) {
+        console.error("Gagal menambahkan supplier:", error);
+        alert("Gagal menambahkan supplier.");
+    }
+}
+
+async function editSupplier() {
+    if (!currentUser.value) return alert("Anda harus login.");
+    const editedSupplier = uiState.modalData;
+    if (!editedSupplier.name || !editedSupplier.contact) {
+        return alert("Nama dan kontak supplier wajib diisi.");
+    }
+    try {
+        const docRef = doc(db, "suppliers", editedSupplier.id);
+        await updateDoc(docRef, {
+            name: editedSupplier.name,
+            contact: editedSupplier.contact,
+        });
+        const index = state.suppliers.findIndex(s => s.id === editedSupplier.id);
+        if (index !== -1) {
+            state.suppliers[index].name = editedSupplier.name;
+            state.suppliers[index].contact = editedSupplier.contact;
+        }
+        hideModal();
+        alert("Data supplier berhasil diperbarui!");
+    } catch (error) {
+        console.error("Gagal memperbarui supplier:", error);
+        alert("Gagal memperbarui supplier.");
+    }
+}
+
+async function deleteSupplier(supplierId) {
+    if (!confirm("Anda yakin ingin menghapus supplier ini? Ini juga akan menghapus semua produknya.")) {
+        return;
+    }
+    try {
+        await deleteDoc(doc(db, "suppliers", supplierId));
+        // Hapus juga produk-produk yang terkait dengan supplier ini jika ada
+        // Logika tambahan bisa ditambahkan di sini, tergantung bagaimana Anda menyimpan produk supplier
+        state.suppliers = state.suppliers.filter(s => s.id !== supplierId);
+        alert("Supplier berhasil dihapus.");
+    } catch (error) {
+        console.error("Gagal menghapus supplier:", error);
+        alert("Gagal menghapus supplier.");
+    }
+}
+
+async function addSupplierProduct(supplierId) {
+    if (!currentUser.value) return alert("Anda harus login.");
+    const product = uiState.nestedModalData;
+    if (!product.sku || !product.name || !product.price || !product.stock) {
+        return alert("Semua field produk wajib diisi.");
+    }
+    try {
+        const supplierRef = doc(db, "suppliers", supplierId);
+        await updateDoc(supplierRef, {
+            products: admin.firestore.FieldValue.arrayUnion(product)
+        });
+        const supplierInState = state.suppliers.find(s => s.id === supplierId);
+        if (supplierInState) {
+            supplierInState.products.push(product);
+        }
+        hideNestedModal();
+        alert("Produk berhasil ditambahkan ke supplier!");
+    } catch (error) {
+        console.error("Gagal menambahkan produk supplier:", error);
+        alert("Gagal menambahkan produk supplier.");
+    }
+}
+
+async function updateSupplierProduct(supplierId) {
+    if (!currentUser.value) return alert("Anda harus login.");
+    const editedProduct = uiState.nestedModalData;
+    const supplierInState = state.suppliers.find(s => s.id === supplierId);
+    if (!supplierInState) return;
+
+    try {
+        const updatedProducts = supplierInState.products.map(p => 
+            p.sku === editedProduct.originalSku ? {
+                sku: editedProduct.sku,
+                name: editedProduct.name,
+                price: editedProduct.price,
+                stock: editedProduct.stock,
+            } : p
+        );
+
+        const supplierRef = doc(db, "suppliers", supplierId);
+        await updateDoc(supplierRef, { products: updatedProducts });
+
+        supplierInState.products = updatedProducts;
+        hideNestedModal();
+        alert("Produk supplier berhasil diperbarui!");
+    } catch (error) {
+        console.error("Gagal memperbarui produk supplier:", error);
+        alert("Gagal memperbarui produk supplier.");
+    }
+}
+
+function removeSupplierProduct(supplierId, sku) {
+    if (!confirm("Anda yakin ingin menghapus produk ini?")) return;
+    const supplierInState = state.suppliers.find(s => s.id === supplierId);
+    if (!supplierInState) return;
+    
+    try {
+        const updatedProducts = supplierInState.products.filter(p => p.sku !== sku);
+        const supplierRef = doc(db, "suppliers", supplierId);
+        updateDoc(supplierRef, { products: updatedProducts });
+        supplierInState.products = updatedProducts;
+        alert("Produk supplier berhasil dihapus.");
+    } catch (error) {
+        console.error("Gagal menghapus produk supplier:", error);
+        alert("Gagal menghapus produk supplier.");
     }
 }
 
@@ -5422,7 +5564,7 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 async function loadAllDataFromFirebase() {
     isLoading.value = true;
     const userId = currentUser.value?.uid;
-    
+
     if (!userId) {
         isLoading.value = false;
         return;
@@ -5443,22 +5585,23 @@ async function loadAllDataFromFirebase() {
             getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
             getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
             getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))), // BARIS BARU UNTUK CATATAN VOUCHER
+            getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "suppliers"), where("userId", "==", userId))), // Tambahan: Mengambil data supplier
         ];
 
         const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
-        
+
         const firstError = results.find(res => res instanceof Error);
         if (firstError) {
             console.error("Salah satu kueri data gagal:", firstError);
             throw new Error("Gagal mengambil data. Periksa aturan keamanan Firestore Anda.");
         }
-        
+
         const [
             settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
             transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
             categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap,
-            notesSnap // TAMBAHKAN NOTES SNAP
+            notesSnap, suppliersSnap, // Tambahan: Deklarasi suppliersSnap di sini
         ] = results;
 
         if (settingsSnap.exists()) {
@@ -5468,7 +5611,7 @@ async function loadAllDataFromFirebase() {
                 state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
             }
         }
-        
+
         const userDocRef = doc(db, "users", userId);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
@@ -5478,11 +5621,9 @@ async function loadAllDataFromFirebase() {
 
         if (promotionsSnap.exists()) {
             const promoData = promotionsSnap.data();
-            // Pastikan objek dasar promosi ada
             state.promotions.perChannel = promoData.perChannel || {};
             state.promotions.perModel = promoData.perModel || {};
 
-            // Periksa setiap channel dan pastikan objek voucher ada
             state.settings.marketplaces.forEach(channel => {
                 if (!state.promotions.perChannel[channel.id]) {
                     state.promotions.perChannel[channel.id] = {};
@@ -5512,7 +5653,7 @@ async function loadAllDataFromFirebase() {
 
         const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
-        
+
         state.produk = productsSnap.docs.map(docSnap => {
             const p = { id: docSnap.id, ...docSnap.data() };
             const hargaJual = {};
@@ -5537,7 +5678,7 @@ async function loadAllDataFromFirebase() {
                 userId: p.userId
             };
         });
-        
+
         state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
@@ -5547,8 +5688,8 @@ async function loadAllDataFromFirebase() {
         state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
         state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.voucherNotes = notesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), endDate: doc.data().endDate?.toDate() })); // BARIS BARU UNTUK MENGISI NOTES
-        
+        state.voucherNotes = notesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), endDate: doc.data().endDate?.toDate() }));
+        state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })); // Tambahan: Mengisi state.suppliers
     } catch (error) {
         console.error("Error besar saat memuat data dari Firebase:", error);
         alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
@@ -5757,6 +5898,12 @@ watch(activePage, (newPage) => {
             <a href="#" @click.prevent="changePage('produksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'produksi' }">
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                 Produksi
+            </a>
+            <a href="#" @click.prevent="changePage('supplier')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'supplier' }">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                Manajemen Supplier
             </a>
             <a href="#" @click.prevent="changePage('gudang-kain')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'gudang-kain' }">
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121M12 12l2.879 2.879M12 12L9.121 14.879M12 12L14.879 9.121M12 12L19 5"/></svg>
@@ -6734,6 +6881,54 @@ watch(activePage, (newPage) => {
         </div>
     </div>
 </div>
+
+<div v-if="activePage === 'supplier'">
+            <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+                <div class="max-w-7xl mx-auto">
+                    <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
+                        <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
+                            <div>
+                                <h2 class="text-3xl font-bold text-slate-800">Manajemen Supplier</h2>
+                                <p class="text-slate-500 mt-1">Kelola data supplier dan stok barang jadi dari mereka.</p>
+                            </div>
+                            <button @click="showModal('addSupplier', { name: '', contact: '', products: [] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
+                                + Tambah Supplier Baru
+                            </button>
+                        </div>
+                        <div class="mb-6">
+                            <input type="text" v-model="uiState.supplierSearch" placeholder="Cari nama supplier..." class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-slate-500">
+                                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                                    <tr>
+                                        <th class="px-6 py-3">Nama Supplier</th>
+                                        <th class="px-6 py-3">Kontak</th>
+                                        <th class="px-6 py-3 text-center">Jumlah Produk</th>
+                                        <th class="px-6 py-3 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200/50">
+                                    <tr v-if="filteredSuppliers.length === 0">
+                                        <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada data supplier yang cocok.</td>
+                                    </tr>
+                                    <tr v-for="supplier in filteredSuppliers" :key="supplier.id" class="hover:bg-slate-50/50">
+                                        <td class="px-6 py-4 font-semibold text-slate-800">{{ supplier.name }}</td>
+                                        <td class="px-6 py-4">{{ supplier.contact }}</td>
+                                        <td class="px-6 py-4 text-center">{{ supplier.products.length }}</td>
+                                        <td class="px-6 py-4 text-right space-x-3">
+                                            <button @click="showModal('viewSupplier', supplier)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Detail</button>
+                                            <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="text-xs bg-indigo-100 text-indigo-700 font-bold py-1 px-2 rounded hover:bg-indigo-200">Edit</button>
+                                            <button @click="deleteSupplier(supplier.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
 <div v-if="activePage === 'gudang-kain'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
@@ -8597,6 +8792,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>        
 
+
 <div v-if="uiState.modalType === 'panduanPromosi'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Panduan Manajemen Promosi & Voucher</h3>
@@ -9925,6 +10121,96 @@ watch(activePage, (newPage) => {
     <div class="flex justify-end gap-3 pt-4 border-t mt-auto">
         <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
         <button type="button" @click="submitReturForm" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Data Retur</button>
+    </div>
+</div>
+
+<div v-if="uiState.modalType === 'addSupplier' || uiState.modalType === 'editSupplier'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full">
+    <h3 class="text-xl font-bold mb-4">{{ uiState.modalType === 'addSupplier' ? 'Tambah Supplier Baru' : 'Edit Supplier' }}</h3>
+    <form @submit.prevent="uiState.modalType === 'addSupplier' ? addSupplier() : editSupplier()" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium">Nama Supplier</label>
+            <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Kontak (Email/Telepon)</label>
+            <input type="text" v-model="uiState.modalData.contact" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div class="flex justify-end gap-3 pt-4 border-t mt-4">
+            <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
+        </div>
+    </form>
+</div>
+
+<div v-if="uiState.modalType === 'viewSupplier'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
+    <h3 class="text-xl font-bold mb-4">Detail Supplier: {{ uiState.modalData.name }}</h3>
+    <div class="flex-1 overflow-y-auto pr-2">
+        <p class="text-sm text-slate-600 mb-4">Kontak: {{ uiState.modalData.contact }}</p>
+        <div class="flex justify-between items-center mb-4">
+            <h4 class="font-semibold">Daftar Produk Barang Jadi</h4>
+            <button @click="showNestedModal('addSupplierProduct', { supplierId: uiState.modalData.id, sku: '', name: '', price: null, stock: null })" class="bg-green-500 text-white font-bold py-1.5 px-3 rounded-md text-sm">
+                + Tambah Produk
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-slate-500">
+                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                    <tr>
+                        <th class="px-6 py-3">SKU</th>
+                        <th class="px-6 py-3">Nama Produk</th>
+                        <th class="px-6 py-3 text-right">Harga Beli</th>
+                        <th class="px-6 py-3 text-center">Stok</th>
+                        <th class="px-6 py-3 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200/50">
+                    <tr v-if="uiState.modalData.products?.length === 0">
+                        <td colspan="5" class="p-4 text-center text-slate-500">Belum ada produk dari supplier ini.</td>
+                    </tr>
+                    <tr v-for="product in uiState.modalData.products" :key="product.sku" class="hover:bg-slate-50/50">
+                        <td class="px-6 py-4">{{ product.sku }}</td>
+                        <td class="px-6 py-4 font-semibold text-slate-800">{{ product.name }}</td>
+                        <td class="px-6 py-4 text-right">{{ formatCurrency(product.price) }}</td>
+                        <td class="px-6 py-4 text-center">{{ product.stock }}</td>
+                        <td class="px-6 py-4 text-right space-x-3">
+                            <button @click="showNestedModal('editSupplierProduct', { ...product, originalSku: product.sku, supplierId: uiState.modalData.id })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
+                            <button @click="removeSupplierProduct(uiState.modalData.id, product.sku)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Tutup</button>
+    </div>
+</div>
+
+<div v-if="uiState.nestedModalType === 'addSupplierProduct' || uiState.nestedModalType === 'editSupplierProduct'" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+        <h3 class="text-xl font-bold mb-4">{{ uiState.nestedModalType === 'addSupplierProduct' ? 'Tambah Produk Supplier' : 'Edit Produk Supplier' }}</h3>
+        <form @submit.prevent="uiState.nestedModalType === 'addSupplierProduct' ? addSupplierProduct(uiState.nestedModalData.supplierId) : updateSupplierProduct(uiState.nestedModalData.supplierId)" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium">SKU Produk</label>
+                <input type="text" v-model="uiState.nestedModalData.sku" class="mt-1 w-full p-2 border rounded-md" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Nama Produk</label>
+                <input type="text" v-model="uiState.nestedModalData.name" class="mt-1 w-full p-2 border rounded-md" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Harga Beli per Unit (Rp)</label>
+                <input type="number" v-model.number="uiState.nestedModalData.price" class="mt-1 w-full p-2 border rounded-md" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Stok Awal</label>
+                <input type="number" v-model.number="uiState.nestedModalData.stock" class="mt-1 w-full p-2 border rounded-md" required>
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t">
+                <button type="button" @click="hideNestedModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
+            </div>
+        </form>
     </div>
 </div>
 
