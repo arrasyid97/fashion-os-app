@@ -6908,7 +6908,7 @@ watch(activePage, (newPage) => {
                                         <th class="px-6 py-3">Nama Supplier</th>
                                         <th class="px-6 py-3">Kontak</th>
                                         <th class="px-6 py-3 text-center">Jumlah Produk</th>
-                                        <th class="px-6 py-3 text-right">Aksi</th>
+                                        
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200/50">
@@ -6920,10 +6920,7 @@ watch(activePage, (newPage) => {
                                         <td class="px-6 py-4">{{ supplier.contact }}</td>
                                         <td class="px-6 py-4 text-center">{{ supplier.products.length }}</td>
                                         <td class="px-6 py-4 text-right space-x-3">
-    <button @click="showModal('viewSupplier', supplier)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Detail</button>
-    <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="text-xs bg-indigo-100 text-indigo-700 font-bold py-1 px-2 rounded hover:bg-indigo-200">Edit</button>
-    <button @click="deleteSupplier(supplier.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
-</td>
+    </td>
                                     </tr>
                                 </tbody>
                             </table>
