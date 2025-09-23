@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
@@ -3307,7 +3307,7 @@ async function addSupplierProduct(supplierId) {
     try {
         const supplierRef = doc(db, "suppliers", supplierId);
         await updateDoc(supplierRef, {
-            products: admin.firestore.FieldValue.arrayUnion(product)
+            products: arrayUnion(product)
         });
         const supplierInState = state.suppliers.find(s => s.id === supplierId);
         if (supplierInState) {
@@ -3355,10 +3355,13 @@ function removeSupplierProduct(supplierId, sku) {
     if (!supplierInState) return;
     
     try {
-        const updatedProducts = supplierInState.products.filter(p => p.sku !== sku);
+        const productToRemove = supplierInState.products.find(p => p.sku === sku);
+        if (!productToRemove) return;
+
         const supplierRef = doc(db, "suppliers", supplierId);
-        updateDoc(supplierRef, { products: updatedProducts });
-        supplierInState.products = updatedProducts;
+        updateDoc(supplierRef, { products: arrayRemove(productToRemove) });
+        
+        supplierInState.products = supplierInState.products.filter(p => p.sku !== sku);
         alert("Produk supplier berhasil dihapus.");
     } catch (error) {
         console.error("Gagal menghapus produk supplier:", error);
