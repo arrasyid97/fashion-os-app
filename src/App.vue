@@ -2734,7 +2734,14 @@ const filteredProduksiBatches = computed(() => {
     return filteredData;
 });
 
-
+const inventoryProductOptions = computed(() => {
+    return state.produk.map(p => ({
+        sku: p.sku,
+        nama: p.nama,
+        warna: p.warna,
+        varian: p.varian
+    }));
+});
 
 const hargaHppProductNames = computed(() => {
     return [...new Set(state.produk.map(p => p.nama))];
@@ -3339,6 +3346,16 @@ function unlockInvestasi() {
     } else {
         uiState.investasiPinError = 'PIN salah. Silakan coba lagi.';
         uiState.investasiPinInput = '';
+    }
+}
+
+function autoFillSupplierProduct(product, selectedSku) {
+    const matchedProduct = state.produk.find(p => p.sku === selectedSku);
+    if (matchedProduct) {
+        product.sku = matchedProduct.sku;
+        product.modelName = matchedProduct.nama;
+        product.color = matchedProduct.warna;
+        product.size = matchedProduct.varian;
     }
 }
 
@@ -8854,16 +8871,28 @@ watch(activePage, (newPage) => {
                     </tr>
                     <tr v-for="(product, index) in uiState.modalData.products" :key="index">
                         <td class="px-4 py-3">
-                            <input type="text" v-model="product.sku" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="SKU">
+                            <input
+                                type="text"
+                                v-model="product.sku"
+                                list="inventaris-skus"
+                                @change="autoFillSupplierProduct(product, $event.target.value)"
+                                class="w-full p-1 border rounded-md text-sm text-slate-800"
+                                placeholder="Cari SKU"
+                            >
+                            <datalist id="inventaris-skus">
+                                <option v-for="item in inventoryProductOptions" :key="item.sku" :value="item.sku">
+                                    {{ item.nama }} ({{ item.warna }} / {{ item.varian }})
+                                </option>
+                            </datalist>
                         </td>
                         <td class="px-4 py-3">
-                            <input type="text" v-model="product.modelName" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Nama Model">
+                            <input type="text" v-model="product.modelName" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Nama Model" readonly>
                         </td>
                         <td class="px-4 py-3">
-                            <input type="text" v-model="product.color" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Warna">
+                            <input type="text" v-model="product.color" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Warna" readonly>
                         </td>
                         <td class="px-4 py-3">
-                            <input type="text" v-model="product.size" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Ukuran">
+                            <input type="text" v-model="product.size" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Ukuran" readonly>
                         </td>
                         <td class="px-4 py-3 text-right">
                             <button @click="removeSupplierProduct(uiState.modalData, index)" type="button" class="text-red-500 hover:underline">Hapus</button>
