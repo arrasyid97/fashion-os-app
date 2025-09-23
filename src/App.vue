@@ -10165,7 +10165,7 @@ watch(activePage, (newPage) => {
                         <th class="px-6 py-3">Nama Produk</th>
                         <th class="px-6 py-3 text-right">Harga Beli</th>
                         <th class="px-6 py-3 text-center">Stok</th>
-                        <th class="px-6 py-3 text-right">Aksi</th>
+                        
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200/50">
@@ -10179,9 +10179,7 @@ watch(activePage, (newPage) => {
                         <td class="px-6 py-4 text-right">{{ formatCurrency(product.price) }}</td>
                         <td class="px-6 py-4 text-center">{{ product.stock }}</td>
                         <td class="px-6 py-4 text-right space-x-3">
-    <button @click="showModal('editSupplierProduct', { ...product, originalSku: product.sku, supplierId: uiState.modalData.id, date: new Date(product.date?.seconds * 1000).toISOString().split('T')[0] })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
-    <button @click="removeSupplierProduct(uiState.modalData.id, product.sku)" class="text-xs text-red-500 hover:underline">Hapus</button>
-</td>
+    </td>
                     </tr>
                 </tbody>
             </table>
