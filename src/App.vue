@@ -3338,27 +3338,25 @@ async function updateSupplierProduct(supplierId) {
     if (!supplierInState) return;
 
     try {
-        // Perbaikan: Buat objek produk yang diperbarui
-        const updatedProduct = {
-            date: new Date(editedProduct.date),
-            sku: editedProduct.sku,
-            name: editedProduct.name,
-            price: editedProduct.price,
-            stock: editedProduct.stock,
-        };
-        
         const updatedProducts = supplierInState.products.map(p => {
-            return p.sku === editedProduct.originalSku ? updatedProduct : p;
+            if (p.sku === editedProduct.originalSku) {
+                return {
+                    // Pastikan properti tanggal terupdate dengan benar
+                    date: new Date(editedProduct.date), 
+                    sku: editedProduct.sku,
+                    name: editedProduct.name,
+                    price: editedProduct.price,
+                    stock: editedProduct.stock,
+                };
+            }
+            return p;
         });
 
         const supplierRef = doc(db, "suppliers", supplierId);
         await updateDoc(supplierRef, { products: updatedProducts });
-        
-        // Perbaikan: Langsung perbarui array di state lokal
-        const index = supplierInState.products.findIndex(p => p.sku === editedProduct.originalSku);
-        if (index !== -1) {
-            supplierInState.products[index] = updatedProduct;
-        }
+
+        // Perbaikan di sini: Perbarui array secara reaktif dengan menimpa seluruh array
+        supplierInState.products = updatedProducts;
 
         hideNestedModal();
         alert("Produk supplier berhasil diperbarui!");
@@ -3382,10 +3380,10 @@ async function removeSupplierProduct(supplierId, sku) {
 
         const supplierRef = doc(db, "suppliers", supplierId);
         await updateDoc(supplierRef, { products: arrayRemove(productToRemove) });
-        
-        // Perbaikan: Langsung perbarui state lokal setelah hapus
+
+        // Perbaikan di sini: Perbarui array secara reaktif
         supplierInState.products = supplierInState.products.filter(p => p.sku !== sku);
-        
+
         alert("Produk supplier berhasil dihapus.");
     } catch (error) {
         console.error("Gagal menghapus produk supplier:", error);
