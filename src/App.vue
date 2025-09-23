@@ -5687,12 +5687,13 @@ onMounted(() => {
                     const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
                                                 (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
 
-                    // --- AWAL LOGIKA BARU YANG LEBIH AKURAT ---
                     if (isSubscriptionValid) {
-                        // SKENARIO 1: Langganan Aktif
-                        // Muat semua data aplikasi seperti biasa jika belum dimuat.
                         if (!hasLoadedInitialData.value) {
                             await loadAllDataFromFirebase();
+                            
+                            // 👇 BARIS BARU DITAMBAHKAN DI SINI 👇
+                            await fetchSuppliers();
+                            
                             hasLoadedInitialData.value = true;
                             changePage(activePage.value);
                             
@@ -5713,11 +5714,9 @@ onMounted(() => {
                             }
                         }
                     } else {
-                        // SKENARIO 2: Langganan Habis
-                        hasLoadedInitialData.value = false; // Reset agar data tidak ditampilkan di halaman lain
+                        hasLoadedInitialData.value = false;
 
                         if (currentUser.value.isPartner) {
-                            // Jika pengguna adalah MITRA, muat HANYA data komisi mereka.
                             const commissionsQuery = query(
                                 collection(db, 'commissions'),
                                 where('partnerId', '==', currentUser.value.uid)
@@ -5727,15 +5726,11 @@ onMounted(() => {
                             });
                         }
                         
-                        // Periksa halaman yang diizinkan untuk diakses saat langganan habis.
                         const allowedPages = ['mitra', 'pengaturan', 'langganan', 'tentang', 'panduan'];
                         if (!allowedPages.includes(activePage.value)) {
-                            // Jika halaman saat ini tidak diizinkan, alihkan ke halaman langganan.
                             activePage.value = 'langganan';
                         }
                     }
-                    // --- AKHIR LOGIKA BARU ---
-
                 } else {
                     console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
                     handleLogout();
@@ -5758,6 +5753,14 @@ onMounted(() => {
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
 watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
+    if (newPage === 'dashboard') {
+        nextTick(renderCharts);
+    }
+    
+    // --- TAMBAHKAN KODE INI UNTUK MEMANGGIL fetchSuppliers SAAT PINDAH HALAMAN ---
+    if (newPage === 'supplier') {
+        fetchSuppliers();
+    }
 });
 
 </script>
