@@ -3282,22 +3282,6 @@ async function editSupplier() {
     }
 }
 
-async function deleteSupplier(supplierId) {
-    if (!confirm("Anda yakin ingin menghapus supplier ini? Ini juga akan menghapus semua produknya.")) {
-        return;
-    }
-    try {
-        await deleteDoc(doc(db, "suppliers", supplierId));
-        // Hapus juga produk-produk yang terkait dengan supplier ini jika ada
-        // Logika tambahan bisa ditambahkan di sini, tergantung bagaimana Anda menyimpan produk supplier
-        state.suppliers = state.suppliers.filter(s => s.id !== supplierId);
-        alert("Supplier berhasil dihapus.");
-    } catch (error) {
-        console.error("Gagal menghapus supplier:", error);
-        alert("Gagal menghapus supplier.");
-    }
-}
-
 async function addSupplierProduct() { // Fungsi tidak lagi menerima supplierId
     if (!currentUser.value) return alert("Anda harus login.");
     const product = uiState.modalData; // Menggunakan modalData, bukan nestedModalData
@@ -3335,31 +3319,6 @@ async function addSupplierProduct() { // Fungsi tidak lagi menerima supplierId
     } catch (error) {
         console.error("Gagal menambahkan produk supplier:", error);
         alert("Gagal menambahkan produk supplier.");
-    }
-}
-
-
-async function removeSupplierProduct(supplierId, sku) {
-    if (!confirm("Anda yakin ingin menghapus produk ini?")) return;
-    const supplierInState = state.suppliers.find(s => s.id === supplierId);
-    if (!supplierInState) return;
-
-    try {
-        const productToRemove = supplierInState.products.find(p => p.sku === sku);
-        if (!productToRemove) {
-            console.warn("Produk tidak ditemukan di state lokal.");
-            return;
-        }
-
-        const supplierRef = doc(db, "suppliers", supplierId);
-        await updateDoc(supplierRef, { products: arrayRemove(productToRemove) });
-        
-        supplierInState.products = supplierInState.products.filter(p => p.sku !== sku);
-        
-        alert("Produk supplier berhasil dihapus.");
-    } catch (error) {
-        console.error("Gagal menghapus produk supplier:", error);
-        alert("Gagal menghapus produk supplier.");
     }
 }
 
