@@ -8344,7 +8344,7 @@ watch(activePage, (newPage) => {
             <div class="max-w-xl mx-auto mb-12 p-6 rounded-xl border border-dashed border-indigo-300 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 300ms;">
                 <h3 class="text-lg font-semibold text-indigo-700">Punya Kode Rujukan? (Untuk Diskon)</h3>
                 <p v-if="!currentUser?.userData?.referredBy" class="text-sm text-slate-600 mb-2">
-                    Masukkan kode dari mitra kami untuk mendapatkan diskon khusus.
+                    Silahkan masukan kodenya.
                 </p>
                 <div v-if="!currentUser?.userData?.referredBy" class="flex gap-2">
     <input type="text" v-model="uiState.referralCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400">
