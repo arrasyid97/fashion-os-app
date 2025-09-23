@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, arrayUnion } from 'firebase/firestore';
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
