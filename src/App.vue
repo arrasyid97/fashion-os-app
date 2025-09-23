@@ -3306,7 +3306,6 @@ async function addSupplierProduct(supplierId) {
     }
     try {
         const supplierRef = doc(db, "suppliers", supplierId);
-        // Simpan tanggal sebagai objek Date yang valid
         const productToSave = {
             date: new Date(product.date),
             sku: product.sku,
@@ -3317,10 +3316,13 @@ async function addSupplierProduct(supplierId) {
         await updateDoc(supplierRef, {
             products: arrayUnion(productToSave)
         });
+        
+        // Perbaikan: Perbarui state lokal dengan push produk baru
         const supplierInState = state.suppliers.find(s => s.id === supplierId);
         if (supplierInState) {
             supplierInState.products.push(productToSave);
         }
+
         hideNestedModal();
         alert("Produk berhasil ditambahkan ke supplier!");
     } catch (error) {
@@ -3336,24 +3338,28 @@ async function updateSupplierProduct(supplierId) {
     if (!supplierInState) return;
 
     try {
+        // Perbaikan: Buat objek produk yang diperbarui
+        const updatedProduct = {
+            date: new Date(editedProduct.date),
+            sku: editedProduct.sku,
+            name: editedProduct.name,
+            price: editedProduct.price,
+            stock: editedProduct.stock,
+        };
+        
         const updatedProducts = supplierInState.products.map(p => {
-            if (p.sku === editedProduct.originalSku) {
-                return {
-                    // Pastikan tanggal selalu menjadi objek Date
-                    date: new Date(editedProduct.date),
-                    sku: editedProduct.sku,
-                    name: editedProduct.name,
-                    price: editedProduct.price,
-                    stock: editedProduct.stock,
-                };
-            }
-            return p;
+            return p.sku === editedProduct.originalSku ? updatedProduct : p;
         });
 
         const supplierRef = doc(db, "suppliers", supplierId);
         await updateDoc(supplierRef, { products: updatedProducts });
+        
+        // Perbaikan: Langsung perbarui array di state lokal
+        const index = supplierInState.products.findIndex(p => p.sku === editedProduct.originalSku);
+        if (index !== -1) {
+            supplierInState.products[index] = updatedProduct;
+        }
 
-        supplierInState.products = updatedProducts;
         hideNestedModal();
         alert("Produk supplier berhasil diperbarui!");
     } catch (error) {
@@ -3362,7 +3368,7 @@ async function updateSupplierProduct(supplierId) {
     }
 }
 
-function removeSupplierProduct(supplierId, sku) {
+async function removeSupplierProduct(supplierId, sku) {
     if (!confirm("Anda yakin ingin menghapus produk ini?")) return;
     const supplierInState = state.suppliers.find(s => s.id === supplierId);
     if (!supplierInState) return;
@@ -3375,9 +3381,11 @@ function removeSupplierProduct(supplierId, sku) {
         }
 
         const supplierRef = doc(db, "suppliers", supplierId);
-        updateDoc(supplierRef, { products: arrayRemove(productToRemove) });
-
+        await updateDoc(supplierRef, { products: arrayRemove(productToRemove) });
+        
+        // Perbaikan: Langsung perbarui state lokal setelah hapus
         supplierInState.products = supplierInState.products.filter(p => p.sku !== sku);
+        
         alert("Produk supplier berhasil dihapus.");
     } catch (error) {
         console.error("Gagal menghapus produk supplier:", error);
