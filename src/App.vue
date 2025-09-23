@@ -2755,8 +2755,8 @@ const hargaHppFilteredVariants = computed(() => {
 });
 
 const filteredPurchaseOrders = computed(() => {
-    // Anda bisa menambahkan filter dan sort di sini nanti jika dibutuhkan
-    return state.purchaseOrders.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+    // PERBAIKAN: Mengurutkan salinan array, bukan array aslinya
+    return [...state.purchaseOrders].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 });
 
 const ringkasanJadiData = computed(() => {
