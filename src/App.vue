@@ -1204,7 +1204,10 @@ async function fetchPurchaseOrders() {
         const purchaseOrdersCollection = collection(db, 'purchase_orders');
         const q = query(purchaseOrdersCollection, where('userId', '==', currentUser.value.uid));
         const snapshot = await getDocs(q);
-        // Anda bisa simpan data ini jika diperlukan, misalnya untuk riwayat
+        
+        // 👇 PERBAIKAN: Menyimpan data ke state lokal 👇
+        state.purchaseOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        
     } catch (error) {
         console.error("Gagal mengambil data pesanan pembelian:", error);
     }
@@ -5804,7 +5807,7 @@ onMounted(() => {
                         if (!hasLoadedInitialData.value) {
                             await loadAllDataFromFirebase();
                             
-                            // 👇 BARIS BARU DITAMBAHKAN DI SINI 👇
+                            // 👇 BARIS UNTUK MEMPERBAIKI ERROR 'fetchSuppliers' is not used 👇
                             await fetchSuppliers();
                             
                             hasLoadedInitialData.value = true;
@@ -5870,7 +5873,7 @@ watch(activePage, (newPage) => {
         nextTick(renderCharts);
     }
     
-    // --- TAMBAHKAN KODE INI UNTUK MEMANGGIL fetchSuppliers SAAT PINDAH HALAMAN ---
+    // 👇 PANGGIL FUNGSI SAAT PINDAH KE HALAMAN SUPPLIER 👇
     if (newPage === 'supplier') {
         fetchSuppliers();
     }
