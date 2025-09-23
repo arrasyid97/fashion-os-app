@@ -2754,7 +2754,10 @@ const hargaHppFilteredVariants = computed(() => {
     return state.produk.filter(p => p.nama === uiState.hargaHppSelectedProduct);
 });
 
-
+const filteredPurchaseOrders = computed(() => {
+    // Anda bisa menambahkan filter dan sort di sini nanti jika dibutuhkan
+    return state.purchaseOrders.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+});
 
 const ringkasanJadiData = computed(() => {
     const summary = {};
@@ -8535,7 +8538,8 @@ watch(activePage, (newPage) => {
                     </button>
                 </div>
 
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 mb-8">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Daftar Supplier</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left text-slate-500">
                             <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
@@ -8559,6 +8563,48 @@ watch(activePage, (newPage) => {
                                         <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
                                         <button @click="showModal('manageSupplierProducts', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-indigo-500 hover:underline">Kelola Produk</button>
                                         <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700">
+                                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Penerimaan Barang</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                                <tr>
+                                    <th class="px-6 py-3">Tanggal</th>
+                                    <th class="px-6 py-3">Supplier</th>
+                                    <th class="px-6 py-3 text-right">Total Nilai Qty</th>
+                                    <th class="px-6 py-3">Status</th>
+                                    <th class="px-6 py-3 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/50">
+                                <tr v-if="filteredPurchaseOrders.length === 0">
+                                    <td colspan="5" class="p-4 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
+                                </tr>
+                                <tr v-for="order in filteredPurchaseOrders" :key="order.id" class="hover:bg-slate-50/50">
+                                    <td class="px-6 py-4">{{ new Date(order.tanggal).toLocaleDateString('id-ID') }}</td>
+                                    <td class="px-6 py-4 font-semibold text-slate-800">{{ order.supplierName }}</td>
+                                    <td class="px-6 py-4 text-right font-bold text-green-600">{{ formatCurrency(order.totalQtyValue) }}</td>
+                                    <td class="px-6 py-4">
+                                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                            :class="{
+                                                'bg-blue-100 text-blue-800': order.statusProses === 'Dalam Proses',
+                                                'bg-green-100 text-green-800': order.statusProses === 'Selesai',
+                                            }">
+                                            {{ order.statusProses }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <button @click="showModal('viewPurchaseOrder', JSON.parse(JSON.stringify(order)))" class="font-semibold text-indigo-500 hover:underline">Detail</button>
+                                        <button @click="deletePurchaseOrder(order.id)" class="text-red-500 hover:text-red-700 ml-3">
                                             <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </td>
@@ -8646,7 +8692,7 @@ watch(activePage, (newPage) => {
                                                     <option>Salah Ukuran</option>
                                                 </select>
                                             </td>
-                                            <td class="px-4 py-3 text-right">
+                                            <td class="px-4 py-3">
                                                 <button @click="removeProductFromPenerimaanBarang(index)" type="button" class="text-red-500 hover:underline text-xs">Hapus</button>
                                             </td>
                                         </tr>
