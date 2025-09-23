@@ -3863,7 +3863,7 @@ async function recordBagiHasilPayment() {
     const result = report.result;
     if (!result || result.investorShare <= 0) return alert("Tidak ada keuntungan.");
 
-    // --- AWAL PERBAIKAN: Mengambill data dari state yang benar ---
+    // --- AWAL PERBAIKAN: Mengambilll data dari state yang benar ---
     const paymentMethod = report.paymentMethod; 
     const adminFee = paymentMethod === 'transfer' ? (report.adminFee || 0) : 0;
     const totalPengeluaran = result.investorShare + adminFee;
