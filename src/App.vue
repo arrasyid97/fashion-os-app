@@ -5063,11 +5063,19 @@ async function saveMarketplaceEdit() {
     }
     
     try {
-        await saveSettingsData(); // <-- PERUBAHAN DI SINI
+        const userId = currentUser.value.uid;
+        const settingsRef = doc(db, "settings", userId);
+        
+        // Cukup perbarui satu field 'marketplaces', tidak seluruh dokumen
+        await updateDoc(settingsRef, {
+            marketplaces: state.settings.marketplaces,
+        });
+
         hideModal();
         alert('Perubahan marketplace berhasil disimpan.');
     } catch(error) {
-        alert("Gagal menyimpan data.");
+        console.error("Gagal menyimpan perubahan marketplace:", error);
+        alert(`Gagal menyimpan data: ${error.message}`);
     }
 }
 
