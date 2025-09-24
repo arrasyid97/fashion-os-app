@@ -5882,7 +5882,7 @@ onMounted(() => {
         if (user) {
             currentUser.value = user;
             await setupListeners(user.uid);
-            // Tambahkan logika untuk mitra di sini jika diperlukan
+            // Tambahkann logika untuk mitra di sini jika diperlukan
         } else {
             currentUser.value = null;
             activePage.value = 'login';
