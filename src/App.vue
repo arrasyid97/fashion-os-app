@@ -5440,7 +5440,7 @@ const panduanData = [
     },
 ];
 
-// [KODE BARU] State untuk mengelola accordion di halaman panduan
+// [KODE BARUu] State untuk mengelola accordion di halaman panduan
 const panduanAccordion = ref(null);
 
 const promosiProductModels = computed(() => {
