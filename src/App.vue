@@ -5727,7 +5727,7 @@ const setupListeners = async (userId) => {
     // Hentikan semua listener yang mungkin aktif dari sesi sebelumnya
     unsubscribe();
 
-    // 1. Deklarasi dan inisialisasi listener settings
+    // 1. Deklarasi dan inisialisasi listener untuk settings
     const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
         if (docSnap.exists()) {
             const settingsData = docSnap.data();
@@ -5738,7 +5738,7 @@ const setupListeners = async (userId) => {
         }
     }, (error) => { console.error("Error fetching settings:", error); });
     
-    // 2. Deklarasi dan inisialisasi listener commissions
+    // 2. Deklarasi dan inisialisasi listener untuk commissions (Hanya jika isPartner)
     let commissionsListener = () => {};
     if (currentUser.value?.isPartner) {
         const commissionsQuery = query(
@@ -5753,8 +5753,8 @@ const setupListeners = async (userId) => {
     // 3. Panggil fungsi untuk mengambil data statis (sekali ambil)
     await fetchStaticData(userId);
 
-    // 4. Gunakan listener dalam fungsi unsubscribe
-    // Ini adalah bagian yang akan memperbaiki error 'never used'
+    // 4. Gunakan listener di dalam fungsi unsubscribe
+    // Bagian ini sangat penting untuk memperbaiki error 'never used'
     unsubscribe = () => {
         settingsListener();
         commissionsListener(); 
