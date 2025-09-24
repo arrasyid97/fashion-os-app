@@ -11794,21 +11794,23 @@ watch(activePage, (newPage) => {
                         </select>
                     </div>
 
-                    <div v-if="uiState.notesData.type === 'model' && (uiState.notesData.voucherType === 'Voucher Produk Tertentu' || uiState.notesData.voucherType === 'Diskon Minimal Belanja Bertingkat')">
-                        <label class="block text-sm font-medium">Pilih Model Produk</label>
-                        <select v-model="uiState.notesData.modelName" class="mt-1 w-full p-2 border rounded-md" required>
-                            <option value="">-- Pilih Model --</option>
-                            <option v-for="model in promosiProductModels" :key="model" :value="model">{{ model }}</option>
-                        </select>
-                    </div>
+                    <template v-if="uiState.notesData.voucherType">
+                         <div v-if="uiState.notesData.type === 'model'">
+                            <label class="block text-sm font-medium">Pilih Model Produk</label>
+                            <select v-model="uiState.notesData.modelName" class="mt-1 w-full p-2 border rounded-md" required>
+                                <option value="">-- Pilih Model --</option>
+                                <option v-for="model in promosiProductModels" :key="model" :value="model">{{ model }}</option>
+                            </select>
+                        </div>
 
-                    <div v-if="uiState.notesData.type === 'channel' && (uiState.notesData.voucherType === 'Voucher Ikuti Toko' || uiState.notesData.voucherType === 'Voucher Semua Produk')">
-                        <label class="block text-sm font-medium">Pilih Akun Penjualan</label>
-                        <select v-model="uiState.notesData.channelId" class="mt-1 w-full p-2 border rounded-md" required>
-                            <option value="">-- Pilih Channel --</option>
-                            <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.id">{{ channel.name }}</option>
-                        </select>
-                    </div>
+                        <div>
+                            <label class="block text-sm font-medium">Pilih Akun Penjualan</label>
+                            <select v-model="uiState.notesData.channelId" class="mt-1 w-full p-2 border rounded-md" required>
+                                <option value="">-- Pilih Channel --</option>
+                                <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.id">{{ channel.name }}</option>
+                            </select>
+                        </div>
+                    </template>
                     
                     <div>
                         <label class="block text-sm font-medium">Nama Voucher</label>
@@ -11902,7 +11904,7 @@ watch(activePage, (newPage) => {
             <button @click="hideNotesModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
         </div>
     </div>
-</div>    
+</div>
 </div>
 </template>
 
