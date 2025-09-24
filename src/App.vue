@@ -1537,14 +1537,16 @@ function generateUniqueCode() {
 }
 
 function showNotesModal() {
-    
-    uiState.notesModalVisible = true;
+    // PERBAIKAN: Menampilkan modal utama dan kemudian mengisi data
+    uiState.isModalVisible = true;
+    uiState.modalType = 'notesModal';
+
     // Reset form data setiap kali modal dibuka
     uiState.notesData = {
         type: 'model', // default
         voucherType: '',
         title: '',
-        endDate: '',
+        endDate: new Date().toISOString().split('T')[0],
         endHour: '23',
         endMinute: '59',
         modelName: '',
