@@ -3194,11 +3194,10 @@ async function saveGeneralSettings() {
     isSavingSettings.value = true;
     uiState.pinError = '';
 
-    const isPinSet = !!state.settings.dashboardPin;
-    let newPinToSave = state.settings.dashboardPin; // <-- AWALNYA AMBIL PIN LAMA
+    let newPinToSave = state.settings.dashboardPin;
 
-    if (uiState.newPin) { // <-- HANYA MASUK KE LOGIKA INI JIKA ADA PIN BARU
-        if (isPinSet && uiState.oldPin !== state.settings.dashboardPin) {
+    if (uiState.newPin) { 
+        if (state.settings.dashboardPin && uiState.oldPin !== state.settings.dashboardPin) {
             uiState.pinError = 'PIN lama salah.';
             isSavingSettings.value = false;
             return;
@@ -3213,34 +3212,43 @@ async function saveGeneralSettings() {
             isSavingSettings.value = false;
             return;
         }
-        newPinToSave = uiState.newPin; // <-- GANTI DENGAN PIN BARU JIKA VALID
+        newPinToSave = uiState.newPin;
     }
 
     try {
         const userId = currentUser.value.uid;
         const settingsRef = doc(db, "settings", userId);
+        
+        // Ambil data pengaturan yang sudah ada dari database
+        const existingSettingsSnap = await getDoc(settingsRef);
+        const existingSettingsData = existingSettingsSnap.exists() ? existingSettingsSnap.data() : {};
+        
+        // Gabungkan data lama dengan data baru
         const dataToUpdate = {
+            ...existingSettingsData, // Ambil semua data yang sudah ada
+            // Tulis ulang hanya data yang berubah
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
-            marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
-            modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
             pinProtection: state.settings.pinProtection,
-            dashboardPin: newPinToSave, // <-- MENGGUNAKAN VARIABEL YANG SUDAH DITENTUKAN
-            userId: userId
+            dashboardPin: newPinToSave,
+            userId: userId,
+            // Data lain yang tidak diubah di sini (marketplaces, modelProduk) tetap aman
         };
 
-        await setDoc(settingsRef, dataToUpdate, { merge: true });
+        await setDoc(settingsRef, dataToUpdate);
         
-        state.settings.dashboardPin = newPinToSave; // Perbarui state lokal
+        state.settings.dashboardPin = newPinToSave;
         uiState.oldPin = '';
         uiState.newPin = '';
         uiState.confirmNewPin = '';
         
         alert('Pengaturan umum berhasil disimpan ke database!');
+        // Panggil fetchStaticData untuk menyegarkan data lokal yang mungkin tidak terupdate
+        await fetchStaticData(userId);
 
     } catch (error) {
         console.error("Gagal menyimpan pengaturan umum:", error);
-        alert("Gagal menyimpan pengaturan umum.");
+        alert("Gagal menyimpan pengaturan umum. Silakan coba lagi.");
     } finally {
         isSavingSettings.value = false;
     }
@@ -5146,12 +5154,22 @@ async function saveModelProdukEdit() {
         };
     }
     
-    // Panggil fungsi saveSettingsData() yang sudah kita perbaiki
-    await saveSettingsData();
+    // Perbarui data modelProduk di database
+    try {
+        const userId = currentUser.value.uid;
+        const settingsRef = doc(db, "settings", userId);
+        await updateDoc(settingsRef, {
+            modelProduk: state.settings.modelProduk,
+        });
 
-    hideModal();
-    alert('Perubahan model Produk berhasil disimpan.');
+        alert('Perubahan model Produk berhasil disimpan.');
+        hideModal();
+    } catch (error) {
+        console.error("Gagal menyimpan perubahan model produk:", error);
+        alert('Gagal menyimpan perubahan model produk. Silakan coba lagi.');
+    }
 }
+
 
 
 async function saveStockAllocation() {
