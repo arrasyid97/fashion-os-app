@@ -951,64 +951,77 @@ const discountedMonthlyPrice = ref(250000);
 const discountedYearlyPrice = ref(2500000);
 
 async function submitAddProduct() {
-    const form = uiState.modalData;
-    // HPP & Harga Jual Default dihapus dari validasi
-    if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian) {
-        alert('SKU, Nama, Model produk, Warna, dan Varian wajib diisi.');
-        return;
+  const form = uiState.modalData;
+  if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian) {
+    alert('SKU, Nama, Model produk, Warna, dan Varian wajib diisi.');
+    return;
+  }
+
+  const skuFormatted = form.sku.toUpperCase().replace(/\s+/g, '-');
+  const userId = currentUser.value.uid;
+
+  try {
+    const productsCollection = collection(db, "products");
+    const q = query(productsCollection, where("sku", "==", skuFormatted), where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      throw new Error(`Produk dengan SKU "${skuFormatted}" sudah terdaftar untuk akun Anda.`);
     }
 
-    const skuFormatted = form.sku.toUpperCase().replace(/\s+/g, '-');
-    const userId = currentUser.value.uid;
+    const newProductRef = doc(collection(db, "products"));
 
-    try {
-        const productsCollection = collection(db, "products");
-        const q = query(productsCollection, where("sku", "==", skuFormatted), where("userId", "==", userId));
-        const querySnapshot = await getDocs(q);
+    const productData = {
+      id: newProductRef.id,
+      product_name: form.nama,
+      model_id: form.modelId,
+      color: form.warna || '',
+      variant: form.varian || '',
+      physical_stock: 0,
+      hpp: 0,
+      userId: userId,
+      sku: skuFormatted
+    };
 
-        if (!querySnapshot.empty) {
-            throw new Error(`Produk dengan SKU "${skuFormatted}" sudah terdaftar untuk akun Anda.`);
-        }
-        
-        const newProductRef = doc(collection(db, "products")); 
+    const batch = writeBatch(db);
+    batch.set(newProductRef, productData);
 
-        const productData = {
-            id: newProductRef.id,
-            product_name: form.nama,
-            model_id: form.modelId,
-            color: form.warna || '',
-            variant: form.varian || '',
-            physical_stock: 0,
-            hpp: 0, // <-- Diubah menjadi 0
-            userId: userId,
-            sku: skuFormatted
-        };
+    state.settings.marketplaces.forEach(channel => {
+      const priceDocId = `${newProductRef.id}-${channel.id}`;
+      const priceRef = doc(db, "product_prices", priceDocId);
+      batch.set(priceRef, {
+        product_id: newProductRef.id,
+        product_sku: skuFormatted,
+        marketplace_id: channel.id,
+        price: 0,
+        userId: userId
+      });
+    });
 
-        const batch = writeBatch(db);
-        batch.set(newProductRef, productData);
+    await batch.commit();
 
-        state.settings.marketplaces.forEach(channel => {
-            const priceDocId = `${newProductRef.id}-${channel.id}`;
-            const priceRef = doc(db, "product_prices", priceDocId);
-            batch.set(priceRef, {
-                product_id: newProductRef.id,
-                product_sku: skuFormatted,
-                marketplace_id: channel.id,
-                price: 0, // <-- Diubah menjadi 0
-                userId: userId
-            });
-        });
+    // Perbarui state lokal secara langsung
+    state.produk.push({
+      docId: newProductRef.id,
+      sku: productData.sku,
+      nama: productData.product_name,
+      model_id: productData.model_id,
+      warna: productData.color,
+      varian: productData.variant,
+      stokFisik: productData.physical_stock,
+      hpp: productData.hpp,
+      hargaJual: {},
+      stokAlokasi: {},
+      userId: productData.userId
+    });
 
-        await batch.commit();
+    alert(`Produk "${form.nama}" berhasil ditambahkan!`);
+    hideModal();
 
-        alert(`Produk "${form.nama}" berhasil ditambahkan!`);
-        await loadAllDataFromFirebase();
-        hideModal();
-
-    } catch (error) {
-        console.error('Error menyimpan produk:', error);
-        alert(`Gagal menyimpan produk: ${error.message}`);
-    }
+  } catch (error) {
+    console.error('Error menyimpan produk:', error);
+    alert(`Gagal menyimpan produk: ${error.message}`);
+  }
 }
 
 async function fetchSuppliers() {
@@ -1180,12 +1193,10 @@ function hidePenerimaanBarangForm() {
 async function submitPenerimaanBarang() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.penerimaanBarangForm;
-
     if (!form.supplierId || form.produk.length === 0) {
         return alert("Nama supplier dan daftar produk tidak boleh kosong.");
     }
     
-    // Hitung total nilai kuantitas
     let totalQtyValue = 0;
     form.produk.forEach(p => {
         totalQtyValue += (p.hargaJual || 0) * (p.qty || 0);
@@ -1200,21 +1211,26 @@ async function submitPenerimaanBarang() {
     };
 
     try {
+        let docRef;
         if (form.id) {
-            // Jika ada ID, lakukan UPDATE
-            const docRef = doc(db, "purchase_orders", form.id);
+            docRef = doc(db, "purchase_orders", form.id);
             await updateDoc(docRef, dataToSave);
+            
+            // Perbarui state lokal
+            const index = state.purchaseOrders.findIndex(order => order.id === form.id);
+            if (index !== -1) {
+                state.purchaseOrders[index] = { id: form.id, ...dataToSave, tanggal: dataToSave.tanggal };
+            }
             alert(`Pesanan berhasil diperbarui.`);
         } else {
-            // Jika tidak ada ID, lakukan CREATE
-            const docRef = await addDoc(collection(db, "purchase_orders"), dataToSave);
+            docRef = await addDoc(collection(db, "purchase_orders"), dataToSave);
+            
+            // Perbarui state lokal
+            state.purchaseOrders.unshift({ id: docRef.id, ...dataToSave, tanggal: dataToSave.tanggal });
             alert(`Penerimaan barang berhasil dicatat dengan ID: ${docRef.id}`);
         }
-        
-        // Muat ulang data untuk memperbarui tampilan tabel
-        await fetchPurchaseOrders();
-        
-        uiState.activeSupplierView = 'list'; // Kembali ke daftar supplier
+
+        uiState.activeSupplierView = 'list';
     } catch (error) {
         console.error("Gagal menyimpan penerimaan barang:", error);
         alert("Gagal menyimpan penerimaan barang. Silakan coba lagi.");
@@ -1460,20 +1476,18 @@ async function processBatchOrders() {
     uiState.is_processing_scan = true;
     const marketplace = getMarketplaceById(uiState.activeCartChannel);
     let successCount = 0;
-
     const batch = writeBatch(db);
+    
     try {
+        const newTransactions = [];
         for (const order of ordersToProcess) {
             const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
             const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
             const finalTotal = subtotal - discount.totalDiscount;
-
             let totalBiaya = 0;
             const biayaList = [];
-
-            // --- [PERUBAIAN 2: Kalkulasi Biaya Komisi Baru] ---
-            // Menghitung total komisi dari setiap item di dalam antrian pesanan
             let totalKomisi = 0;
+            
             for (const item of order.items) {
                 if (item.commissionRate > 0) {
                     totalKomisi += (item.commissionRate / 100) * (item.hargaJualAktual * item.qty);
@@ -1483,9 +1497,7 @@ async function processBatchOrders() {
                 biayaList.push({ name: 'Komisi Produk', value: totalKomisi });
                 totalBiaya += totalKomisi;
             }
-            // --- [AKHIR PERUBAIAN 2] ---
-
-            // Biaya Marketplace lainnya (baris 'marketplace.komisi' sudah dihapus)
+            
             if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
             if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
             if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
@@ -1502,7 +1514,8 @@ async function processBatchOrders() {
 
             const transactionRef = doc(collection(db, "transactions"));
             batch.set(transactionRef, newTransactionData);
-            
+            newTransactions.push({ ...newTransactionData, id: transactionRef.id });
+
             for (const item of order.items) {
                 const productRef = doc(db, "products", item.docId);
                 const productInState = state.produk.find(p => p.docId === item.docId);
@@ -1515,10 +1528,19 @@ async function processBatchOrders() {
         
         await batch.commit();
 
-        await loadAllDataFromFirebase();
+        // Perbarui state lokal secara langsung
+        state.transaksi.unshift(...newTransactions);
+        ordersToProcess.forEach(order => {
+            order.items.forEach(item => {
+                const productInState = state.produk.find(p => p.docId === item.docId);
+                if (productInState) {
+                    productInState.stokFisik -= item.qty;
+                }
+            });
+        });
+
         alert(`Proses Selesai! ${successCount} pesanan berhasil diproses.`);
         uiState.bulk_order_queue = [];
-
     } catch (error) {
         alert(`Terjadi kesalahan: ${error.message}. Tidak ada pesanan yang diproses.`);
     } finally {
@@ -1827,7 +1849,7 @@ async function addCategory() {
         const categoryRef = doc(db, "categories", newCategory.id);
         await setDoc(categoryRef, newCategory);
 
-        // --- BARIS PERBAIKAN: Menambahkan data baru ke state lokal
+        // Langsung tambahkan kategori baru ke state lokal
         state.settings.categories.push(newCategory);
 
         alert('Kategori baru berhasil ditambahkan.');
@@ -1849,6 +1871,13 @@ async function updateCategory() {
             name: form.name,
             description: form.description,
         });
+
+        // Cari dan perbarui kategori di state lokal
+        const index = state.settings.categories.findIndex(cat => cat.id === form.id);
+        if (index !== -1) {
+            state.settings.categories[index] = { ...form };
+        }
+
         alert('Kategori berhasil diperbarui.');
         hideNestedModal();
     } catch (error) {
@@ -1864,11 +1893,10 @@ async function deleteCategory(categoryId) {
         const categoryRef = doc(db, "categories", categoryId);
         await deleteDoc(categoryRef);
         
-        // --- BARIS PERBAIKAN: Menghapus data dari state lokal
+        // Hapus data dari state lokal
         state.settings.categories = state.settings.categories.filter(cat => cat.id !== categoryId);
 
         alert('Kategori berhasil dihapus.');
-        // Tidak perlu memanggil hideNestedModal karena modal sudah ditutup
     } catch (error) {
         console.error("Gagal menghapus kategori:", error);
         alert("Gagal menghapus kategori. Silakan coba lagi.");
@@ -2078,81 +2106,80 @@ function removeProgram(programId) {
 }
 
 async function submitStockAdjustment() {
-    const form = uiState.modalData;
-    if (!form.sku || !form.qty || form.qty <= 0 || !form.alasan || !form.tipe) {
-        alert('Semua kolom wajib diisi dan jumlah harus lebih dari 0.');
-        return;
+  const form = uiState.modalData;
+  if (!form.sku || !form.qty || form.qty <= 0 || !form.alasan || !form.tipe) {
+    alert('Semua kolom wajib diisi dan jumlah harus lebih dari 0.');
+    return;
+  }
+
+  const skuToUpdate = form.sku.toUpperCase();
+  const quantity = form.qty;
+  const adjustmentType = form.tipe;
+  let hppLoss = 0;
+
+  try {
+    const productsCollection = collection(db, "products");
+    const q = query(productsCollection, where("sku", "==", skuToUpdate), where("userId", "==", currentUser.value.uid));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      throw new Error(`Produk dengan SKU "${skuToUpdate}" tidak ditemukan.`);
     }
 
-    const skuToUpdate = form.sku.toUpperCase();
-    const quantity = form.qty;
-    const adjustmentType = form.tipe;
+    const productDocSnapshot = querySnapshot.docs[0];
+    const productId = productDocSnapshot.id;
+    const productRef = doc(db, "products", productId);
+    const productInState = state.produk.find(p => p.docId === productId);
 
-    try {
-        // ▼▼▼ PERUBAHAN UTAMA DI SINI ▼▼▼
-        // 1. Cari produk berdasarkan SKU dan userId untuk mendapatkan ID dokumen yang sebenarnya
-        const productsCollection = collection(db, "products");
-        const q = query(productsCollection, where("sku", "==", skuToUpdate), where("userId", "==", currentUser.value.uid));
-        const querySnapshot = await getDocs(q);
+    await runTransaction(db, async (transaction) => {
+      const productDoc = await transaction.get(productRef);
+      const currentStock = productDoc.data().physical_stock || 0;
+      let newStock;
 
-        if (querySnapshot.empty) {
-            // Jika tidak ada produk yang cocok, lempar error
-            throw new Error(`Produk dengan SKU "${skuToUpdate}" tidak ditemukan.`);
+      if (adjustmentType === 'penambahan') {
+        newStock = currentStock + quantity;
+      } else { // 'pengurangan'
+        newStock = currentStock - quantity;
+        if (newStock < 0) {
+          throw new Error(`Stok tidak cukup. Stok saat ini: ${currentStock}, akan dikurangi: ${quantity}.`);
         }
-        
-        // 2. Ambil ID dokumen yang benar dari hasil pencarian
-        const productDocSnapshot = querySnapshot.docs[0];
-        const productId = productDocSnapshot.id;
-        const productRef = doc(db, "products", productId); // Gunakan ID yang benar untuk referensi
-        
-        let hppLoss = 0;
+        hppLoss = (productDoc.data().hpp || 0) * quantity;
+      }
 
-        await runTransaction(db, async (transaction) => {
-            const productDoc = await transaction.get(productRef); // get() sekarang menggunakan referensi yang benar
-            // Kitaa tidak perlu memeriksa 'exists()' lagi karena sudah diperiksa di atas
-            
-            const currentStock = productDoc.data().physical_stock || 0;
-            let newStock;
+      transaction.update(productRef, { physical_stock: newStock });
 
-            if (adjustmentType === 'penambahan') {
-                newStock = currentStock + quantity;
-            } else { // 'pengurangan'
-                newStock = currentStock - quantity;
-                if (newStock < 0) {
-                    throw new Error(`Stok tidak cukup. Stok saat ini: ${currentStock}, akan dikurangi: ${quantity}.`);
-                }
-                hppLoss = (productDoc.data().hpp || 0) * quantity;
-            }
+      if (adjustmentType === 'pengurangan' && hppLoss > 0) {
+        const expenseData = {
+          kategori: 'Kerugian Stok',
+          jumlah: hppLoss,
+          catatan: `${form.alasan}: ${quantity} pcs x ${skuToUpdate}`,
+          jenis: 'pengeluaran',
+          userId: currentUser.value.uid,
+          tanggal: new Date()
+        };
+        const expenseRef = doc(collection(db, "keuangan"));
+        transaction.set(expenseRef, expenseData);
+        state.keuangan.push({ id: expenseRef.id, ...expenseData });
+      }
+    });
 
-            transaction.update(productRef, { physical_stock: newStock });
-        });
-
-        // Jika ini adalah pengurangan stok & ada kerugian, catat sebagai pengeluaran
-        if (adjustmentType === 'pengurangan' && hppLoss > 0) {
-            const expenseData = {
-                kategori: 'Kerugian Stok',
-                jumlah: hppLoss,
-                catatan: `${form.alasan}: ${quantity} pcs x ${skuToUpdate}`,
-                jenis: 'pengeluaran',
-                userId: currentUser.value.uid,
-                tanggal: new Date()
-            };
-            await addDoc(collection(db, "keuangan"), expenseData);
-        }
-
-        await loadAllDataFromFirebase();
-        alert(`Stok untuk SKU ${skuToUpdate} berhasil disesuaikan.`);
-        hideModal();
-
-    } catch (error) {
-        console.error("Error dalam transaksi penyesuaian stok:", error);
-        alert(`Gagal memperbarui stok: ${error.message}`);
+    // Perbarui state lokal setelah transaksi selesai
+    if (productInState) {
+      if (adjustmentType === 'penambahan') {
+        productInState.stokFisik += quantity;
+      } else {
+        productInState.stokFisik -= quantity;
+      }
     }
+
+    alert(`Stok untuk SKU ${skuToUpdate} berhasil disesuaikan.`);
+    hideModal();
+
+  } catch (error) {
+    console.error("Error dalam transaksi penyesuaian stok:", error);
+    alert(`Gagal memperbarui stok: ${error.message}`);
+  }
 }
-
-
-
-
 
 let profitExpenseChart = null;
 let salesChannelChart = null;
@@ -4742,17 +4769,10 @@ async function deleteReturnItem(itemToDelete) {
 
     try {
         const returnDocRef = doc(db, "returns", itemToDelete.returnDocId);
-
-        // ▼▼▼ PERBAIKAN UTAMA DI SINI ▼▼▼
-        // 1. Cari produk lengkap di state lokal menggunakan SKU untuk mendapatkan docId-nya
         const productInState = state.produk.find(p => p.sku === itemToDelete.sku);
-
-        // 2. Jika produk tidak ditemukan di state, hentikan proses
         if (!productInState) {
             throw new Error(`Produk dengan SKU ${itemToDelete.sku} tidak ditemukan di inventaris.`);
         }
-        
-        // 3. Gunakan docId yang benar untuk referensi ke database
         const productRef = doc(db, "products", productInState.docId);
         const allocationRef = doc(db, "stock_allocations", productInState.docId);
 
@@ -4765,7 +4785,6 @@ async function deleteReturnItem(itemToDelete) {
                 throw new Error("Salah satu dokumen (retur, produk, atau alokasi) tidak ditemukan.");
             }
 
-            // Kurangi stok karena retur dibatalkan
             const currentStock = productDoc.data().physical_stock || 0;
             const newStock = currentStock - itemToDelete.qty;
             const currentAllocations = allocationDoc.data() || {};
@@ -4775,7 +4794,6 @@ async function deleteReturnItem(itemToDelete) {
                 throw new Error(`Gagal menghapus retur karena akan membuat stok produk (${itemToDelete.sku}) menjadi minus.`);
             }
 
-            // Update dokumen di database
             transaction.update(productRef, { physical_stock: newStock });
             const updatedAllocations = { ...currentAllocations, [itemToDelete.channelId]: newChannelStock };
             transaction.set(allocationRef, updatedAllocations, { merge: true });
@@ -4791,7 +4809,11 @@ async function deleteReturnItem(itemToDelete) {
             }
         });
 
-        await loadAllDataFromFirebase();
+        // Perbarui state lokal secara langsung
+        productInState.stokFisik -= itemToDelete.qty;
+        productInState.stokAlokasi[itemToDelete.channelId] -= itemToDelete.qty;
+        state.retur = state.retur.filter(r => r.id !== itemToDelete.returnDocId || (r.id === itemToDelete.returnDocId && r.items.length > 1));
+
         alert('Item retur berhasil dihapus dan stok inventaris telah disesuaikan.');
 
     } catch (error) {
@@ -4830,7 +4852,7 @@ async function submitReturForm() {
                     biayaMarketplace: biayaMarketplace,
                     alasan: item.alasan || '',
                     tindakLanjut: item.tindakLanjut || 'Ganti Baru'
-                }
+                };
             }),
             userId: currentUser.value.uid
         };
@@ -4838,18 +4860,14 @@ async function submitReturForm() {
         const returnRef = doc(collection(db, "returns"));
         batch.set(returnRef, dataToSave);
 
-        // Mengembalikan stok ke inventaris fisik DAN alokasi stok channel
         for (const item of dataToSave.items) {
-            // ▼▼▼ PERBAIKAN DI SINI ▼▼▼
             const productInState = getProductBySku(item.sku);
             if (productInState) {
-                // Perbarui stok fisik menggunakan docId yang benar
                 const newStockFisik = productInState.stokFisik + item.qty;
-                const productRef = doc(db, "products", productInState.docId); // Gunakan docId
-                batch.update(productRef, { physical_stock: newStockFisik });
+                const productRef = doc(db, "products", productInState.docId);
+                const allocationRef = doc(db, "stock_allocations", productInState.docId);
                 
-                // Perbarui alokasi stok menggunakan docId yang benar
-                const allocationRef = doc(db, "stock_allocations", productInState.docId); // Gunakan docId
+                batch.update(productRef, { physical_stock: newStockFisik });
                 const newAlokasi = { ...productInState.stokAlokasi };
                 newAlokasi[trxAsli.channelId] = (newAlokasi[trxAsli.channelId] || 0) + item.qty;
                 batch.set(allocationRef, newAlokasi, { merge: true });
@@ -4857,7 +4875,16 @@ async function submitReturForm() {
         }
         
         await batch.commit();
-        await loadAllDataFromFirebase();
+
+        // Perbarui state lokal secara langsung
+        state.retur.unshift({ id: returnRef.id, ...dataToSave, tanggal: dataToSave.tanggal.toDate() });
+        for (const item of selectedItems) {
+            const productInState = state.produk.find(p => p.sku === item.sku);
+            if (productInState) {
+                productInState.stokFisik += item.returnQty;
+                productInState.stokAlokasi[trxAsli.channelId] += item.returnQty;
+            }
+        }
 
         alert(`Data retur untuk pesanan ${trxAsli.marketplaceOrderId} berhasil disimpan! Stok telah dikembalikan.`);
         hideModal();
@@ -5056,25 +5083,24 @@ async function saveSettingsData() {
         const userId = currentUser.value.uid;
         const settingsRef = doc(db, "settings", userId);
         
-        // Siapkan hanya data yang relevan dari state
+        // Cukup ambil data yang relevan dari state
         const settingsData = {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
             marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
             modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
+            pinProtection: state.settings.pinProtection,
+            dashboardPin: state.settings.dashboardPin,
             userId: userId
-            // Kita tidak menyertakan data lain yang tidak relevan di sini
         };
         
-        // Simpan data ke Firestore
         await setDoc(settingsRef, settingsData, { merge: true });
         
-        // Tidak perlu alert di sini karena fungsi pemanggil sudah punya
+        console.log('Pengaturan berhasil disimpan ke Firestore!');
         
     } catch (error) {
         console.error("Gagal menyimpan pengaturan:", error);
-        // Lemparkan error agar fungsi pemanggil tahu ada masalah
-        throw new Error("Gagal menyimpan data ke Firebase."); 
+        throw new Error("Gagal menyimpan data ke Firebase.");
     } finally {
         isSaving.value = false;
     }
@@ -5113,15 +5139,17 @@ async function saveModelProdukEdit() {
     const editedModel = uiState.modalData;
     const index = state.settings.modelProduk.findIndex(model => model.id === editedModel.id);
     if (index !== -1) {
-        // PERBAIKAN: Pastikan semua properti diperbarui
-        state.settings.modelProduk[index] = { 
-            ...editedModel, 
+        state.settings.modelProduk[index] = {
+            ...editedModel,
             hargaJahit: editedModel.hargaJahit || 0,
-            warna: editedModel.warna || '', // Tambahkan ini
-            ukuran: editedModel.ukuran || '' // Tambahkan ini
+            warna: editedModel.warna || '',
+            ukuran: editedModel.ukuran || ''
         };
     }
-    await saveData();
+    
+    // Panggil fungsi saveSettingsData() yang sudah kita perbaiki
+    await saveSettingsData();
+
     hideModal();
     alert('Perubahan model Produk berhasil disimpan.');
 }
@@ -5185,7 +5213,6 @@ async function deleteGroup(variants) {
 
         const productRef = doc(db, "products", variant.docId);
         batch.delete(productRef);
-
         const allocationRef = doc(db, "stock_allocations", variant.docId);
         batch.delete(allocationRef);
 
@@ -5199,7 +5226,11 @@ async function deleteGroup(variants) {
 
     try {
         await batch.commit();
-        await loadAllDataFromFirebase();
+
+        // Perbarui state lokal secara langsung
+        const deletedDocIds = variants.map(v => v.docId);
+        state.produk = state.produk.filter(p => !deletedDocIds.includes(p.docId));
+        
         alert(`Berhasil menghapus ${successCount} varian.`);
     } catch (error) {
         console.error("Gagal menghapus grup produk:", error);
@@ -5226,7 +5257,6 @@ async function removeProductVariant(productId) {
 
         const productRef = doc(db, "products", productId);
         batch.delete(productRef);
-
         const allocationRef = doc(db, "stock_allocations", productId);
         batch.delete(allocationRef);
 
@@ -5237,7 +5267,10 @@ async function removeProductVariant(productId) {
         });
 
         await batch.commit();
-        await loadAllDataFromFirebase();
+        
+        // Perbarui state lokal secara langsung
+        state.produk = state.produk.filter(p => p.docId !== productId);
+
         alert(`Varian produk berhasil dihapus.`);
     } catch (error) {
         console.error(`Error menghapus produk ID: ${productId}:`, error);
@@ -5443,54 +5476,44 @@ const promosiProductModels = computed(() => {
 });
 
 async function deleteTransaction(transactionId) {
-    if (!confirm(`Anda yakin ingin menghapus transaksi ID: ${transactionId}? Stok produk akan dikembalikan.`)) {
-        return;
+  if (!confirm(`Anda yakin ingin menghapus transaksi ID: ${transactionId}? Stok produk akan dikembalikan.`)) {
+    return;
+  }
+
+  const trxToDelete = state.transaksi.find(trx => trx.id === transactionId);
+  if (!trxToDelete) {
+    alert("Transaksi tidak ditemukan.");
+    return;
+  }
+
+  try {
+    const batch = writeBatch(db);
+    const transactionRef = doc(db, "transactions", transactionId);
+    batch.delete(transactionRef);
+
+    for (const item of trxToDelete.items) {
+      const productInState = state.produk.find(p => p.sku === item.sku);
+      if (productInState) {
+        const newStock = (productInState.stokFisik || 0) + item.qty;
+        const productRef = doc(db, "products", productInState.docId);
+        batch.update(productRef, { physical_stock: newStock });
+        
+        // Perbarui state lokal
+        productInState.stokFisik += item.qty;
+      }
     }
 
-    const trxToDelete = state.transaksi.find(trx => trx.id === transactionId);
-    if (!trxToDelete) {
-        alert("Transaksi tidak ditemukan.");
-        return;
-    }
+    await batch.commit();
 
-    try {
-        const batch = writeBatch(db);
+    // Hapus transaksi dari state lokal setelah berhasil
+    state.transaksi = state.transaksi.filter(trx => trx.id !== transactionId);
 
-        // Hapus dokumen transaksi itu sendiri
-        const transactionRef = doc(db, "transactions", transactionId);
-        batch.delete(transactionRef);
+    alert("Transaksi berhasil dihapus dan stok telah dikembalikan.");
 
-        // Kembalikan stok untuk setiap item dalam transaksi
-        for (const item of trxToDelete.items) {
-            // ▼▼▼ PERBAIKAN DI SINI ▼▼▼
-            // 1. Cari produk lengkap di state lokal menggunakan SKU
-            const productInState = state.produk.find(p => p.sku === item.sku);
-            
-            if (productInState) {
-                // 2. Gunakan docId yang benar dari produk yang ditemukan untuk referensi
-                const productRef = doc(db, "products", productInState.docId); 
-                const newStock = (productInState.stokFisik || 0) + item.qty;
-                batch.update(productRef, { physical_stock: newStock });
-            }
-        }
-
-        await batch.commit();
-
-        // Update state lokal setelah berhasil
-        trxToDelete.items.forEach(item => {
-            const productInState = state.produk.find(p => p.sku === item.sku);
-            if (productInState) {
-                productInState.stokFisik += item.qty;
-            }
-        });
-        state.transaksi = state.transaksi.filter(trx => trx.id !== transactionId);
-
-        alert("Transaksi berhasil dihapus dan stok telah dikembalikan.");
-
-    } catch (error) {
-        console.error("Error saat menghapus transaksi:", error);
-        alert("Gagal menghapus transaksi dari database.");
-    }
+  } catch (error) {
+    console.error("Error saat menghapus transaksi:", error);
+    alert("Gagal menghapus transaksi dari database.");
+  }
 }
 
 
@@ -5841,89 +5864,161 @@ async function loadAllDataFromFirebase() {
     }
 }
 
+let unsubscribe = () => {}; // Fungsi untuk menghentikan listeners
+const setupListeners = async (userId) => {
+    // Hentikan semua listener lama jika ada
+    unsubscribe();
+
+    // Listener untuk data settings (cukup dipantau 1 dokumen)
+    const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
+        if (docSnap.exists()) {
+            const settingsData = docSnap.data();
+            Object.assign(state.settings, settingsData);
+            if (!state.settings.pinProtection) {
+                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
+            }
+        }
+    }, (error) => { console.error("Error fetching settings:", error); });
+
+    // Panggil fungsi sekali-ambil untuk data yang tidak perlu real-time
+    await fetchStaticData(userId);
+
+    // Kumpulkan semua fungsi untuk menghentikan listener
+    unsubscribe = () => {
+        settingsListener();
+        // tambahkan listener lain di sini jika ada
+    };
+};
+
+// Fungsi baru untuk mengambil data statis (sekali ambil)
+const fetchStaticData = async (userId) => {
+    try {
+        const [
+            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
+            transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
+            categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap,
+            suppliersSnap, purchaseOrdersSnap, notesSnap
+        ] = await Promise.all([
+            getDoc(doc(db, "settings", userId)),
+            getDoc(doc(db, "promotions", userId)),
+            getDocs(query(collection(db, "products"), where("userId", "==", userId))),
+            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
+            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
+            getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "categories"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "suppliers"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "purchase_orders"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))),
+        ]);
+
+        // Proses dan simpan data ke state Anda
+        if (settingsSnap.exists()) {
+            const settingsData = settingsSnap.data();
+            Object.assign(state.settings, settingsData);
+            if (!state.settings.pinProtection) {
+                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
+            }
+        }
+
+        const userDocRef = doc(db, "users", userId);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            state.settings.inflowCategories = userData.inflowCategories || [];
+        }
+
+        if (promotionsSnap.exists()) {
+            const promoData = promotionsSnap.data();
+            state.promotions.perChannel = promoData.perChannel || {};
+            state.promotions.perModel = promoData.perModel || {};
+            state.settings.marketplaces.forEach(channel => {
+                if (!state.promotions.perChannel[channel.id]) { state.promotions.perChannel[channel.id] = {}; }
+                if (!state.promotions.perChannel[channel.id].voucherToko) { state.promotions.perChannel[channel.id].voucherToko = {}; }
+                if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) { state.promotions.perChannel[channel.id].voucherSemuaProduk = {}; }
+            });
+            if (uiState.promosiSelectedModel) {
+                if (!state.promotions.perModel[uiState.promosiSelectedModel]) { state.promotions.perModel[uiState.promosiSelectedModel] = {}; }
+                state.settings.marketplaces.forEach(channel => {
+                    if (!state.promotions.perModel[uiState.promosiSelectedModel][channel.id]) { state.promotions.perModel[uiState.promosiSelectedModel][channel.id] = { minBelanja: null, diskonRate: null, diskonBertingkat: [] }; }
+                });
+            }
+        } else {
+            state.promotions.perChannel = {};
+            state.promotions.perModel = {};
+        }
+
+        const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
+
+        state.produk = productsSnap.docs.map(docSnap => {
+            const p = { id: docSnap.id, ...docSnap.data() };
+            const hargaJual = {};
+            const stokAlokasi = {};
+            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
+            (state.settings.marketplaces || []).forEach(mp => {
+                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
+                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+            });
+            return {
+                docId: p.id,
+                sku: p.sku,
+                nama: p.product_name,
+                model_id: p.model_id,
+                warna: p.color,
+                varian: p.variant,
+                stokFisik: p.physical_stock,
+                hpp: p.hpp,
+                hargaJual,
+                stokAlokasi,
+                userId: p.userId
+            };
+        });
+
+        state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
+        state.bankAccounts = bankAccountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        state.investorPayments = investorPaymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), paymentDate: doc.data().paymentDate?.toDate() }));
+        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
+        state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        state.purchaseOrders = purchaseOrdersSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        state.voucherNotes = notesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), endDate: doc.data().endDate?.toDate() }));
+        
+        console.log('Data statis berhasil dimuat.');
+        isLoading.value = false;
+        hasLoadedInitialData.value = true;
+        changePage(activePage.value);
+
+    } catch (error) {
+        console.error("Error memuat data statis:", error);
+        alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
+        handleLogout();
+    }
+};
+
 onMounted(() => {
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
-        if (onSnapshotListener) onSnapshotListener();
-        if (commissionsListener) commissionsListener();
-
         if (user) {
             currentUser.value = user;
-
-            onSnapshotListener = onSnapshot(doc(db, "users", user.uid), async (userDocSnap) => {
-                if (userDocSnap.exists()) {
-                    const userData = userDocSnap.data();
-                    currentUser.value.userData = userData;
-                    state.settings.dashboardPin = userData.dashboardPin || '';
-                    currentUser.value.isPartner = userData.isPartner || false;
-                    currentUser.value.referralCode = userData.referralCode || null;
-
-                    const now = new Date();
-                    const endDate = userData.subscriptionEndDate?.toDate();
-                    const trialDate = userData.trialEndDate?.toDate();
-
-                    const isSubscriptionValid = (userData.subscriptionStatus === 'active' && endDate && now <= endDate) ||
-                                                (userData.subscriptionStatus === 'trial' && trialDate && now <= trialDate);
-
-                    if (isSubscriptionValid) {
-                        if (!hasLoadedInitialData.value) {
-                            await loadAllDataFromFirebase();
-                            
-                            // 👇 BARIS UNTUK MEMPERBAIKI ERROR 'fetchSuppliers' is not used 👇
-                            await fetchSuppliers();
-                            await fetchPurchaseOrders();
-                            hasLoadedInitialData.value = true;
-                            changePage(activePage.value);
-                            
-                            if (currentUser.value.isPartner) {
-                                const commissionsQuery = query(
-                                    collection(db, 'commissions'),
-                                    where('partnerId', '==', currentUser.value.uid)
-                                );
-                                commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                    commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                                });
-                            }
-
-                            if (activePage.value === 'login') {
-                                const storedPage = localStorage.getItem('lastActivePage');
-                                const pageToLoad = (storedPage && storedPage !== 'login' && storedPage !== 'langganan') ? storedPage : 'dashboard';
-                                changePage(pageToLoad);
-                            }
-                        }
-                    } else {
-                        hasLoadedInitialData.value = false;
-
-                        if (currentUser.value.isPartner) {
-                            const commissionsQuery = query(
-                                collection(db, 'commissions'),
-                                where('partnerId', '==', currentUser.value.uid)
-                            );
-                            commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-                                commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            });
-                        }
-                        
-                        const allowedPages = ['mitra', 'pengaturan', 'langganan', 'tentang', 'panduan'];
-                        if (!allowedPages.includes(activePage.value)) {
-                            activePage.value = 'langganan';
-                        }
-                    }
-                } else {
-                    console.error("Dokumen pengguna tidak ditemukan di Firestore. Melakukan logout.");
-                    handleLogout();
-                }
-                isLoading.value = false;
-            }, (error) => {
-                console.error("Gagal mendengarkan data pengguna:", error);
-                alert("Gagal memuat data pengguna. Silakan coba lagi.");
-                isLoading.value = false;
-                handleLogout();
-            });
+            await setupListeners(user.uid);
+            // Tambahkan logika untuk mitra di sini jika diperlukan
         } else {
             currentUser.value = null;
             activePage.value = 'login';
             isLoading.value = false;
+            unsubscribe();
         }
     });
 });
