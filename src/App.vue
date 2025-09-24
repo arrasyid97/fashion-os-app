@@ -3015,19 +3015,29 @@ async function saveData() {
         const userId = currentUser.value.uid;
         const batch = writeBatch(db);
 
-        // [PERBAIKAN] Fungsi ini sekarang HANYA menyimpan data promosi dan harga,
-        // tidak lagi menyimpan ulang semua pengaturan. Ini akan menghemat 90% kuota.
-
-        // Menyimpan data promosi
-        const promotionsRef = doc(db, "promotions", userId);
-        const promotionsData = {
-            perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
-            perModel: JSON.parse(JSON.stringify(state.promotions.perModel)),
+        // Simpan semua pengaturan
+        const settingsRef = doc(db, "settings", userId);
+        const settingsData = {
+            brandName: state.settings.brandName,
+            minStok: state.settings.minStok,
+            marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
+            modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
+            categories: JSON.parse(JSON.stringify(state.settings.categories)),
+            inflowCategories: JSON.parse(JSON.stringify(state.settings.inflowCategories)),
             userId: userId
         };
-        batch.set(promotionsRef, promotionsData);
+        batch.set(settingsRef, settingsData);
 
-        // Menyimpan data komisi jika yang login adalah admin
+        const promotionsRef = doc(db, "promotions", userId);
+const promotionsData = {
+    perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
+    perModel: JSON.parse(JSON.stringify(state.promotions.perModel)),
+    userId: userId
+};
+batch.set(promotionsRef, promotionsData);
+
+        // ▼▼▼ PERUBAHAN KUNCI ADA DI SINI ▼▼▼
+        // HANYA jalankan penyimpanan konfigurasi komisi JIKA pengguna adalah Admin
         if (isAdmin.value) {
             const commissionsRef = doc(db, "commissions", userId);
             const commissionsData = {
@@ -3036,8 +3046,9 @@ async function saveData() {
             };
             batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)));
         }
+        // ▲▲▲ AKHIR DARI PERUBAHAN ▲▲▲
 
-        // Menyimpan HPP & Harga Jual untuk setiap produk
+        // Simpan HPP & Harga Jual
         for (const product of state.produk) {
             const productRef = doc(db, "products", product.docId);
             batch.update(productRef, { hpp: product.hpp });
@@ -3054,8 +3065,12 @@ async function saveData() {
                 }, { merge: true });
             }
         }
-
         await batch.commit();
+        
+        // Memuat ulang data setelah berhasil disimpan tidak diperlukan di sini
+        // karena state lokal sudah diperbarui. Cukup tampilkan notifikasi.
+        
+        console.log('Perubahan berhasil disimpan ke Database!');
         alert('Semua perubahan berhasil disimpan!');
 
     } catch (error) {
@@ -5007,14 +5022,10 @@ async function removeMarketplace(marketplaceId) {
     if (index > -1) {
         state.settings.marketplaces.splice(index, 1);
         try {
-            // [PERBAIKAN] Memanggil fungsi baru yang efisien
-            await saveSettingsData(); 
-            // [BARU] Memberi notifikasi sukses kepada pengguna
+            await saveSettingsData(); // <-- PERUBAHAN DI SINI
             alert('Marketplace berhasil dihapus dan perubahan telah disimpan.');
         } catch(error) {
-            alert("Gagal menghapus data marketplace.");
-            // Jika gagal, muat ulang data dari server untuk konsistensi
-            await loadAllDataFromFirebase();
+            alert("Gagal menyimpan data.");
         }
     }
 }
@@ -5030,15 +5041,11 @@ async function saveMarketplaceEdit() {
     }
     
     try {
-        // [PERBAIKAN] Memanggil fungsi baru yang efisien
-        await saveSettingsData(); 
+        await saveSettingsData(); // <-- PERUBAHAN DI SINI
         hideModal();
-        // [BARU] Memberi notifikasi sukses kepada pengguna
         alert('Perubahan marketplace berhasil disimpan.');
     } catch(error) {
-        alert("Gagal menyimpan data marketplace.");
-        // Jika gagal, muat ulang data dari server untuk memastikan konsistensi
-        await loadAllDataFromFirebase();
+        alert("Gagal menyimpan data.");
     }
 }
 
@@ -5049,22 +5056,24 @@ async function saveSettingsData() {
         const userId = currentUser.value.uid;
         const settingsRef = doc(db, "settings", userId);
         
-        // FUNGSI INI SEKARANG HANYA MENYIMPAN DATA PENGATURAN SAJA,
-        // TIDAK LAGI MENYIMPAN SEMUA DATA LAIN. INI MENGHEMAT KUOTA.
+        // Siapkan hanya data yang relevan dari state
         const settingsData = {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
             marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
             modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
             userId: userId
+            // Kita tidak menyertakan data lain yang tidak relevan di sini
         };
         
-        // setDoc dengan merge:true lebih aman dan efisien
+        // Simpan data ke Firestore
         await setDoc(settingsRef, settingsData, { merge: true });
+        
+        // Tidak perlu alert di sini karena fungsi pemanggil sudah punya
         
     } catch (error) {
         console.error("Gagal menyimpan pengaturan:", error);
-        // Lemparkan error agar fungsi pemanggil tahu jika ada masalah
+        // Lemparkan error agar fungsi pemanggil tahu ada masalah
         throw new Error("Gagal menyimpan data ke Firebase."); 
     } finally {
         isSaving.value = false;
@@ -5083,16 +5092,8 @@ async function addModelProduk() {
         hargaJahit: 0,
     };
     state.settings.modelProduk.push(newModel);
-    
-    try {
-        // [PERBAIKAN] Memanggil fungsi yang efisien, bukan saveData()
-        await saveSettingsData();
-        alert('Model Produk baru berhasil ditambahkan.');
-    } catch (error) {
-        alert('Gagal menyimpan model baru.');
-        // Jika gagal, muat ulang data dari server untuk konsistensi
-        await loadAllDataFromFirebase();
-    }
+    await saveData();
+    alert('Model Produk baru berhasil ditambahkan.');
 }
 
 async function removeModelProduk(modelId) {
@@ -5102,15 +5103,8 @@ async function removeModelProduk(modelId) {
     const index = state.settings.modelProduk.findIndex(m => m.id === modelId);
     if (index > -1) {
         state.settings.modelProduk.splice(index, 1);
-        try {
-            // [PERBAIKAN] Memanggil fungsi yang efisien
-            await saveSettingsData(); 
-            alert('Model Produk berhasil dihapus.');
-        } catch (error) {
-            alert('Gagal menghapus model produk.');
-            // Jika gagal, muat ulang data dari server untuk konsistensi
-            await loadAllDataFromFirebase();
-        }
+        await saveData(); // Panggil saveData untuk menyimpan
+        alert('Model Produk berhasil dihapus.');
     }
 }
 
