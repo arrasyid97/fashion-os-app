@@ -1150,17 +1150,19 @@ function showEditPenerimaanBarangForm(order) {
 }
 
 function showPenerimaanBarangForm(supplier) {
-    uiState.penerimaanBarangForm.supplierId = supplier.id;
-    uiState.penerimaanBarangForm.supplierName = supplier.name;
-    uiState.penerimaanBarangForm.tanggal = new Date().toISOString().split('T')[0];
-    uiState.penerimaanBarangForm.produk = JSON.parse(JSON.stringify(supplier.products || []));
-    uiState.penerimaanBarangForm.produk = uiState.penerimaanBarangForm.produk.map(p => ({
-        ...p,
-        qty: null,
+    // ⚠️ KUNCI PERBAIKAN: Reset seluruh objek form sebelum mengisi
+    uiState.penerimaanBarangForm = {
+        id: null, // Pastikan ID kosong untuk pesanan baru
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        tanggal: new Date().toISOString().split('T')[0],
+        produk: [], // Mulai dengan array produk kosong, tidak semua produk supplier
         statusProses: 'Dalam Proses',
         statusPembayaran: 'Belum Dibayar',
-        returReason: null,
-    }));
+        catatan: '',
+        totalQtyValue: 0,
+        createdAt: null,
+    };
     uiState.activeSupplierView = 'form';
 }
 
@@ -1210,21 +1212,21 @@ async function submitPenerimaanBarang() {
     };
 
     try {
-        let docRef;
-        if (form.id) {
-            docRef = doc(db, "purchase_orders", form.id);
+        if (form.id) { // Jika ada ID, berarti ini operasi EDIT
+            const docRef = doc(db, "purchase_orders", form.id);
             await updateDoc(docRef, dataToSave);
             
-            // Perbarui state lokal
+            // Perbarui state lokal dengan data yang sudah di-edit
             const index = state.purchaseOrders.findIndex(order => order.id === form.id);
             if (index !== -1) {
                 state.purchaseOrders[index] = { id: form.id, ...dataToSave, tanggal: dataToSave.tanggal };
             }
             alert(`Pesanan berhasil diperbarui.`);
-        } else {
-            docRef = await addDoc(collection(db, "purchase_orders"), dataToSave);
+
+        } else { // Jika TIDAK ada ID, berarti ini pesanan BARU
+            const docRef = await addDoc(collection(db, "purchase_orders"), dataToSave);
             
-            // Perbarui state lokal
+            // Tambahkan data baru ke state lokal
             state.purchaseOrders.unshift({ id: docRef.id, ...dataToSave, tanggal: dataToSave.tanggal });
             alert(`Penerimaan barang berhasil dicatat dengan ID: ${docRef.id}`);
         }
