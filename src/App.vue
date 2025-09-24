@@ -11778,7 +11778,7 @@ watch(activePage, (newPage) => {
                         <option value="channel">Per Akun Penjualan</option>
                     </select>
                 </div>
-                
+
                 <div>
                     <label class="block text-sm font-medium">Jenis Voucher</label>
                     <select v-model="uiState.notesData.voucherType" class="mt-1 w-full p-2 border rounded-md" required>
@@ -11807,7 +11807,7 @@ watch(activePage, (newPage) => {
                         </select>
                     </div>
                 </template>
-                
+
                 <div>
                     <label class="block text-sm font-medium">Nama Voucher</label>
                     <input type="text" v-model="uiState.notesData.title" class="mt-1 w-full p-2 border rounded-md" required>
@@ -11836,7 +11836,7 @@ watch(activePage, (newPage) => {
 
         <div class="p-4 bg-white rounded-lg border">
             <h4 class="font-semibold text-lg text-slate-800 mb-4">Daftar Catatan Voucher</h4>
-            
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
                     <label class="block text-sm font-medium">Cari</label>
@@ -11865,7 +11865,7 @@ watch(activePage, (newPage) => {
                     </select>
                 </div>
             </div>
-            
+
             <div class="overflow-x-auto max-h-[40vh]">
                 <table class="min-w-full text-sm text-left text-slate-500">
                     <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
@@ -11900,7 +11900,7 @@ watch(activePage, (newPage) => {
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
 </div>        
-         </div>
+        </div>
 
 </template>
 
