@@ -3190,6 +3190,7 @@ async function deleteBankAccount(accountId) {
 
 async function saveGeneralSettings() {
     if (!currentUser.value) return alert("Anda harus login untuk menyimpan pengaturan.");
+    
     isSavingSettings.value = true;
     uiState.pinError = '';
 
@@ -3218,13 +3219,18 @@ async function saveGeneralSettings() {
         const userId = currentUser.value.uid;
         const settingsRef = doc(db, "settings", userId);
         
-        // Perbarui data secara parsial (hanya field yang relevan)
-        await updateDoc(settingsRef, {
+        const dataToUpdate = {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
             pinProtection: state.settings.pinProtection,
-            dashboardPin: newPinToSave,
-        });
+            // Menggunakan operator kondisional untuk memastikan nilai PIN tidak undefined
+            // Jika newPinToSave ada, gunakan itu. Jika tidak, jangan masukkan field-nya.
+            ...(newPinToSave !== undefined && { dashboardPin: newPinToSave }),
+        };
+
+        // Menggunakan setDoc dengan merge: true adalah cara teraman untuk partial update.
+        // Ini akan menyimpan dataToUpdate sambil tetap mempertahankan field lain (misal: marketplaces, modelProduk)
+        await setDoc(settingsRef, dataToUpdate, { merge: true });
         
         // Perbarui state lokal setelah berhasil
         state.settings.dashboardPin = newPinToSave;
