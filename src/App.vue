@@ -162,7 +162,7 @@ const uiState = reactive({
         
     },
 
-    notesModalVisible: false,
+    
     notesData: {},
     notesSearch: '',
     notesFilterType: 'all', // 'all', 'model', 'channel'
@@ -11895,9 +11895,8 @@ watch(activePage, (newPage) => {
     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
-</div>        
-        </div>
-
+</div>
+</div>
 </template>
 
 <style scoped>
