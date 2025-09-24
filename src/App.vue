@@ -1554,10 +1554,6 @@ function showNotesModal() {
     };
 }
 
-function hideNotesModal() {
-    uiState.notesModalVisible = false;
-}
-
 async function submitVoucherNote() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.notesData;
@@ -1590,7 +1586,7 @@ async function submitVoucherNote() {
         const docRef = await addDoc(collection(db, "voucher_notes"), dataToSave);
         state.voucherNotes.push({ id: docRef.id, ...dataToSave, endDate: dataToSave.endDate });
         alert("Catatan voucher berhasil disimpan!");
-        hideNotesModal();
+        hideModal(); // <-- INI PERBAIKANNYA
     } catch (error) {
         console.error("Gagal menyimpan catatan:", error);
         alert("Gagal menyimpan catatan. Silakan coba lagi.");
