@@ -1537,7 +1537,7 @@ function generateUniqueCode() {
 }
 
 function showNotesModal() {
-    uiState.isModalVisible = true;
+    
     uiState.notesModalVisible = true;
     // Reset form data setiap kali modal dibuka
     uiState.notesData = {
@@ -3545,7 +3545,7 @@ function exportLaporanSemuaToExcel() {
 }
 function hideModal() {
     uiState.isModalVisible = false;
-    uiState.notesModalVisible = false;
+    
     uiState.modalType = '';
     uiState.modalData = {};
 }
@@ -11761,7 +11761,7 @@ watch(activePage, (newPage) => {
                 </div>
             </form>
         </div>
-    </div>
+    
 
 <div v-if="uiState.notesModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full max-h-[90vh] flex flex-col">
@@ -11899,11 +11899,11 @@ watch(activePage, (newPage) => {
         </div>
 
         <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-            <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+            <button @click="hideNotesModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
         </div>
     </div>
 </div>    
-
+</div>
 </template>
 
 <style scoped>
