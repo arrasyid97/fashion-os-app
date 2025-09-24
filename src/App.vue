@@ -3190,7 +3190,6 @@ async function deleteBankAccount(accountId) {
 
 async function saveGeneralSettings() {
     if (!currentUser.value) return alert("Anda harus login untuk menyimpan pengaturan.");
-    
     isSavingSettings.value = true;
     uiState.pinError = '';
 
@@ -3219,32 +3218,21 @@ async function saveGeneralSettings() {
         const userId = currentUser.value.uid;
         const settingsRef = doc(db, "settings", userId);
         
-        // Ambil data pengaturan yang sudah ada dari database
-        const existingSettingsSnap = await getDoc(settingsRef);
-        const existingSettingsData = existingSettingsSnap.exists() ? existingSettingsSnap.data() : {};
-        
-        // Gabungkan data lama dengan data baru
-        const dataToUpdate = {
-            ...existingSettingsData, // Ambil semua data yang sudah ada
-            // Tulis ulang hanya data yang berubah
+        // Perbarui data secara parsial (hanya field yang relevan)
+        await updateDoc(settingsRef, {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
             pinProtection: state.settings.pinProtection,
             dashboardPin: newPinToSave,
-            userId: userId,
-            // Data lain yang tidak diubah di sini (marketplaces, modelProduk) tetap aman
-        };
-
-        await setDoc(settingsRef, dataToUpdate);
+        });
         
+        // Perbarui state lokal setelah berhasil
         state.settings.dashboardPin = newPinToSave;
         uiState.oldPin = '';
         uiState.newPin = '';
         uiState.confirmNewPin = '';
         
         alert('Pengaturan umum berhasil disimpan ke database!');
-        // Panggil fetchStaticData untuk menyegarkan data lokal yang mungkin tidak terupdate
-        await fetchStaticData(userId);
 
     } catch (error) {
         console.error("Gagal menyimpan pengaturan umum:", error);
@@ -5154,10 +5142,12 @@ async function saveModelProdukEdit() {
         };
     }
     
-    // Perbarui data modelProduk di database
+    // Perbarui data modelProduk di database secara langsung
     try {
         const userId = currentUser.value.uid;
         const settingsRef = doc(db, "settings", userId);
+        
+        // Cukup perbarui satu field 'modelProduk', tidak seluruh dokumen
         await updateDoc(settingsRef, {
             modelProduk: state.settings.modelProduk,
         });
@@ -5166,11 +5156,9 @@ async function saveModelProdukEdit() {
         hideModal();
     } catch (error) {
         console.error("Gagal menyimpan perubahan model produk:", error);
-        alert('Gagal menyimpan perubahan model produk. Silakan coba lagi.');
+        alert(`Gagal menyimpan perubahan model produk: ${error.message}`);
     }
 }
-
-
 
 async function saveStockAllocation() {
     if (!currentUser.value) return alert("Anda harus login untuk menyimpan perubahan.");
