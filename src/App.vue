@@ -345,8 +345,7 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
-let onSnapshotListener = null;
-let commissionsListener = null;
+
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
