@@ -3195,9 +3195,9 @@ async function saveGeneralSettings() {
     uiState.pinError = '';
 
     const isPinSet = !!state.settings.dashboardPin;
-    let newPinToSave = state.settings.dashboardPin;
+    let newPinToSave = state.settings.dashboardPin; // <-- AWALNYA AMBIL PIN LAMA
 
-    if (uiState.newPin) {
+    if (uiState.newPin) { // <-- HANYA MASUK KE LOGIKA INI JIKA ADA PIN BARU
         if (isPinSet && uiState.oldPin !== state.settings.dashboardPin) {
             uiState.pinError = 'PIN lama salah.';
             isSavingSettings.value = false;
@@ -3213,7 +3213,7 @@ async function saveGeneralSettings() {
             isSavingSettings.value = false;
             return;
         }
-        newPinToSave = uiState.newPin;
+        newPinToSave = uiState.newPin; // <-- GANTI DENGAN PIN BARU JIKA VALID
     }
 
     try {
@@ -3222,16 +3222,16 @@ async function saveGeneralSettings() {
         const dataToUpdate = {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
-            dashboardPin: newPinToSave,
+            marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
+            modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
             pinProtection: state.settings.pinProtection,
+            dashboardPin: newPinToSave, // <-- MENGGUNAKAN VARIABEL YANG SUDAH DITENTUKAN
             userId: userId
         };
 
-        // SIMPAN DATA PENGATURAN UMUM KE DATABASE
         await setDoc(settingsRef, dataToUpdate, { merge: true });
         
-        // Perbarui state lokal setelah berhasil
-        state.settings.dashboardPin = newPinToSave;
+        state.settings.dashboardPin = newPinToSave; // Perbarui state lokal
         uiState.oldPin = '';
         uiState.newPin = '';
         uiState.confirmNewPin = '';
