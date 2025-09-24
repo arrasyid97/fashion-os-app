@@ -5727,7 +5727,7 @@ const setupListeners = async (userId) => {
     // Hentikan semua listener yang mungkin aktif dari sesi sebelumnya
     unsubscribe();
 
-    // 1. Deklarasi dan inisialisasi listener
+    // 1. Deklarasi dan inisialisasi listener settings
     const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
         if (docSnap.exists()) {
             const settingsData = docSnap.data();
@@ -5738,6 +5738,7 @@ const setupListeners = async (userId) => {
         }
     }, (error) => { console.error("Error fetching settings:", error); });
     
+    // 2. Deklarasi dan inisialisasi listener commissions
     let commissionsListener = () => {};
     if (currentUser.value?.isPartner) {
         const commissionsQuery = query(
@@ -5749,18 +5750,17 @@ const setupListeners = async (userId) => {
         });
     }
 
-    // Panggil fungsi untuk mengambil data statis yang tidak perlu real-time
+    // 3. Panggil fungsi untuk mengambil data statis (sekali ambil)
     await fetchStaticData(userId);
 
-    // 2. Gunakan listener dalam fungsi unsubscribe
-    // Ini adalah bagian yang memperbaiki error 'never used'
+    // 4. Gunakan listener dalam fungsi unsubscribe
+    // Ini adalah bagian yang akan memperbaiki error 'never used'
     unsubscribe = () => {
         settingsListener();
         commissionsListener(); 
     };
 };
 
-// Fungsi baru untuk mengambil data statis (sekali ambil)
 const fetchStaticData = async (userId) => {
     try {
         const [
@@ -5788,7 +5788,6 @@ const fetchStaticData = async (userId) => {
             getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))),
         ]);
 
-        // Proses dan simpan data ke state Anda
         if (settingsSnap.exists()) {
             const settingsData = settingsSnap.data();
             Object.assign(state.settings, settingsData);
