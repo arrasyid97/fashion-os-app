@@ -3015,29 +3015,19 @@ async function saveData() {
         const userId = currentUser.value.uid;
         const batch = writeBatch(db);
 
-        // Simpan semua pengaturan
-        const settingsRef = doc(db, "settings", userId);
-        const settingsData = {
-            brandName: state.settings.brandName,
-            minStok: state.settings.minStok,
-            marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
-            modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
-            categories: JSON.parse(JSON.stringify(state.settings.categories)),
-            inflowCategories: JSON.parse(JSON.stringify(state.settings.inflowCategories)),
+        // [PERBAIKAN] Fungsi ini sekarang HANYA menyimpan data promosi dan harga,
+        // tidak lagi menyimpan ulang semua pengaturan. Ini akan menghemat 90% kuota.
+
+        // Menyimpan data promosi
+        const promotionsRef = doc(db, "promotions", userId);
+        const promotionsData = {
+            perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
+            perModel: JSON.parse(JSON.stringify(state.promotions.perModel)),
             userId: userId
         };
-        batch.set(settingsRef, settingsData);
+        batch.set(promotionsRef, promotionsData);
 
-        const promotionsRef = doc(db, "promotions", userId);
-const promotionsData = {
-    perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
-    perModel: JSON.parse(JSON.stringify(state.promotions.perModel)),
-    userId: userId
-};
-batch.set(promotionsRef, promotionsData);
-
-        // ▼▼▼ PERUBAHAN KUNCI ADA DI SINI ▼▼▼
-        // HANYA jalankan penyimpanan konfigurasi komisi JIKA pengguna adalah Admin
+        // Menyimpan data komisi jika yang login adalah admin
         if (isAdmin.value) {
             const commissionsRef = doc(db, "commissions", userId);
             const commissionsData = {
@@ -3046,9 +3036,8 @@ batch.set(promotionsRef, promotionsData);
             };
             batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)));
         }
-        // ▲▲▲ AKHIR DARI PERUBAHAN ▲▲▲
 
-        // Simpan HPP & Harga Jual
+        // Menyimpan HPP & Harga Jual untuk setiap produk
         for (const product of state.produk) {
             const productRef = doc(db, "products", product.docId);
             batch.update(productRef, { hpp: product.hpp });
@@ -3065,12 +3054,8 @@ batch.set(promotionsRef, promotionsData);
                 }, { merge: true });
             }
         }
+
         await batch.commit();
-        
-        // Memuat ulang data setelah berhasil disimpan tidak diperlukan di sini
-        // karena state lokal sudah diperbarui. Cukup tampilkan notifikasi.
-        
-        console.log('Perubahan berhasil disimpan ke Database!');
         alert('Semua perubahan berhasil disimpan!');
 
     } catch (error) {
