@@ -5719,157 +5719,12 @@ watch(() => uiState.pengaturanTab, (newTab) => {
     }
 });
 
-async function loadAllDataFromFirebase() {
-    isLoading.value = true;
-    const userId = currentUser.value?.uid;
-    
-    if (!userId) {
-        isLoading.value = false;
-        return;
-    }
-    try {
-        const collectionsToFetch = [
-            getDoc(doc(db, "settings", userId)),
-            getDoc(doc(db, "promotions", userId)),
-            getDocs(query(collection(db, "products"), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
-            getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "categories"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "suppliers"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "purchase_orders"), where("userId", "==", userId))),
-        ];
 
-        const results = await Promise.all(collectionsToFetch.map(p => p.catch(e => e)));
-        
-        const firstError = results.find(res => res instanceof Error);
-        if (firstError) {
-            console.error("Salah satu kueri data gagal:", firstError);
-            throw new Error("Gagal mengambil data. Periksa aturan keamanan Firestore Anda.");
-        }
-        
-        const [
-            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
-            transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
-            categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap,
-            suppliersSnap,
-            purchaseOrdersSnap,
-            notesSnap // TAMBAHKAN NOTES SNAP
-        ] = results;
 
-        if (settingsSnap.exists()) {
-            const settingsData = settingsSnap.data();
-            Object.assign(state.settings, settingsData);
-            if (!state.settings.pinProtection) {
-                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
-            }
-        }
-        
-        const userDocRef = doc(db, "users", userId);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            state.settings.inflowCategories = userData.inflowCategories || [];
-        }
-
-        if (promotionsSnap.exists()) {
-            const promoData = promotionsSnap.data();
-            // Pastikan objek dasar promosi ada
-            state.promotions.perChannel = promoData.perChannel || {};
-            state.promotions.perModel = promoData.perModel || {};
-
-            // Periksa setiap channel dan pastikan objek voucher ada
-            state.settings.marketplaces.forEach(channel => {
-                if (!state.promotions.perChannel[channel.id]) {
-                    state.promotions.perChannel[channel.id] = {};
-                }
-                if (!state.promotions.perChannel[channel.id].voucherToko) {
-                    state.promotions.perChannel[channel.id].voucherToko = {};
-                }
-                if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) {
-                    state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
-                }
-            });
-
-            if (uiState.promosiSelectedModel) {
-                if (!state.promotions.perModel[uiState.promosiSelectedModel]) {
-                    state.promotions.perModel[uiState.promosiSelectedModel] = {};
-                }
-                state.settings.marketplaces.forEach(channel => {
-                    if (!state.promotions.perModel[uiState.promosiSelectedModel][channel.id]) {
-                        state.promotions.perModel[uiState.promosiSelectedModel][channel.id] = { minBelanja: null, diskonRate: null, diskonBertingkat: [] };
-                    }
-                });
-            }
-        } else {
-            state.promotions.perChannel = {};
-            state.promotions.perModel = {};
-        }
-
-        const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
-        
-        state.produk = productsSnap.docs.map(docSnap => {
-            const p = { id: docSnap.id, ...docSnap.data() };
-            const hargaJual = {};
-            const stokAlokasi = {};
-            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
-            (state.settings.marketplaces || []).forEach(mp => {
-                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-            });
-            return {
-                docId: p.id,
-                sku: p.sku,
-                nama: p.product_name,
-                model_id: p.model_id,
-                warna: p.color,
-                varian: p.variant,
-                stokFisik: p.physical_stock,
-                hpp: p.hpp,
-                hargaJual,
-                stokAlokasi,
-                userId: p.userId
-            };
-        });
-        
-        state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
-        state.bankAccounts = bankAccountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.investorPayments = investorPaymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), paymentDate: doc.data().paymentDate?.toDate() }));
-        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
-        state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.purchaseOrders = purchaseOrdersSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.voucherNotes = notesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), endDate: doc.data().endDate?.toDate() })); // BARIS BARU UNTUK MENGISI NOTES
-        
-    } catch (error) {
-        console.error("Error besar saat memuat data dari Firebase:", error);
-        alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
-        handleLogout();
-    } finally {
-        isLoading.value = false;
-    }
-}
-
-let unsubscribe = () => {}; // Fungsi untuk menghentikan listeners
+let unsubscribe = () => {}; 
 const setupListeners = async (userId) => {
-    // Hentikan semua listener lama jika ada
     unsubscribe();
 
-    // Listener untuk data settings (cukup dipantau 1 dokumen)
     const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
         if (docSnap.exists()) {
             const settingsData = docSnap.data();
@@ -5879,14 +5734,23 @@ const setupListeners = async (userId) => {
             }
         }
     }, (error) => { console.error("Error fetching settings:", error); });
+    
+    let commissionsListener = () => {};
+    if (currentUser.value?.isPartner) {
+        const commissionsQuery = query(
+            collection(db, 'commissions'),
+            where('partnerId', '==', currentUser.value.uid)
+        );
+        commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+            commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        });
+    }
 
-    // Panggil fungsi sekali-ambil untuk data yang tidak perlu real-time
     await fetchStaticData(userId);
 
-    // Kumpulkan semua fungsi untuk menghentikan listener
     unsubscribe = () => {
         settingsListener();
-        // tambahkan listener lain di sini jika ada
+        commissionsListener(); // Baris ini sekarang sudah digunakan
     };
 };
 
