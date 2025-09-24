@@ -10657,7 +10657,8 @@ watch(activePage, (newPage) => {
 <div v-if="uiState.modalType === 'viewNote'" class="bg-white rounded-lg shadow-xl p-6 max-w-7xl w-full h-full md:max-h-[30vh] flex flex-col animate-fade-in-up">
     <h3 class="text-xl font-bold mb-4">{{ uiState.modalData?.title }}</h3>
     <div class="max-h-[60vh] overflow-y-auto p-4 bg-slate-50 rounded-lg border">
-        <p class="text-slate-700 whitespace-pre-wrap">{{ uiState.modalData?.content }}</p>
+        <p v-if="uiState.modalData?.content" class="text-slate-700 whitespace-pre-wrap">{{ uiState.modalData.content }}</p>
+        <p v-else class="text-center text-slate-500">Tidak ada konten untuk ditampilkan.</p>
     </div>
     <div class="flex justify-end mt-6 border-t pt-4">
         <button @click="hideModal" class="bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-400">Tutup</button>
