@@ -162,7 +162,7 @@ const uiState = reactive({
         
     },
 
-    notesModalVisible: false,
+    
     notesData: {},
     notesSearch: '',
     notesFilterType: 'all', // 'all', 'model', 'channel'
@@ -1537,22 +1537,21 @@ function generateUniqueCode() {
 }
 
 function showNotesModal() {
-    uiState.notesModalVisible = true;
+    // PERBAIKAN: Menampilkan modal utama dan kemudian mengisi data
+    uiState.isModalVisible = true;
+    uiState.modalType = 'notesModal';
+
     // Reset form data setiap kali modal dibuka
     uiState.notesData = {
         type: 'model', // default
         voucherType: '',
         title: '',
-        endDate: '',
+        endDate: new Date().toISOString().split('T')[0],
         endHour: '23',
         endMinute: '59',
         modelName: '',
         channelId: ''
     };
-}
-
-function hideNotesModal() {
-    uiState.notesModalVisible = false;
 }
 
 async function submitVoucherNote() {
@@ -1587,7 +1586,7 @@ async function submitVoucherNote() {
         const docRef = await addDoc(collection(db, "voucher_notes"), dataToSave);
         state.voucherNotes.push({ id: docRef.id, ...dataToSave, endDate: dataToSave.endDate });
         alert("Catatan voucher berhasil disimpan!");
-        hideNotesModal();
+        hideModal(); // <-- INI PERBAIKANNYA
     } catch (error) {
         console.error("Gagal menyimpan catatan:", error);
         alert("Gagal menyimpan catatan. Silakan coba lagi.");
@@ -2511,7 +2510,7 @@ const filteredTransaksi = computed(() => {
         uiState.posEndYear
     );
     
-    // BARIS BARU: Menambahkan filter berdasarkan channel jika sudah dipilih
+    // BARIS BARUu: Menambahkan filter berdasarkan channel jika sudah dipilih
     if (uiState.posChannelFilter && uiState.posChannelFilter !== 'all') {
         filteredData = filteredData.filter(trx => trx.channelId === uiState.posChannelFilter);
     }
@@ -2788,6 +2787,22 @@ const hargaHppFilteredVariants = computed(() => {
 const filteredPurchaseOrders = computed(() => {
     // PERBAIKAN: Mengurutkan salinan array, bukan array aslinya
     return [...state.purchaseOrders].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+});
+
+const itemizedPurchaseHistory = computed(() => {
+  // flatMap akan mengubah array pesanan menjadi array item produk yang rata
+  return filteredPurchaseOrders.value.flatMap(order => 
+    // Jika tidak ada produk di dalam pesanan, kembalikan array kosong
+    (order.produk || []).map(item => ({
+      ...item, // Ambil semua data dari item (nama, harga, qty, dll)
+      orderId: order.id,
+      tanggal: order.tanggal,
+      supplierName: order.supplierName,
+      // Kita simpan juga status dari pesanan induknya
+      orderStatusProses: order.statusProses,
+      orderStatusPembayaran: order.statusPembayaran
+    }))
+  );
 });
 
 const ringkasanJadiData = computed(() => {
@@ -3403,12 +3418,11 @@ function showModal(type, data = {}) {
         uiState.isModalVisible = true; // Selalu set ke true untuk menampilkan container modal
 
         // Salin data dengan aman untuk menghindari referensi langsung
-        // Ini menangani semua jenis data kecuali yang butuh perlakuan khusus
         if (data) {
              uiState.modalData = JSON.parse(JSON.stringify(data));
         }
 
-        // Logika khususs untuk modal tertentu
+        // Logika khusus untuk modal tertentu
         if (type === 'editMarketplace' && data) {
             if (!uiState.modalData.programs) {
                 uiState.modalData.programs = [];
@@ -3416,18 +3430,16 @@ function showModal(type, data = {}) {
         } else if (type === 'addProduksi') {
             if (!state.settings.modelProduk || state.settings.modelProduk.length === 0) {
                 alert("Data 'Model Produk' belum dibuat. silahkan kehalaman pengaturan untuk menambahkan model produk.");
-                hideModal();
+                hideModal(); // Langsung tutup lagi jika syarat tidak terpenuhi
                 return;
             }
             setupNewProduksiBatch();
         } else if (type === 'editProduksi' && data) {
             setupEditProduksiBatch(data);
         } else if (type === 'editRetur' && data) {
+            // Pastikan tanggal diformat dengan benar untuk input type="date"
             uiState.modalData.tanggal = new Date(data.tanggal).toISOString().split('T')[0];
         }
-        
-        // Modal 'investorInfo' dan 'kpiHelp' tidak memerlukan data khusus, 
-        // sehingga mereka akan langsung bekerja dengan benar sekarang.
     });
 }
 
@@ -3528,6 +3540,7 @@ function exportLaporanSemuaToExcel() {
 }
 function hideModal() {
     uiState.isModalVisible = false;
+    
     uiState.modalType = '';
     uiState.modalData = {};
 }
@@ -3863,7 +3876,7 @@ async function recordBagiHasilPayment() {
     const result = report.result;
     if (!result || result.investorShare <= 0) return alert("Tidak ada keuntungan.");
 
-    // --- AWAL PERBAIKAN: Mengambil data dari state yang benar ---
+    // --- AWAL PERBAIKAN: Mengambilll data dari state yang benar ---
     const paymentMethod = report.paymentMethod; 
     const adminFee = paymentMethod === 'transfer' ? (report.adminFee || 0) : 0;
     const totalPengeluaran = result.investorShare + adminFee;
@@ -4114,7 +4127,7 @@ async function submitNewProduksiBatch() {
 }
 
 function setupEditProduksiBatch(batch) {
-    // Buatt salinan data batch agar data asli di state tidak ikut berubah sebelum disimpan
+    // Buat salinan data batch agar data asli di state tidak ikut berubah sebelum disimpan
     const dataForModal = JSON.parse(JSON.stringify(batch));
     
     // Pastikan properti dinamis ada, meskipun tidak ada di data database
@@ -5422,7 +5435,7 @@ const panduanData = [
     },
 ];
 
-// [KODE BARU] State untuk mengelola accordion di halaman panduan
+// [KODE BARUu] State untuk mengelola accordion di halaman panduan
 const panduanAccordion = ref(null);
 
 const promosiProductModels = computed(() => {
@@ -8602,40 +8615,45 @@ watch(activePage, (newPage) => {
                         </table>
                     </div>
                 </div>
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 mt-8">
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
     <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Penerimaan Barang</h3>
     <div class="overflow-x-auto">
         <table class="w-full text-sm text-left text-slate-500">
             <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
                 <tr>
-                    <th class="px-6 py-3">Tanggal</th>
-                    <th class="px-6 py-3">Supplier</th>
-                    <th class="px-6 py-3 text-right">Total Nilai Qty</th>
-                    <th class="px-6 py-3">Status</th>
-                    <th class="px-6 py-3 text-right">Aksi</th>
+                    <th class="px-4 py-3">Tanggal</th>
+                    <th class="px-4 py-3">Supplier</th>
+                    <th class="px-4 py-3">Produk</th>
+                    <th class="px-4 py-3 text-right">Harga</th>
+                    <th class="px-4 py-3 text-center">Jumlah Barang</th>
+                    <th class="px-4 py-3 text-right">Total Nilai Barang</th>
+                    <th class="px-4 py-3">Status Proses</th>
+                    <th class="px-4 py-3">Status Bayar</th>
+                    <th class="px-4 py-3">Retur</th>
+                    <th class="px-4 py-3 text-right">Aksi</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-200/50">
-                <tr v-if="filteredPurchaseOrders.length === 0">
-                    <td colspan="5" class="p-4 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
+                <tr v-if="itemizedPurchaseHistory.length === 0">
+                    <td colspan="10" class="p-10 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
                 </tr>
-                <tr v-for="order in filteredPurchaseOrders" :key="order.id" class="hover:bg-slate-50/50">
-                    <td class="px-6 py-4">{{ new Date(order.tanggal).toLocaleDateString('id-ID') }}</td>
-                    <td class="px-6 py-4 font-semibold text-slate-800">{{ order.supplierName }}</td>
-                    <td class="px-6 py-4 text-right font-bold text-green-600">{{ formatCurrency(order.totalQtyValue) }}</td>
-                    <td class="px-6 py-4">
-                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
-                            :class="{
-                                'bg-blue-100 text-blue-800': order.statusProses === 'Dalam Proses',
-                                'bg-green-100 text-green-800': order.statusProses === 'Selesai',
-                            }">
-                            {{ order.statusProses }}
-                        </span>
+                <tr v-for="(item, index) in itemizedPurchaseHistory" :key="`${item.orderId}-${index}`" class="hover:bg-slate-50/50">
+                    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
+                    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
+                    <td class="px-4 py-3">
+                        <p class="font-semibold">{{ item.modelName }}</p>
+                        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
                     </td>
-                    <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap">
-                        <button @click="showModal('viewPurchaseOrder', JSON.parse(JSON.stringify(order)))" class="font-semibold text-indigo-500 hover:underline">Detail</button>
-                        <button @click="showEditPenerimaanBarangForm(order)" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                        <button @click="deletePurchaseOrder(order.id)" class="text-red-500 hover:text-red-700">
+                    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
+                    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
+                    <td class="px-4 py-3 text-right font-bold text-green-600">{{ formatCurrency(item.hargaJual * item.qty) }}</td>
+                    <td class="px-4 py-3">{{ item.statusProses }}</td>
+                    <td class="px-4 py-3">{{ item.statusPembayaran }}</td>
+                    <td class="px-4 py-3">{{ item.returReason || 'Tidak Retur' }}</td>
+                    <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+                        <button @click="showModal('viewPurchaseOrder', JSON.parse(JSON.stringify(filteredPurchaseOrders.find(o => o.id === item.orderId))))" class="font-semibold text-indigo-500 hover:underline">Detail</button>
+                        <button @click="showEditPenerimaanBarangForm(filteredPurchaseOrders.find(o => o.id === item.orderId))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+                        <button @click="deletePurchaseOrder(item.orderId)" class="text-red-500 hover:text-red-700">
                             <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         </button>
                     </td>
@@ -8657,7 +8675,10 @@ watch(activePage, (newPage) => {
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
                     <form @submit.prevent="submitPenerimaanBarang" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            
+                          <div>
+    <label class="block text-sm font-medium">Tanggal</label>
+    <input type="date" v-model="uiState.penerimaanBarangForm.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
+</div>  
                             <div>
                                 <label class="block text-sm font-medium">Catatan</label>
                                 <input type="text" v-model="uiState.penerimaanBarangForm.catatan" class="mt-1 w-full p-2 border rounded-md">
@@ -8880,6 +8901,7 @@ watch(activePage, (newPage) => {
     <!-- Modal System -->
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
+
 
 <div v-if="uiState.modalType === 'viewPurchaseOrder'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
@@ -11734,40 +11756,38 @@ watch(activePage, (newPage) => {
                 </div>
             </form>
         </div>
+<div v-if="uiState.modalType === 'notesModal'" class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full max-h-[90vh] flex flex-col">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Catatan Masa Berakhir Voucher</h3>
+        <p class="text-slate-500 mt-1">Lacak masa berlaku voucher agar promosi tidak terlewat.</p>
     </div>
 
-<div v-if="uiState.notesModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full max-h-[90vh] flex flex-col">
-        <div class="flex-shrink-0 pb-4 border-b">
-            <h3 class="text-2xl font-bold text-slate-800">Catatan Masa Berakhir Voucher</h3>
-            <p class="text-slate-500 mt-1">Lacak masa berlaku voucher agar promosi tidak terlewat.</p>
-        </div>
+    <div class="flex-1 overflow-y-auto py-4 pr-2 space-y-6">
+        <div class="p-4 bg-slate-50 rounded-lg border">
+            <form @submit.prevent="submitVoucherNote" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <h4 class="col-span-full font-semibold text-lg text-indigo-700">Tambah Catatan Baru</h4>
 
-        <div class="flex-1 overflow-y-auto py-4 pr-2 space-y-6">
-            <div class="p-4 bg-slate-50 rounded-lg border">
-                <form @submit.prevent="submitVoucherNote" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <h4 class="col-span-full font-semibold text-lg text-indigo-700">Tambah Catatan Baru</h4>
+                <div>
+                    <label class="block text-sm font-medium">Tipe Voucher</label>
+                    <select v-model="uiState.notesData.type" class="mt-1 w-full p-2 border rounded-md">
+                        <option value="model">Per Model Produk</option>
+                        <option value="channel">Per Akun Penjualan</option>
+                    </select>
+                </div>
 
-                    <div>
-                        <label class="block text-sm font-medium">Tipe Voucher</label>
-                        <select v-model="uiState.notesData.type" class="mt-1 w-full p-2 border rounded-md">
-                            <option value="model">Per Model Produk</option>
-                            <option value="channel">Per Akun Penjualan</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium">Jenis Voucher</label>
-                        <select v-model="uiState.notesData.voucherType" class="mt-1 w-full p-2 border rounded-md" required>
-                            <option value="" disabled>-- Pilih Jenis Voucher --</option>
-                            <option value="Voucher Ikuti Toko">Voucher Ikuti Toko</option>
-                            <option value="Voucher Semua Produk">Voucher Semua Produk</option>
-                            <option value="Voucher Produk Tertentu">Voucher Produk Tertentu</option>
-                            <option value="Diskon Minimal Belanja Bertingkat">Diskon Minimal Belanja Bertingkat</option>
-                        </select>
-                    </div>
+                <div>
+                    <label class="block text-sm font-medium">Jenis Voucher</label>
+                    <select v-model="uiState.notesData.voucherType" class="mt-1 w-full p-2 border rounded-md" required>
+                        <option value="" disabled>-- Pilih Jenis Voucher --</option>
+                        <option value="Voucher Ikuti Toko">Voucher Ikuti Toko</option>
+                        <option value="Voucher Semua Produk">Voucher Semua Produk</option>
+                        <option value="Voucher Produk Tertentu">Voucher Produk Tertentu</option>
+                        <option value="Diskon Minimal Belanja Bertingkat">Diskon Minimal Belanja Bertingkat</option>
+                    </select>
+                </div>
 
-                    <div v-if="uiState.notesData.type === 'model' && (uiState.notesData.voucherType === 'Voucher Produk Tertentu' || uiState.notesData.voucherType === 'Diskon Minimal Belanja Bertingkat')">
+                <template v-if="uiState.notesData.voucherType">
+                    <div v-if="uiState.notesData.type === 'model'">
                         <label class="block text-sm font-medium">Pilih Model Produk</label>
                         <select v-model="uiState.notesData.modelName" class="mt-1 w-full p-2 border rounded-md" required>
                             <option value="">-- Pilih Model --</option>
@@ -11775,108 +11795,107 @@ watch(activePage, (newPage) => {
                         </select>
                     </div>
 
-                    <div v-if="uiState.notesData.type === 'channel' && (uiState.notesData.voucherType === 'Voucher Ikuti Toko' || uiState.notesData.voucherType === 'Voucher Semua Produk')">
+                    <div>
                         <label class="block text-sm font-medium">Pilih Akun Penjualan</label>
                         <select v-model="uiState.notesData.channelId" class="mt-1 w-full p-2 border rounded-md" required>
                             <option value="">-- Pilih Channel --</option>
                             <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.id">{{ channel.name }}</option>
                         </select>
                     </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium">Nama Voucher</label>
-                        <input type="text" v-model="uiState.notesData.title" class="mt-1 w-full p-2 border rounded-md" required>
-                    </div>
+                </template>
 
-                    <div class="grid grid-cols-3 gap-2 col-span-full">
-                        <div>
-                            <label class="block text-sm font-medium">Tgl Berakhir</label>
-                            <input type="date" v-model="uiState.notesData.endDate" class="mt-1 w-full p-2 border rounded-md" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium">Jam</label>
-                            <input type="number" v-model.number="uiState.notesData.endHour" min="0" max="23" class="mt-1 w-full p-2 border rounded-md" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium">Menit</label>
-                            <input type="number" v-model.number="uiState.notesData.endMinute" min="0" max="59" class="mt-1 w-full p-2 border rounded-md" required>
-                        </div>
-                    </div>
+                <div>
+                    <label class="block text-sm font-medium">Nama Voucher</label>
+                    <input type="text" v-model="uiState.notesData.title" class="mt-1 w-full p-2 border rounded-md" required>
+                </div>
 
-                    <div class="col-span-full flex justify-end">
-                        <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Simpan Catatan</button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="p-4 bg-white rounded-lg border">
-                <h4 class="font-semibold text-lg text-slate-800 mb-4">Daftar Catatan Voucher</h4>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div class="grid grid-cols-3 gap-2">
                     <div>
-                        <label class="block text-sm font-medium">Cari</label>
-                        <input type="text" v-model="uiState.notesSearch" placeholder="Cari model/channel..." class="mt-1 w-full p-2 border rounded-md">
+                        <label class="block text-sm font-medium">Tgl Berakhir</label>
+                        <input type="date" v-model="uiState.notesData.endDate" class="mt-1 w-full p-2 border rounded-md" required>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium">Filter Tipe</label>
-                        <select v-model="uiState.notesFilterType" class="mt-1 w-full p-2 border rounded-md">
-                            <option value="all">Semua Tipe</option>
-                            <option value="model">Per Model</option>
-                            <option value="channel">Per Akun</option>
-                        </select>
+                        <label class="block text-sm font-medium">Jam</label>
+                        <input type="number" v-model.number="uiState.notesData.endHour" min="0" max="23" class="mt-1 w-full p-2 border rounded-md" required>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium">Filter Model</label>
-                        <select v-model="uiState.notesFilterModel" class="mt-1 w-full p-2 border rounded-md">
-                            <option value="">Semua Model</option>
-                            <option v-for="model in promosiProductModels" :key="model" :value="model">{{ model }}</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium">Filter Akun</label>
-                        <select v-model="uiState.notesFilterChannel" class="mt-1 w-full p-2 border rounded-md">
-                            <option value="">Semua Akun</option>
-                            <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.id">{{ channel.name }}</option>
-                        </select>
+                        <label class="block text-sm font-medium">Menit</label>
+                        <input type="number" v-model.number="uiState.notesData.endMinute" min="0" max="59" class="mt-1 w-full p-2 border rounded-md" required>
                     </div>
                 </div>
-                
-                <div class="overflow-x-auto max-h-[40vh]">
-                    <table class="min-w-full text-sm text-left text-slate-500">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                            <tr>
-                                <th class="px-4 py-3">Voucher</th>
-                                <th class="px-4 py-3">Berakhir pada</th>
-                                <th class="px-4 py-3">Tipe</th>
-                                <th class="px-4 py-3">Detail</th>
-                                <th class="px-4 py-3 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="filteredVoucherNotes.length === 0">
-                                <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada catatan voucher.</td>
-                            </tr>
-                            <tr v-for="note in filteredVoucherNotes" :key="note.id" class="hover:bg-slate-50/50">
-                                <td class="px-4 py-3 font-semibold text-slate-800">{{ note.title }}</td>
-                                <td class="px-4 py-3 whitespace-nowrap">{{ new Date(note.endDate).toLocaleString('id-ID') }}</td>
-                                <td class="px-4 py-3 capitalize">{{ note.type }}</td>
-                                <td class="px-4 py-3">{{ note.modelName || note.channelName }}</td>
-                                <td class="px-4 py-3 text-center">
-                                    <button @click="deleteVoucherNote(note.id)" class="text-red-500 hover:underline text-xs font-bold">Hapus</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+
+                <div class="col-span-full flex justify-end">
+                    <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Simpan Catatan</button>
                 </div>
-            </div>
+            </form>
         </div>
 
-        <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-            <button @click="hideNotesModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+        <div class="p-4 bg-white rounded-lg border">
+            <h4 class="font-semibold text-lg text-slate-800 mb-4">Daftar Catatan Voucher</h4>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium">Cari</label>
+                    <input type="text" v-model="uiState.notesSearch" placeholder="Cari model/channel..." class="mt-1 w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Filter Tipe</label>
+                    <select v-model="uiState.notesFilterType" class="mt-1 w-full p-2 border rounded-md">
+                        <option value="all">Semua Tipe</option>
+                        <option value="model">Per Model</option>
+                        <option value="channel">Per Akun</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Filter Model</label>
+                    <select v-model="uiState.notesFilterModel" class="mt-1 w-full p-2 border rounded-md">
+                        <option value="">Semua Model</option>
+                        <option v-for="model in promosiProductModels" :key="model" :value="model">{{ model }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Filter Akun</label>
+                    <select v-model="uiState.notesFilterChannel" class="mt-1 w-full p-2 border rounded-md">
+                        <option value="">Semua Akun</option>
+                        <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.id">{{ channel.name }}</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto max-h-[40vh]">
+                <table class="min-w-full text-sm text-left text-slate-500">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-3">Voucher</th>
+                            <th class="px-4 py-3">Berakhir pada</th>
+                            <th class="px-4 py-3">Tipe</th>
+                            <th class="px-4 py-3">Detail</th>
+                            <th class="px-4 py-3 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200/50">
+                        <tr v-if="filteredVoucherNotes.length === 0">
+                            <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada catatan voucher.</td>
+                        </tr>
+                        <tr v-for="note in filteredVoucherNotes" :key="note.id" class="hover:bg-slate-50/50">
+                            <td class="px-4 py-3 font-semibold text-slate-800">{{ note.title }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">{{ new Date(note.endDate).toLocaleString('id-ID') }}</td>
+                            <td class="px-4 py-3 capitalize">{{ note.type }}</td>
+                            <td class="px-4 py-3">{{ note.modelName || note.channelName }}</td>
+                            <td class="px-4 py-3 text-center">
+                                <button @click="deleteVoucherNote(note.id)" class="text-red-500 hover:underline text-xs font-bold">Hapus</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
 
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+    </div>
+</div>
 </template>
 
 <style scoped>
