@@ -5722,9 +5722,12 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 
 
 let unsubscribe = () => {}; 
+
 const setupListeners = async (userId) => {
+    // Hentikan semua listener yang mungkin aktif dari sesi sebelumnya
     unsubscribe();
 
+    // 1. Deklarasi dan inisialisasi listener
     const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
         if (docSnap.exists()) {
             const settingsData = docSnap.data();
@@ -5746,11 +5749,14 @@ const setupListeners = async (userId) => {
         });
     }
 
+    // Panggil fungsi untuk mengambil data statis yang tidak perlu real-time
     await fetchStaticData(userId);
 
+    // 2. Gunakan listener dalam fungsi unsubscribe
+    // Ini adalah bagian yang memperbaiki error 'never used'
     unsubscribe = () => {
         settingsListener();
-        commissionsListener(); // Baris ini sekarang sudah digunakan
+        commissionsListener(); 
     };
 };
 
