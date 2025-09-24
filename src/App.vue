@@ -5899,9 +5899,14 @@ onMounted(() => {
     onAuthStateChanged(auth, async (user) => {
         isLoading.value = true;
         if (user) {
-            currentUser.value = user;
+            // Ambil data user dari Firestore
+            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+            const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+            
+            // Gabungkan data user dari Auth dan Firestore ke dalam satu objek
+            currentUser.value = { ...user, userData };
+            
             await setupListeners(user.uid);
-            // Tambahkann logika untuk mitra di sini jika diperlukan
         } else {
             currentUser.value = null;
             activePage.value = 'login';
