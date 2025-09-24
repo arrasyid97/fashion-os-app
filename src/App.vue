@@ -5057,12 +5057,33 @@ async function removeMarketplace(marketplaceId) {
 
     const index = state.settings.marketplaces.findIndex(mp => mp.id === marketplaceId);
     if (index > -1) {
+        // Hapus marketplace dari array lokal
         state.settings.marketplaces.splice(index, 1);
+        
         try {
-            await saveSettingsData(); // <-- PERUBAHAN DI SINI
+            const userId = currentUser.value.uid;
+            const settingsRef = doc(db, "settings", userId);
+            
+            // Lakukan update dokumen yang sangat spesifik
+            await updateDoc(settingsRef, {
+                marketplaces: state.settings.marketplaces,
+            });
+            
+            // Hapus juga data promosi yang mungkin ada di perChannel dan perModel
+            // agar data tidak 'menggantung' di database.
+            // ini opsional, tetapi merupakan praktik terbaik
+            if (state.promotions.perChannel[marketplaceId]) {
+                delete state.promotions.perChannel[marketplaceId];
+                // Hapus data promosi dari Firestore juga jika ada
+                const promotionsRef = doc(db, "promotions", userId);
+                await updateDoc(promotionsRef, {
+                    perChannel: state.promotions.perChannel,
+                });
+            }
+
             alert('Marketplace berhasil dihapus dan perubahan telah disimpan.');
         } catch(error) {
-            alert("Gagal menyimpan data.");
+            alert(`Gagal menyimpan data: ${error.message}`);
         }
     }
 }
