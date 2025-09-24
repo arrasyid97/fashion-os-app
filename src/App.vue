@@ -5022,10 +5022,14 @@ async function removeMarketplace(marketplaceId) {
     if (index > -1) {
         state.settings.marketplaces.splice(index, 1);
         try {
-            await saveSettingsData(); // <-- PERUBAHAN DI SINI
+            // [PERBAIKAN] Memanggil fungsi baru yang efisien
+            await saveSettingsData(); 
+            // [BARU] Memberi notifikasi sukses kepada pengguna
             alert('Marketplace berhasil dihapus dan perubahan telah disimpan.');
         } catch(error) {
-            alert("Gagal menyimpan data.");
+            alert("Gagal menghapus data marketplace.");
+            // Jika gagal, muat ulang data dari server untuk konsistensi
+            await loadAllDataFromFirebase();
         }
     }
 }
@@ -5041,11 +5045,15 @@ async function saveMarketplaceEdit() {
     }
     
     try {
-        await saveSettingsData(); // <-- PERUBAHAN DI SINI
+        // [PERBAIKAN] Memanggil fungsi baru yang efisien
+        await saveSettingsData(); 
         hideModal();
+        // [BARU] Memberi notifikasi sukses kepada pengguna
         alert('Perubahan marketplace berhasil disimpan.');
     } catch(error) {
-        alert("Gagal menyimpan data.");
+        alert("Gagal menyimpan data marketplace.");
+        // Jika gagal, muat ulang data dari server untuk memastikan konsistensi
+        await loadAllDataFromFirebase();
     }
 }
 
@@ -5056,24 +5064,22 @@ async function saveSettingsData() {
         const userId = currentUser.value.uid;
         const settingsRef = doc(db, "settings", userId);
         
-        // Siapkan hanya data yang relevan dari state
+        // FUNGSI INI SEKARANG HANYA MENYIMPAN DATA PENGATURAN SAJA,
+        // TIDAK LAGI MENYIMPAN SEMUA DATA LAIN. INI MENGHEMAT KUOTA.
         const settingsData = {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
             marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
             modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
             userId: userId
-            // Kita tidak menyertakan data lain yang tidak relevan di sini
         };
         
-        // Simpan data ke Firestore
+        // setDoc dengan merge:true lebih aman dan efisien
         await setDoc(settingsRef, settingsData, { merge: true });
-        
-        // Tidak perlu alert di sini karena fungsi pemanggil sudah punya
         
     } catch (error) {
         console.error("Gagal menyimpan pengaturan:", error);
-        // Lemparkan error agar fungsi pemanggil tahu ada masalah
+        // Lemparkan error agar fungsi pemanggil tahu jika ada masalah
         throw new Error("Gagal menyimpan data ke Firebase."); 
     } finally {
         isSaving.value = false;
@@ -5092,8 +5098,16 @@ async function addModelProduk() {
         hargaJahit: 0,
     };
     state.settings.modelProduk.push(newModel);
-    await saveData();
-    alert('Model Produk baru berhasil ditambahkan.');
+    
+    try {
+        // [PERBAIKAN] Memanggil fungsi yang efisien, bukan saveData()
+        await saveSettingsData();
+        alert('Model Produk baru berhasil ditambahkan.');
+    } catch (error) {
+        alert('Gagal menyimpan model baru.');
+        // Jika gagal, muat ulang data dari server untuk konsistensi
+        await loadAllDataFromFirebase();
+    }
 }
 
 async function removeModelProduk(modelId) {
@@ -5103,8 +5117,15 @@ async function removeModelProduk(modelId) {
     const index = state.settings.modelProduk.findIndex(m => m.id === modelId);
     if (index > -1) {
         state.settings.modelProduk.splice(index, 1);
-        await saveData(); // Panggil saveData untuk menyimpan
-        alert('Model Produk berhasil dihapus.');
+        try {
+            // [PERBAIKAN] Memanggil fungsi yang efisien
+            await saveSettingsData(); 
+            alert('Model Produk berhasil dihapus.');
+        } catch (error) {
+            alert('Gagal menghapus model produk.');
+            // Jika gagal, muat ulang data dari server untuk konsistensi
+            await loadAllDataFromFirebase();
+        }
     }
 }
 
@@ -11755,6 +11776,7 @@ watch(activePage, (newPage) => {
                     <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Konfirmasi</button>
                 </div>
             </form>
+        </div>
         </div>
 <div v-if="uiState.modalType === 'notesModal'" class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
