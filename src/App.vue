@@ -5033,12 +5033,21 @@ async function addMarketplace() {
     if (!state.promotions.perChannel[newMarketplace.id]) {
         state.promotions.perChannel[newMarketplace.id] = { voucherToko: null, voucherSemuaProduk: null };
     }
-
+    
+    // Perbarui data marketplaces di database secara langsung
     try {
-        await saveSettingsData(); // <-- PERUBAHAN DI SINI
+        const userId = currentUser.value.uid;
+        const settingsRef = doc(db, "settings", userId);
+        
+        // Cukup perbarui satu field 'marketplaces', tidak seluruh dokumen
+        await updateDoc(settingsRef, {
+            marketplaces: state.settings.marketplaces,
+        });
+
         alert('Marketplace baru berhasil ditambahkan dan disimpan!');
-    } catch (error) {
-        alert("Gagal menyimpan data.");
+    } catch(error) {
+        console.error("Gagal menyimpan perubahan marketplace:", error);
+        alert(`Gagal menyimpan data: ${error.message}`);
     }
 }
 
