@@ -1558,21 +1558,25 @@ function generateUniqueCode() {
 }
 
 function showNotesModal() {
-    // PERBAIKAN: Menampilkan modal utama dan kemudian mengisi data
+    // Reset semua state terkait modal sebelum menampilkan yang baru
+    uiState.modalData = {};
     uiState.isModalVisible = true;
-    uiState.modalType = 'notesModal';
-
-    // Reset form data setiap kali modal dibuka
-    uiState.notesData = {
-        type: 'model', // default
-        voucherType: '',
-        title: '',
-        endDate: new Date().toISOString().split('T')[0],
-        endHour: '23',
-        endMinute: '59',
-        modelName: '',
-        channelId: ''
-    };
+    
+    // Tunda eksekusi sampai DOM diperbarui
+    nextTick(() => {
+        uiState.modalType = 'notesModal';
+        // Reset form data setiap kali modal dibuka
+        uiState.notesData = {
+            type: 'model', // default
+            voucherType: '',
+            title: '',
+            endDate: new Date().toISOString().split('T')[0],
+            endHour: '23',
+            endMinute: '59',
+            modelName: '',
+            channelId: ''
+        };
+    });
 }
 
 async function submitVoucherNote() {
@@ -3566,9 +3570,9 @@ function exportLaporanSemuaToExcel() {
     worksheet["!cols"] = Array(13).fill({ wch: 20 });
     XLSX.writeFile(workbook, `Laporan_Produksi_Menyeluruh_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
+
 function hideModal() {
     uiState.isModalVisible = false;
-    
     uiState.modalType = '';
     uiState.modalData = {};
 }
