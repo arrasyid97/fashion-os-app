@@ -2536,7 +2536,7 @@ const filteredTransaksi = computed(() => {
         uiState.posEndYear
     );
     
-    // BARIS BARUu: Menambahkan filter berdasarkan channel jika sudah dipilih
+    // BARIS BARUuu: Menambahkan filter berdasarkan channel jika sudah dipilih
     if (uiState.posChannelFilter && uiState.posChannelFilter !== 'all') {
         filteredData = filteredData.filter(trx => trx.channelId === uiState.posChannelFilter);
     }
