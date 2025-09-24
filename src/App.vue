@@ -11758,7 +11758,8 @@ watch(activePage, (newPage) => {
                 </div>
             </form>
         </div>
-    </div><div v-if="uiState.notesModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
+    
+    <div v-if="uiState.notesModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full max-h-[90vh] flex flex-col">
         <div class="flex-shrink-0 pb-4 border-b">
             <h3 class="text-2xl font-bold text-slate-800">Catatan Masa Berakhir Voucher</h3>
@@ -11900,7 +11901,7 @@ watch(activePage, (newPage) => {
         </div>
     </div>
 </div>
-
+        </div>
 
 
 </template>
