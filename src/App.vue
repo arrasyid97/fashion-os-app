@@ -8984,7 +8984,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'notesModal'" class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full max-h-[90vh] flex flex-col animate-fade-in-up">
+<div v-if="uiState.modalType === 'notesModal'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
         <div class="flex-shrink-0 pb-4 border-b">
             <h3 class="text-2xl font-bold text-slate-800">Catatan Masa Berakhir Voucher</h3>
             <p class="text-slate-500 mt-1">Lacak masa berlaku voucher agar promosi tidak terlewat.</p>
