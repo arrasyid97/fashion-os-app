@@ -2766,6 +2766,18 @@ const sisaPembayaran = computed(() => {
     return totalYangHarusDibayarkan.value - (uiState.penerimaanBarangForm.dibayarkan || 0);
 });
 
+const aggregatedSupplierProductCounts = computed(() => {
+    const counts = {};
+    for (const order of state.purchaseOrders) {
+        if (!counts[order.supplierId]) {
+            counts[order.supplierId] = 0;
+        }
+        const totalQtyInOrder = order.produk.reduce((sum, item) => sum + (item.qty || 0), 0);
+        counts[order.supplierId] += totalQtyInOrder;
+    }
+    return counts;
+});
+
 const filteredMarketplaces = computed(() => {
     // Memberikan nilai default array kosong jika state.settings.marketplaces undefined
     const marketplacesData = state.settings.marketplaces || [];
@@ -8642,7 +8654,7 @@ watch(activePage, (newPage) => {
                                 <tr v-for="supplier in state.suppliers" :key="supplier.id" class="hover:bg-slate-50/50">
                                     <td class="px-6 py-4 font-semibold text-slate-800">{{ supplier.name }}</td>
                                     <td class="px-6 py-4">{{ supplier.contact || '-' }}</td>
-                                    <td class="px-6 py-4 text-center">{{ supplier.products?.length || 0 }}</td>
+                                    <td class="px-6 py-4 text-center">{{ aggregatedSupplierProductCounts[supplier.id] || 0 }}</td>
                                     <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap">
                                         <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline" :disabled="!isSubscriptionActive">Buat Pesanan</button>
                                         <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
