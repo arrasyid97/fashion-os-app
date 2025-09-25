@@ -2751,6 +2751,10 @@ const filteredRetur = computed(() => {
     return returData.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 });
 
+const isAnyProductPaymentInProgress = computed(() => {
+    return uiState.penerimaanBarangForm.produk.some(p => p.statusPembayaran === 'Proses Pembayaran');
+});
+
 const totalYangHarusDibayarkan = computed(() => {
     return uiState.penerimaanBarangForm.produk.reduce((sum, p) => {
         return sum + (p.hargaJual || 0) * (p.qty || 0);
@@ -8796,7 +8800,7 @@ watch(activePage, (newPage) => {
         </div>
     </div>
     
-    <div v-if="uiState.penerimaanBarangForm.statusPembayaran === 'Proses Pembayaran'" class="mt-4 p-4 border rounded-lg bg-slate-50 animate-fade-in">
+    <div v-if="isAnyProductPaymentInProgress" class="mt-4 p-4 border rounded-lg bg-slate-50 animate-fade-in">
     <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
