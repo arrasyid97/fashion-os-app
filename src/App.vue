@@ -2616,7 +2616,7 @@ const inventoryProductGroups = computed(() => {
     const grouped = state.produk.reduce((acc, product) => {
         // Ambil nama model konseptual (misal: "SALWA")
         const model = state.settings.modelProduk.find(m => m.id === product.model_id);
-        const modelName = model ? model.namaModel.split(' ')[0] : 'N/A'; // <-- PERUBAHAN UTAMA DI SINI
+        const modelName = model ? model.namaModel.split(' ')[0] : 'N/A';
 
         if (!acc[modelName]) {
             acc[modelName] = {
@@ -2658,6 +2658,27 @@ const inventoryProductGroups = computed(() => {
             case 'stok-asc': return a.totalStock - b.totalStock;
             case 'nama-asc': default: return a.namaModel.localeCompare(b.namaModel);
         }
+    });
+    
+    // --- PERBAIKAN UTAMA: SORTING VARIAN DI DALAM KELOMPOK ---
+    const sizeOrder = {
+        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
+        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, 
+        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
+        'allsize': 90, 'satuukuran': 90
+    };
+    productGroups.forEach(group => {
+        group.variants.sort((a, b) => {
+            // 1. Urutkan berdasarkan warna (alfabetis)
+            const colorCompare = (a.warna || '').localeCompare(b.warna || '');
+            if (colorCompare !== 0) {
+                return colorCompare;
+            }
+            // 2. Jika warna sama, urutkan berdasarkan ukuran
+            const sizeA = sizeOrder[a.varian.toLowerCase()] || 999; 
+            const sizeB = sizeOrder[b.varian.toLowerCase()] || 999;
+            return sizeA - sizeB;
+        });
     });
 
     return productGroups;
