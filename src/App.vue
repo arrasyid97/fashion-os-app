@@ -170,9 +170,7 @@ const uiState = reactive({
     notesFilterChannel: '',
     notesSortBy: 'endDate-asc',
 
-    supplierModalData: {
-        productSearch: ''
-    },
+    supplierModalData: {},
     activeSupplierView: 'list', // 'list' atau 'form' <-- TAMBAHKAN BARIS INI
     penerimaanBarangForm: { // <-- TAMBAHKAN OBJEK INI
         supplierId: null,
@@ -347,44 +345,7 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
-const filteredSupplierProducts = computed(() => {
-    const searchQuery = uiState.supplierModalData.productSearch?.toLowerCase() || '';
-    if (!searchQuery) {
-        return state.produk;
-    }
-    return state.produk.filter(p =>
-        p.sku?.toLowerCase().includes(searchQuery) ||
-        p.nama?.toLowerCase().includes(searchQuery) ||
-        p.warna?.toLowerCase().includes(searchQuery) ||
-        p.varian?.toLowerCase().includes(searchQuery)
-    );
-});
 
-// Tambahkan fungsi baru ini di bawah fungsi `hideModal`
-function addProductToPenerimaanBarang(product) {
-    // Cek apakah produk sudah ada di daftar
-    const existingItem = uiState.penerimaanBarangForm.produk.find(p => p.sku === product.sku);
-    if (existingItem) {
-        alert("Produk ini sudah ada di daftar.");
-        return;
-    }
-    
-    // Tambahkan produk yang sudah dipilih
-    uiState.penerimaanBarangForm.produk.push({
-        id: product.docId,
-        sku: product.sku,
-        modelName: product.nama,
-        color: product.warna,
-        size: product.varian,
-        hargaJual: product.hpp || 0, // Menggunakan HPP sebagai harga default
-        qty: 1,
-        statusProses: 'Dalam Proses',
-        statusPembayaran: 'Belum Dibayar',
-        returReason: null,
-    });
-    alert('Produk berhasil ditambahkan ke daftar pesanan.');
-    hideModal(); // Tutup modal setelah produk ditambahkan
-}
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
@@ -8531,8 +8492,9 @@ watch(activePage, (newPage) => {
             <div class="space-y-4">
                 <div v-for="(panduan, index) in panduanData" :key="panduan.title" 
                      class="bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl animate-fade-in-up"
-                     :style="{ animationDelay: `${200 + index * 100}ms` }"
-                     v-if="panduan?.content"> <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" 
+                     :style="{ animationDelay: `${200 + index * 100}ms` }">
+                    
+                    <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" 
                          class="flex items-center gap-4 p-5 cursor-pointer">
                         <div class="text-3xl flex-shrink-0">{{ panduan.icon }}</div>
                         <div class="flex-1">
@@ -8725,102 +8687,97 @@ watch(activePage, (newPage) => {
             </div>
 
             <div v-if="uiState.activeSupplierView === 'form'" class="animate-fade-in-up">
-    <div class="flex justify-between items-center mb-8">
-        <div>
-            <h2 class="text-3xl font-bold text-slate-800">Penerimaan Barang</h2>
-            <p class="text-slate-500 mt-1">Buat pesanan baru dari supplier: <span class="font-semibold">{{ uiState.penerimaanBarangForm.supplierName }}</span></p>
-        </div>
-    </div>
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800">Penerimaan Barang</h2>
+                        <p class="text-slate-500 mt-1">Buat pesanan baru dari supplier: <span class="font-semibold">{{ uiState.penerimaanBarangForm.supplierName }}</span></p>
+                    </div>
+                </div>
 
-    <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
-        <form @submit.prevent="submitPenerimaanBarang" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium">Tanggal</label>
-                    <input type="date" v-model="uiState.penerimaanBarangForm.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium">Catatan</label>
-                    <input type="text" v-model="uiState.penerimaanBarangForm.catatan" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-            </div>
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+                    <form @submit.prevent="submitPenerimaanBarang" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+    <label class="block text-sm font-medium">Tanggal</label>
+    <input type="date" v-model="uiState.penerimaanBarangForm.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
+</div>  
+                            <div>
+                                <label class="block text-sm font-medium">Catatan</label>
+                                <input type="text" v-model="uiState.penerimaanBarangForm.catatan" class="mt-1 w-full p-2 border rounded-md">
+                            </div>
+                        </div>
 
-            <div class="mt-8">
-                <div class="flex justify-between items-center mb-4">
-                    <h4 class="text-lg font-bold">Daftar Produk Pesanan</h4>
-                    <button @click="showModal('selectSupplierProduct')" type="button" class="text-sm bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">+ Tambah Produk</button>
-                </div>
-                <div class="overflow-x-auto max-h-96">
-                    <table class="w-full text-sm text-left text-slate-500">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                            <tr>
-                                <th class="px-4 py-3">Produk</th>
-                                <th class="px-4 py-3 text-right">Harga Jual</th>
-                                <th class="px-4 py-3 text-center">Qty</th>
-                                <th class="px-4 py-3 text-right">Total</th>
-                                <th class="px-4 py-3">Status Proses</th>
-                                <th class="px-4 py-3">Status Bayar</th>
-                                <th class="px-4 py-3">Retur</th>
-                                <th class="px-4 py-3">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="!uiState.penerimaanBarangForm.produk || uiState.penerimaanBarangForm.produk.length === 0">
-                                <td colspan="8" class="p-4 text-center text-slate-500">
-                                    Silakan pilih produk untuk ditambahkan.
-                                </td>
-                            </tr>
-                            <tr v-for="(p, index) in uiState.penerimaanBarangForm.produk" :key="p.id">
-                                <td class="px-4 py-3">
-                                    <p class="font-semibold text-slate-800">{{ p.modelName }}</p>
-                                    <p class="text-xs">{{ p.sku }} ({{ p.color }} / {{ p.size }})</p>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <input type="number" v-model.number="p.hargaJual" class="w-full p-1 border rounded-md text-sm text-right">
-                                </td>
-                                <td class="px-4 py-3">
-                                    <input type="number" v-model.number="p.qty" class="w-20 p-1 border rounded-md text-sm text-center">
-                                </td>
-                                <td class="px-4 py-3 text-right font-bold text-indigo-600">
-                                    {{ formatCurrency(hitungTotalNilaiQty(p)) }}
-                                </td>
-                                <td class="px-4 py-3">
-                                    <select v-model="p.statusProses" class="w-full p-1 border rounded-md text-xs">
-                                        <option>Dalam Proses</option>
-                                        <option>Selesai</option>
-                                        <option>Revisi</option>
-                                    </select>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <select v-model="p.statusPembayaran" class="w-full p-1 border rounded-md text-xs">
-                                        <option>Belum Dibayar</option>
-                                        <option>Sudah Dibayar</option>
-                                    </select>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <select v-model="p.returReason" class="w-full p-1 border rounded-md text-xs">
-                                        <option :value="null">Tidak Retur</option>
-                                        <option>Cacat</option>
-                                        <option>Salah Warna</option>
-                                        <option>Salah Ukuran</option>
-                                    </select>
-                                </td>
-                                <td class="px-4 py-3">
-                                    <button @click="removeProductFromPenerimaanBarang(index)" type="button" class="text-red-500 hover:underline text-xs">Hapus</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                        <div class="mt-8">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="text-lg font-bold">Daftar Produk Pesanan</h4>
+                                <button @click="addProductToPenerimaanBarang" type="button" class="text-sm text-blue-600 hover:underline">+ Tambah Produk</button>
+                            </div>
+                            <div class="overflow-x-auto max-h-96">
+                                <table class="w-full text-sm text-left text-slate-500">
+                                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                                        <tr>
+                                            <th class="px-4 py-3">Produk</th>
+                                            <th class="px-4 py-3 text-right">Harga Jual</th>
+                                            <th class="px-4 py-3 text-center">Qty</th>
+                                            <th class="px-4 py-3 text-right">Total</th>
+                                            <th class="px-4 py-3">Status Proses</th>
+                                            <th class="px-4 py-3">Status Bayar</th>
+                                            <th class="px-4 py-3">Retur</th>
+                                            <th class="px-4 py-3">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(p, index) in uiState.penerimaanBarangForm.produk" :key="p.id">
+                                            <td class="px-4 py-3">
+                                                <p class="font-semibold text-slate-800">{{ p.modelName }}</p>
+                                                <p class="text-xs">{{ p.sku }} ({{ p.color }} / {{ p.size }})</p>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <input type="number" v-model.number="p.hargaJual" class="w-full p-1 border rounded-md text-sm text-right">
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <input type="number" v-model.number="p.qty" class="w-20 p-1 border rounded-md text-sm text-center">
+                                            </td>
+                                            <td class="px-4 py-3 text-right font-bold text-indigo-600">
+                                                {{ formatCurrency(hitungTotalNilaiQty(p)) }}
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <select v-model="p.statusProses" class="w-full p-1 border rounded-md text-xs">
+                                                    <option>Dalam Proses</option>
+                                                    <option>Selesai</option>
+                                                    <option>Revisi</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <select v-model="p.statusPembayaran" class="w-full p-1 border rounded-md text-xs">
+                                                    <option>Belum Dibayar</option>
+                                                    <option>Sudah Dibayar</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <select v-model="p.returReason" class="w-full p-1 border rounded-md text-xs">
+                                                    <option :value="null">Tidak Retur</option>
+                                                    <option>Cacat</option>
+                                                    <option>Salah Warna</option>
+                                                    <option>Salah Ukuran</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <button @click="removeProductFromPenerimaanBarang(index)" type="button" class="text-red-500 hover:underline text-xs">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
+                            <button @click="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
+                        </div>
+                    </form>
                 </div>
             </div>
-            
-            <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
-                <button @click="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
-            </div>
-        </form>
-    </div>
-</div>
             
         </div>
     </div>
@@ -8967,22 +8924,6 @@ watch(activePage, (newPage) => {
      
     <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
 
-<div v-if="uiState.modalType === 'selectSupplierProduct'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[90vh] flex flex-col animate-fade-in-up">
-    <h3 class="text-xl font-bold mb-4">Pilih Produk dari Inventaris</h3>
-    <div class="flex-1 overflow-y-auto pr-2">
-        <input type="text" v-model="uiState.supplierModalData.productSearch" placeholder="Cari SKU atau nama produk..." class="w-full p-2 border rounded-md mb-4 sticky top-0 bg-white">
-        <ul v-if="filteredSupplierProducts.length > 0" class="space-y-2">
-            <li v-for="product in filteredSupplierProducts" :key="product.docId" @click="addProductToPenerimaanBarang(product)" class="p-3 border rounded-lg hover:bg-slate-100 cursor-pointer">
-                <p class="font-semibold text-slate-800">{{ product.nama }} ({{ product.sku }})</p>
-                <p class="text-sm text-slate-600">Model: {{ state.settings.modelProduk.find(m => m.id === product.model_id)?.namaModel || 'N/A' }}, Warna: {{ product.warna }}, Ukuran: {{ product.varian }}</p>
-            </li>
-        </ul>
-        <p v-else class="text-center text-slate-500 py-4">Tidak ada produk yang cocok ditemukan.</p>
-    </div>
-    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
-    </div>
-</div>
 
 <div v-if="uiState.modalType === 'viewPurchaseOrder'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
@@ -10648,11 +10589,10 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'viewNote'" class="bg-white rounded-lg shadow-xl p-6 max-w-7xl w-full h-full md:max-h-[30vh] flex flex-col animate-fade-in-up">
-    <h3 class="text-xl font-bold mb-4">{{ uiState.modalData?.title }}</h3>
+<div v-if="uiState.modalType === 'viewNote'" class="bg-white rounded-lg shadow-xl p-6 max-w-7xl w-full h-full md:max-h-[30vh] flex flex-col">
+    <h3 class="text-xl font-bold mb-4">{{ uiState.modalData.title }}</h3>
     <div class="max-h-[60vh] overflow-y-auto p-4 bg-slate-50 rounded-lg border">
-        <p v-if="uiState.modalData?.content" class="text-slate-700 whitespace-pre-wrap">{{ uiState.modalData.content }}</p>
-        <p v-else class="text-center text-slate-500 py-4">Tidak ada konten untuk ditampilkan.</p>
+        <p class="text-slate-700 whitespace-pre-wrap">{{ uiState.modalData.content }}</p>
     </div>
     <div class="flex justify-end mt-6 border-t pt-4">
         <button @click="hideModal" class="bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-400">Tutup</button>
