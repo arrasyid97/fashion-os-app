@@ -1159,20 +1159,7 @@ function showPenerimaanBarangForm(supplier) {
     uiState.activeSupplierView = 'form';
 }
 
-function addProductToPenerimaanBarang() {
-    uiState.penerimaanBarangForm.produk.push({
-        id: `PROD-${Date.now()}`,
-        sku: '',
-        modelName: '',
-        color: '',
-        size: '',
-        hargaJual: null,
-        qty: null,
-        statusProses: 'Dalam Proses',
-        statusPembayaran: 'Belum Dibayar',
-        returReason: null,
-    });
-}
+
 
 function removeProductFromPenerimaanBarang(index) {
     uiState.penerimaanBarangForm.produk.splice(index, 1);
@@ -1232,9 +1219,6 @@ async function submitPenerimaanBarang() {
 }
 
 
-const hitungTotalNilaiQty = (product) => {
-    return (product.hargaJual || 0) * (product.qty || 0);
-};
 
 // Tambahkan fetch untuk data Purchase Orders
 async function fetchPurchaseOrders() {
