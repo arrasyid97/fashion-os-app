@@ -1090,43 +1090,7 @@ async function deleteSupplier(supplierId) {
     }
 }
 
-function addSupplierProduct(supplier) {
-    if (!supplier.products) {
-        supplier.products = [];
-    }
-    supplier.products.push({ 
-        id: `PROD-${Date.now()}`, 
-        sku: '', 
-        modelName: '', 
-        color: '', 
-        size: '',
-    });
-}
 
-function removeSupplierProduct(supplier, index) {
-    supplier.products.splice(index, 1);
-}
-
-async function saveSupplierProducts() {
-    if (!currentUser.value) return alert("Anda harus login.");
-    const supplier = uiState.modalData;
-    
-    try {
-        const supplierRef = doc(db, "suppliers", supplier.id);
-        await updateDoc(supplierRef, { products: supplier.products });
-        
-        const index = state.suppliers.findIndex(s => s.id === supplier.id);
-        if (index !== -1) {
-            state.suppliers[index].products = supplier.products;
-        }
-        
-        hideModal();
-        alert('Produk supplier berhasil disimpan!');
-    } catch (error) {
-        console.error("Gagal menyimpan produk supplier:", error);
-        alert("Gagal menyimpan produk supplier. Silakan coba lagi.");
-    }
-}
 
 async function deletePurchaseOrder(orderId) {
     if (!confirm("Anda yakin ingin menghapus riwayat penerimaan barang ini? Aksi ini tidak dapat dibatalkan.")) {
@@ -3430,15 +3394,7 @@ function unlockInvestasi() {
     }
 }
 
-function autoFillSupplierProduct(product, selectedSku) {
-    const matchedProduct = state.produk.find(p => p.sku === selectedSku);
-    if (matchedProduct) {
-        product.sku = matchedProduct.sku;
-        product.modelName = matchedProduct.nama;
-        product.color = matchedProduct.warna;
-        product.size = matchedProduct.varian;
-    }
-}
+
 
 function showModal(type, data = {}) {
     // Reset data modal untuk memastikan tidak ada data lama yang bocor
@@ -8627,7 +8583,7 @@ watch(activePage, (newPage) => {
                                     <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap">
                                         <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline">Buat Pesanan</button>
                                         <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                                        <button @click="showModal('manageSupplierProducts', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-indigo-500 hover:underline">Kelola Produk</button>
+                                        
                                         <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700">
                                             <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
@@ -9158,65 +9114,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'manageSupplierProducts'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
-    <div class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
-        <h3 class="text-xl font-bold mb-4">Kelola Produk Supplier: {{ uiState.modalData.name }}</h3>
-        <div class="flex-1 overflow-y-auto pr-2">
-            <table class="min-w-full text-sm text-left text-slate-500">
-                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                    <tr>
-                        <th class="px-4 py-3">SKU</th>
-                        <th class="px-4 py-3">Nama Model</th>
-                        <th class="px-4 py-3">Warna</th>
-                        <th class="px-4 py-3">Ukuran</th>
-                        <th class="px-4 py-3 text-right">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200/50">
-                    <tr v-if="!uiState.modalData.products || uiState.modalData.products.length === 0">
-                        <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada produk yang terdaftar untuk supplier ini.</td>
-                    </tr>
-                    <tr v-for="(product, index) in uiState.modalData.products" :key="index">
-                        <td class="px-4 py-3">
-                            <input
-                                type="text"
-                                v-model="product.sku"
-                                list="inventaris-skus"
-                                @change="autoFillSupplierProduct(product, $event.target.value)"
-                                class="w-full p-1 border rounded-md text-sm text-slate-800"
-                                placeholder="Cari SKU"
-                            >
-                            <datalist id="inventaris-skus">
-                                <option v-for="item in inventoryProductOptions" :key="item.sku" :value="item.sku">
-                                    {{ item.nama }} ({{ item.warna }} / {{ item.varian }})
-                                </option>
-                            </datalist>
-                        </td>
-                        <td class="px-4 py-3">
-                            <input type="text" v-model="product.modelName" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Nama Model" readonly>
-                        </td>
-                        <td class="px-4 py-3">
-                            <input type="text" v-model="product.color" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Warna" readonly>
-                        </td>
-                        <td class="px-4 py-3">
-                            <input type="text" v-model="product.size" class="w-full p-1 border rounded-md text-sm text-slate-800" placeholder="Ukuran" readonly>
-                        </td>
-                        <td class="px-4 py-3 text-right">
-                            <button @click="removeSupplierProduct(uiState.modalData, index)" type="button" class="text-red-500 hover:underline">Hapus</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="flex justify-between items-center mt-4 pt-4 border-t">
-            <button @click="addSupplierProduct(uiState.modalData)" type="button" class="text-sm text-blue-600 hover:underline">+ Tambah Produk</button>
-            <div class="flex gap-3">
-                <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                <button type="button" @click="saveSupplierProducts" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Produk</button>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 <div v-if="uiState.modalType === 'inventarisInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
