@@ -6642,8 +6642,10 @@ watch(activePage, (newPage) => {
     </button>
 </div>
                     <div class="flex flex-wrap items-center gap-3">
-                        <button @click="showModal('addStockIn', { sku: '', qty: null, tipe: 'penambahan', alasan: 'Penyesuaian Inventaris' })" class="bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow">Penyesuaian Stok</button>
-                        <button @click="showModal('addProduct', { sku: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors shadow">+ Tambah Produk Baru</button>
+                        <button @click="showModal('addStockIn', { sku: '', qty: null, tipe: 'penambahan', alasan: 'Penyesuaian Inventaris' })" class="bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow" :disabled="!isSubscriptionActive">
+    Penyesuaian Stok
+</button>
+                        <button @click="showModal('addProduct', { sku: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors shadow" :disabled="!isSubscriptionActive">+ Tambah Produk Baru</button>
                     </div>
                 </div>
 
@@ -6708,7 +6710,7 @@ watch(activePage, (newPage) => {
                                     </td>
                                     <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
                                     <td class="px-6 py-3 text-center">
-                                        <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya">
+                                        <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya" :disabled="!isSubscriptionActive">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </td>
@@ -6730,7 +6732,7 @@ watch(activePage, (newPage) => {
                                         </td>
                                         <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
                                         <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
-                                            <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline">Hapus</button>
+                                            <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
                                             <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(v)), original: v })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
                                             <button @click.stop="goToAturHarga(v.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
                                         </td>
