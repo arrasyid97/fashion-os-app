@@ -1193,27 +1193,33 @@ async function submitPenerimaanBarang() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.penerimaanBarangForm;
     
-    // PERBAIKAN: Validasi tambahan untuk memastikan semua produk memiliki nilai yang valid
+    // Perbaikan: Validasi tambahan
     if (form.produk.length === 0) {
         return alert("Daftar produk tidak boleh kosong.");
     }
     for (const p of form.produk) {
-        // Cek properti penting, pastikan tidak ada yang null atau undefined
         if (!p.sku || p.qty === null || p.qty === undefined || p.hargaJual === null || p.hargaJual === undefined) {
             return alert("Setiap produk harus memiliki SKU, Harga Jual, dan Kuantitas yang valid.");
         }
     }
 
-    let totalQtyValue = form.produk.reduce((sum, p) => sum + (p.hargaJual || 0) * (p.qty || 0), 0);
+    // Perbaikan: Tentukan status pembayaran order secara keseluruhan
+    let orderPaymentStatus = 'Belum Dibayar';
+    if (form.produk.every(p => p.statusPembayaran === 'Sudah Dibayar')) {
+        orderPaymentStatus = 'Sudah Dibayar';
+    } else if (form.produk.some(p => p.statusPembayaran === 'Proses Pembayaran')) {
+        orderPaymentStatus = 'Proses Pembayaran';
+    }
 
-    // PERBAIKAN: Buat objek data secara eksplisit untuk menghindari nilai undefined
+    let totalQtyValue = form.produk.reduce((sum, p) => sum + (p.hargaJual || 0) * (p.qty || 0), 0);
+    
+    // Perbaikan: Buat objek data secara eksplisit
     const dataToSave = {
         userId: currentUser.value.uid,
         supplierId: form.supplierId || null,
         supplierName: form.supplierName || 'N/A',
         tanggal: new Date(form.tanggal),
         produk: form.produk.map(p => ({
-            // PERBAIKAN UTAMA: Salin hanya properti yang dibutuhkan
             id: p.id || null, 
             sku: p.sku || '',
             modelName: p.modelName || '',
@@ -1222,12 +1228,11 @@ async function submitPenerimaanBarang() {
             hargaJual: p.hargaJual || 0,
             qty: p.qty || 0,
             statusProses: p.statusProses || 'Dalam Proses',
-            statusPembayaran: p.statusPembayaran || 'Belum Dibayar',
+            statusPembayaran: p.statusPembayaran || 'Belum Dibayar', // Simpan status per produk
             returReason: p.returReason || null,
         })),
-        dibayarkan: form.dibayarkan || 0,
-        statusProses: form.statusProses || 'Dalam Proses',
-        statusPembayaran: form.statusPembayaran || 'Belum Dibayar',
+        dibayarkan: form.dibayarkan || 0, // Simpan total yang sudah dibayarkan
+        statusPembayaran: orderPaymentStatus, // Simpan status keseluruhan
         catatan: form.catatan || '',
         totalQtyValue,
         createdAt: new Date(),
@@ -1236,22 +1241,18 @@ async function submitPenerimaanBarang() {
     try {
         let docRef;
         if (form.id) {
-            // Logika untuk mengedit dokumen yang sudah ada
             const docToUpdate = doc(db, "purchase_orders", form.id);
             await updateDoc(docToUpdate, dataToSave);
-            
             const index = state.purchaseOrders.findIndex(order => order.id === form.id);
             if (index !== -1) {
-                state.purchaseOrders[index] = { id: form.id, ...dataToSave };
+                state.purchaseOrders[index] = { id: form.id, ...dataToSave, tanggal: dataToSave.tanggal };
             }
             alert(`Pesanan berhasil diperbarui.`);
         } else {
-            // Logika untuk membuat dokumen baru
             docRef = await addDoc(collection(db, "purchase_orders"), dataToSave);
             state.purchaseOrders.unshift({ id: docRef.id, ...dataToSave, tanggal: dataToSave.tanggal });
             alert(`Penerimaan barang berhasil dicatat dengan ID: ${docRef.id}`);
         }
-
         uiState.activeSupplierView = 'list';
     } catch (error) {
         console.error("Gagal menyimpan penerimaan barang:", error);
@@ -8975,6 +8976,7 @@ watch(activePage, (newPage) => {
 <div v-if="uiState.modalType === 'viewPurchaseOrder'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
         <h3 class="text-xl font-bold mb-4">Detail Penerimaan Barang</h3>
+        
         <div class="flex-1 overflow-y-auto pr-2">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-6">
                 <div>
@@ -8994,7 +8996,24 @@ watch(activePage, (newPage) => {
                     <p class="font-bold text-lg text-green-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</p>
                 </div>
             </div>
-            
+    
+            <div v-if="uiState.modalData.statusPembayaran === 'Proses Pembayaran'" class="md:col-span-2">
+                <h4 class="text-base font-semibold mb-2 mt-4 border-t pt-4">Status Pembayaran Parsial</h4>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium">Total Tagihan</label>
+                        <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Sudah Dibayarkan</label>
+                        <p class="font-bold text-lg">{{ formatCurrency(uiState.modalData.dibayarkan) }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Sisa Pembayaran</label>
+                        <p class="font-bold text-lg text-red-600">{{ formatCurrency(uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan) }}</p>
+                    </div>
+                </div>
+            </div>
             <h4 class="text-lg font-bold mt-4 mb-2">Daftar Produk</h4>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left text-slate-500">
@@ -9023,8 +9042,8 @@ watch(activePage, (newPage) => {
                     </tbody>
                 </table>
             </div>
-
         </div>
+        
         <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
             <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg">Tutup</button>
         </div>
