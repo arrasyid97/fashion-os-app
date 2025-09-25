@@ -8600,9 +8600,9 @@ watch(activePage, (newPage) => {
                         <h2 class="text-3xl font-bold text-slate-800">Manajemen Supplier</h2>
                         <p class="text-slate-500 mt-1">Kelola data supplier dan produk yang mereka sediakan.</p>
                     </div>
-                    <button @click="showModal('addSupplier', { name: '', contact: '', products: [] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
-                        + Tambah Supplier Baru
-                    </button>
+                    <button @click="showModal('addSupplier', { name: '', contact: '', products: [] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors" :disabled="!isSubscriptionActive">
+    + Tambah Supplier Baru
+</button>
                 </div>
 
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 mb-8">
@@ -8626,12 +8626,12 @@ watch(activePage, (newPage) => {
                                     <td class="px-6 py-4">{{ supplier.contact || '-' }}</td>
                                     <td class="px-6 py-4 text-center">{{ supplier.products?.length || 0 }}</td>
                                     <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap">
-                                        <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline">Buat Pesanan</button>
-                                        <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+                                        <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline" :disabled="!isSubscriptionActive">Buat Pesanan</button>
+                                        <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
                                         
-                                        <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700">
-                                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
+                                        <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">
+    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+</button>
                                     </td>
                                 </tr>
                             </tbody>
