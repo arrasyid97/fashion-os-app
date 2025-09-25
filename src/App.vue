@@ -2858,18 +2858,17 @@ const filteredProduksiBatches = computed(() => {
     return filteredData;
 });
 
-
-
 const hargaHppProductNames = computed(() => {
-    // Perbaikan: Tambahkan .sort() untuk mengurutkan nama produk
-    return [...new Set(state.produk.map(p => p.nama))].sort();
+    // PERBAIKAN: Gunakan `state.produk || []` untuk menghindari error jika data belum dimuat
+    return [...new Set((state.produk || []).map(p => p.nama))].sort();
 });
 
 const hargaHppFilteredVariants = computed(() => {
     if (!uiState.hargaHppSelectedProduct) {
         return [];
     }
-    return state.produk.filter(p => p.nama === uiState.hargaHppSelectedProduct);
+    // PERBAIKAN: Gunakan `state.produk || []` untuk menghindari error
+    return (state.produk || []).filter(p => p.nama === uiState.hargaHppSelectedProduct);
 });
 
 // --- FUNGSI BARU UNTUK FITUR PENCARIAN MODEL ---
@@ -2883,7 +2882,8 @@ function handleHargaHppSearch() {
         return;
     }
     hargaHppSearchDebounceTimer = setTimeout(() => {
-        uiState.hargaHppRecommendations = state.settings.modelProduk
+        // PERBAIKAN: Gunakan `state.settings.modelProduk || []` untuk menghindari error
+        uiState.hargaHppRecommendations = (state.settings.modelProduk || [])
             .filter(m => (m.namaModel || '').toLowerCase().includes(query))
             .slice(0, 5);
     }, 200);
