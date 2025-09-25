@@ -6761,10 +6761,10 @@ watch(activePage, (newPage) => {
                     <button @click="showModal('priceCalculator')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
                         Kalkulator Harga
                     </button>
-                    <button @click="saveData" :disabled="isSaving" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400">
-                        <span v-if="isSaving">Menyimpan...</span>
-                        <span v-else>Simpan Semua Perubahan</span>
-                    </button>
+                    <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
+    <span v-if="isSaving">Menyimpan...</span>
+    <span v-else>Simpan Semua Perubahan</span>
+</button>
                 </div>
             </div>
 
