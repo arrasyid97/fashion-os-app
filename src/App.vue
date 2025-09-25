@@ -1856,18 +1856,6 @@ async function applyReferralCode() {
 }
 
 
-const commissionModelComputed = (modelName, channelId) => computed({
-    get() {
-        return state.commissions.perModel[modelName]?.[channelId] ? state.commissions.perModel[modelName][channelId] + '%' : '';
-    },
-    set(newValue) {
-        if (!state.commissions.perModel[modelName]) {
-            state.commissions.perModel[modelName] = {};
-        }
-        state.commissions.perModel[modelName][channelId] = parsePercentageInput(newValue);
-    }
-});
-
 
 async function addCategory() {
     if (!currentUser.value) return alert("Anda harus login.");
@@ -2860,36 +2848,48 @@ const filteredProduksiBatches = computed(() => {
     return filteredData;
 });
 
-const hargaHppModelGroups = computed(() => {
-    // Kelompokkan produk berdasarkan model_id mereka
-    const grouped = state.produk.reduce((acc, product) => {
-        if (!product.model_id) return acc; // Lewati produk tanpa model_id
-        
-        // Temukan nama model dari daftar modelProduk
-        const modelInfo = state.settings.modelProduk.find(m => m.id === product.model_id);
-        const modelName = modelInfo ? modelInfo.namaModel : 'Model Tidak Dikenal';
-        
-        if (!acc[modelName]) {
-            acc[modelName] = [];
-        }
-        acc[modelName].push(product);
-        return acc;
-    }, {});
-
-    return Object.keys(grouped).map(modelName => {
-        return {
-            name: modelName,
-            variants: grouped[modelName]
-        };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+const hargaHppModelNames = computed(() => {
+  const uniqueModelNames = new Set(state.settings.modelProduk.map(m => m.namaModel).filter(name => name));
+  return Array.from(uniqueModelNames).sort((a, b) => a.localeCompare(b));
 });
 
+// Ambil varian produk yang sesuai dengan nama model yang dipilih
 const hargaHppSelectedModelVariants = computed(() => {
     if (!uiState.hargaHppSelectedModelName) {
         return [];
     }
-    const group = hargaHppModelGroups.value.find(g => g.name === uiState.hargaHppSelectedModelName);
-    return group ? group.variants : [];
+    const model = state.settings.modelProduk.find(m => m.namaModel === uiState.hargaHppSelectedModelName);
+    if (!model) {
+        return [];
+    }
+    
+    // Filter produk berdasarkan model_id yang cocok
+    const variants = state.produk.filter(p => p.model_id === model.id);
+
+    // Mengurutkan varian berdasarkan warna dan ukuran
+    const sizeOrder = { 'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10, '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39, 'allsize': 90, 'satuukuran': 90 };
+    
+    return variants.sort((a, b) => {
+        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
+        if (colorCompare !== 0) {
+            return colorCompare;
+        }
+        const sizeA = sizeOrder[a.varian?.toLowerCase()] || 999;
+        const sizeB = sizeOrder[b.varian?.toLowerCase()] || 999;
+        return sizeA - sizeB;
+    });
+});
+
+const commissionModelComputed = (modelName, channelId) => computed({
+    get() {
+        return state.commissions.perModel[modelName]?.[channelId] ? state.commissions.perModel[modelName][channelId] + '%' : '';
+    },
+    set(newValue) {
+        if (!state.commissions.perModel[modelName]) {
+            state.commissions.perModel[modelName] = {};
+        }
+        state.commissions.perModel[modelName][channelId] = parsePercentageInput(newValue);
+    }
 });
 
 
@@ -6912,8 +6912,8 @@ watch(activePage, (newPage) => {
                     <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Model Produk untuk Diatur</label>
                     <select v-model="uiState.hargaHppSelectedModelName" class="w-full p-3 border border-slate-300 rounded-md shadow-sm">
                         <option value="">-- Pilih Model Produk --</option>
-                        <option v-for="modelGroup in hargaHppModelGroups" :key="modelGroup.name" :value="modelGroup.name">
-                            {{ modelGroup.name }}
+                        <option v-for="modelName in hargaHppModelNames" :key="modelName" :value="modelName">
+                            {{ modelName }}
                         </option>
                     </select>
                 </div>
