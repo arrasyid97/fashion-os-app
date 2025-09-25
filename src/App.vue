@@ -7062,9 +7062,9 @@ watch(activePage, (newPage) => {
                         <h2 class="text-3xl font-bold text-slate-800">Manajemen Gudang Kain</h2>
                         <p class="text-slate-500 mt-1">Kelola semua aset bahan baku kain untuk produksi Anda.</p>
                     </div>
-                    <button @click="showModal('addKain', { tanggalBeli: new Date().toISOString().split('T')[0] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
-                        + Tambah Stok Kain Baru
-                    </button>
+                    <button @click="showModal('addKain', { tanggalBeli: new Date().toISOString().split('T')[0] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors" :disabled="!isSubscriptionActive">
+    + Tambah Stok Kain Baru
+</button>
                 </div>
 
                 <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -7120,8 +7120,8 @@ watch(activePage, (newPage) => {
                                 </td>
                                 <td class="px-6 py-4 text-right font-medium text-green-600">{{ formatCurrency(kain.hargaBeliPerYard) }}</td>
                                 <td class="px-6 py-4 text-center space-x-3">
-                                    <button @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
-                                    <button @click="deleteKain(kain.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                                    <button @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200" :disabled="!isSubscriptionActive">Edit</button>
+                                    <button @click="deleteKain(kain.id)" class="text-xs text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
                                 </td>
                             </tr>
                         </tbody>
