@@ -2846,41 +2846,7 @@ const filteredProduksiBatches = computed(() => {
     return filteredData;
 });
 
-const hargaHppModelNames = computed(() => {
-    // Memastikan data modelProduk ada sebelum diproses
-    if (!state.settings.modelProduk || state.settings.modelProduk.length === 0) {
-        return [];
-    }
-    const uniqueModelNames = new Set(state.settings.modelProduk.map(m => m.namaModel).filter(name => name));
-    return Array.from(uniqueModelNames).sort((a, b) => a.localeCompare(b));
-});
 
-// Ambil varian produk yang sesuai dengan nama model yang dipilih
-const hargaHppSelectedModelVariants = computed(() => {
-    if (!uiState.hargaHppSelectedModelName) {
-        return [];
-    }
-    const model = state.settings.modelProduk.find(m => m.namaModel === uiState.hargaHppSelectedModelName);
-    if (!model) {
-        return [];
-    }
-
-    // Filter produk berdasarkan model_id yang cocok
-    const variants = state.produk.filter(p => p.model_id === model.id);
-
-    // Logika pengurutan berdasarkan warna dan ukuran
-    const sizeOrder = { 'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10, '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39, 'allsize': 90, 'satuukuran': 90 };
-
-    return variants.sort((a, b) => {
-        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
-        if (colorCompare !== 0) {
-            return colorCompare;
-        }
-        const sizeA = sizeOrder[a.varian?.toLowerCase()] || 999;
-        const sizeB = sizeOrder[b.varian?.toLowerCase()] || 999;
-        return sizeA - sizeB;
-    });
-});
 
 const commissionModelComputed = (modelName, channelId) => computed({
     get() {
@@ -6936,71 +6902,95 @@ watch(activePage, (newPage) => {
             </div>
 
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-                <div class="mb-6 max-w-lg">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Model Produk untuk Diatur</label>
-                    <select v-model="uiState.hargaHppSelectedModelName" class="w-full p-3 border border-slate-300 rounded-md shadow-sm">
-                        <option value="">-- Pilih Model Produk --</option>
-                        <option v-for="modelName in hargaHppModelNames" :key="modelName" :value="modelName">
-                            {{ modelName }}
-                        </option>
-                    </select>
-                </div>
                 
-                <div v-if="uiState.hargaHppSelectedModelName" class="space-y-6 animate-fade-in">
-                    <div class="p-4 border-2 border-dashed border-indigo-200 bg-indigo-50/50 rounded-lg">
-                        <h4 class="text-lg font-semibold text-indigo-800">Pengaturan Komisi per Model: {{ uiState.hargaHppSelectedModelName }}</h4>
-                        <p class="text-sm text-slate-600 mt-1 mb-4">Komisi yang Anda atur di sini akan berlaku untuk SEMUA varian dari model ini.</p>
-                        <div class="space-y-3">
-                            <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
-                                <label class="text-sm font-medium text-slate-700">{{ marketplace.name }}</label>
-                                <div class="relative w-36">
-                                    <input type="text" :value="commissionModelComputed(uiState.hargaHppSelectedModelName, marketplace.id).value" @input="commissionModelComputed(uiState.hargaHppSelectedModelName, marketplace.id).setValue($event.target.value)" class="w-full p-2 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" placeholder="0">
-                                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Daftar Produk</h3>
 
-                    <div class="space-y-4">
-                        <p v-if="!hargaHppSelectedModelVariants.length" class="text-center py-8 text-slate-500">Tidak ada varian untuk model ini.</p>
-
-                        <div v-for="varian in hargaHppSelectedModelVariants" :key="varian.sku" class="bg-white border border-slate-200/80 rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 shadow-sm hover:shadow-md transition-shadow">
-                            <div class="md:col-span-1">
-                                <p class="font-bold text-lg text-slate-800">{{ varian.warna }} - {{ varian.varian }}</p>
-                                <p class="text-sm font-mono text-slate-500">{{ varian.sku }}</p>
-                                <div class="mt-4">
-                                    <label class="block text-sm font-medium text-slate-700">HPP (Modal)</label>
-                                    <div class="relative mt-1">
-                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                        <input type="text" :value="formatInputNumber(varian.hpp)" @input="varian.hpp = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="md:col-span-2 space-y-3">
-                                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
-                                    <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
-                                            :class="{
-                                                'bg-green-100 text-green-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 40, 
-                                                'bg-yellow-100 text-yellow-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 20 && ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 40, 
-                                                'bg-red-100 text-red-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 20
-                                            }">
-                                            {{ (varian.hargaJual[marketplace.id] && varian.hpp && varian.hargaJual[marketplace.id] > 0 ? (((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
-                                        </span>
-                                        <div class="relative w-36">
-                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                            <input type="text" :value="formatInputNumber(varian.hargaJual[marketplace.id])" @input="varian.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold">
+                <div class="overflow-x-auto max-h-[70vh]">
+                    <table class="w-full text-sm text-left text-slate-500">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                            <tr>
+                                <th class="px-6 py-3 font-semibold">Nama Model & SKU</th>
+                                <th class="px-6 py-3 font-semibold">Warna</th>
+                                <th class="px-6 py-3 font-semibold">Ukuran</th>
+                                <th class="px-6 py-3 font-semibold text-center">HPP</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200/50">
+                            <tr v-if="state.produk.length === 0">
+                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
+                            </tr>
+                            <template v-for="product in state.produk" :key="product.sku">
+                                <tr class="bg-white hover:bg-slate-50/50 cursor-pointer" @click="uiState.activeAccordion = uiState.activeAccordion === product.sku ? null : product.sku">
+                                    <td class="px-6 py-4 font-bold text-slate-800">
+                                        <div class="flex items-center">
+                                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === product.sku }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                            <div>
+                                                {{ product.nama }}
+                                                <p class="font-mono text-xs font-normal text-slate-500">{{ product.sku }}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                                    </td>
+                                    <td class="px-6 py-4">{{ product.warna }}</td>
+                                    <td class="px-6 py-4">{{ product.varian }}</td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="font-bold text-red-600">{{ formatCurrency(product.hpp) }}</span>
+                                    </td>
+                                </tr>
+                                
+                                <tr v-if="uiState.activeAccordion === product.sku" class="animate-fade-in">
+                                    <td colspan="4" class="p-6 bg-slate-50/50 border-b-2 border-indigo-200/50">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            
+                                            <div>
+                                                <h4 class="text-sm font-bold text-slate-700 mb-2">HPP (Harga Pokok Produksi)</h4>
+                                                <div class="relative mt-1">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                                    <input type="text" :value="formatInputNumber(product.hpp)" @input="product.hpp = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600">
+                                                </div>
+                                            </div>
+
+                                            <div class="lg:col-span-2">
+                                                <h4 class="text-sm font-bold text-slate-700 mb-2">Pengaturan Komisi per Model: {{ product.nama }}</h4>
+                                                <div class="space-y-2">
+                                                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
+                                                        <label class="text-xs font-medium text-slate-600">{{ marketplace.name }}</label>
+                                                        <div class="relative w-32">
+                                                            <input type="text" :value="commissionModelComputed(product.nama, marketplace.id).value" @input="commissionModelComputed(product.nama, marketplace.id).setValue($event.target.value)" class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-xs font-semibold" placeholder="0">
+                                                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="lg:col-span-3 space-y-3">
+                                                <h4 class="text-sm font-bold text-slate-700 mt-4 mb-2 border-t pt-4">Harga Jual per Channel</h4>
+                                                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
+                                                    <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
+                                                            :class="{
+                                                                'bg-green-100 text-green-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) >= 40, 
+                                                                'bg-yellow-100 text-yellow-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) >= 20 && ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) < 40, 
+                                                                'bg-red-100 text-red-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) < 20
+                                                            }">
+                                                            {{ (product.hargaJual[marketplace.id] && product.hpp && product.hargaJual[marketplace.id] > 0 ? (((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
+                                                        </span>
+                                                        <div class="relative w-36">
+                                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                                            <input type="text" :value="formatInputNumber(product.hargaJual[marketplace.id])" @input="product.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
                 </div>
 
-                <p v-else class="text-center py-16 text-slate-500">Pilih model produk di atas untuk mulai mengatur harga.</p>
             </div>
         </div>
     </div>
