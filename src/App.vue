@@ -1169,6 +1169,8 @@ function showPenerimaanBarangForm(supplier) {
         produk: [], // <-- GANTI DENGAN ARRAY KOSONG
         statusProses: 'Dalam Proses',
         statusPembayaran: 'Belum Dibayar',
+        dibayarkan: 0,
+        tanggalPembayaran: '',
         catatan: '',
     };
     uiState.selectedProductForPurchase = null; // <-- TAMBAHKAN BARIS INI
@@ -1223,6 +1225,7 @@ async function submitPenerimaanBarang() {
             statusPembayaran: p.statusPembayaran || 'Belum Dibayar',
             returReason: p.returReason || null,
         })),
+        dibayarkan: form.dibayarkan || 0,
         statusProses: form.statusProses || 'Dalam Proses',
         statusPembayaran: form.statusPembayaran || 'Belum Dibayar',
         catatan: form.catatan || '',
@@ -2746,6 +2749,16 @@ const filteredRetur = computed(() => {
     );
 
     return returData.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+});
+
+const totalYangHarusDibayarkan = computed(() => {
+    return uiState.penerimaanBarangForm.produk.reduce((sum, p) => {
+        return sum + (p.hargaJual || 0) * (p.qty || 0);
+    }, 0);
+});
+
+const sisaPembayaran = computed(() => {
+    return totalYangHarusDibayarkan.value - (uiState.penerimaanBarangForm.dibayarkan || 0);
 });
 
 const filteredMarketplaces = computed(() => {
@@ -8761,9 +8774,10 @@ watch(activePage, (newPage) => {
                         </td>
                         <td class="px-4 py-3">
                             <select v-model="p.statusPembayaran" class="w-full p-1 border rounded-md text-xs">
-                                <option>Belum Dibayar</option>
-                                <option>Sudah Dibayar</option>
-                            </select>
+    <option>Belum Dibayar</option>
+    <option>Proses Pembayaran</option>
+    <option>Sudah Dibayar</option>
+</select>
                         </td>
                         <td class="px-4 py-3">
                             <select v-model="p.returReason" class="w-full p-1 border rounded-md text-xs">
@@ -8782,10 +8796,28 @@ watch(activePage, (newPage) => {
         </div>
     </div>
     
-    <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
-        <button @click.prevent="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-        <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
+    <div v-if="uiState.penerimaanBarangForm.statusPembayaran === 'Proses Pembayaran'" class="mt-4 p-4 border rounded-lg bg-slate-50 animate-fade-in">
+    <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm font-medium">Total yang Harus Dibayarkan</label>
+            <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(totalYangHarusDibayarkan) }}</p>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Dibayarkan Berapa</label>
+            <input type="number" v-model.number="uiState.penerimaanBarangForm.dibayarkan" class="mt-1 w-full p-2 border rounded-md text-right" placeholder="0">
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Sisa Pembayaran</label>
+            <p class="font-bold text-lg text-red-600">{{ formatCurrency(sisaPembayaran) }}</p>
+        </div>
     </div>
+</div>
+
+<div class="flex justify-end gap-3 mt-8 pt-4 border-t">
+    <button @click.prevent="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+    <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
+</div>
 </form>
                 </div>
             </div>
