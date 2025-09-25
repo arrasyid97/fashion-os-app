@@ -8531,7 +8531,8 @@ watch(activePage, (newPage) => {
             <div class="space-y-4">
                 <div v-for="(panduan, index) in panduanData" :key="panduan.title" 
                      class="bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl animate-fade-in-up"
-                     :style="{ animationDelay: `${200 + index * 100}ms` }">
+                     :style="{ animationDelay: `${200 + index * 100}ms` }"
+                     v-if="panduan?.content">
                     
                     <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" 
                          class="flex items-center gap-4 p-5 cursor-pointer">
