@@ -347,7 +347,23 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
-
+const isSubscriptionActive = computed(() => {
+    if (!currentUser.value || !currentUser.value.userData) {
+        return false;
+    }
+    const status = currentUser.value.userData.subscriptionStatus;
+    const trialEndDate = currentUser.value.userData.trialEndDate?.seconds * 1000;
+    const subscriptionEndDate = currentUser.value.userData.subscriptionEndDate?.seconds * 1000;
+    
+    // Cek apakah status aktif DAN tanggal kedaluwarsa belum terlewati
+    if (status === 'active' && subscriptionEndDate > Date.now()) {
+        return true;
+    }
+    if (status === 'trial' && trialEndDate > Date.now()) {
+        return true;
+    }
+    return false;
+});
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
@@ -6511,9 +6527,9 @@ watch(activePage, (newPage) => {
                         <div class="flex justify-between text-xs text-slate-500"><span>Jumlah Barang</span><span>{{ cartSummary.itemCount }}</span></div>
                     </div>
                     
-                    <button @click="confirmCompleteTransaction" :disabled="activeCart.length === 0" class="mt-6 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-slate-400 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">
-                        Selesaikan Transaksi
-                    </button>
+                    <button @click="confirmCompleteTransaction" :disabled="activeCart.length === 0 || !isSubscriptionActive" class="mt-6 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-slate-400 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">
+    Selesaikan Transaksi
+</button>
                 </div>
             </div>
         </div>
