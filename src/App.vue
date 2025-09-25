@@ -2758,14 +2758,7 @@ const filteredProduksiBatches = computed(() => {
     return filteredData;
 });
 
-const inventoryProductOptions = computed(() => {
-    return state.produk.map(p => ({
-        sku: p.sku,
-        nama: p.nama,
-        warna: p.warna,
-        varian: p.varian
-    }));
-});
+
 
 const hargaHppProductNames = computed(() => {
     return [...new Set(state.produk.map(p => p.nama))];
