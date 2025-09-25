@@ -1856,19 +1856,6 @@ async function applyReferralCode() {
 }
 
 
-const commissionModelComputed = (modelName, channelId) => computed({
-    get() {
-        return state.commissions.perModel[modelName]?.[channelId] ? state.commissions.perModel[modelName][channelId] + '%' : '';
-    },
-    set(newValue) {
-        if (!state.commissions.perModel[modelName]) {
-            state.commissions.perModel[modelName] = {};
-        }
-        state.commissions.perModel[modelName][channelId] = parsePercentageInput(newValue);
-    }
-});
-
-
 async function addCategory() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.nestedModalData;
