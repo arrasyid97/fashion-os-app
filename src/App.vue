@@ -6958,9 +6958,9 @@ watch(activePage, (newPage) => {
         Informasi
     </button>
 </div>
-                    <button @click="showModal('addProduksi')" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors">
-                        + Buat Batch Produksi
-                    </button>
+                    <button @click="showModal('addProduksi')" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors" :disabled="!isSubscriptionActive">
+    + Buat Batch Produksi
+</button>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -7041,8 +7041,8 @@ watch(activePage, (newPage) => {
                         </div>
                         <div class="p-3 bg-slate-50/50 border-t border-slate-200/80 rounded-b-2xl flex gap-2">
                             <button @click="showModal('produksiDetail', batch)" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Detail</button>
-                            <button @click="showModal('editProduksi', batch)" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Edit</button>
-                            <button @click="deleteProduksiBatch(batch.id)" class="flex-1 text-sm bg-red-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-red-600">Hapus</button>
+                            <button @click="showModal('editProduksi', batch)" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100" :disabled="!isSubscriptionActive">Edit</button>
+                            <button @click="deleteProduksiBatch(batch.id)" class="flex-1 text-sm bg-red-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-red-600" :disabled="!isSubscriptionActive">Hapus</button>
                         </div>
                     </div>
                 </div>
@@ -11411,9 +11411,9 @@ watch(activePage, (newPage) => {
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
                                     Sudah Masuk Inventaris
                                 </span>
-                                <button v-if="!kb.isInventoried && kb.aktualJadi > 0" @click="updateProductionInventoryStatus(batch.id, index)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-lg hover:bg-indigo-700 text-sm">
-                                    + Masukkan ke Inventaris
-                                </button>
+                                <button v-if="!kb.isInventoried && kb.aktualJadi > 0" @click="updateProductionInventoryStatus(batch.id, index)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-lg hover:bg-indigo-700 text-sm" :disabled="!isSubscriptionActive">
+    + Masukkan ke Inventaris
+</button>
                             </div>
                         </div>
                     </div>
