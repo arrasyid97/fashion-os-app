@@ -8632,7 +8632,7 @@ watch(activePage, (newPage) => {
         <tr>
             <th class="px-6 py-3">Nama Supplier</th>
             <th class="px-6 py-3">Kontak</th>
-            <th class="px-6 py-3 text-right" style="width: 150px;">Aksi</th>
+            <th class="px-6 py-3 text-right" style="width: 250px;">Aksi</th>
         </tr>
     </thead>
     <tbody class="divide-y divide-slate-200/50">
@@ -8642,7 +8642,7 @@ watch(activePage, (newPage) => {
         <tr v-for="supplier in state.suppliers" :key="supplier.id" class="hover:bg-slate-50/50">
             <td class="px-6 py-4 font-semibold text-slate-800">{{ supplier.name }}</td>
             <td class="px-6 py-4">{{ supplier.contact || '-' }}</td>
-            <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap" style="width: 150px;">
+            <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap" style="width: 250px;">
                 <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline" :disabled="!isSubscriptionActive">Buat Pesanan</button>
                 <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
                 <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">
