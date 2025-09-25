@@ -6574,9 +6574,9 @@ watch(activePage, (newPage) => {
                                     </div>
                                 </div>
                             </div>
-                            <button @click="finalizeManualOrder" :disabled="!uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-')) || !uiState.bulk_manual_input" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
-                                Jadikan ID Pesanan
-                            </button>
+                            <button @click="finalizeManualOrder" :disabled="!uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-')) || !uiState.bulk_manual_input || !isSubscriptionActive" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
+    Jadikan ID Pesanan
+</button>
                         </div>
 
                         <div class="border-t pt-6">
@@ -6589,9 +6589,9 @@ watch(activePage, (newPage) => {
                 <div class="lg:col-span-2 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
                     <div class="flex justify-between items-center mb-4 pb-4 border-b border-slate-200/80">
                         <h3 class="text-xl font-semibold text-slate-800">Antrian Pesanan untuk Diproses ({{ uiState.bulk_order_queue.length }})</h3>
-                        <button @click="processBatchOrders" :disabled="uiState.bulk_order_queue.length === 0" class="bg-green-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-green-700 disabled:bg-slate-400 shadow">
-                            Proses Semua Antrian
-                        </button>
+                        <button @click="processBatchOrders" :disabled="uiState.bulk_order_queue.length === 0 || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-green-700 disabled:bg-slate-400 disabled:shadow-none shadow">
+    Proses Semua Antrian
+</button>
                     </div>
                     <div class="space-y-3 max-h-[70vh] overflow-y-auto p-2 -mr-2">
                         <p v-if="uiState.bulk_order_queue.length === 0" class="text-center py-16 text-slate-400">
