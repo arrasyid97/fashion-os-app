@@ -1856,6 +1856,19 @@ async function applyReferralCode() {
 }
 
 
+const commissionModelComputed = (modelName, channelId) => computed({
+    get() {
+        return state.commissions.perModel[modelName]?.[channelId] ? state.commissions.perModel[modelName][channelId] + '%' : '';
+    },
+    set(newValue) {
+        if (!state.commissions.perModel[modelName]) {
+            state.commissions.perModel[modelName] = {};
+        }
+        state.commissions.perModel[modelName][channelId] = parsePercentageInput(newValue);
+    }
+});
+
+
 async function addCategory() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.nestedModalData;
@@ -2879,21 +2892,6 @@ const hargaHppSelectedModelVariants = computed(() => {
     return group ? group.variants : [];
 });
 
-const getCommissionRateForVariant = (variant, channelId) => {
-    const modelName = state.settings.modelProduk.find(m => m.id === variant.model_id)?.namaModel;
-    return computed({
-        get() {
-            const rate = state.commissions.perModel[modelName]?.[channelId] || 0;
-            return rate > 0 ? `${rate}%` : '';
-        },
-        set(newValue) {
-            if (!state.commissions.perModel[modelName]) {
-                state.commissions.perModel[modelName] = {};
-            }
-            state.commissions.perModel[modelName][channelId] = parsePercentageInput(newValue);
-        }
-    });
-};
 
 const filteredPurchaseOrders = computed(() => {
     let orders = [...state.purchaseOrders];
