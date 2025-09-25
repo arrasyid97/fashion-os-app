@@ -7367,9 +7367,9 @@ watch(activePage, (newPage) => {
                                 <option value="selesai">Hanya Selesai</option>
                                 <option value="semua">Tampilkan Semua</option>
                             </select>
-                            <button @click="showModal('addInvestor', { name: '', amount: null, profitShare: null, startDate: new Date().toISOString().split('T')[0], status: 'aktif' })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 shadow transition-colors text-sm">
-                                + Tambah Investor
-                            </button>
+                            <button @click="showModal('addInvestor', { name: '', amount: null, profitShare: null, startDate: new Date().toISOString().split('T')[0], status: 'aktif' })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 shadow transition-colors text-sm" :disabled="!isSubscriptionActive">
+    + Tambah Investor
+</button>
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -7406,10 +7406,10 @@ watch(activePage, (newPage) => {
                                     </td>
                                     <td class="px-6 py-4 text-center space-x-2 whitespace-nowrap">
                                         <button @click="toggleInvestorStatus(inv)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Ubah Status</button>
-                                        <button @click="showModal('editInvestor', inv)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200">Edit</button>
-                                        <button v-if="inv.status === 'selesai'" @click="deleteInvestor(inv.id)" class="text-xs bg-red-100 text-red-700 font-bold py-1 px-2 rounded hover:bg-red-200">
-                                            Hapus
-                                        </button>
+                                        <button @click="showModal('editInvestor', inv)" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200" :disabled="!isSubscriptionActive">Edit</button>
+                                        <button v-if="inv.status === 'selesai'" @click="deleteInvestor(inv.id)" class="text-xs bg-red-100 text-red-700 font-bold py-1 px-2 rounded hover:bg-red-200" :disabled="!isSubscriptionActive">
+    Hapus
+</button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -7463,7 +7463,7 @@ watch(activePage, (newPage) => {
                                     </div>
                                     <div class="flex justify-end items-center gap-3 pt-4 border-t mt-4">
                                         <button type="button" @click="uiState.laporanBagiHasil.result = null" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
-                                        <button type="button" @click="recordBagiHasilPayment" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">Catat Pembayaran Bagi Hasil</button>
+                                        <button type="button" @click="recordBagiHasilPayment" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700" :disabled="!isSubscriptionActive">Catat Pembayaran Bagi Hasil</button>
                                     </div>
                                 </div>
                                 <div v-else class="text-center py-8"><p class="font-semibold text-slate-700">Tidak ada keuntungan pada periode ini.</p></div>
