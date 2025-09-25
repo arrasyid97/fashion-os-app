@@ -5981,10 +5981,29 @@ const fetchStaticData = async (userId) => {
 
         if (settingsSnap.exists()) {
             const settingsData = settingsSnap.data();
-            Object.assign(state.settings, settingsData);
-            if (!state.settings.pinProtection) {
-                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
-            }
+            // PERBAIKAN UTAMA: Pastikan array selalu terinisialisasi
+            state.settings = {
+                brandName: settingsData.brandName || 'FASHION OS',
+                minStok: settingsData.minStok || 10,
+                pinProtection: settingsData.pinProtection || { dashboard: true, profitDetails: true, incomeHistory: true, investmentPage: true },
+                marketplaces: settingsData.marketplaces || [],
+                modelProduk: settingsData.modelProduk || [],
+                categories: settingsData.categories || [],
+                inflowCategories: settingsData.inflowCategories || [],
+                dashboardPin: settingsData.dashboardPin || null,
+            };
+        } else {
+            // Jika dokumen settings tidak ada, inisialisasi dengan nilai default
+            state.settings = {
+                brandName: 'FASHION OS',
+                minStok: 10,
+                pinProtection: { dashboard: true, profitDetails: true, incomeHistory: true, investmentPage: true },
+                marketplaces: [],
+                modelProduk: [],
+                categories: [],
+                inflowCategories: [],
+                dashboardPin: null,
+            };
         }
 
         const userDocRef = doc(db, "users", userId);
