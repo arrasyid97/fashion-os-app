@@ -7152,7 +7152,7 @@ watch(activePage, (newPage) => {
                 <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
                     <div class="flex justify-between items-center mb-4 pb-4 border-b border-slate-200/80">
                         <h3 class="text-xl font-semibold text-slate-800">Riwayat Pengeluaran</h3>
-                        <button @click="showModal('addBiaya', { tanggal: new Date().toISOString().split('T')[0], kategori: '', jumlah: null, catatan: '', paymentMethod: 'transfer', selectedBankAccountId: null, adminFee: 0 })" class="bg-rose-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-rose-600 text-sm shadow">Tambah Baru</button>
+                        <button @click="showModal('addBiaya', { tanggal: new Date().toISOString().split('T')[0], kategori: '', jumlah: null, catatan: '', paymentMethod: 'transfer', selectedBankAccountId: null, adminFee: 0 })" class="bg-rose-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-rose-600 text-sm shadow" :disabled="!isSubscriptionActive">Tambah Baru</button>
                     </div>
                     <div class="p-4 border-b border-slate-200/80 mb-4">
                         <div class="flex items-start gap-2">
@@ -7203,7 +7203,7 @@ watch(activePage, (newPage) => {
                                     <td class="px-4 py-3 text-xs align-top">{{ item.catatan || '-' }}</td>
                                     <td class="px-4 py-3 font-semibold text-red-600 text-right align-top">{{ formatCurrency(item.jumlah) }}</td>
                                     <td class="px-4 py-3 text-center align-top">
-                                        <button @click="deleteBiaya(item.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                                        <button @click="deleteBiaya(item.id)" class="text-xs text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -7229,7 +7229,7 @@ watch(activePage, (newPage) => {
                         <div class="flex justify-between items-center mb-4 pb-4 border-b border-slate-200/80">
                             <h3 class="text-xl font-semibold text-slate-800">Riwayat Pemasukan</h3>
                             <div class="flex gap-2">
-                                <button @click="showModal('addPemasukan', { tanggal: new Date().toISOString().split('T')[0], kategori: 'Modal Masuk', jumlah: null, catatan: '' })" class="bg-sky-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-sky-600 text-sm shadow">Tambah Baru</button>
+                                <button @click="showModal('addPemasukan', { tanggal: new Date().toISOString().split('T')[0], kategori: 'Modal Masuk', jumlah: null, catatan: '' })" class="bg-sky-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-sky-600 text-sm shadow" :disabled="!isSubscriptionActive">Tambah Baru</button>
                                 <button @click="showNestedModal('manageInflowCategories')" class="bg-slate-100 p-1 text-slate-600 rounded-md hover:bg-slate-200" title="Kelola Kategori">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.82 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.82 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.82-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.82-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
@@ -7287,7 +7287,7 @@ watch(activePage, (newPage) => {
                                         <td class="px-4 py-3 text-xs align-top">{{ item.catatan || '-' }}</td>
                                         <td class="px-4 py-3 font-semibold text-green-600 text-right align-top">{{ formatCurrency(item.jumlah) }}</td>
                                         <td class="px-4 py-3 text-center align-top">
-                                            <button @click="deletePemasukan(item.id)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                                            <button @click="deletePemasukan(item.id)" class="text-xs text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
                                         </td>
                                     </tr>
                                 </tbody>
