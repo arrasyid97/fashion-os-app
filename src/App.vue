@@ -1195,9 +1195,17 @@ async function submitPenerimaanBarang() {
         supplierName: form.supplierName || 'N/A',
         tanggal: new Date(form.tanggal),
         produk: form.produk.map(p => ({
-            ...p,
+            // PERBAIKAN UTAMA: Salin hanya properti yang dibutuhkan
+            id: p.id || null, 
+            sku: p.sku || '',
+            modelName: p.modelName || '',
+            color: p.color || '',
+            size: p.size || '',
             hargaJual: p.hargaJual || 0,
-            qty: p.qty || 0
+            qty: p.qty || 0,
+            statusProses: p.statusProses || 'Dalam Proses',
+            statusPembayaran: p.statusPembayaran || 'Belum Dibayar',
+            returReason: p.returReason || null,
         })),
         statusProses: form.statusProses || 'Dalam Proses',
         statusPembayaran: form.statusPembayaran || 'Belum Dibayar',
