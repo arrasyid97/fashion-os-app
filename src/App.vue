@@ -2861,7 +2861,8 @@ const filteredProduksiBatches = computed(() => {
 
 
 const hargaHppProductNames = computed(() => {
-    return [...new Set(state.produk.map(p => p.nama))];
+    // Perbaikan: Tambahkan .sort() untuk mengurutkan nama produk
+    return [...new Set(state.produk.map(p => p.nama))].sort();
 });
 
 const hargaHppFilteredVariants = computed(() => {
@@ -2870,6 +2871,29 @@ const hargaHppFilteredVariants = computed(() => {
     }
     return state.produk.filter(p => p.nama === uiState.hargaHppSelectedProduct);
 });
+
+// --- FUNGSI BARU UNTUK FITUR PENCARIAN MODEL ---
+let hargaHppSearchDebounceTimer = null;
+function handleHargaHppSearch() {
+    clearTimeout(hargaHppSearchDebounceTimer);
+    uiState.hargaHppSelectedProduct = null;
+    const query = uiState.hargaHppSearch.trim().toLowerCase();
+    if (query.length < 2) {
+        uiState.hargaHppRecommendations = [];
+        return;
+    }
+    hargaHppSearchDebounceTimer = setTimeout(() => {
+        uiState.hargaHppRecommendations = state.settings.modelProduk
+            .filter(m => (m.namaModel || '').toLowerCase().includes(query))
+            .slice(0, 5);
+    }, 200);
+}
+
+function selectHargaHppRecommendation(model) {
+    uiState.hargaHppSelectedProduct = model.namaModel;
+    uiState.hargaHppSearch = model.namaModel;
+    uiState.hargaHppRecommendations = [];
+}
 
 const filteredPurchaseOrders = computed(() => {
     let orders = [...state.purchaseOrders];
@@ -6879,19 +6903,30 @@ watch(activePage, (newPage) => {
                         Kalkulator Harga
                     </button>
                     <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
-    <span v-if="isSaving">Menyimpan...</span>
-    <span v-else>Simpan Semua Perubahan</span>
-</button>
+                        <span v-if="isSaving">Menyimpan...</span>
+                        <span v-else>Simpan Semua Perubahan</span>
+                    </button>
                 </div>
             </div>
 
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-                <div class="mb-6 max-w-lg">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Model Produk untuk Diatur</label>
-                    <select v-model="uiState.hargaHppSelectedProduct" class="w-full p-3 border border-slate-300 rounded-md shadow-sm">
-                        <option value="">-- Pilih Model Produk --</option>
-                        <option v-for="namaProduk in hargaHppProductNames" :key="namaProduk" :value="namaProduk">{{ namaProduk }}</option>
-                    </select>
+                <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
+                    <div class="relative">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Cari Nama Model Produk</label>
+                        <input type="text" v-model="uiState.hargaHppSearch" @input="handleHargaHppSearch" placeholder="Ketik nama model..." class="w-full p-3 border border-slate-300 rounded-md" autocomplete="off">
+                        <div v-if="uiState.hargaHppRecommendations.length > 0" class="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            <div v-for="model in uiState.hargaHppRecommendations" :key="model.id" @click="selectHargaHppRecommendation(model)" class="p-3 hover:bg-slate-100 cursor-pointer">
+                                {{ model.namaModel }}
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Atau Pilih Model dari Daftar</label>
+                        <select v-model="uiState.hargaHppSelectedProduct" class="w-full p-3 border border-slate-300 rounded-md">
+                            <option value="">-- Pilih Model Produk --</option>
+                            <option v-for="namaProduk in hargaHppProductNames" :key="namaProduk" :value="namaProduk">{{ namaProduk }}</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div v-if="uiState.hargaHppSelectedProduct" class="space-y-6 animate-fade-in">
@@ -6930,11 +6965,11 @@ watch(activePage, (newPage) => {
                                     <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
                                     <div class="flex items-center gap-2">
                                         <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
-                                              :class="{
-                                                'bg-green-100 text-green-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 40, 
-                                                'bg-yellow-100 text-yellow-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 20 && ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 40, 
-                                                'bg-red-100 text-red-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 20
-                                              }">
+                                                :class="{
+                                                    'bg-green-100 text-green-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 40,
+                                                    'bg-yellow-100 text-yellow-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) >= 20 && ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 40,
+                                                    'bg-red-100 text-red-800': ((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id] * 100) < 20
+                                                }">
                                             {{ (varian.hargaJual[marketplace.id] && varian.hpp && varian.hargaJual[marketplace.id] > 0 ? (((varian.hargaJual[marketplace.id] - varian.hpp) / varian.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
                                         </span>
                                         <div class="relative w-36">
