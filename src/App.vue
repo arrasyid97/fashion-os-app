@@ -246,6 +246,8 @@ adminVerificationResult: null,
 isVerifying: false,
 adminVerificationError: '',
 
+selectedProductForPurchase: null,
+
     pengaturanTab: 'umum',
     isKeuanganInfoVisible: false,
     priceCalculator: {
@@ -587,7 +589,37 @@ async function verifyCashoutRequest() {
     }
 }
 
+function addProductFromSelection() {
+    const selectedProduct = uiState.selectedProductForPurchase;
+    if (!selectedProduct) return;
 
+    // Cek apakah produk sudah ada di daftar
+    const existingItem = uiState.penerimaanBarangForm.produk.find(
+        (item) => item.sku === selectedProduct.sku
+    );
+
+    if (existingItem) {
+        // Jika sudah ada, tambahkan kuantitasnya
+        existingItem.qty = (existingItem.qty || 0) + 1;
+    } else {
+        // Jika belum ada, tambahkan produk baru ke daftar
+        uiState.penerimaanBarangForm.produk.push({
+            id: selectedProduct.id,
+            sku: selectedProduct.sku,
+            modelName: selectedProduct.nama,
+            color: selectedProduct.warna,
+            size: selectedProduct.varian,
+            hargaJual: selectedProduct.hargaJual?.[Object.keys(selectedProduct.hargaJual)[0]] || 0, // Ambil harga jual pertama
+            qty: 1,
+            statusProses: 'Dalam Proses',
+            statusPembayaran: 'Belum Dibayar',
+            returReason: null,
+        });
+    }
+
+    // Kosongkan pilihan setelah produk ditambahkan
+    uiState.selectedProductForPurchase = null;
+}
 
 function showInvestorPaymentDetail(p) {
     // 'p' adalah objek data dari `filteredInvestorPayments` yang berisi semua detail
@@ -1114,17 +1146,16 @@ function showEditPenerimaanBarangForm(order) {
 }
 
 function showPenerimaanBarangForm(supplier) {
-    uiState.penerimaanBarangForm.supplierId = supplier.id;
-    uiState.penerimaanBarangForm.supplierName = supplier.name;
-    uiState.penerimaanBarangForm.tanggal = new Date().toISOString().split('T')[0];
-    uiState.penerimaanBarangForm.produk = JSON.parse(JSON.stringify(supplier.products || []));
-    uiState.penerimaanBarangForm.produk = uiState.penerimaanBarangForm.produk.map(p => ({
-        ...p,
-        qty: null,
+    uiState.penerimaanBarangForm = {
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        tanggal: new Date().toISOString().split('T')[0],
+        produk: [], // <-- GANTI DENGAN ARRAY KOSONG
         statusProses: 'Dalam Proses',
         statusPembayaran: 'Belum Dibayar',
-        returReason: null,
-    }));
+        catatan: '',
+    };
+    uiState.selectedProductForPurchase = null; // <-- TAMBAHKAN BARIS INI
     uiState.activeSupplierView = 'form';
 }
 
@@ -8645,86 +8676,96 @@ watch(activePage, (newPage) => {
 
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
                     <form @submit.prevent="submitPenerimaanBarang" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-    <label class="block text-sm font-medium">Tanggal</label>
-    <input type="date" v-model="uiState.penerimaanBarangForm.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
-</div>  
-                            <div>
-                                <label class="block text-sm font-medium">Catatan</label>
-                                <input type="text" v-model="uiState.penerimaanBarangForm.catatan" class="mt-1 w-full p-2 border rounded-md">
-                            </div>
-                        </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm font-medium">Tanggal</label>
+            <input type="date" v-model="uiState.penerimaanBarangForm.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Catatan</label>
+            <input type="text" v-model="uiState.penerimaanBarangForm.catatan" class="mt-1 w-full p-2 border rounded-md">
+        </div>
+        <div class="relative">
+            <label class="block text-sm font-medium">Pilih Produk</label>
+            <div class="flex gap-2">
+                <select v-model="uiState.selectedProductForPurchase" class="mt-1 w-full p-2 border rounded-md" :class="{'text-slate-400': !uiState.selectedProductForPurchase}" required>
+                    <option :value="null" disabled>-- Pilih Produk Inventaris --</option>
+                    <option v-for="product in state.produk" :key="product.sku" :value="product">{{ product.nama }} ({{ product.sku }})</option>
+                </select>
+                <button @click.prevent="addProductFromSelection" type="button" class="bg-indigo-600 text-white font-bold px-4 rounded-lg flex-shrink-0" :disabled="!uiState.selectedProductForPurchase">+ Tambah</button>
+            </div>
+        </div>
+    </div>
 
-                        <div class="mt-8">
-                            <div class="flex justify-between items-center mb-4">
-                                <h4 class="text-lg font-bold">Daftar Produk Pesanan</h4>
-                                <button @click="addProductToPenerimaanBarang" type="button" class="text-sm text-blue-600 hover:underline">+ Tambah Produk</button>
-                            </div>
-                            <div class="overflow-x-auto max-h-96">
-                                <table class="w-full text-sm text-left text-slate-500">
-                                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                                        <tr>
-                                            <th class="px-4 py-3">Produk</th>
-                                            <th class="px-4 py-3 text-right">Harga Jual</th>
-                                            <th class="px-4 py-3 text-center">Qty</th>
-                                            <th class="px-4 py-3 text-right">Total</th>
-                                            <th class="px-4 py-3">Status Proses</th>
-                                            <th class="px-4 py-3">Status Bayar</th>
-                                            <th class="px-4 py-3">Retur</th>
-                                            <th class="px-4 py-3">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(p, index) in uiState.penerimaanBarangForm.produk" :key="p.id">
-                                            <td class="px-4 py-3">
-                                                <p class="font-semibold text-slate-800">{{ p.modelName }}</p>
-                                                <p class="text-xs">{{ p.sku }} ({{ p.color }} / {{ p.size }})</p>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <input type="number" v-model.number="p.hargaJual" class="w-full p-1 border rounded-md text-sm text-right">
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <input type="number" v-model.number="p.qty" class="w-20 p-1 border rounded-md text-sm text-center">
-                                            </td>
-                                            <td class="px-4 py-3 text-right font-bold text-indigo-600">
-                                                {{ formatCurrency(hitungTotalNilaiQty(p)) }}
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <select v-model="p.statusProses" class="w-full p-1 border rounded-md text-xs">
-                                                    <option>Dalam Proses</option>
-                                                    <option>Selesai</option>
-                                                    <option>Revisi</option>
-                                                </select>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <select v-model="p.statusPembayaran" class="w-full p-1 border rounded-md text-xs">
-                                                    <option>Belum Dibayar</option>
-                                                    <option>Sudah Dibayar</option>
-                                                </select>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <select v-model="p.returReason" class="w-full p-1 border rounded-md text-xs">
-                                                    <option :value="null">Tidak Retur</option>
-                                                    <option>Cacat</option>
-                                                    <option>Salah Warna</option>
-                                                    <option>Salah Ukuran</option>
-                                                </select>
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <button @click="removeProductFromPenerimaanBarang(index)" type="button" class="text-red-500 hover:underline text-xs">Hapus</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
-                            <button @click="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
-                        </div>
-                    </form>
+    <div class="mt-8">
+        <h4 class="text-lg font-bold mb-2">Daftar Produk Pesanan</h4>
+        <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-sm text-left text-slate-500">
+                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                    <tr>
+                        <th class="px-4 py-3">Produk</th>
+                        <th class="px-4 py-3 text-right">Harga Jual</th>
+                        <th class="px-4 py-3 text-center">Qty</th>
+                        <th class="px-4 py-3 text-right">Total</th>
+                        <th class="px-4 py-3">Status Proses</th>
+                        <th class="px-4 py-3">Status Bayar</th>
+                        <th class="px-4 py-3">Retur</th>
+                        <th class="px-4 py-3">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-if="uiState.penerimaanBarangForm.produk.length === 0">
+                        <td colspan="8" class="p-4 text-center text-slate-500">Daftar pesanan kosong.</td>
+                    </tr>
+                    <tr v-for="(p, index) in uiState.penerimaanBarangForm.produk" :key="p.sku">
+                        <td class="px-4 py-3">
+                            <p class="font-semibold text-slate-800">{{ p.nama }}</p>
+                            <p class="text-xs">{{ p.sku }} ({{ p.warna }} / {{ p.varian }})</p>
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="number" v-model.number="p.hargaJual" class="w-full p-1 border rounded-md text-sm text-right">
+                        </td>
+                        <td class="px-4 py-3">
+                            <input type="number" v-model.number="p.qty" class="w-20 p-1 border rounded-md text-sm text-center">
+                        </td>
+                        <td class="px-4 py-3 text-right font-bold text-indigo-600">
+                            {{ formatCurrency(p.hargaJual * p.qty) }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <select v-model="p.statusProses" class="w-full p-1 border rounded-md text-xs">
+                                <option>Dalam Proses</option>
+                                <option>Selesai</option>
+                                <option>Revisi</option>
+                            </select>
+                        </td>
+                        <td class="px-4 py-3">
+                            <select v-model="p.statusPembayaran" class="w-full p-1 border rounded-md text-xs">
+                                <option>Belum Dibayar</option>
+                                <option>Sudah Dibayar</option>
+                            </select>
+                        </td>
+                        <td class="px-4 py-3">
+                            <select v-model="p.returReason" class="w-full p-1 border rounded-md text-xs">
+                                <option :value="null">Tidak Retur</option>
+                                <option>Cacat</option>
+                                <option>Salah Warna</option>
+                                <option>Salah Ukuran</option>
+                            </select>
+                        </td>
+                        <td class="px-4 py-3">
+                            <button @click.prevent="removeProductFromPenerimaanBarang(index)" type="button" class="text-red-500 hover:underline text-xs">Hapus</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
+        <button @click.prevent="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+        <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
+    </div>
+</form>
                 </div>
             </div>
             
