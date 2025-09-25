@@ -2846,7 +2846,43 @@ const filteredProduksiBatches = computed(() => {
     return filteredData;
 });
 
+const sortedProduk = computed(() => {
+    // Kopi array produk agar tidak mengubah state asli
+    const products = [...state.produk];
 
+    // Objek untuk menentukan urutan ukuran
+    const sizeOrder = {
+        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
+        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
+        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
+        'allsize': 90, 'satuukuran': 90
+    };
+
+    // Lakukan pengurutan bertingkat
+    return products.sort((a, b) => {
+        // 1. Urutkan berdasarkan Nama Model
+        const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama;
+        const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama;
+        const modelCompare = modelA.localeCompare(modelB);
+        if (modelCompare !== 0) return modelCompare;
+
+        // 2. Urutkan berdasarkan Warna
+        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
+        if (colorCompare !== 0) return colorCompare;
+
+        // 3. Urutkan berdasarkan Ukuran (jika numerik, urutkan angka. Jika alfabetis, urutkan huruf).
+        const sizeA = sizeOrder[a.varian?.toLowerCase()] || 999;
+        const sizeB = sizeOrder[b.varian?.toLowerCase()] || 999;
+
+        // Periksa jika keduanya adalah angka
+        if (sizeA < 999 && sizeB < 999) {
+            return sizeA - sizeB;
+        }
+
+        // Jika bukan, urutkan secara alfabetis
+        return a.varian.localeCompare(b.varian);
+    });
+});
 
 const commissionModelComputed = (modelName, channelId) => computed({
     get() {
@@ -6919,7 +6955,7 @@ watch(activePage, (newPage) => {
                             <tr v-if="state.produk.length === 0">
                                 <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
                             </tr>
-                            <template v-for="product in state.produk" :key="product.sku">
+                            <template v-for="product in sortedProduk" :key="product.sku">
                                 <tr class="bg-white hover:bg-slate-50/50 cursor-pointer" @click="uiState.activeAccordion = uiState.activeAccordion === product.sku ? null : product.sku">
                                     <td class="px-6 py-4 font-bold text-slate-800">
                                         <div class="flex items-center">
