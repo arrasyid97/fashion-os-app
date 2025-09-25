@@ -2614,49 +2614,49 @@ const filteredGudangKain = computed(() => {
 });
 const inventoryProductGroups = computed(() => {
     const grouped = state.produk.reduce((acc, product) => {
-        if (!acc[product.nama]) {
-            acc[product.nama] = { 
-                nama: product.nama, 
-                variants: [], 
-                totalStock: 0, 
+        // Ambil nama model dari model_id produk
+        const model = state.settings.modelProduk.find(m => m.id === product.model_id);
+        const modelName = model ? model.namaModel : 'N/A';
+
+        if (!acc[modelName]) {
+            acc[modelName] = {
+                namaModel: modelName,
+                variants: [],
+                totalStock: 0,
                 totalNilaiStok: 0,
-                totalVariants: 0
             };
         }
-        acc[product.nama].variants.push(product);
-        acc[product.nama].totalStock += (product.stokFisik || 0);
-        acc[product.nama].totalNilaiStok += (product.stokFisik || 0) * (parseInputNumber(product.hpp) || 0);
+        acc[modelName].variants.push(product);
+        acc[modelName].totalStock += (product.stokFisik || 0);
+        acc[modelName].totalNilaiStok += (product.stokFisik || 0) * (parseInputNumber(product.hpp) || 0);
         return acc;
     }, {});
-    
-    let productGroups = Object.values(grouped);
 
-    productGroups.forEach(group => {
-        group.totalVariants = group.variants.length;
-    });
+    let productGroups = Object.values(grouped);
 
     const searchTerm = (uiState.inventorySearch || '').toLowerCase();
     const stockFilter = uiState.inventoryFilterStock;
     const minStock = state.settings.minStok;
 
     productGroups = productGroups.filter(group => {
-        const matchesSearch = (group.nama || '').toLowerCase().includes(searchTerm);
+        const matchesSearch = (group.namaModel || '').toLowerCase().includes(searchTerm) || 
+                              group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm));
         if (!matchesSearch) return false;
         
-        // Logika filter stok yang sudah diperbaiki
+        const totalStock = group.variants.reduce((sum, v) => sum + (v.stokFisik || 0), 0);
         if (stockFilter === 'all') return true;
-        if (stockFilter === 'aman') return group.totalStock > minStock;
-        if (stockFilter === 'menipis') return group.totalStock > 0 && group.totalStock <= minStock;
-        if (stockFilter === 'habis') return group.totalStock === 0;
-        return true; 
+        if (stockFilter === 'aman') return totalStock > minStock;
+        if (stockFilter === 'menipis') return totalStock > 0 && totalStock <= minStock;
+        if (stockFilter === 'habis') return totalStock === 0;
+        return true;
     });
 
     productGroups.sort((a, b) => {
         switch (uiState.inventorySort) {
-            case 'nama-desc': return b.nama.localeCompare(a.nama);
+            case 'nama-desc': return b.namaModel.localeCompare(a.namaModel);
             case 'stok-desc': return b.totalStock - a.totalStock;
             case 'stok-asc': return a.totalStock - b.totalStock;
-            case 'nama-asc': default: return a.nama.localeCompare(b.nama);
+            case 'nama-asc': default: return a.namaModel.localeCompare(b.namaModel);
         }
     });
 
@@ -6774,69 +6774,68 @@ watch(activePage, (newPage) => {
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                            <tr>
-                                <th class="px-6 py-3 font-semibold">Nama Produk / Varian</th>
-                                <th class="px-6 py-3 font-semibold">SKU</th>
-                                <th class="px-6 py-3 font-semibold">Warna</th>
-                                <th class="px-6 py-3 font-semibold text-center">Stok</th>
-                                <th class="px-6 py-3 font-semibold text-right">Nilai Stok (HPP)</th>
-                                <th class="px-6 py-3 font-semibold text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="inventoryProductGroups.length === 0">
-                                <td colspan="6" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
-                            </tr>
-                            <template v-for="group in inventoryProductGroups" :key="group.nama">
-                                <tr class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.nama ? null : group.nama">
-                                    <td class="px-6 py-4 font-bold text-slate-800">
-                                        <div class="flex items-center">
-                                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.nama }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                                            <div>
-                                                {{ group.nama }}
-                                                <span class="block text-xs font-normal text-slate-500">{{ group.totalVariants }} varian</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-3" colspan="2"></td>
-                                    <td class="px-6 py-3 text-center">
-                                        <span class="font-bold text-base text-slate-800">{{ formatNumber(group.totalStock) }}</span>
-                                        <span class="text-xs"> pcs</span>
-                                    </td>
-                                    <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
-                                    <td class="px-6 py-3 text-center">
-                                        <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya" :disabled="!isSubscriptionActive">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </td>
-                                </tr>
+    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+        <tr>
+            <th class="px-6 py-3 font-semibold">Nama Produk</th>
+            <th class="px-6 py-3 font-semibold text-center">Jumlah Stok</th>
+            <th class="px-6 py-3 font-semibold text-right">Total Nilai Stok (HPP)</th>
+            <th class="px-6 py-3 font-semibold text-center">Aksi</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr v-if="inventoryProductGroups.length === 0">
+            <td colspan="4" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
+        </tr>
+        <template v-for="group in inventoryProductGroups" :key="group.namaModel">
+            <tr class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel">
+                <td class="px-6 py-4 font-bold text-slate-800">
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.namaModel }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        <div>
+                            {{ group.namaModel }}
+                            <span class="block text-xs font-normal text-slate-500">{{ group.variants.length }} varian</span>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-3 text-center">
+                    <span class="font-bold text-base text-slate-800">{{ formatNumber(group.totalStock) }}</span>
+                    <span class="text-xs"> pcs</span>
+                </td>
+                <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
+                <td class="px-6 py-3 text-center">
+                    <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya" :disabled="!isSubscriptionActive">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </td>
+            </tr>
 
-                                <template v-if="uiState.activeAccordion === group.nama">
-                                    <tr v-for="v in group.variants" :key="v.docId" class="border-b border-slate-200/50 hover:bg-slate-50/50 animate-fade-in">
-                                        <td class="px-6 py-3 pl-12 text-slate-600">{{ v.varian }}</td>
-                                        <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
-                                        <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
-                                        <td class="px-6 py-3 text-center">
-                                            <span class="stock-badge" :class="{
-                                                'stock-safe': v.stokFisik > state.settings.minStok,
-                                                'stock-low': v.stokFisik > 0 && v.stokFisik <= state.settings.minStok,
-                                                'stock-empty': v.stokFisik === 0
-                                            }">
-                                                {{ formatNumber(v.stokFisik) }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
-                                        <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
-                                            <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
-                                            <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(v)), original: v })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
-                                            <button @click.stop="goToAturHarga(v.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </template>
-                        </tbody>
-                    </table>
+            <template v-if="uiState.activeAccordion === group.namaModel">
+                <tr v-for="v in group.variants" :key="v.docId" class="border-b border-slate-200/50 hover:bg-slate-50/50 animate-fade-in">
+                    <td class="px-6 py-3 pl-12 text-slate-600">
+                        <p class="font-semibold">{{ v.nama }}</p>
+                        <p class="text-sm font-mono text-slate-500">SKU: {{ v.sku }}</p>
+                        <p class="text-sm text-slate-500">Warna: {{ v.warna }} / Ukuran: {{ v.varian }}</p>
+                    </td>
+                    <td class="px-6 py-3 text-center">
+                        <span class="stock-badge" :class="{
+                            'stock-safe': v.stokFisik > state.settings.minStok,
+                            'stock-low': v.stokFisik > 0 && v.stokFisik <= state.settings.minStok,
+                            'stock-empty': v.stokFisik === 0
+                        }">
+                            {{ formatNumber(v.stokFisik) }} pcs
+                        </span>
+                    </td>
+                    <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
+                    <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
+                        <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
+                        <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(v)), original: v })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
+                        <button @click.stop="goToAturHarga(v.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
+                    </td>
+                </tr>
+            </template>
+        </template>
+    </tbody>
+</table>
                 </div>
             </div>
 
