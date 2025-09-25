@@ -6797,64 +6797,40 @@ watch(activePage, (newPage) => {
                     <table class="w-full text-sm text-left">
     <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
         <tr>
-            <th class="px-6 py-3 font-semibold">Nama Model / Varian</th>
-            <th class="px-6 py-3 font-semibold text-center">Jumlah Stok</th>
-            <th class="px-6 py-3 font-semibold text-right">Total Nilai Stok (HPP)</th>
+            <th class="px-6 py-3 font-semibold">Nama Produk</th>
+            <th class="px-6 py-3 font-semibold">SKU</th>
+            <th class="px-6 py-3 font-semibold">Warna</th>
+            <th class="px-6 py-3 font-semibold">Ukuran</th>
+            <th class="px-6 py-3 font-semibold text-center">Stok</th>
+            <th class="px-6 py-3 font-semibold text-right">Nilai Stok (HPP)</th>
             <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
         </tr>
     </thead>
     <tbody>
-        <tr v-if="inventoryProductGroups.length === 0">
-            <td colspan="4" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
+        <tr v-if="state.produk.length === 0">
+            <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
         </tr>
-        <template v-for="group in inventoryProductGroups" :key="group.namaModel">
-            <tr class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel">
-                <td class="px-6 py-4 font-bold text-slate-800">
-                    <div class="flex items-center">
-                        <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.namaModel }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                        <div>
-                            {{ group.namaModel }}
-                            <span class="block text-xs font-normal text-slate-500">{{ group.variants.length }} varian</span>
-                        </div>
-                    </div>
-                </td>
-                <td class="px-6 py-3 text-center">
-                    <span class="font-bold text-base text-slate-800">{{ formatNumber(group.totalStock) }}</span>
-                    <span class="text-xs"> pcs</span>
-                </td>
-                <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
-                <td class="px-6 py-3 text-center" style="width: 250px;">
-                    <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya" :disabled="!isSubscriptionActive">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </td>
-            </tr>
-
-            <template v-if="uiState.activeAccordion === group.namaModel">
-                <tr v-for="v in group.variants" :key="v.docId" class="border-b border-slate-200/50 hover:bg-slate-50/50 animate-fade-in">
-                    <td class="px-6 py-3 pl-12 text-slate-600">
-                        <p class="font-semibold">{{ v.nama }}</p>
-                        <p class="text-sm font-mono text-slate-500">SKU: {{ v.sku }}</p>
-                        <p class="text-sm text-slate-500">Warna: {{ v.warna }} / Ukuran: {{ v.varian }}</p>
-                    </td>
-                    <td class="px-6 py-3 text-center">
-                        <span class="stock-badge" :class="{
-                            'stock-safe': v.stokFisik > state.settings.minStok,
-                            'stock-low': v.stokFisik > 0 && v.stokFisik <= state.settings.minStok,
-                            'stock-empty': v.stokFisik === 0
-                        }">
-                            {{ formatNumber(v.stokFisik) }} pcs
-                        </span>
-                    </td>
-                    <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
-                    <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs" style="width: 250px;">
-                        <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
-                        <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(v)), original: v })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
-                        <button @click.stop="goToAturHarga(v.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
-                    </td>
-                </tr>
-            </template>
-        </template>
+        <tr v-for="product in state.produk" :key="product.docId" class="border-b border-slate-200/50 hover:bg-slate-50/50">
+            <td class="px-6 py-3 pl-12 text-slate-600">{{ product.nama }}</td>
+            <td class="px-6 py-3 font-mono text-xs">{{ product.sku }}</td>
+            <td class="px-6 py-3 text-slate-600">{{ product.warna }}</td>
+            <td class="px-6 py-3 text-slate-600">{{ product.varian }}</td>
+            <td class="px-6 py-3 text-center">
+                <span class="stock-badge" :class="{
+                    'stock-safe': product.stokFisik > state.settings.minStok,
+                    'stock-low': product.stokFisik > 0 && product.stokFisik <= state.settings.minStok,
+                    'stock-empty': product.stokFisik === 0
+                }">
+                    {{ formatNumber(product.stokFisik) }} pcs
+                </span>
+            </td>
+            <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(product.stokFisik * (product.hpp || 0)) }}</td>
+            <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs" style="width: 250px;">
+                <button @click.stop="removeProductVariant(product.docId)" class="font-semibold text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
+                <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(product)), original: product })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
+                <button @click.stop="goToAturHarga(product.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
+            </td>
+        </tr>
     </tbody>
 </table>
                 </div>
