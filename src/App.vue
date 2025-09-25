@@ -7736,9 +7736,9 @@ watch(activePage, (newPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
                             Informasi
                         </button>
-                        <button @click="showModal('addRetur', { tanggal: new Date().toISOString().split('T')[0], transactionIdSearch: '', foundTransaction: null, items: [] })" class="bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 shadow transition-colors">
-                            + Tambah Retur
-                        </button>
+                        <button @click="showModal('addRetur', { tanggal: new Date().toISOString().split('T')[0], transactionIdSearch: '', foundTransaction: null, items: [] })" class="bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 shadow transition-colors" :disabled="!isSubscriptionActive">
+    + Tambah Retur
+</button>
                     </div>
                 </div>
 
@@ -7839,7 +7839,7 @@ watch(activePage, (newPage) => {
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-center space-x-2">
-                                    <button @click="deleteReturnItem(item)" class="text-xs text-red-500 hover:underline">Hapus</button>
+                                    <button @click="deleteReturnItem(item)" class="text-xs text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -10658,7 +10658,7 @@ watch(activePage, (newPage) => {
 
     <div class="flex justify-end gap-3 pt-4 border-t mt-auto">
         <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-        <button type="button" @click="submitReturForm" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Data Retur</button>
+        <button type="button" @click="submitReturForm" class="bg-indigo-600 text-white py-2 px-4 rounded-lg" :disabled="!isSubscriptionActive">Simpan Data Retur</button>
     </div>
 </div>
 
