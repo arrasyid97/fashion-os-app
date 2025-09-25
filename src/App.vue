@@ -1615,12 +1615,10 @@ async function submitVoucherNote() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.notesData;
 
-    // Perbarui validasi untuk menyertakan voucherType
     if (!form.title || !form.endDate || !form.channelId || !form.voucherType) {
         return alert("Semua kolom wajib diisi.");
     }
 
-    // Logika untuk validasi spesifik model
     if (form.type === 'model' && !form.modelName) {
         return alert("Nama model produk wajib diisi.");
     }
@@ -1630,7 +1628,7 @@ async function submitVoucherNote() {
     const dataToSave = {
         title: form.title,
         type: form.type,
-        voucherType: form.voucherType, // BARIS BARU: simpan jenis voucher
+        voucherType: form.voucherType,
         modelName: form.modelName || null,
         channelId: form.channelId,
         channelName: state.settings.marketplaces.find(c => c.id === form.channelId)?.name || 'N/A',
@@ -1643,7 +1641,7 @@ async function submitVoucherNote() {
         const docRef = await addDoc(collection(db, "voucher_notes"), dataToSave);
         state.voucherNotes.push({ id: docRef.id, ...dataToSave, endDate: dataToSave.endDate });
         alert("Catatan voucher berhasil disimpan!");
-        hideModal(); // <-- INI PERBAIKANNYA
+        hideModal();
     } catch (error) {
         console.error("Gagal menyimpan catatan:", error);
         alert("Gagal menyimpan catatan. Silakan coba lagi.");
@@ -7009,86 +7007,111 @@ watch(activePage, (newPage) => {
 </div>
 
     <div v-if="activePage === 'promosi'">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        
-        <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-            <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Promosi per Akun Penjualan</h3>
-            <p class="text-sm text-slate-500 mb-4">Voucher ini berlaku untuk semua produk yang dijual di akun yang bersangkutan.</p>
-            <div class="space-y-4">
-                <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-slate-50/50">
-                    <p class="font-semibold text-slate-700">{{ channel.name }}</p>
-                    <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
-                            <div class="mt-1 grid grid-cols-2 gap-2">
-                                <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
-                            <div class="mt-1 grid grid-cols-2 gap-2">
-                                <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                            </div>
-                        </div>
-                    </div>
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
+
+            <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
+                <div class="flex items-center gap-4">
+                    <h2 class="text-3xl font-bold text-slate-800">Manajemen Promosi & Voucher</h2>
+                    
+                    <button @click="showNotesModal" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h-2a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2a1 1 0 01-1-1V2a1 1 0 10-2 0v1H9a1 1 0 00-1 1v1H6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd" /></svg>
+                        Catatan
+                    </button>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <button @click="showModal('panduanPromosi')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                        Informasi
+                    </button>
+                    <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
+                        <span v-if="isSaving">Menyimpan...</span>
+                        <span v-else>Simpan Semua Perubahan</span>
+                    </button>
                 </div>
             </div>
-        </div>
 
-        <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-            <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Promosi Spesifik per Model Produk</h3>
-            <p class="text-sm text-slate-500 mb-4">Atur diskon yang hanya berlaku untuk model produk tertentu di setiap akun.</p>
-            
-            <div class="mb-4">
-                <label for="promo-model-filter" class="block text-sm font-medium text-slate-700">Pilih Model Produk</label>
-                <div v-if="promosiProductModels.length === 0" class="mt-1 p-3 bg-red-100 text-red-800 border-l-4 border-red-500 rounded-r-lg shadow-sm">
-                    <p class="font-semibold mb-1">Peringatan:</p>
-                    <p class="text-sm">Anda belum memiliki produk di Inventaris.</p>
-                    <a href="#" @click.prevent="changePage('inventaris')" class="mt-2 inline-block text-red-700 font-bold hover:underline text-sm">Buka Halaman Inventaris &raquo;</a>
-                </div>
-                <select v-else v-model="uiState.promosiSelectedModel" id="promo-model-filter" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm">
-                    <option value="">-- Pilih Model untuk Diatur --</option>
-                    <option v-for="modelName in promosiProductModels" :key="modelName" :value="modelName">{{ modelName }}</option>
-                </select>
-            </div>
-
-            <div v-if="uiState.promosiSelectedModel" class="space-y-4 animate-fade-in">
-                <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-slate-50/50">
-                    <p class="font-semibold text-slate-700">{{ channel.name }}</p>
-                    <div class="mt-2 space-y-3">
-                        <div v-for="varian in promosiSelectedModelVariants" :key="varian.sku">
-                            <h5 class="text-sm font-semibold text-slate-800 mb-1">{{ varian.nama }} ({{ varian.sku }})</h5>
-                            
-                            <div class="flex flex-col md:flex-row gap-2">
-                                <div class="flex-1">
-                                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+                    <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Promosi per Akun Penjualan</h3>
+                    <p class="text-sm text-slate-500 mb-4">Voucher ini berlaku untuk semua produk yang dijual di akun yang bersangkutan.</p>
+                    <div class="space-y-4">
+                        <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-slate-50/50">
+                            <p class="font-semibold text-slate-700">{{ channel.name }}</p>
+                            <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
                                     <div class="mt-1 grid grid-cols-2 gap-2">
-                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(uiState.promosiSelectedModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                        <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(uiState.promosiSelectedModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                        <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
+                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                        <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div class="mt-3">
-                                <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
-                                <div class="space-y-2 mt-1">
-                                    <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].diskonBertingkat" :key="index" class="flex items-center gap-2">
-                                        <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                        <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                        <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-                                    </div>
-                                </div>
-                                <button @click="addPromotionTier(uiState.promosiSelectedModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
-                            </div>
-
                         </div>
                     </div>
                 </div>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Promosi Spesifik per Model Produk</h3>
+                    <p class="text-sm text-slate-500 mb-4">Atur diskon yang hanya berlaku untuk model produk tertentu di setiap akun.</p>
+                    
+                    <div class="mb-4">
+                        <label for="promo-model-filter" class="block text-sm font-medium text-slate-700">Pilih Model Produk</label>
+                        <div v-if="promosiProductModels.length === 0" class="mt-1 p-3 bg-red-100 text-red-800 border-l-4 border-red-500 rounded-r-lg shadow-sm">
+                            <p class="font-semibold mb-1">Peringatan:</p>
+                            <p class="text-sm">Anda belum memiliki produk di Inventaris.</p>
+                            <a href="#" @click.prevent="changePage('inventaris')" class="mt-2 inline-block text-red-700 font-bold hover:underline text-sm">Buka Halaman Inventaris &raquo;</a>
+                        </div>
+                        <select v-else v-model="uiState.promosiSelectedModel" id="promo-model-filter" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                            <option value="">-- Pilih Model untuk Diatur --</option>
+                            <option v-for="modelName in promosiProductModels" :key="modelName" :value="modelName">{{ modelName }}</option>
+                        </select>
+                    </div>
+
+                    <div v-if="uiState.promosiSelectedModel" class="space-y-4 animate-fade-in">
+                        <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-slate-50/50">
+                            <p class="font-semibold text-slate-700">{{ channel.name }}</p>
+                            <div class="mt-2 space-y-3">
+                                <div v-for="varian in promosiSelectedModelVariants" :key="varian.sku">
+                                    <h5 class="text-sm font-semibold text-slate-800 mb-1">{{ varian.nama }} ({{ varian.sku }})</h5>
+                                    
+                                    <div class="flex flex-col md:flex-row gap-2">
+                                        <div class="flex-1">
+                                            <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
+                                            <div class="mt-1 grid grid-cols-2 gap-2">
+                                                <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(uiState.promosiSelectedModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(uiState.promosiSelectedModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-3">
+                                        <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
+                                        <div class="space-y-2 mt-1">
+                                            <div v-for="(tier, index) in state.promotions.perModel[uiState.promosiSelectedModel][channel.id].diskonBertingkat" :key="index" class="flex items-center gap-2">
+                                                <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                <button @click="removePromotionTier(uiState.promosiSelectedModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
+                                            </div>
+                                        </div>
+                                        <button @click="addPromotionTier(uiState.promosiSelectedModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p v-else class="text-center text-slate-500 py-4">Pilih model produk di atas untuk melihat pengaturannya.</p>
+                </div>
             </div>
-            
-            <p v-else class="text-center text-slate-500 py-4">Pilih model produk di atas untuk melihat pengaturannya.</p>
         </div>
     </div>
 </div>
