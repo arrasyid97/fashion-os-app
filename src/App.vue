@@ -1176,21 +1176,32 @@ async function submitPenerimaanBarang() {
     const form = uiState.penerimaanBarangForm;
     
     // PERBAIKAN: Validasi tambahan untuk memastikan semua produk memiliki nilai yang valid
+    if (form.produk.length === 0) {
+        return alert("Daftar produk tidak boleh kosong.");
+    }
     for (const p of form.produk) {
+        // Cek properti penting, pastikan tidak ada yang null atau undefined
         if (!p.sku || p.qty === null || p.qty === undefined || p.hargaJual === null || p.hargaJual === undefined) {
             return alert("Setiap produk harus memiliki SKU, Harga Jual, dan Kuantitas yang valid.");
         }
     }
 
-    let totalQtyValue = 0;
-    form.produk.forEach(p => {
-        totalQtyValue += (p.hargaJual || 0) * (p.qty || 0);
-    });
+    let totalQtyValue = form.produk.reduce((sum, p) => sum + (p.hargaJual || 0) * (p.qty || 0), 0);
 
+    // PERBAIKAN: Buat objek data secara eksplisit untuk menghindari nilai undefined
     const dataToSave = {
-        ...form,
         userId: currentUser.value.uid,
+        supplierId: form.supplierId || null,
+        supplierName: form.supplierName || 'N/A',
         tanggal: new Date(form.tanggal),
+        produk: form.produk.map(p => ({
+            ...p,
+            hargaJual: p.hargaJual || 0,
+            qty: p.qty || 0
+        })),
+        statusProses: form.statusProses || 'Dalam Proses',
+        statusPembayaran: form.statusPembayaran || 'Belum Dibayar',
+        catatan: form.catatan || '',
         totalQtyValue,
         createdAt: new Date(),
     };
@@ -1198,8 +1209,17 @@ async function submitPenerimaanBarang() {
     try {
         let docRef;
         if (form.id) {
-            // ... (logika update doc) ...
+            // Logika untuk mengedit dokumen yang sudah ada
+            const docToUpdate = doc(db, "purchase_orders", form.id);
+            await updateDoc(docToUpdate, dataToSave);
+            
+            const index = state.purchaseOrders.findIndex(order => order.id === form.id);
+            if (index !== -1) {
+                state.purchaseOrders[index] = { id: form.id, ...dataToSave };
+            }
+            alert(`Pesanan berhasil diperbarui.`);
         } else {
+            // Logika untuk membuat dokumen baru
             docRef = await addDoc(collection(db, "purchase_orders"), dataToSave);
             state.purchaseOrders.unshift({ id: docRef.id, ...dataToSave, tanggal: dataToSave.tanggal });
             alert(`Penerimaan barang berhasil dicatat dengan ID: ${docRef.id}`);
@@ -1208,7 +1228,7 @@ async function submitPenerimaanBarang() {
         uiState.activeSupplierView = 'list';
     } catch (error) {
         console.error("Gagal menyimpan penerimaan barang:", error);
-        alert("Gagal menyimpan penerimaan barang. Silakan coba lagi.");
+        alert(`Gagal menyimpan penerimaan barang. Detail: ${error.message}`);
     }
 }
 // Tambahkan fetch untuk data Purchase Orders
