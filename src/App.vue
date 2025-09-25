@@ -609,7 +609,7 @@ function addProductFromSelection() {
             modelName: selectedProduct.nama,
             color: selectedProduct.warna,
             size: selectedProduct.varian,
-            hargaJual: selectedProduct.hargaJual?.[Object.keys(selectedProduct.hargaJual)[0]] || 0, // Ambil harga jual pertama
+            hargaJual: 0, // <-- BARIS INI YANG DIUBAH
             qty: 1,
             statusProses: 'Dalam Proses',
             statusPembayaran: 'Belum Dibayar',
