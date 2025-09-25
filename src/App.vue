@@ -8628,33 +8628,30 @@ watch(activePage, (newPage) => {
                     <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Daftar Supplier</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left text-slate-500">
-                            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                                <tr>
-                                    <th class="px-6 py-3">Nama Supplier</th>
-                                    <th class="px-6 py-3">Kontak</th>
-                                    
-                                    <th class="px-6 py-3 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-200/50">
-                                <tr v-if="state.suppliers.length === 0">
-                                    <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada data supplier.</td>
-                                </tr>
-                                <tr v-for="supplier in state.suppliers" :key="supplier.id" class="hover:bg-slate-50/50">
-                                    <td class="px-6 py-4 font-semibold text-slate-800">{{ supplier.name }}</td>
-                                    <td class="px-6 py-4">{{ supplier.contact || '-' }}</td>
-                                    
-                                    <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap">
-                                        <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline" :disabled="!isSubscriptionActive">Buat Pesanan</button>
-                                        <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
-                                        
-                                        <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">
-    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+        <tr>
+            <th class="px-6 py-3">Nama Supplier</th>
+            <th class="px-6 py-3">Kontak</th>
+            <th class="px-6 py-3 text-right" style="width: 150px;">Aksi</th>
+        </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-200/50">
+        <tr v-if="state.suppliers.length === 0">
+            <td colspan="3" class="p-10 text-center text-slate-500">Tidak ada data supplier.</td>
+        </tr>
+        <tr v-for="supplier in state.suppliers" :key="supplier.id" class="hover:bg-slate-50/50">
+            <td class="px-6 py-4 font-semibold text-slate-800">{{ supplier.name }}</td>
+            <td class="px-6 py-4">{{ supplier.contact || '-' }}</td>
+            <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap" style="width: 150px;">
+                <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline" :disabled="!isSubscriptionActive">Buat Pesanan</button>
+                <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
+                <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">
+                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            </td>
+        </tr>
+    </tbody>
+</table>
                     </div>
                 </div>
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
