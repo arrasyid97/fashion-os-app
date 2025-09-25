@@ -248,6 +248,18 @@ adminVerificationError: '',
 
 selectedProductForPurchase: null,
 
+purchaseOrderSearch: '',
+    purchaseOrderStatusProsesFilter: 'all', // 'all', 'Dalam Proses', 'Selesai'
+    purchaseOrderStatusBayarFilter: 'all', // 'all', 'Belum Dibayar', 'Proses Pembayaran', 'Sudah Dibayar'
+    purchaseOrderSort: 'tanggal-desc', // 'total-desc', 'total-asc'
+    purchaseOrderDateFilter: 'all_time',
+    purchaseOrderStartDate: '',
+    purchaseOrderEndDate: '',
+    purchaseOrderStartMonth: new Date().getMonth() + 1,
+    purchaseOrderEndMonth: new Date().getMonth() + 1,
+    purchaseOrderStartYear: new Date().getFullYear(),
+    purchaseOrderEndYear: new Date().getFullYear(),
+
     pengaturanTab: 'umum',
     isKeuanganInfoVisible: false,
     priceCalculator: {
@@ -2841,8 +2853,50 @@ const hargaHppFilteredVariants = computed(() => {
 });
 
 const filteredPurchaseOrders = computed(() => {
-    // PERBAIKAN: Mengurutkan salinan array, bukan array aslinya
-    return [...state.purchaseOrders].sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+    let orders = [...state.purchaseOrders];
+
+    // --- Terapkan Filter Waktu ---
+    orders = filterDataByDate(
+        orders.map(o => ({ ...o, tanggal: o.tanggal })),
+        uiState.purchaseOrderDateFilter,
+        uiState.purchaseOrderStartDate,
+        uiState.purchaseOrderEndDate,
+        uiState.purchaseOrderStartMonth,
+        uiState.purchaseOrderStartYear,
+        uiState.purchaseOrderEndMonth,
+        uiState.purchaseOrderEndYear
+    );
+
+    // --- Terapkan Filter Nama Supplier & SKU ---
+    const searchTerm = uiState.purchaseOrderSearch.toLowerCase();
+    if (searchTerm) {
+        orders = orders.filter(order =>
+            order.supplierName.toLowerCase().includes(searchTerm) ||
+            order.produk.some(item => item.sku.toLowerCase().includes(searchTerm))
+        );
+    }
+
+    // --- Terapkan Filter Status Proses ---
+    if (uiState.purchaseOrderStatusProsesFilter !== 'all') {
+        orders = orders.filter(order => order.statusProses === uiState.purchaseOrderStatusProsesFilter);
+    }
+    
+    // --- Terapkan Filter Status Bayar ---
+    if (uiState.purchaseOrderStatusBayarFilter !== 'all') {
+        orders = orders.filter(order => order.statusPembayaran === uiState.purchaseOrderStatusBayarFilter);
+    }
+
+    // --- Terapkan Logika Pengurutan ---
+    return orders.sort((a, b) => {
+        switch (uiState.purchaseOrderSort) {
+            case 'total-desc':
+                return b.totalQtyValue - a.totalQtyValue;
+            case 'total-asc':
+                return a.totalQtyValue - b.totalQtyValue;
+            default: // 'tanggal-desc'
+                return new Date(b.tanggal) - new Date(a.tanggal);
+        }
+    });
 });
 
 const itemizedPurchaseHistory = computed(() => {
@@ -3600,6 +3654,29 @@ function hideKeuanganInfoModal() {
     uiState.isKeuanganInfoVisible = false;
 }
 
+function exportPurchaseOrdersToExcel() {
+    const dataToExport = filteredPurchaseOrders.value.map(order => ({
+        "ID Pesanan": order.id,
+        "Tanggal": new Date(order.tanggal),
+        "Nama Supplier": order.supplierName,
+        "Total Nilai": order.totalQtyValue,
+        "Status Proses": order.statusProses,
+        "Status Pembayaran": order.statusPembayaran,
+        "Jumlah Dibayarkan": order.dibayarkan || 0,
+        "Sisa Pembayaran": order.totalQtyValue - (order.dibayarkan || 0)
+    }));
+
+    if (dataToExport.length === 0) {
+        alert("Tidak ada data untuk diekspor.");
+        return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Penerimaan Barang");
+    worksheet["!cols"] = Array(8).fill({ wch: 20 });
+    XLSX.writeFile(workbook, `Riwayat_Penerimaan_Barang_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
 
 function addProductToCart(product, qty = 1) {
     if (!uiState.activeCartChannel) { alert("Pilih channel penjualan."); return; }
@@ -8656,6 +8733,72 @@ watch(activePage, (newPage) => {
                 </div>
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
     <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Penerimaan Barang</h3>
+    <div class="p-4 bg-slate-50/50 rounded-xl border shadow-sm mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <div>
+            <label class="block text-sm font-medium mb-1">Cari Supplier / SKU</label>
+            <input type="text" v-model="uiState.purchaseOrderSearch" placeholder="Ketik nama supplier atau SKU..." class="w-full p-2 border rounded-md bg-white shadow-sm">
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">Filter Status Proses</label>
+            <select v-model="uiState.purchaseOrderStatusProsesFilter" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                <option value="all">Semua Status</option>
+                <option value="Dalam Proses">Dalam Proses</option>
+                <option value="Selesai">Selesai</option>
+                <option value="Revisi">Revisi</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">Filter Status Bayar</label>
+            <select v-model="uiState.purchaseOrderStatusBayarFilter" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                <option value="all">Semua Status</option>
+                <option value="Belum Dibayar">Belum Dibayar</option>
+                <option value="Proses Pembayaran">Proses Pembayaran</option>
+                <option value="Sudah Dibayar">Sudah Dibayar</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">Urutkan</label>
+            <select v-model="uiState.purchaseOrderSort" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                <option value="tanggal-desc">Tanggal (Terbaru)</option>
+                <option value="tanggal-asc">Tanggal (Terlama)</option>
+                <option value="total-desc">Total Nilai (Tertinggi)</option>
+                <option value="total-asc">Total Nilai (Terendah)</option>
+            </select>
+        </div>
+        <div class="lg:col-span-4">
+            <label class="block text-sm font-medium mb-1">Filter Waktu</label>
+            <div class="flex flex-wrap items-center gap-2">
+                <select v-model="uiState.purchaseOrderDateFilter" class="flex-grow bg-white border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                    <option value="all_time">Semua Waktu</option>
+                    <option value="today">Hari Ini</option>
+                    <option value="last_7_days">7 Hari Terakhir</option>
+                    <option value="last_30_days">30 Hari Terakhir</option>
+                    <option value="this_year">Tahun Ini</option>
+                    <option value="by_month_range">Rentang Bulan</option>
+                    <option value="by_year_range">Rentang Tahun</option>
+                </select>
+                <div v-if="uiState.purchaseOrderDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
+                    <select v-model.number="uiState.purchaseOrderStartMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                    <input type="number" v-model.number="uiState.purchaseOrderStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                    <span class="mx-2">s/d</span>
+                    <select v-model.number="uiState.purchaseOrderEndMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                    <input type="number" v-model.number="uiState.purchaseOrderEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                </div>
+                <div v-if="uiState.purchaseOrderDateFilter === 'by_year_range'" class="flex items-center gap-2">
+                    <input type="number" v-model.number="uiState.purchaseOrderStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                    <span>s/d</span>
+                    <input type="number" v-model.number="uiState.purchaseOrderEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                </div>
+            </div>
+        </div>
+        <div class="lg:col-span-4 flex justify-end">
+            <button @click="exportPurchaseOrdersToExcel" class="bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-700 text-sm h-[42px] flex-shrink-0" :disabled="!isSubscriptionActive">
+                Export ke Excel
+            </button>
+        </div>
+    </div>
+</div>
     <div class="overflow-x-auto">
         <table class="w-full text-sm text-left text-slate-500">
             <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
