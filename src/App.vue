@@ -6796,14 +6796,17 @@ watch(activePage, (newPage) => {
     <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
         <tr>
             <th class="px-6 py-3 font-semibold">Nama Model</th>
-            <th class="px-6 py-3 font-semibold">Jumlah Stok</th>
-            <th class="px-6 py-3 font-semibold text-right">Total Nilai Stok (HPP)</th>
-            <th class="px-6 py-3 font-semibold text-center" style="width: 150px;">Aksi</th>
+            <th class="px-6 py-3 font-semibold">SKU</th>
+            <th class="px-6 py-3 font-semibold">Warna</th>
+            <th class="px-6 py-3 font-semibold">Ukuran</th>
+            <th class="px-6 py-3 font-semibold text-center">Stok</th>
+            <th class="px-6 py-3 font-semibold text-right">Nilai Stok (HPP)</th>
+            <th class="px-6 py-3 font-semibold text-center">Aksi</th>
         </tr>
     </thead>
     <tbody>
         <tr v-if="inventoryProductGroups.length === 0">
-            <td colspan="4" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
+            <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
         </tr>
         <template v-for="group in inventoryProductGroups" :key="group.namaModel">
             <tr class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel">
@@ -6816,12 +6819,13 @@ watch(activePage, (newPage) => {
                         </div>
                     </div>
                 </td>
+                <td colspan="3"></td>
                 <td class="px-6 py-3 text-center">
                     <span class="font-bold text-base text-slate-800">{{ formatNumber(group.totalStock) }}</span>
                     <span class="text-xs"> pcs</span>
                 </td>
                 <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
-                <td class="px-6 py-3 text-center" style="width: 150px;">
+                <td class="px-6 py-3 text-center">
                     <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya" :disabled="!isSubscriptionActive">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
@@ -6829,15 +6833,6 @@ watch(activePage, (newPage) => {
             </tr>
 
             <template v-if="uiState.activeAccordion === group.namaModel">
-                <tr class="bg-slate-50/50">
-                    <th class="px-6 py-2 pl-12 text-xs font-semibold text-slate-500">Nama Produk</th>
-                    <th class="px-6 py-2 text-xs font-semibold text-slate-500">SKU</th>
-                    <th class="px-6 py-2 text-xs font-semibold text-slate-500">Warna</th>
-                    <th class="px-6 py-2 text-xs font-semibold text-slate-500">Ukuran</th>
-                    <th class="px-6 py-2 text-xs font-semibold text-slate-500 text-center">Stok</th>
-                    <th class="px-6 py-2 text-xs font-semibold text-slate-500 text-right">Nilai Stok (HPP)</th>
-                    <th class="px-6 py-2 text-xs font-semibold text-slate-500 text-center" style="width: 250px;">Aksi</th>
-                </tr>
                 <tr v-for="v in group.variants" :key="v.docId" class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in">
                     <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
                     <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
@@ -6853,7 +6848,7 @@ watch(activePage, (newPage) => {
                         </span>
                     </td>
                     <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
-                    <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs" style="width: 250px;">
+                    <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
                         <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
                         <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(v)), original: v })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
                         <button @click.stop="goToAturHarga(v.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
