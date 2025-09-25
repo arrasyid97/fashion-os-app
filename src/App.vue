@@ -2614,7 +2614,7 @@ const filteredGudangKain = computed(() => {
 });
 const inventoryProductGroups = computed(() => {
     const grouped = state.produk.reduce((acc, product) => {
-        // Ambil nama model dari model_id produk
+        // Mengambil nama model konseptual (misal: "SALWA") dari model_id
         const model = state.settings.modelProduk.find(m => m.id === product.model_id);
         const modelName = model ? model.namaModel : 'N/A';
 
@@ -6776,10 +6776,10 @@ watch(activePage, (newPage) => {
                     <table class="w-full text-sm text-left">
     <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
         <tr>
-            <th class="px-6 py-3 font-semibold">Nama Produk</th>
-            <th class="px-6 py-3 font-semibold text-center">Jumlah Stok</th>
-            <th class="px-6 py-3 font-semibold text-right">Total Nilai Stok (HPP)</th>
-            <th class="px-6 py-3 font-semibold text-center">Aksi</th>
+            <th class="px-6 py-3 font-semibold">Nama Model / Varian</th>
+            <th class="px-6 py-3 font-semibold text-center">Stok</th>
+            <th class="px-6 py-3 font-semibold text-right">Nilai Stok (HPP)</th>
+            <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
         </tr>
     </thead>
     <tbody>
@@ -6802,7 +6802,7 @@ watch(activePage, (newPage) => {
                     <span class="text-xs"> pcs</span>
                 </td>
                 <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
-                <td class="px-6 py-3 text-center">
+                <td class="px-6 py-3 text-center" style="width: 250px;">
                     <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya" :disabled="!isSubscriptionActive">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
@@ -6826,7 +6826,7 @@ watch(activePage, (newPage) => {
                         </span>
                     </td>
                     <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
-                    <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
+                    <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs" style="width: 250px;">
                         <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
                         <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(v)), original: v })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
                         <button @click.stop="goToAturHarga(v.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
