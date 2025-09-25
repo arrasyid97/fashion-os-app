@@ -2614,9 +2614,9 @@ const filteredGudangKain = computed(() => {
 });
 const inventoryProductGroups = computed(() => {
     const grouped = state.produk.reduce((acc, product) => {
-        // Mengambil nama model konseptual (misal: "SALWA") dari model_id
+        // Ambil nama model konseptual (misal: "SALWA")
         const model = state.settings.modelProduk.find(m => m.id === product.model_id);
-        const modelName = model ? model.namaModel : 'N/A';
+        const modelName = model ? model.namaModel.split(' ')[0] : 'N/A'; // <-- PERUBAHAN UTAMA DI SINI
 
         if (!acc[modelName]) {
             acc[modelName] = {
@@ -2640,7 +2640,7 @@ const inventoryProductGroups = computed(() => {
 
     productGroups = productGroups.filter(group => {
         const matchesSearch = (group.namaModel || '').toLowerCase().includes(searchTerm) || 
-                              group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm));
+                              group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm) || (v.nama || '').toLowerCase().includes(searchTerm));
         if (!matchesSearch) return false;
         
         const totalStock = group.variants.reduce((sum, v) => sum + (v.stokFisik || 0), 0);
@@ -6777,8 +6777,8 @@ watch(activePage, (newPage) => {
     <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
         <tr>
             <th class="px-6 py-3 font-semibold">Nama Model / Varian</th>
-            <th class="px-6 py-3 font-semibold text-center">Stok</th>
-            <th class="px-6 py-3 font-semibold text-right">Nilai Stok (HPP)</th>
+            <th class="px-6 py-3 font-semibold text-center">Jumlah Stok</th>
+            <th class="px-6 py-3 font-semibold text-right">Total Nilai Stok (HPP)</th>
             <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
         </tr>
     </thead>
