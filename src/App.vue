@@ -6973,9 +6973,14 @@ watch(activePage, (newPage) => {
                                         </td>
                                 </tr>
 
-                                <template v-if="uiState.activeAccordion === group.namaModel">
+                                <template v-if="uiState.activeAccordion === group.namaModel || group.variants.some(v => uiState.activeAccordion === `harga-${v.sku}` || uiState.activeAccordion === `komisi-${v.sku}`)">
+                                    
                                     <template v-for="v in group.variants" :key="v.docId">
-                                        <tr class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in">
+                                        
+                                        <tr 
+                                            class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in"
+                                            :class="{ 'bg-slate-100': uiState.activeAccordion === `harga-${v.sku}` || uiState.activeAccordion === `komisi-${v.sku}` }"
+                                        >
                                             <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
                                             <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
                                             <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
@@ -7011,8 +7016,10 @@ watch(activePage, (newPage) => {
                                                 >
                                                     Hapus
                                                 </button>
-                                                </td>
+                                                
+                                            </td>
                                         </tr>
+
                                         <tr v-if="uiState.activeAccordion === `harga-${v.sku}`" class="animate-fade-in">
                                             <td colspan="7" class="p-6 bg-indigo-50/50 border-b-2 border-indigo-400/50">
                                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
