@@ -4118,6 +4118,33 @@ function calculateSellingPrice() {
     };
 }
 
+async function saveCommissionSettings() {
+    if (!currentUser.value || !isAdmin.value) {
+        return alert("Aksi tidak diizinkan.");
+    }
+
+    isSaving.value = true;
+    try {
+        const userId = currentUser.value.uid;
+        const commissionsRef = doc(db, "commissions", userId);
+        
+        // Langsung simpan state komisi saat ini ke database
+        await setDoc(commissionsRef, {
+            perModel: JSON.parse(JSON.stringify(state.commissions.perModel)) || {},
+            userId: userId
+        }, { merge: true });
+
+        alert('Pengaturan komisi berhasil disimpan!');
+        uiState.activeAccordion = null; // Menutup panel setelah simpan
+
+    } catch (error) {
+        console.error("Gagal menyimpan pengaturan komisi:", error);
+        alert("Gagal menyimpan pengaturan komisi.");
+    } finally {
+        isSaving.value = false;
+    }
+}
+
 async function recordBagiHasilPayment() {
     const report = uiState.laporanBagiHasil;
     const result = report.result;
@@ -7098,14 +7125,14 @@ watch(activePage, (newPage) => {
                                             </div>
                                         </div>
                                         <div class="mt-4 flex justify-end">
-                                            <button @click.stop="saveData().then(() => uiState.activeAccordion = null)" 
-                                                type="button" 
-                                                class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
-                                                :disabled="isSaving || !isSubscriptionActive"
-                                            >
-                                                <span v-if="isSaving">Menyimpan Komisi...</span>
-                                                <span v-else>Simpan & Tutup</span>
-                                            </button>
+                                            <button @click.stop="saveCommissionSettings()" 
+    type="button" 
+    class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
+    :disabled="isSaving || !isSubscriptionActive"
+>
+    <span v-if="isSaving">Menyimpan Komisi...</span>
+    <span v-else>Simpan & Tutup</span>
+</button>
                                         </div>
                                     </td>
                                 </tr>
