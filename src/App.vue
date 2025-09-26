@@ -2906,6 +2906,49 @@ const sortedProduk = computed(() => {
     });
 });
 
+const sortedProductsForPriceAndPromo = computed(() => {
+    const products = [...state.produk];
+
+    const sizeOrder = {
+        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
+        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
+        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
+        'allsize': 90, 'satuukuran': 90
+    };
+
+    function compareSizes(sizeA, sizeB) {
+        const cleanA = (sizeA || '').toLowerCase().trim();
+        const cleanB = (sizeB || '').toLowerCase().trim();
+        
+        const orderA = sizeOrder[cleanA] || 999;
+        const orderB = sizeOrder[cleanB] || 999;
+
+        if (orderA !== 999 && orderB !== 999) {
+            return orderA - orderB;
+        }
+
+        const numA = parseInt(cleanA, 10);
+        const numB = parseInt(cleanB, 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB;
+        }
+        
+        return cleanA.localeCompare(cleanB);
+    }
+    
+    return products.sort((a, b) => {
+        const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama;
+        const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama;
+        const modelCompare = modelA.localeCompare(modelB);
+        if (modelCompare !== 0) return modelCompare;
+
+        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
+        if (colorCompare !== 0) return colorCompare;
+
+        return compareSizes(a.varian, b.varian);
+    });
+});
+
 const commissionModelComputed = (modelName, channelId) => computed({
     get() {
         return state.commissions.perModel[modelName]?.[channelId] ? state.commissions.perModel[modelName][channelId] + '%' : '';
@@ -6947,91 +6990,100 @@ watch(activePage, (newPage) => {
         <option value="size-desc">Ukuran (Terbesar-Terkecil)</option>
     </select>
 </div>
-                <div class="overflow-x-auto max-h-[70vh]">
-                    <table class="w-full text-sm text-left text-slate-500">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                            <tr>
-                                <th class="px-6 py-3 font-semibold">Nama Model & SKU</th>
-                                <th class="px-6 py-3 font-semibold">Warna</th>
-                                <th class="px-6 py-3 font-semibold">Ukuran</th>
-                                <th class="px-6 py-3 font-semibold text-center">HPP</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="state.produk.length === 0">
-                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
-                            </tr>
-                            <template v-for="product in sortedProduk" :key="product.sku">
-                                <tr class="bg-white hover:bg-slate-50/50 cursor-pointer" @click="uiState.activeAccordion = uiState.activeAccordion === product.sku ? null : product.sku">
-                                    <td class="px-6 py-4 font-bold text-slate-800">
-                                        <div class="flex items-center">
-                                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === product.sku }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                                            <div>
-                                                {{ product.nama }}
-                                                <p class="font-mono text-xs font-normal text-slate-500">{{ product.sku }}</p>
-                                            </div>
+                <div class="mb-4">
+    <label for="sort-harga-hpp" class="block text-sm font-medium text-slate-700 mb-1">Urutkan Berdasarkan</label>
+    <select v-model="uiState.hargaHppSort" id="sort-harga-hpp" class="w-full md:w-auto p-2 border border-slate-300 rounded-md shadow-sm">
+        <option value="nama-asc">Nama Model (A-Z)</option>
+        <option value="nama-desc">Nama Model (Z-A)</option>
+        <option value="size-asc">Ukuran (Terkecil-Terbesar)</option>
+        <option value="size-desc">Ukuran (Terbesar-Terkecil)</option>
+    </select>
+</div>
+
+<div class="overflow-x-auto max-h-[70vh]">
+    <table class="w-full text-sm text-left">
+        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+            <tr>
+                <th class="px-6 py-3 font-semibold">Nama Model</th>
+                <th class="px-6 py-3 font-semibold">SKU</th>
+                <th class="px-6 py-3 font-semibold">Warna</th>
+                <th class="px-6 py-3 font-semibold">Ukuran</th>
+                <th class="px-6 py-3 font-semibold text-center">HPP</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200/50">
+            <tr v-if="sortedProductsForPriceAndPromo.length === 0">
+                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
+            </tr>
+            <template v-for="product in sortedProductsForPriceAndPromo" :key="product.sku">
+                <tr class="bg-white hover:bg-slate-50/50 cursor-pointer" @click="uiState.activeAccordion = uiState.activeAccordion === product.sku ? null : product.sku">
+                    <td class="px-6 py-4 font-bold text-slate-800">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === product.sku }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            <div>
+                                {{ product.nama }}
+                                <p class="font-mono text-xs font-normal text-slate-500">{{ product.sku }}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">{{ product.warna }}</td>
+                    <td class="px-6 py-4">{{ product.varian }}</td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="font-bold text-red-600">{{ formatCurrency(product.hpp) }}</span>
+                    </td>
+                </tr>
+
+                <tr v-if="uiState.activeAccordion === product.sku" class="animate-fade-in">
+                    <td colspan="4" class="p-6 bg-slate-50/50 border-b-2 border-indigo-200/50">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-700 mb-2">HPP (Harga Pokok Produksi)</h4>
+                                <div class="relative mt-1">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                    <input type="text" :value="formatInputNumber(product.hpp)" @input="product.hpp = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600">
+                                </div>
+                            </div>
+
+                            <div class="lg:col-span-2">
+                                <h4 class="text-sm font-bold text-slate-700 mb-2">Pengaturan Komisi per Model: {{ product.nama }}</h4>
+                                <div class="space-y-2">
+                                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
+                                        <label class="text-xs font-medium text-slate-600">{{ marketplace.name }}</label>
+                                        <div class="relative w-32">
+                                            <input type="text" :value="commissionModelComputed(product.nama, marketplace.id).value" @input="commissionModelComputed(product.nama, marketplace.id).setValue($event.target.value)" class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-xs font-semibold" placeholder="0">
+                                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
                                         </div>
-                                    </td>
-                                    <td class="px-6 py-4">{{ product.warna }}</td>
-                                    <td class="px-6 py-4">{{ product.varian }}</td>
-                                    <td class="px-6 py-4 text-center">
-                                        <span class="font-bold text-red-600">{{ formatCurrency(product.hpp) }}</span>
-                                    </td>
-                                </tr>
-                                
-                                <tr v-if="uiState.activeAccordion === product.sku" class="animate-fade-in">
-                                    <td colspan="4" class="p-6 bg-slate-50/50 border-b-2 border-indigo-200/50">
-                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                            
-                                            <div>
-                                                <h4 class="text-sm font-bold text-slate-700 mb-2">HPP (Harga Pokok Produksi)</h4>
-                                                <div class="relative mt-1">
-                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                                    <input type="text" :value="formatInputNumber(product.hpp)" @input="product.hpp = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600">
-                                                </div>
-                                            </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                                            <div class="lg:col-span-2">
-                                                <h4 class="text-sm font-bold text-slate-700 mb-2">Pengaturan Komisi per Model: {{ product.nama }}</h4>
-                                                <div class="space-y-2">
-                                                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
-                                                        <label class="text-xs font-medium text-slate-600">{{ marketplace.name }}</label>
-                                                        <div class="relative w-32">
-                                                            <input type="text" :value="commissionModelComputed(product.nama, marketplace.id).value" @input="commissionModelComputed(product.nama, marketplace.id).setValue($event.target.value)" class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-xs font-semibold" placeholder="0">
-                                                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="lg:col-span-3 space-y-3">
-                                                <h4 class="text-sm font-bold text-slate-700 mt-4 mb-2 border-t pt-4">Harga Jual per Channel</h4>
-                                                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
-                                                    <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
-                                                    <div class="flex items-center gap-2">
-                                                        <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
-                                                            :class="{
-                                                                'bg-green-100 text-green-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) >= 40, 
-                                                                'bg-yellow-100 text-yellow-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) >= 20 && ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) < 40, 
-                                                                'bg-red-100 text-red-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) < 20
-                                                            }">
-                                                            {{ (product.hargaJual[marketplace.id] && product.hpp && product.hargaJual[marketplace.id] > 0 ? (((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
-                                                        </span>
-                                                        <div class="relative w-36">
-                                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                                            <input type="text" :value="formatInputNumber(product.hargaJual[marketplace.id])" @input="product.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold">
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
+                            <div class="lg:col-span-3 space-y-3">
+                                <h4 class="text-sm font-bold text-slate-700 mt-4 mb-2 border-t pt-4">Harga Jual per Channel</h4>
+                                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
+                                    <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
+                                            :class="{
+                                                'bg-green-100 text-green-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) >= 40, 
+                                                'bg-yellow-100 text-yellow-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) >= 20 && ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) < 40, 
+                                                'bg-red-100 text-red-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) < 20
+                                            }">
+                                            {{ (product.hargaJual[marketplace.id] && product.hpp && product.hargaJual[marketplace.id] > 0 ? (((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
+                                        </span>
+                                        <div class="relative w-36">
+                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                            <input type="text" :value="formatInputNumber(product.hargaJual[marketplace.id])" @input="product.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold">
                                         </div>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </template>
+        </tbody>
+    </table>
+</div>
 
             </div>
         </div>
@@ -7076,89 +7128,100 @@ watch(activePage, (newPage) => {
         <option value="size-desc">Ukuran (Terbesar-Terkecil)</option>
     </select>
 </div>
-                <div class="overflow-x-auto max-h-[70vh]">
-                    <table class="w-full text-sm text-left text-slate-500">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                            <tr>
-                                <th class="px-6 py-3 font-semibold">Nama Model & SKU</th>
-                                <th class="px-6 py-3 font-semibold">Warna</th>
-                                <th class="px-6 py-3 font-semibold">Ukuran</th>
-                                <th class="px-6 py-3 font-semibold text-center">Harga Normal</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="sortedProduk.length === 0">
-                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
-                            </tr>
-                            
-                            <template v-for="product in sortedProduk" :key="product.sku">
-                                <tr class="bg-white hover:bg-slate-50/50 cursor-pointer" @click="uiState.activeAccordion = uiState.activeAccordion === product.sku ? null : product.sku">
-                                    <td class="px-6 py-4 font-bold text-slate-800">
-                                        <div class="flex items-center">
-                                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === product.sku }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                                            <div>
-                                                {{ product.nama }}
-                                                <p class="font-mono text-xs font-normal text-slate-500">{{ product.sku }}</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4">{{ product.warna }}</td>
-                                    <td class="px-6 py-4">{{ product.varian }}</td>
-                                    <td class="px-6 py-4 text-center">
-                                        <span class="font-bold text-indigo-600">{{ formatCurrency(product.hargaJual[state.settings.marketplaces[0]?.id] || 0) }}</span>
-                                    </td>
-                                </tr>
-                                
-                                <tr v-if="uiState.activeAccordion === product.sku" class="animate-fade-in">
-                                    <td colspan="4" class="p-6 bg-slate-50/50 border-b-2 border-indigo-200/50">
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="mb-4">
+    <label for="sort-harga-hpp" class="block text-sm font-medium text-slate-700 mb-1">Urutkan Berdasarkan</label>
+    <select v-model="uiState.hargaHppSort" id="sort-harga-hpp" class="w-full md:w-auto p-2 border border-slate-300 rounded-md shadow-sm">
+        <option value="nama-asc">Nama Model (A-Z)</option>
+        <option value="nama-desc">Nama Model (Z-A)</option>
+        <option value="size-asc">Ukuran (Terkecil-Terbesar)</option>
+        <option value="size-desc">Ukuran (Terbesar-Terkecil)</option>
+    </select>
+</div>
 
-                                            <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-white shadow-sm">
-                                                <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
-                                                
-                                                <div>
-                                                    <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
-                                                    <div class="mt-1 grid grid-cols-2 gap-2">
-                                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-3">
-                                                    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
-                                                    <div class="mt-1 grid grid-cols-2 gap-2">
-                                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-3">
-                                                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
-                                                    <div class="mt-1 grid grid-cols-2 gap-2">
-                                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(product.nama, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                        <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(product.nama, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="mt-3">
-                                                    <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
-                                                    <div class="space-y-2 mt-1">
-                                                        <div v-for="(tier, index) in state.promotions.perModel[product.nama]?.[channel.id]?.diskonBertingkat" :key="index" class="flex items-center gap-2">
-                                                            <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                            <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                            <button @click="removePromotionTier(product.nama, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-                                                        </div>
-                                                    </div>
-                                                    <button @click="addPromotionTier(product.nama, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
-                                                </div>
-                                            </div>
+<div class="overflow-x-auto max-h-[70vh]">
+    <table class="w-full text-sm text-left">
+        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+            <tr>
+                <th class="px-6 py-3 font-semibold">Nama Model</th>
+                <th class="px-6 py-3 font-semibold">SKU</th>
+                <th class="px-6 py-3 font-semibold">Warna</th>
+                <th class="px-6 py-3 font-semibold">Ukuran</th>
+                <th class="px-6 py-3 font-semibold text-center">HPP</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200/50">
+            <tr v-if="sortedProductsForPriceAndPromo.length === 0">
+                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
+            </tr>
+            <template v-for="product in sortedProductsForPriceAndPromo" :key="product.sku">
+                <tr class="bg-white hover:bg-slate-50/50 cursor-pointer" @click="uiState.activeAccordion = uiState.activeAccordion === product.sku ? null : product.sku">
+                    <td class="px-6 py-4 font-bold text-slate-800">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === product.sku }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            <div>
+                                {{ product.nama }}
+                                <p class="font-mono text-xs font-normal text-slate-500">{{ product.sku }}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">{{ product.warna }}</td>
+                    <td class="px-6 py-4">{{ product.varian }}</td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="font-bold text-red-600">{{ formatCurrency(product.hpp) }}</span>
+                    </td>
+                </tr>
+
+                <tr v-if="uiState.activeAccordion === product.sku" class="animate-fade-in">
+                    <td colspan="4" class="p-6 bg-slate-50/50 border-b-2 border-indigo-200/50">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-700 mb-2">HPP (Harga Pokok Produksi)</h4>
+                                <div class="relative mt-1">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                    <input type="text" :value="formatInputNumber(product.hpp)" @input="product.hpp = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600">
+                                </div>
+                            </div>
+
+                            <div class="lg:col-span-2">
+                                <h4 class="text-sm font-bold text-slate-700 mb-2">Pengaturan Komisi per Model: {{ product.nama }}</h4>
+                                <div class="space-y-2">
+                                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
+                                        <label class="text-xs font-medium text-slate-600">{{ marketplace.name }}</label>
+                                        <div class="relative w-32">
+                                            <input type="text" :value="commissionModelComputed(product.nama, marketplace.id).value" @input="commissionModelComputed(product.nama, marketplace.id).setValue($event.target.value)" class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-xs font-semibold" placeholder="0">
+                                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
                                         </div>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="lg:col-span-3 space-y-3">
+                                <h4 class="text-sm font-bold text-slate-700 mt-4 mb-2 border-t pt-4">Harga Jual per Channel</h4>
+                                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
+                                    <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
+                                            :class="{
+                                                'bg-green-100 text-green-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) >= 40, 
+                                                'bg-yellow-100 text-yellow-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) >= 20 && ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) < 40, 
+                                                'bg-red-100 text-red-800': ((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id] * 100) < 20
+                                            }">
+                                            {{ (product.hargaJual[marketplace.id] && product.hpp && product.hargaJual[marketplace.id] > 0 ? (((product.hargaJual[marketplace.id] - product.hpp) / product.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
+                                        </span>
+                                        <div class="relative w-36">
+                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                            <input type="text" :value="formatInputNumber(product.hargaJual[marketplace.id])" @input="product.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </template>
+        </tbody>
+    </table>
+</div>
 
             </div>
         </div>
