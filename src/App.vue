@@ -6921,7 +6921,7 @@ watch(activePage, (newPage) => {
                     <p class="text-slate-500 mt-1">Atur profitabilitas untuk setiap varian produk di semua channel penjualan.</p>
                 </div>
                 <div class="flex gap-3">
-                    <button @click="showModal('priceCalculator')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
+                    <button @click="showModal('priceCalculator')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors" :disabled="!isSubscriptionActive">
                         Kalkulator Harga
                     </button>
                     <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
@@ -6953,7 +6953,10 @@ watch(activePage, (newPage) => {
                                 <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
                             </tr>
                             <template v-for="group in inventoryProductGroups" :key="group.namaModel">
-                                <tr class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel">
+                                <tr 
+                                    class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" 
+                                    @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel"
+                                >
                                     <td class="px-6 py-4 font-bold text-slate-800">
                                         <div class="flex items-center">
                                             <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.namaModel }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -6970,82 +6973,84 @@ watch(activePage, (newPage) => {
                                 </tr>
 
                                 <template v-if="uiState.activeAccordion === group.namaModel">
-                                    <tr v-for="v in group.variants" :key="v.docId" class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in">
-                                        <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
-                                        <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
-                                        <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
-                                        <td class="px-6 py-3 text-slate-600">{{ v.varian }}</td>
-                                        <td class="px-6 py-3 text-center">
-                                            <span class="stock-badge" :class="{
-                                                'stock-safe': v.stokFisik > state.settings.minStok,
-                                                'stock-low': v.stokFisik > 0 && v.stokFisik <= state.settings.minStok,
-                                                'stock-empty': v.stokFisik === 0
-                                            }">
-                                                {{ formatNumber(v.stokFisik) }} pcs
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
-                                        <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
-                                            
-                                            <button 
-                                                @click.stop="uiState.activeAccordion = v.sku"
-                                                class="font-semibold text-indigo-600 hover:underline px-2 py-1 rounded-md bg-indigo-50"
-                                            >
-                                                Atur Harga
-                                            </button>
-                                            <button 
-                                                @click.stop="uiState.activeAccordion = `komisi-${v.sku}`"
-                                                class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
-                                            >
-                                                Atur Komisi
-                                            </button>
-                                            <button 
-                                                @click.stop="removeProductVariant(v.docId)" 
-                                                class="font-semibold text-red-500 hover:underline px-2 py-1 rounded-md bg-red-50" 
-                                                :disabled="!isSubscriptionActive"
-                                            >
-                                                Hapus
-                                            </button>
+                                    <template v-for="v in group.variants" :key="v.docId">
+                                        <tr class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in">
+                                            <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
+                                            <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
+                                            <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
+                                            <td class="px-6 py-3 text-slate-600">{{ v.varian }}</td>
+                                            <td class="px-6 py-3 text-center">
+                                                <span class="stock-badge" :class="{
+                                                    'stock-safe': v.stokFisik > state.settings.minStok,
+                                                    'stock-low': v.stokFisik > 0 && v.stokFisik <= state.settings.minStok,
+                                                    'stock-empty': v.stokFisik === 0
+                                                }">
+                                                    {{ formatNumber(v.stokFisik) }} pcs
+                                                </span>
                                             </td>
-                                    </tr>
-                                    <tr v-if="uiState.activeAccordion === v.sku" class="animate-fade-in">
-                                        <td colspan="7" class="p-6 bg-indigo-50/50 border-b-2 border-indigo-400/50">
-                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
+                                            <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
                                                 
-                                                <div>
-                                                    <h4 class="text-sm font-bold text-slate-700 mb-2">HPP (Harga Pokok Produksi)</h4>
-                                                    <div class="relative mt-1">
-                                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                                        <input 
-                                                            type="text" 
-                                                            :value="formatInputNumber(v.hpp)" 
-                                                            @input="v.hpp = parseInputNumber($event.target.value)" 
-                                                            class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600"
-                                                        >
+                                                <button 
+                                                    @click.stop="uiState.activeAccordion = `harga-${v.sku}`"
+                                                    class="font-semibold text-indigo-600 hover:underline px-2 py-1 rounded-md bg-indigo-50"
+                                                >
+                                                    Atur Harga
+                                                </button>
+                                                <button 
+                                                    @click.stop="uiState.activeAccordion = `komisi-${v.sku}`"
+                                                    class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
+                                                >
+                                                    Atur Komisi
+                                                </button>
+                                                <button 
+                                                    @click.stop="removeProductVariant(v.docId)" 
+                                                    class="font-semibold text-red-500 hover:underline px-2 py-1 rounded-md bg-red-50" 
+                                                    :disabled="!isSubscriptionActive"
+                                                >
+                                                    Hapus
+                                                </button>
+                                                </td>
+                                        </tr>
+                                        <tr v-if="uiState.activeAccordion === `harga-${v.sku}`" class="animate-fade-in">
+                                            <td colspan="7" class="p-6 bg-indigo-50/50 border-b-2 border-indigo-400/50">
+                                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                    
+                                                    <div>
+                                                        <h4 class="text-sm font-bold text-slate-700 mb-2">HPP (Harga Pokok Produksi)</h4>
+                                                        <div class="relative mt-1">
+                                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                                            <input 
+                                                                type="text" 
+                                                                :value="formatInputNumber(v.hpp)" 
+                                                                @input="v.hpp = parseInputNumber($event.target.value)" 
+                                                                class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600"
+                                                            >
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                
-                                                <div class="md:col-span-2 space-y-3">
-                                                    <h4 class="text-sm font-bold text-slate-700 mb-2">Harga Jual per Channel</h4>
-                                                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
-                                                        <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
-                                                        <div class="flex items-center gap-2">
-                                                            <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
-                                                                :class="{
-                                                                    'bg-green-100 text-green-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) >= 40,
-                                                                    'bg-yellow-100 text-yellow-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) >= 20 && ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) < 40,
-                                                                    'bg-red-100 text-red-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) < 20
-                                                                }">
-                                                                {{ (v.hargaJual[marketplace.id] && v.hpp && v.hargaJual[marketplace.id] > 0 ? (((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
-                                                            </span>
-                                                            <div class="relative w-36">
-                                                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                                                <input 
-                                                                    type="text" 
-                                                                    :value="formatInputNumber(v.hargaJual[marketplace.id])" 
-                                                                    @input="v.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" 
-                                                                    class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold"
-                                                                >
+                                                    
+                                                    <div class="md:col-span-2 space-y-3">
+                                                        <h4 class="text-sm font-bold text-slate-700 mb-2">Harga Jual per Channel</h4>
+                                                        <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
+                                                            <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
+                                                                    :class="{
+                                                                        'bg-green-100 text-green-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) >= 40,
+                                                                        'bg-yellow-100 text-yellow-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) >= 20 && ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) < 40,
+                                                                        'bg-red-100 text-red-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) < 20
+                                                                    }">
+                                                                    {{ (v.hargaJual[marketplace.id] && v.hpp && v.hargaJual[marketplace.id] > 0 ? (((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
+                                                                </span>
+                                                                <div class="relative w-36">
+                                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        :value="formatInputNumber(v.hargaJual[marketplace.id])" 
+                                                                        @input="v.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" 
+                                                                        class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold"
+                                                                    >
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -7083,7 +7088,7 @@ watch(activePage, (newPage) => {
                                             </div>
                                         </td>
                                     </tr>
-                                </template>
+                                    </template>
                             </template>
                         </tbody>
                     </table>
