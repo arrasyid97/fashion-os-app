@@ -6946,7 +6946,7 @@ watch(activePage, (newPage) => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="state.produk.length === 0">
+                            <tr v-if="sortedProduk.length === 0">
                                 <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
                             </tr>
                             <template v-for="product in sortedProduk" :key="product.sku">
@@ -6978,7 +6978,7 @@ watch(activePage, (newPage) => {
                                                     <input type="text" :value="formatInputNumber(product.hpp)" @input="product.hpp = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600">
                                                 </div>
                                             </div>
-
+                                            
                                             <div class="lg:col-span-2">
                                                 <h4 class="text-sm font-bold text-slate-700 mb-2">Pengaturan Komisi per Model: {{ product.nama }}</h4>
                                                 <div class="space-y-2">
@@ -6991,7 +6991,7 @@ watch(activePage, (newPage) => {
                                                     </div>
                                                 </div>
                                             </div>
-
+                                            
                                             <div class="lg:col-span-3 space-y-3">
                                                 <h4 class="text-sm font-bold text-slate-700 mt-4 mb-2 border-t pt-4">Harga Jual per Channel</h4>
                                                 <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
@@ -7010,6 +7010,20 @@ watch(activePage, (newPage) => {
                                                             <input type="text" :value="formatInputNumber(product.hargaJual[marketplace.id])" @input="product.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold">
                                                         </div>
                                                     </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="lg:col-span-3 flex justify-between mt-4 border-t pt-4">
+                                                <div class="flex gap-3">
+                                                    <button @click.stop="removeProductVariant(product.docId)" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition-colors text-sm flex items-center gap-1" :disabled="!isSubscriptionActive">
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                        Hapus Varian
+                                                    </button>
+                                                </div>
+                                                <div class="flex gap-3">
+                                                    <button @click.stop="showModal('editModelProduk', { id: product.model_id, namaModel: product.nama, warna: product.warna, ukuran: product.varian, yardPerModel: product.yardPerModel, hargaMaklun: product.hargaMaklun, hargaJahit: product.hargaJahit })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors text-sm" :disabled="!isSubscriptionActive">
+                                                        Atur Model Default
+                                                    </button>
                                                 </div>
                                             </div>
 
