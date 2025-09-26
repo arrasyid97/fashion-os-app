@@ -1808,6 +1808,36 @@ const voucherSemuaProdukDiskonRateComputed = (channel) => computed({
     }
 });
 
+const diskonMinBelanjaComputed = (modelName, channelId) => computed({
+    get() { 
+        return state.promotions.perModel[modelName]?.[channelId]?.minBelanja ? 'Rp ' + formatInputNumber(state.promotions.perModel[modelName][channelId].minBelanja) : '';
+    },
+    set(newValue) {
+        if (!state.promotions.perModel[modelName]) {
+            state.promotions.perModel[modelName] = {};
+        }
+        if (!state.promotions.perModel[modelName][channelId]) {
+            state.promotions.perModel[modelName][channelId] = {};
+        }
+        state.promotions.perModel[modelName][channelId].minBelanja = parseInputNumber(newValue);
+    }
+});
+
+const diskonRateComputed = (modelName, channelId) => computed({
+    get() { 
+        return state.promotions.perModel[modelName]?.[channelId]?.diskonRate ? state.promotions.perModel[modelName][channelId].diskonRate + '%' : '';
+    },
+    set(newValue) {
+        if (!state.promotions.perModel[modelName]) {
+            state.promotions.perModel[modelName] = {};
+        }
+        if (!state.promotions.perModel[modelName][channelId]) {
+            state.promotions.perModel[modelName][channelId] = {};
+        }
+        state.promotions.perModel[modelName][channelId].diskonRate = parsePercentageInput(newValue);
+    }
+});
+
 const tieredMinComputed = (tier) => computed({
     get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
     set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
@@ -2253,30 +2283,6 @@ const programRateComputed = (program) => ({
     }
 });
 
-const diskonMinBelanjaComputed = (modelName, channelId) => computed({
-    get() { return state.promotions.perModel[modelName]?.[channelId]?.minBelanja ? 'Rp ' + formatInputNumber(state.promotions.perModel[modelName][channelId].minBelanja) : ''; },
-    set(newValue) {
-        if (!state.promotions.perModel[modelName]) {
-            state.promotions.perModel[modelName] = {};
-        }
-        if (!state.promotions.perModel[modelName][channelId]) {
-            state.promotions.perModel[modelName][channelId] = {};
-        }
-        state.promotions.perModel[modelName][channelId].minBelanja = parseInputNumber(newValue);
-    }
-});
-const diskonRateComputed = (modelName, channelId) => computed({
-    get() { return state.promotions.perModel[modelName]?.[channelId]?.diskonRate ? state.promotions.perModel[modelName][channelId].diskonRate + '%' : ''; },
-    set(newValue) {
-        if (!state.promotions.perModel[modelName]) {
-            state.promotions.perModel[modelName] = {};
-        }
-        if (!state.promotions.perModel[modelName][channelId]) {
-            state.promotions.perModel[modelName][channelId] = {};
-        }
-        state.promotions.perModel[modelName][channelId].diskonRate = parsePercentageInput(newValue);
-    }
-});
 
 const formatNumber = (value) => (value === null || value === undefined) ? '' : new Intl.NumberFormat('id-ID').format(value);
 const getProductBySku = (sku) => {
@@ -4215,6 +4221,8 @@ function addPromotionTier(modelName, channelId) {
     if (!state.promotions.perModel[modelName][channelId].diskonBertingkat) state.promotions.perModel[modelName][channelId].diskonBertingkat = [];
     state.promotions.perModel[modelName][channelId].diskonBertingkat.push({ min: 0, diskon: 0 });
 }
+
+// Logika untuk menghapus tingkatan diskon
 function removePromotionTier(modelName, channelId, tierIndex) {
     if (state.promotions.perModel[modelName]?.[channelId]?.diskonBertingkat) {
         state.promotions.perModel[modelName][channelId].diskonBertingkat.splice(tierIndex, 1);
@@ -5672,35 +5680,6 @@ const panduanData = [
 // [KODE BARUu] State untuk mengelola accordion di halaman panduan
 const panduanAccordion = ref(null);
 
-const promosiProductModels = computed(() => {
-    if (!state.settings.modelProduk || state.settings.modelProduk.length === 0) {
-        return [];
-    }
-    const uniqueModelNames = new Set(state.settings.modelProduk.map(m => m.namaModel));
-    return Array.from(uniqueModelNames).sort();
-});
-
-// Untuk menampilkan varian di halaman Promosi
-const promosiSelectedModelVariants = computed(() => {
-    if (!uiState.promosiSelectedModel) {
-        return [];
-    }
-    const model = state.settings.modelProduk.find(m => m.namaModel === uiState.promosiSelectedModel);
-    if (!model) {
-        return [];
-    }
-    const variants = state.produk.filter(p => p.model_id === model.id);
-    const sizeOrder = { 'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10, '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39, 'allsize': 90, 'satuukuran': 90 };
-    return variants.sort((a, b) => {
-        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
-        if (colorCompare !== 0) {
-            return colorCompare;
-        }
-        const sizeA = sizeOrder[a.varian?.toLowerCase()] || 999;
-        const sizeB = sizeOrder[b.varian?.toLowerCase()] || 999;
-        return sizeA - sizeB;
-    });
-});
 
 async function deleteTransaction(transactionId) {
   if (!confirm(`Anda yakin ingin menghapus transaksi ID: ${transactionId}? Stok produk akan dikembalikan.`)) {
@@ -7105,28 +7084,45 @@ watch(activePage, (newPage) => {
                                 
                                 <tr v-if="uiState.activeAccordion === product.sku" class="animate-fade-in">
                                     <td colspan="4" class="p-6 bg-slate-50/50 border-b-2 border-indigo-200/50">
-                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
                                             <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-white shadow-sm">
-                                                <p class="font-semibold text-slate-700">{{ channel.name }}</p>
-                                                <div class="mt-2 space-y-3">
-                                                    <div>
-                                                        <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
-                                                        <div class="mt-1 grid grid-cols-2 gap-2">
-                                                            <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(product.nama, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                            <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(product.nama, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
+                                                
+                                                <div>
+                                                    <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
+                                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mt-3">
+                                                    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
+                                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mt-3">
+                                                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
+                                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(product.nama, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(product.nama, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="mt-3">
+                                                    <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
+                                                    <div class="space-y-2 mt-1">
+                                                        <div v-for="(tier, index) in state.promotions.perModel[product.nama]?.[channel.id]?.diskonBertingkat" :key="index" class="flex items-center gap-2">
+                                                            <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                            <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                            <button @click="removePromotionTier(product.nama, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
                                                         </div>
                                                     </div>
-                                                    <div class="mt-3">
-                                                        <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
-                                                        <div class="space-y-2 mt-1">
-                                                            <div v-for="(tier, index) in state.promotions.perModel[product.nama]?.[channel.id]?.diskonBertingkat" :key="index" class="flex items-center gap-2">
-                                                                <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                                <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                                <button @click="removePromotionTier(product.nama, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-                                                            </div>
-                                                        </div>
-                                                        <button @click="addPromotionTier(product.nama, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
-                                                    </div>
+                                                    <button @click="addPromotionTier(product.nama, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
                                                 </div>
                                             </div>
                                         </div>
