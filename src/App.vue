@@ -2854,45 +2854,33 @@ const filteredProduksiBatches = computed(() => {
 
 const sortedProduk = computed(() => {
     const products = [...state.produk];
-    
-    // Objek untuk menentukan urutan ukuran khusus (logis)
+
     const sizeOrder = {
         'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
-        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
+        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, 
         '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
         'allsize': 90, 'satuukuran': 90
     };
 
-    // Fungsi pembantu yang lebih canggih untuk mengekstrak ukuran
     const getNumericSize = (variantString) => {
-        if (!variantString) return 999; // Nilai besar untuk diletakkan di akhir
-        
-        // Pola regex yang mencari 'S', 'M', 'L', 'XXL', atau angka di akhir string
-        const match = variantString.match(/(\bS\b|\bM\b|\bL\b|\bXL\b|\bXXL\b|\b\d+\b)/i);
-        
-        if (match) {
-            const size = match[0].toLowerCase();
-            return sizeOrder[size] || 999;
-        }
-
-        return 999; // Jika tidak ada yang cocok, diletakkan di akhir
+        const size = (variantString || '').toLowerCase().trim();
+        return sizeOrder[size] || 999;
     };
 
-    // Lakukan pengurutan bertingkat
     return products.sort((a, b) => {
-        // 1. Urutkan berdasarkan Nama Model
+        // Urutan 1: Berdasarkan Nama Model (alfabetis)
         const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama;
         const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama;
         const modelCompare = modelA.localeCompare(modelB);
         if (modelCompare !== 0) return modelCompare;
 
-        // 2. Urutkan berdasarkan Warna
+        // Urutan 2: Berdasarkan Warna (alfabetis)
         const colorCompare = (a.warna || '').localeCompare(b.warna || '');
         if (colorCompare !== 0) return colorCompare;
 
-        // 3. Urutkan berdasarkan Ukuran (logika yang sudah diperbaiki)
-        const sizeA = getNumericSize(a.nama);
-        const sizeB = getNumericSize(b.nama);
+        // Urutan 3: Berdasarkan Ukuran (logis, dari terkecil ke terbesar)
+        const sizeA = getNumericSize(a.varian);
+        const sizeB = getNumericSize(b.varian);
         return sizeA - sizeB;
     });
 });
