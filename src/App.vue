@@ -6048,8 +6048,7 @@ const fetchStaticData = async (userId) => {
             state.settings.inflowCategories = userData.inflowCategories || [];
         }
 
-        // 3. Muat Konfigurasi Komisi (products_commissions)
-        // KODE INI MENGGANTIKAN arguments[2] LAMA
+        // 3. Muat Konfigurasi Komisi (products_commissions) - Diletakkan di sini setelah Promise.all selesai
         if (productsCommissionsSnap.exists()) {
             const commsData = productsCommissionsSnap.data();
             state.commissions.perModel = commsData.perModel || {};
@@ -6057,13 +6056,13 @@ const fetchStaticData = async (userId) => {
             state.commissions.perModel = {};
         }
 
-        // 4. Muat Promotions (Sekarang sudah memuat Komisi ke state.commissions.perModel)
+        // 4. Muat Promotions (memastikan logika komisi tidak lagi di sini)
         if (promotionsSnap.exists()) {
             const promoData = promotionsSnap.data();
             state.promotions.perChannel = promoData.perChannel || {};
             state.promotions.perModel = promoData.perModel || {};
             
-            // JANGAN MUAT KOMISI DISINI LAGI. Logika Anda sebelumnya salah di sini!
+            // JANGAN MUAT KOMISI DISINI. Logika Komisi ada di blok 3.
             
             state.settings.marketplaces.forEach(channel => {
                 if (!state.promotions.perChannel[channel.id]) { state.promotions.perChannel[channel.id] = {}; }
@@ -6132,6 +6131,7 @@ const fetchStaticData = async (userId) => {
         changePage(activePage.value);
 
     } catch (error) {
+        // Ini adalah blok penanganan error yang memicu logout!
         console.error("Error memuat data statis:", error);
         alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
         handleLogout();
