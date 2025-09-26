@@ -6952,6 +6952,7 @@ watch(activePage, (newPage) => {
                             <tr v-if="inventoryProductGroups.length === 0">
                                 <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
                             </tr>
+                            
                             <template v-for="group in inventoryProductGroups" :key="group.namaModel">
                                 <tr 
                                     class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" 
@@ -6992,13 +6993,13 @@ watch(activePage, (newPage) => {
                                             <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
                                                 
                                                 <button 
-                                                    @click.stop="uiState.activeAccordion = `harga-${v.sku}`"
+                                                    @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `harga-${v.sku}` ? group.namaModel : `harga-${v.sku}`)"
                                                     class="font-semibold text-indigo-600 hover:underline px-2 py-1 rounded-md bg-indigo-50"
                                                 >
                                                     Atur Harga
                                                 </button>
                                                 <button 
-                                                    @click.stop="uiState.activeAccordion = `komisi-${v.sku}`"
+                                                    @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `komisi-${v.sku}` ? group.namaModel : `komisi-${v.sku}`)"
                                                     class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
                                                 >
                                                     Atur Komisi
@@ -7056,39 +7057,39 @@ watch(activePage, (newPage) => {
                                                     </div>
                                                 </div>
 
-                                            </div>
-                                            <div class="mt-4 flex justify-end">
-                                                <button @click.stop="uiState.activeAccordion = null" type="button" class="text-sm text-slate-600 hover:text-slate-800 font-semibold">Tutup Pengaturan Harga</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr v-if="uiState.activeAccordion === `komisi-${v.sku}`" class="animate-fade-in">
-                                        <td colspan="7" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
-                                            <div class="space-y-3">
-                                                <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
-                                                <p class="text-xs text-slate-500">Komisi ini akan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
-                                                <div class="space-y-2">
-                                                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
-                                                        <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
-                                                        <div class="relative w-32">
-                                                            <input 
-                                                                type="text" 
-                                                                :value="commissionModelComputed(group.namaModel, marketplace.id).value" 
-                                                                @input="commissionModelComputed(group.namaModel, marketplace.id).setValue($event.target.value)" 
-                                                                class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
-                                                                placeholder="0"
-                                                            >
-                                                            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
+                                                <div class="mt-4 flex justify-end">
+                                                    <button @click.stop="uiState.activeAccordion = group.namaModel" type="button" class="text-sm text-slate-600 hover:text-slate-800 font-semibold">Tutup Pengaturan Harga</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr v-if="uiState.activeAccordion === `komisi-${v.sku}`" class="animate-fade-in">
+                                            <td colspan="7" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
+                                                <div class="space-y-3">
+                                                    <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
+                                                    <p class="text-xs text-slate-500">Komisi ini akan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
+                                                    <div class="space-y-2">
+                                                        <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
+                                                            <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
+                                                            <div class="relative w-32">
+                                                                <input 
+                                                                    type="text" 
+                                                                    :value="commissionModelComputed(group.namaModel, marketplace.id).value" 
+                                                                    @input="commissionModelComputed(group.namaModel, marketplace.id).setValue($event.target.value)" 
+                                                                    class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
+                                                                    placeholder="0"
+                                                                >
+                                                                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div class="mt-4 flex justify-end">
-                                                <button @click.stop="uiState.activeAccordion = null" type="button" class="text-sm text-slate-600 hover:text-slate-800 font-semibold">Tutup Pengaturan Komisi</button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                                <div class="mt-4 flex justify-end">
+                                                    <button @click.stop="uiState.activeAccordion = group.namaModel" type="button" class="text-sm text-slate-600 hover:text-slate-800 font-semibold">Tutup Pengaturan Komisi</button>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     </template>
+                                </template>
                             </template>
                         </tbody>
                     </table>
