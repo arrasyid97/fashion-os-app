@@ -6047,30 +6047,33 @@ const fetchStaticData = async (userId) => {
         const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
 
-        state.produk = productsSnap.docs.map(docSnap => {
-            const p = { id: docSnap.id, ...docSnap.data() };
-            const hargaJual = {};
-            const stokAlokasi = {};
-            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
-            (state.settings.marketplaces || []).forEach(mp => {
-                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-            });
-            return {
-                docId: p.id,
-                sku: p.sku,
-                nama: p.product_name,
-                model_id: p.model_id,
-                warna: p.color,
-                varian: p.variant,
-                stokFisik: p.physical_stock,
-                hpp: p.hpp,
-                hargaJual,
-                stokAlokasi,
-                userId: p.userId
-            };
-        });
+        const productsData = productsSnap.docs.map(docSnap => {
+    const p = { id: docSnap.id, ...docSnap.data() };
+    const hargaJual = {};
+    const stokAlokasi = {};
+    const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
+    (state.settings.marketplaces || []).forEach(mp => {
+        const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
+        hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+        stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+    });
+    return {
+        docId: p.id,
+        sku: p.sku,
+        nama: p.product_name,
+        model_id: p.model_id,
+        warna: p.color,
+        varian: p.variant, // <- Pastikan ini terisi dari Firestore
+        stokFisik: p.physical_stock,
+        hpp: p.hpp,
+        hargaJual,
+        stokAlokasi,
+        userId: p.userId
+    };
+});
+
+// Perbarui state.produk sekali setelah semua data digabungkan
+state.produk = productsData;
 
         state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
