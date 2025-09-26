@@ -37,6 +37,10 @@ const activationCodeInput = ref('');
 const activationCodeMessage = ref('');
 const commissionPayouts = ref([]);
 const commissions = ref([]);
+const editedProducts = ref(new Set());
+const markProductAsEdited = (productId) => {
+  editedProducts.value.add(productId);
+};
 const activationCodes = ref([]);
 const newActivationCode = ref('');
 const state = reactive({
@@ -3195,12 +3199,19 @@ const kpiExplanations = {
 // --- METHODS ---
 async function saveData() {
     if (!currentUser.value) return alert("Anda harus login untuk menyimpan data.");
+
+    // Cek apakah ada perubahan yang perlu disimpan
+    if (editedProducts.value.size === 0) {
+        alert('Tidak ada perubahan yang perlu disimpan.');
+        return;
+    }
+
     isSaving.value = true;
     try {
         const userId = currentUser.value.uid;
         const batch = writeBatch(db);
 
-        // Simpan semua pengaturan
+        // Simpan semua pengaturan (ini tetap karena pengaturan bersifat global)
         const settingsRef = doc(db, "settings", userId);
         const settingsData = {
             brandName: state.settings.brandName,
@@ -3211,33 +3222,36 @@ async function saveData() {
             inflowCategories: JSON.parse(JSON.stringify(state.settings.inflowCategories)),
             userId: userId
         };
-        batch.set(settingsRef, settingsData);
+        batch.set(settingsRef, settingsData, { merge: true });
 
         const promotionsRef = doc(db, "promotions", userId);
-const promotionsData = {
-    perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
-    perModel: JSON.parse(JSON.stringify(state.promotions.perModel)),
-    userId: userId
-};
-batch.set(promotionsRef, promotionsData);
-
-        // ▼▼▼ PERUBAHAN KUNCI ADA DI SINI ▼▼▼
-        // HANYA jalankan penyimpanan konfigurasi komisi JIKA pengguna adalah Admin
+        const promotionsData = {
+            perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
+            perModel: JSON.parse(JSON.stringify(state.promotions.perModel)),
+            userId: userId
+        };
+        batch.set(promotionsRef, promotionsData, { merge: true });
+        
         if (isAdmin.value) {
             const commissionsRef = doc(db, "commissions", userId);
             const commissionsData = {
                 perModel: state.commissions.perModel || {},
                 userId: userId
             };
-            batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)));
+            batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)), { merge: true });
         }
-        // ▲▲▲ AKHIR DARI PERUBAHAN ▲▲▲
 
-        // Simpan HPP & Harga Jual
-        for (const product of state.produk) {
+        // --- INI BAGIAN UTAMA YANG BERUBAH ---
+        // Iterasi HANYA pada produk yang diedit
+        for (const productId of editedProducts.value) {
+            const product = state.produk.find(p => p.docId === productId);
+            if (!product) continue; // Lanjutkan jika produk tidak ditemukan
+
+            // Update HPP hanya untuk produk yang diedit
             const productRef = doc(db, "products", product.docId);
             batch.update(productRef, { hpp: product.hpp });
 
+            // Update Harga Jual hanya untuk produk yang diedit
             for (const marketplaceId in product.hargaJual) {
                 const priceDocId = `${product.docId}-${marketplaceId}`;
                 const priceRef = doc(db, "product_prices", priceDocId);
@@ -3250,13 +3264,14 @@ batch.set(promotionsRef, promotionsData);
                 }, { merge: true });
             }
         }
+        // --- AKHIR PERUBAHAN UTAMA ---
+
         await batch.commit();
         
-        // Memuat ulang data setelah berhasil disimpan tidak diperlukan di sini
-        // karena state lokal sudah diperbarui. Cukup tampilkan notifikasi.
+        // Kosongkan daftar produk yang diedit setelah berhasil disimpan
+        editedProducts.value.clear();
         
-        console.log('Perubahan berhasil disimpan ke Database!');
-        alert('Semua perubahan berhasil disimpan!');
+        alert('Perubahan yang Anda buat berhasil disimpan!');
 
     } catch (error) {
         console.error("Gagal menyimpan data ke Firebase:", error);
@@ -7065,11 +7080,11 @@ watch(activePage, (newPage) => {
                                                         <div class="relative mt-1">
                                                             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
                                                             <input 
-                                                                type="text" 
-                                                                :value="formatInputNumber(v.hpp)" 
-                                                                @input="v.hpp = parseInputNumber($event.target.value)" 
-                                                                class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600"
-                                                            >
+    type="text" 
+    :value="formatInputNumber(v.hpp)" 
+    @input="v.hpp = parseInputNumber($event.target.value); markProductAsEdited(v.docId)" 
+    class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600"
+>
                                                         </div>
                                                     </div>
                                                     
@@ -7089,11 +7104,11 @@ watch(activePage, (newPage) => {
                                                                 <div class="relative w-36">
                                                                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
                                                                     <input 
-                                                                        type="text" 
-                                                                        :value="formatInputNumber(v.hargaJual[marketplace.id])" 
-                                                                        @input="v.hargaJual[marketplace.id] = parseInputNumber($event.target.value)" 
-                                                                        class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold"
-                                                                    >
+    type="text" 
+    :value="formatInputNumber(v.hargaJual[marketplace.id])" 
+    @input="v.hargaJual[marketplace.id] = parseInputNumber($event.target.value); markProductAsEdited(v.docId)" 
+    class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold"
+>
                                                                 </div>
                                                             </div>
                                                         </div>
