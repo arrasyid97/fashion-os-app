@@ -2607,8 +2607,48 @@ const filteredGudangKain = computed(() => {
     return kainData;
 });
 const inventoryProductGroups = computed(() => {
-    const grouped = state.produk.reduce((acc, product) => {
-        // Ambil nama model konseptual (misal: "SALWA")
+    // Definisi sorting order diakses langsung di sini
+    const sizeOrder = {
+        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
+        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
+        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
+        'allsize': 90, 'satuukuran': 90
+    };
+
+    function compareSizes(a, b) {
+        const sizeA = (a || '').toLowerCase().trim();
+        const sizeB = (b || '').toLowerCase().trim();
+        const orderA = sizeOrder[sizeA] || 999;
+        const orderB = sizeOrder[sizeB] || 999;
+        if (orderA !== 999 && orderB !== 999) {
+            return orderA - orderB;
+        }
+        const numA = parseInt(sizeA, 10);
+        const numB = parseInt(sizeB, 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB;
+        }
+        return sizeA.localeCompare(sizeB);
+    }
+    
+    // 1. Ambil data produk dan terapkan sorting awal (yang tadinya ada di sortedProduk)
+    const sortedProducts = [...state.produk].sort((a, b) => {
+        // 1. Urutkan berdasarkan Nama Model
+        const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama;
+        const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama;
+        const modelCompare = modelA.localeCompare(modelB);
+        if (modelCompare !== 0) return modelCompare;
+
+        // 2. Urutkan berdasarkan Warna
+        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
+        if (colorCompare !== 0) return colorCompare;
+
+        // 3. Urutkan berdasarkan Ukuran dengan fungsi perbandingan yang baru
+        return compareSizes(a.varian, b.varian);
+    });
+
+    // 2. Lanjutkan dengan pengelompokan (grouping)
+    const grouped = sortedProducts.reduce((acc, product) => {
         const model = state.settings.modelProduk.find(m => m.id === product.model_id);
         const modelName = model ? model.namaModel.split(' ')[0] : 'N/A';
 
@@ -2628,6 +2668,7 @@ const inventoryProductGroups = computed(() => {
 
     let productGroups = Object.values(grouped);
 
+    // 3. Terapkan filtering (logika filtering lama)
     const searchTerm = (uiState.inventorySearch || '').toLowerCase();
     const stockFilter = uiState.inventoryFilterStock;
     const minStock = state.settings.minStok;
@@ -2645,6 +2686,7 @@ const inventoryProductGroups = computed(() => {
         return true;
     });
 
+    // 4. Terapkan sorting grup (logika sorting lama)
     productGroups.sort((a, b) => {
         switch (uiState.inventorySort) {
             case 'nama-desc': return b.namaModel.localeCompare(a.namaModel);
@@ -2653,26 +2695,8 @@ const inventoryProductGroups = computed(() => {
             case 'nama-asc': default: return a.namaModel.localeCompare(b.namaModel);
         }
     });
-    
-    // --- PERBAIKAN: SORTING VARIAN DI DALAM KELOMPOK ---
-    const sizeOrder = {
-        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
-        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, 
-        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
-        'allsize': 90, 'satuukuran': 90
-    };
-    productGroups.forEach(group => {
-        group.variants.sort((a, b) => {
-            const colorCompare = (a.warna || '').localeCompare(b.warna || '');
-            if (colorCompare !== 0) {
-                return colorCompare;
-            }
-            const sizeA = sizeOrder[a.varian.toLowerCase()] || 999;
-            const sizeB = sizeOrder[b.varian.toLowerCase()] || 999;
-            return sizeA - sizeB;
-        });
-    });
 
+    // Karena kita sudah menyortir `sortedProducts` di awal, varian di dalam group sudah terurut.
     return productGroups;
 });
 
