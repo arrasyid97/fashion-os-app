@@ -2847,13 +2847,25 @@ const filteredProduksiBatches = computed(() => {
 });
 
 const sortedProduk = computed(() => {
+    // Kopi array produk agar tidak mengubah state asli
     const products = [...state.produk];
 
+    // Objek untuk menentukan urutan ukuran khusus (logis)
     const sizeOrder = {
         'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
         '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
         '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
         'allsize': 90, 'satuukuran': 90
+    };
+
+    // Fungsi pembantu untuk membersihkan string varian
+    const extractSize = (variantString) => {
+        if (!variantString) return '';
+        // Ubah "SALWA HTM L" menjadi "l"
+        // Ubah "SALWA HITAM M" menjadi "m"
+        // Ubah "SALWA HITAM XXL" menjadi "xxl"
+        const match = variantString.match(/\b(xxs|xs|s|m|l|xl|xxl|xxxl|xxxxl|xxxxxl|\d+|allsize|satuukuran)\b/i);
+        return match ? match[0].toLowerCase() : variantString.toLowerCase();
     };
 
     // Lakukan pengurutan bertingkat
@@ -2869,13 +2881,6 @@ const sortedProduk = computed(() => {
         if (colorCompare !== 0) return colorCompare;
 
         // 3. Urutkan berdasarkan Ukuran (logika yang diperbaiki)
-        
-        // Fungsi pembantu untuk membersihkan string varian
-        const extractSize = (variantString) => {
-            if (!variantString) return '';
-            return variantString.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        };
-
         const sizeA = sizeOrder[extractSize(a.varian)] || 999;
         const sizeB = sizeOrder[extractSize(b.varian)] || 999;
         
