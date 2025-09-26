@@ -2847,10 +2847,8 @@ const filteredProduksiBatches = computed(() => {
 });
 
 const sortedProduk = computed(() => {
-    // Kopi array produk agar tidak mengubah state asli
     const products = [...state.produk];
 
-    // Objek untuk menentukan urutan ukuran khusus (logis)
     const sizeOrder = {
         'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
         '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
@@ -2871,15 +2869,22 @@ const sortedProduk = computed(() => {
         if (colorCompare !== 0) return colorCompare;
 
         // 3. Urutkan berdasarkan Ukuran (logika yang diperbaiki)
-        const sizeA = sizeOrder[a.varian?.toLowerCase()] || 999;
-        const sizeB = sizeOrder[b.varian?.toLowerCase()] || 999;
+        
+        // Fungsi pembantu untuk membersihkan string varian
+        const extractSize = (variantString) => {
+            if (!variantString) return '';
+            return variantString.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        };
+
+        const sizeA = sizeOrder[extractSize(a.varian)] || 999;
+        const sizeB = sizeOrder[extractSize(b.varian)] || 999;
         
         // Jika keduanya adalah ukuran yang dikenal, bandingkan angkanya
         if (sizeA !== 999 && sizeB !== 999) {
             return sizeA - sizeB;
         }
 
-        // Jika bukan ukuran khusus, urutkan secara alfabetis
+        // Jika tidak, urutkan secara alfabetis
         return a.varian.localeCompare(b.varian);
     });
 });
