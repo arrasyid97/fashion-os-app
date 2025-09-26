@@ -2607,34 +2607,69 @@ const filteredGudangKain = computed(() => {
     return kainData;
 });
 const inventoryProductGroups = computed(() => {
-    const grouped = state.produk.reduce((acc, product) => {
-        // Ambil nama model konseptual (misal: "SALWA")
-        const model = state.settings.modelProduk.find(m => m.id === product.model_id);
-        const modelName = model ? model.namaModel.split(' ')[0] : 'N/A';
+    // 1. Definisikan urutan ukuran logis
+    const sizeOrder = {
+        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
+        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
+        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
+        'allsize': 90, 'satuukuran': 90
+    };
 
-        if (!acc[modelName]) {
-            acc[modelName] = {
+    const extractCleanSize = (sizeString) => {
+        if (!sizeString) return null;
+        const cleaned = sizeString.toLowerCase().trim();
+        const match = cleaned.match(/(\bxxs\b|\bxs\b|\bs\b|\bm\b|\bl\b|\bxl\b|\bxxl\b|\bxxxl\b|\bxxxxl\b|\bxxxxxl\b|\ballsize\b|\bsatuukuran\b|\b\d{2}\b|\b\d+\b)/);
+        return match ? match[0] : null;
+    };
+
+    // 2. Lakukan pengurutan bertingkat terlebih dahulu pada data mentah
+    const sortedProducts = [...state.produk].sort((a, b) => {
+        const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama.split(' ')[0];
+        const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama.split(' ')[0];
+        const modelCompare = modelA.localeCompare(modelB);
+        if (modelCompare !== 0) return modelCompare;
+
+        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
+        if (colorCompare !== 0) return colorCompare;
+        
+        const sizeA = extractCleanSize(a.varian);
+        const sizeB = extractCleanSize(b.varian);
+        const orderA = sizeA ? sizeOrder[sizeA] || 999 : 999;
+        const orderB = sizeB ? sizeOrder[sizeB] || 999 : 999;
+        return orderA - orderB;
+    });
+
+    // 3. Kemudian, lakukan pengelompokan dari data yang sudah diurutkan
+    const grouped = sortedProducts.reduce((acc, product) => {
+        const model = state.settings.modelProduk.find(m => m.id === product.model_id);
+        const modelName = model ? model.namaModel : product.nama.split(' ')[0]; // Mengambil nama model dari data mentah
+        const groupKey = `${modelName}-${product.warna}`;
+
+        if (!acc[groupKey]) {
+            acc[groupKey] = {
                 namaModel: modelName,
+                warna: product.warna,
                 variants: [],
                 totalStock: 0,
                 totalNilaiStok: 0,
             };
         }
-        acc[modelName].variants.push(product);
-        acc[modelName].totalStock += (product.stokFisik || 0);
-        acc[modelName].totalNilaiStok += (product.stokFisik || 0) * (parseInputNumber(product.hpp) || 0);
+        acc[groupKey].variants.push(product);
+        acc[groupKey].totalStock += (product.stokFisik || 0);
+        acc[groupKey].totalNilaiStok += (product.stokFisik || 0) * (parseInputNumber(product.hpp) || 0);
         return acc;
     }, {});
 
     let productGroups = Object.values(grouped);
 
+    // 4. Terapkan filter pencarian dan stok pada grup
     const searchTerm = (uiState.inventorySearch || '').toLowerCase();
     const stockFilter = uiState.inventoryFilterStock;
     const minStock = state.settings.minStok;
 
     productGroups = productGroups.filter(group => {
-        const matchesSearch = (group.namaModel || '').toLowerCase().includes(searchTerm) || 
-                              group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm) || (v.nama || '').toLowerCase().includes(searchTerm));
+        const matchesSearch = (group.namaModel || '').toLowerCase().includes(searchTerm) ||
+                                (group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm) || (v.nama || '').toLowerCase().includes(searchTerm)));
         if (!matchesSearch) return false;
         
         const totalStock = group.variants.reduce((sum, v) => sum + (v.stokFisik || 0), 0);
@@ -2645,7 +2680,9 @@ const inventoryProductGroups = computed(() => {
         return true;
     });
 
-    productGroups.sort((a, b) => {
+    // 5. Kembalikan grup yang sudah difilter dan diurutkan
+    return productGroups.sort((a, b) => {
+        // Logika pengurutan grup utama (seperti yang sudah ada)
         switch (uiState.inventorySort) {
             case 'nama-desc': return b.namaModel.localeCompare(a.namaModel);
             case 'stok-desc': return b.totalStock - a.totalStock;
@@ -2653,27 +2690,6 @@ const inventoryProductGroups = computed(() => {
             case 'nama-asc': default: return a.namaModel.localeCompare(b.namaModel);
         }
     });
-    
-    // --- PERBAIKAN: SORTING VARIAN DI DALAM KELOMPOK ---
-    const sizeOrder = {
-        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
-        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, 
-        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
-        'allsize': 90, 'satuukuran': 90
-    };
-    productGroups.forEach(group => {
-        group.variants.sort((a, b) => {
-            const colorCompare = (a.warna || '').localeCompare(b.warna || '');
-            if (colorCompare !== 0) {
-                return colorCompare;
-            }
-            const sizeA = sizeOrder[a.varian.toLowerCase()] || 999;
-            const sizeB = sizeOrder[b.varian.toLowerCase()] || 999;
-            return sizeA - sizeB;
-        });
-    });
-
-    return productGroups;
 });
 
 const modalStockSummary = computed(() => {
