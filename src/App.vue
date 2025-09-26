@@ -6939,17 +6939,17 @@ watch(activePage, (newPage) => {
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-    <tr>
-        <th class="px-6 py-3 font-semibold">Nama Model</th>
-        <th class="px-6 py-3 font-semibold">SKU</th>
-        <th class="px-6 py-3 font-semibold">Warna</th>
-        <th class="px-6 py-3 font-semibold">Ukuran</th>
-        <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
-    </tr>
-</thead>
+                            <tr>
+                                <th class="px-6 py-3 font-semibold">Nama Model</th>
+                                <th class="px-6 py-3 font-semibold">SKU</th>
+                                <th class="px-6 py-3 font-semibold">Warna</th>
+                                <th class="px-6 py-3 font-semibold">Ukuran</th>
+                                <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             <tr v-if="inventoryProductGroups.length === 0">
-                                <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
+                                <td colspan="5" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
                             </tr>
                             
                             <template v-for="group in inventoryProductGroups" :key="group.namaModel">
@@ -6966,23 +6966,63 @@ watch(activePage, (newPage) => {
                                             </div>
                                         </div>
                                     </td>
-                                    <td colspan="3"></td> <td class="px-6 py-3 text-center">
-        </td>
+                                    <td colspan="3"></td>
+                                    <td class="px-6 py-3 text-center">
+                                        <button 
+                                            @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `komisi-${group.namaModel}` ? null : `komisi-${group.namaModel}`)"
+                                            class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
+                                            :class="{'bg-blue-200': uiState.activeAccordion === `komisi-${group.namaModel}`}"
+                                        >
+                                            Atur Komisi
+                                        </button>
+                                    </td>
                                 </tr>
 
-                                <template v-if="uiState.activeAccordion === group.namaModel || group.variants.some(v => uiState.activeAccordion === `harga-${v.sku}` || uiState.activeAccordion === `komisi-${v.sku}`)">
+                                <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`" class="animate-fade-in">
+                                    <td colspan="5" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
+                                        <div class="space-y-3">
+                                            <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
+                                            <p class="text-xs text-slate-500">Komisi ini akan diterapkan ke **semua varian** dalam model ini dan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
+                                            <div class="space-y-2">
+                                                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
+                                                    <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
+                                                    <div class="relative w-32">
+                                                        <input 
+                                                            type="text" 
+                                                            v-model="commissionModelComputed(group.namaModel, marketplace.id).value" 
+                                                            class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
+                                                            placeholder="0"
+                                                        >
+                                                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 flex justify-end">
+                                            <button @click.stop="saveData().then(() => uiState.activeAccordion = null)" 
+                                                type="button" 
+                                                class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
+                                                :disabled="isSaving || !isSubscriptionActive"
+                                            >
+                                                <span v-if="isSaving">Menyimpan Komisi...</span>
+                                                <span v-else>Simpan & Tutup</span>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <template v-if="uiState.activeAccordion === group.namaModel || group.variants.some(v => uiState.activeAccordion === `harga-${v.sku}`)">
                                     
                                     <template v-for="v in group.variants" :key="v.docId">
                                         
                                         <tr 
                                             class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in"
-                                            :class="{ 'bg-slate-100': uiState.activeAccordion === `harga-${v.sku}` || uiState.activeAccordion === `komisi-${v.sku}` }"
+                                            :class="{ 'bg-slate-100': uiState.activeAccordion === `harga-${v.sku}` }"
                                         >
                                             <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
                                             <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
                                             <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
                                             <td class="px-6 py-3 text-slate-600">{{ v.varian }}</td>
-                                            
                                             <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
                                                 
                                                 <button 
@@ -6991,12 +7031,7 @@ watch(activePage, (newPage) => {
                                                 >
                                                     Atur Harga
                                                 </button>
-                                                <button 
-                                                    @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `komisi-${v.sku}` ? group.namaModel : `komisi-${v.sku}`)"
-                                                    class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
-                                                >
-                                                    Atur Komisi
-                                                </button>
+                                                
                                                 <button 
                                                     @click.stop="removeProductVariant(v.docId)" 
                                                     class="font-semibold text-red-500 hover:underline px-2 py-1 rounded-md bg-red-50" 
@@ -7053,54 +7088,18 @@ watch(activePage, (newPage) => {
                                                 </div>
 
                                                 <div class="mt-4 flex justify-end">
-                                                    <button @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" 
-    type="button" 
-    class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
-    :disabled="isSaving || !isSubscriptionActive"
->
-    <span v-if="isSaving">Menyimpan Harga...</span>
-    <span v-else>Simpan & Tutup</span>
-</button>
+                                                    <button @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" type="button" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
+                                                        <span v-if="isSaving">Menyimpan Harga...</span>
+                                                        <span v-else>Simpan & Tutup</span>
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
-                                        <tr v-if="uiState.activeAccordion === `komisi-${v.sku}`" class="animate-fade-in">
-    <td colspan="5" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
-        <div class="space-y-3">
-            <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
-            <p class="text-xs text-slate-500">Komisi ini akan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
-            <div class="space-y-2">
-                
-                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
-                    <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
-                    
-                    <div class="relative w-32">
-                        <input 
-                            type="text" 
-                            v-model="commissionModelComputed(group.namaModel, marketplace.id).value" 
-                            class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
-                            placeholder="0"
-                        >
-                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-        <div class="mt-4 flex justify-end">
-            <button @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" 
-                type="button" 
-                class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
-                :disabled="isSaving || !isSubscriptionActive"
-            >
-                <span v-if="isSaving">Menyimpan Komisi...</span>
-                <span v-else>Simpan & Tutup</span>
-            </button>
-        </div>
-    </td>
-</tr>
+                                        
                                     </template>
                                 </template>
+
+                                <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`"></tr>
                             </template>
                         </tbody>
                     </table>
