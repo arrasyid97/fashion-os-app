@@ -7086,9 +7086,11 @@ watch(activePage, (newPage) => {
                                                             <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
                                                             <div class="relative w-32">
                                                                 <input 
-                                                                    type="text" 
-                                                                    :value="commissionModelComputed(group.namaModel, marketplace.id).value" 
-                                                                    @input="commissionModelComputed(group.namaModel, marketplace.id).setValue($event.target.value)" 
+    type="text" 
+    v-model="commissionModelComputed(group.namaModel, marketplace.id).value" 
+    class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
+    placeholder="0"
+>
                                                                     class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
                                                                     placeholder="0"
                                                                 >
