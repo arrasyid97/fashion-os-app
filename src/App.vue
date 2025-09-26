@@ -2863,36 +2863,44 @@ const sortedProduk = computed(() => {
         'allsize': 90, 'satuukuran': 90
     };
 
-    // Fungsi perbandingan yang lebih cerdas
-    function compareSizes(a, b) {
-        const sizeA = (a || '').toLowerCase().trim();
-        const sizeB = (b || '').toLowerCase().trim();
+    // Fungsi perbandingan yang lebih cerdas untuk ukuran
+    function compareSizes(sizeA, sizeB) {
+        const cleanA = (sizeA || '').toLowerCase().trim();
+        const cleanB = (sizeB || '').toLowerCase().trim();
         
-        // Menggunakan nilai numerik dari sizeOrder untuk urutan yang konsisten
-        const orderA = sizeOrder[sizeA] || 999;
-        const orderB = sizeOrder[sizeB] || 999;
+        const orderA = sizeOrder[cleanA] || 999;
+        const orderB = sizeOrder[cleanB] || 999;
 
-        // Jika kedua ukuran ditemukan di sizeOrder, urutkan berdasarkan nilainya
         if (orderA !== 999 && orderB !== 999) {
             return orderA - orderB;
         }
 
-        // Jika salah satu adalah angka murni (misal: "38"), urutkan secara numerik
-        const numA = parseInt(sizeA, 10);
-        const numB = parseInt(sizeB, 10);
+        const numA = parseInt(cleanA, 10);
+        const numB = parseInt(cleanB, 10);
         if (!isNaN(numA) && !isNaN(numB)) {
             return numA - numB;
         }
         
-        // Jika tidak ada yang cocok, gunakan perbandingan string biasa
-        return sizeA.localeCompare(sizeB);
+        return cleanA.localeCompare(cleanB);
     }
-
-    // Lakukan pengurutan bertingkat
+    
     return products.sort((a, b) => {
+        // Fallback yang lebih baik: pisahkan model dari nama jika model_id tidak ada
+        const extractModelName = (product) => {
+            const model = state.settings.modelProduk.find(m => m.id === product.model_id);
+            if (model) return model.namaModel;
+
+            const nameParts = product.nama.split(' ');
+            if (nameParts.length > 2) {
+                // Asumsi nama model adalah dua kata pertama
+                return nameParts.slice(0, 2).join(' ');
+            }
+            return product.nama;
+        };
+
         // 1. Urutkan berdasarkan Nama Model
-        const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama;
-        const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama;
+        const modelA = extractModelName(a);
+        const modelB = extractModelName(b);
         const modelCompare = modelA.localeCompare(modelB);
         if (modelCompare !== 0) return modelCompare;
 
