@@ -2858,16 +2858,6 @@ const sortedProduk = computed(() => {
         'allsize': 90, 'satuukuran': 90
     };
 
-    // Fungsi pembantu untuk membersihkan string varian
-    const extractSize = (variantString) => {
-        if (!variantString) return '';
-        // Ubah "SALWA HTM L" menjadi "l"
-        // Ubah "SALWA HITAM M" menjadi "m"
-        // Ubah "SALWA HITAM XXL" menjadi "xxl"
-        const match = variantString.match(/\b(xxs|xs|s|m|l|xl|xxl|xxxl|xxxxl|xxxxxl|\d+|allsize|satuukuran)\b/i);
-        return match ? match[0].toLowerCase() : variantString.toLowerCase();
-    };
-
     // Lakukan pengurutan bertingkat
     return products.sort((a, b) => {
         // 1. Urutkan berdasarkan Nama Model
@@ -2881,16 +2871,19 @@ const sortedProduk = computed(() => {
         if (colorCompare !== 0) return colorCompare;
 
         // 3. Urutkan berdasarkan Ukuran (logika yang diperbaiki)
+        
+        // Fungsi pembantu untuk membersihkan string varian
+        const extractSize = (variantString) => {
+            if (!variantString) return '';
+            const match = variantString.match(/\b(xxs|xs|s|m|l|xl|xxl|xxxl|xxxxl|xxxxxl|allsize|satuukuran|\d+)\b/i);
+            return match ? match[0].toLowerCase() : '';
+        };
+
         const sizeA = sizeOrder[extractSize(a.varian)] || 999;
         const sizeB = sizeOrder[extractSize(b.varian)] || 999;
         
-        // Jika keduanya adalah ukuran yang dikenal, bandingkan angkanya
-        if (sizeA !== 999 && sizeB !== 999) {
-            return sizeA - sizeB;
-        }
-
-        // Jika tidak, urutkan secara alfabetis
-        return a.varian.localeCompare(b.varian);
+        // Cukup bandingkan nilai numeriknya saja
+        return sizeA - sizeB;
     });
 });
 
