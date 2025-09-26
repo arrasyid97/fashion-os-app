@@ -7093,11 +7093,12 @@ watch(activePage, (newPage) => {
                                                     <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
                                                     <div class="relative w-32">
                                                         <input 
-                                                            type="text" 
-                                                            v-model="commissionModelComputed(group.namaModel, marketplace.id).value" 
-                                                            class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
-                                                            placeholder="0"
-                                                        >
+    type="text" 
+    v-model="commissionModelComputed(group.namaModel, marketplace.id).value"
+    @input="markProductAsEdited(group.variants[0].docId)" 
+    class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
+    placeholder="0"
+>
                                                         <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
                                                     </div>
                                                 </div>
