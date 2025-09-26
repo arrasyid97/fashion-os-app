@@ -1100,17 +1100,6 @@ async function submitAddProduct() {
   }
 }
 
-async function fetchSuppliers() {
-    if (!currentUser.value) return;
-    try {
-        const suppliersCollection = collection(db, 'suppliers');
-        const q = query(suppliersCollection, where('userId', '==', currentUser.value.uid));
-        const snapshot = await getDocs(q);
-        state.suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (error) {
-        console.error("Gagal mengambil data supplier:", error);
-    }
-}
 
 async function addSupplier() {
     if (!currentUser.value) return alert("Anda harus login.");
@@ -1286,21 +1275,6 @@ async function submitPenerimaanBarang() {
     } catch (error) {
         console.error("Gagal menyimpan penerimaan barang:", error);
         alert(`Gagal menyimpan penerimaan barang. Detail: ${error.message}`);
-    }
-}
-// Tambahkan fetch untuk data Purchase Orders
-async function fetchPurchaseOrders() {
-    if (!currentUser.value) return;
-    try {
-        const purchaseOrdersCollection = collection(db, 'purchase_orders');
-        const q = query(purchaseOrdersCollection, where('userId', '==', currentUser.value.uid));
-        const snapshot = await getDocs(q);
-        
-        // 👇 PERBAIKAN: Menyimpan data ke state lokal 👇
-        state.purchaseOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        
-    } catch (error) {
-        console.error("Gagal mengambil data pesanan pembelian:", error);
     }
 }
 
