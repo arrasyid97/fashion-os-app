@@ -2607,48 +2607,8 @@ const filteredGudangKain = computed(() => {
     return kainData;
 });
 const inventoryProductGroups = computed(() => {
-    // Definisi sorting order diakses langsung di sini
-    const sizeOrder = {
-        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
-        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
-        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
-        'allsize': 90, 'satuukuran': 90
-    };
-
-    function compareSizes(a, b) {
-        const sizeA = (a || '').toLowerCase().trim();
-        const sizeB = (b || '').toLowerCase().trim();
-        const orderA = sizeOrder[sizeA] || 999;
-        const orderB = sizeOrder[sizeB] || 999;
-        if (orderA !== 999 && orderB !== 999) {
-            return orderA - orderB;
-        }
-        const numA = parseInt(sizeA, 10);
-        const numB = parseInt(sizeB, 10);
-        if (!isNaN(numA) && !isNaN(numB)) {
-            return numA - numB;
-        }
-        return sizeA.localeCompare(sizeB);
-    }
-    
-    // 1. Ambil data produk dan terapkan sorting awal (yang tadinya ada di sortedProduk)
-    const sortedProducts = [...state.produk].sort((a, b) => {
-        // 1. Urutkan berdasarkan Nama Model
-        const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama;
-        const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama;
-        const modelCompare = modelA.localeCompare(modelB);
-        if (modelCompare !== 0) return modelCompare;
-
-        // 2. Urutkan berdasarkan Warna
-        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
-        if (colorCompare !== 0) return colorCompare;
-
-        // 3. Urutkan berdasarkan Ukuran dengan fungsi perbandingan yang baru
-        return compareSizes(a.varian, b.varian);
-    });
-
-    // 2. Lanjutkan dengan pengelompokan (grouping)
-    const grouped = sortedProducts.reduce((acc, product) => {
+    const grouped = state.produk.reduce((acc, product) => {
+        // Ambil nama model konseptual (misal: "SALWA")
         const model = state.settings.modelProduk.find(m => m.id === product.model_id);
         const modelName = model ? model.namaModel.split(' ')[0] : 'N/A';
 
@@ -2668,7 +2628,6 @@ const inventoryProductGroups = computed(() => {
 
     let productGroups = Object.values(grouped);
 
-    // 3. Terapkan filtering (logika filtering lama)
     const searchTerm = (uiState.inventorySearch || '').toLowerCase();
     const stockFilter = uiState.inventoryFilterStock;
     const minStock = state.settings.minStok;
@@ -2686,7 +2645,6 @@ const inventoryProductGroups = computed(() => {
         return true;
     });
 
-    // 4. Terapkan sorting grup (logika sorting lama)
     productGroups.sort((a, b) => {
         switch (uiState.inventorySort) {
             case 'nama-desc': return b.namaModel.localeCompare(a.namaModel);
@@ -2695,8 +2653,26 @@ const inventoryProductGroups = computed(() => {
             case 'nama-asc': default: return a.namaModel.localeCompare(b.namaModel);
         }
     });
+    
+    // --- PERBAIKAN: SORTING VARIAN DI DALAM KELOMPOK ---
+    const sizeOrder = {
+        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
+        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, 
+        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
+        'allsize': 90, 'satuukuran': 90
+    };
+    productGroups.forEach(group => {
+        group.variants.sort((a, b) => {
+            const colorCompare = (a.warna || '').localeCompare(b.warna || '');
+            if (colorCompare !== 0) {
+                return colorCompare;
+            }
+            const sizeA = sizeOrder[a.varian.toLowerCase()] || 999;
+            const sizeB = sizeOrder[b.varian.toLowerCase()] || 999;
+            return sizeA - sizeB;
+        });
+    });
 
-    // Karena kita sudah menyortir `sortedProducts` di awal, varian di dalam group sudah terurut.
     return productGroups;
 });
 
@@ -7142,12 +7118,13 @@ watch(activePage, (newPage) => {
             <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
                 <div class="flex items-center gap-4">
                     <h2 class="text-3xl font-bold text-slate-800">Manajemen Promosi & Voucher</h2>
+                    
                     <button @click="showNotesModal" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h-2a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2a1 1 0 01-1-1V2a1 1 0 10-2 0v1H9a1 1 0 00-1 1v1H6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd" /></svg>
                         Catatan
                     </button>
                 </div>
-
+                
                 <div class="flex items-center gap-3">
                     <button @click="showModal('panduanPromosi')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
@@ -7162,177 +7139,87 @@ watch(activePage, (newPage) => {
 
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
                 
-                <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Daftar Produk</h3>
+                <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Pengaturan Promosi per Produk</h3>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                <div class="overflow-x-auto max-h-[70vh]">
+                    <table class="w-full text-sm text-left text-slate-500">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
                             <tr>
-                                <th class="px-6 py-3 font-semibold">Nama Model</th>
-                                <th class="px-6 py-3 font-semibold">SKU</th>
+                                <th class="px-6 py-3 font-semibold">Nama Model & SKU</th>
                                 <th class="px-6 py-3 font-semibold">Warna</th>
                                 <th class="px-6 py-3 font-semibold">Ukuran</th>
-                                <th class="px-6 py-3 font-semibold text-center" style="width: 280px;">Aksi</th>
+                                <th class="px-6 py-3 font-semibold text-center">Harga Normal</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr v-if="inventoryProductGroups.length === 0">
-                                <td colspan="5" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
+                        <tbody class="divide-y divide-slate-200/50">
+                            <tr v-if="sortedProduk.length === 0">
+                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
                             </tr>
                             
-                            <template v-for="group in inventoryProductGroups" :key="group.namaModel">
-                                <tr 
-                                    class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" 
-                                    @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel"
-                                >
+                            <template v-for="product in sortedProduk" :key="product.sku">
+                                <tr class="bg-white hover:bg-slate-50/50 cursor-pointer" @click="uiState.activeAccordion = uiState.activeAccordion === product.sku ? null : product.sku">
                                     <td class="px-6 py-4 font-bold text-slate-800">
                                         <div class="flex items-center">
-                                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.namaModel }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === product.sku }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                                             <div>
-                                                {{ group.namaModel }}
-                                                <span class="block text-xs font-normal text-slate-500">{{ group.variants.length }} varian</span>
+                                                {{ product.nama }}
+                                                <p class="font-mono text-xs font-normal text-slate-500">{{ product.sku }}</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td colspan="3"></td>
-                                    <td class="px-6 py-3 text-center"></td>
+                                    <td class="px-6 py-4">{{ product.warna }}</td>
+                                    <td class="px-6 py-4">{{ product.varian }}</td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="font-bold text-indigo-600">{{ formatCurrency(product.hargaJual[state.settings.marketplaces[0]?.id] || 0) }}</span>
+                                    </td>
                                 </tr>
+                                
+                                <tr v-if="uiState.activeAccordion === product.sku" class="animate-fade-in">
+                                    <td colspan="4" class="p-6 bg-slate-50/50 border-b-2 border-indigo-200/50">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                                <template v-if="uiState.activeAccordion === group.namaModel || group.variants.some(v => uiState.activeAccordion === `promosi-${v.sku}` || uiState.activeAccordion === `special-${v.sku}`)">
-                                    
-                                    <template v-for="v in group.variants" :key="v.docId">
-                                        
-                                        <tr 
-                                            class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in"
-                                            :class="{ 'bg-slate-100': uiState.activeAccordion === `promosi-${v.sku}` || uiState.activeAccordion === `special-${v.sku}` }"
-                                        >
-                                            <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
-                                            <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
-                                            <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
-                                            <td class="px-6 py-3 text-slate-600">{{ v.varian }}</td>
-                                            <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
+                                            <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-white shadow-sm">
+                                                <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
                                                 
-                                                <button 
-                                                    @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `promosi-${v.sku}` ? group.namaModel : `promosi-${v.sku}`)"
-                                                    class="font-semibold text-indigo-600 hover:underline px-2 py-1 rounded-md bg-indigo-50"
-                                                >
-                                                    Atur Promosi
-                                                </button>
-                                                
-                                                <button 
-                                                    @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `special-${v.sku}` ? group.namaModel : `special-${v.sku}`)"
-                                                    class="font-semibold text-amber-600 hover:underline px-2 py-1 rounded-md bg-amber-50"
-                                                >
-                                                    Harga Spesial
-                                                </button>
-                                                
-                                            </td>
-                                        </tr>
-
-                                        <tr v-if="uiState.activeAccordion === `promosi-${v.sku}`" class="animate-fade-in">
-                                            <td colspan="5" class="p-6 bg-indigo-50/50 border-b-2 border-indigo-400/50">
-                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200/80 rounded-lg bg-white shadow-sm">
-                                                        <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
-                                                        
-                                                        <div>
-                                                            <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
-                                                            <div class="mt-1 grid grid-cols-2 gap-2">
-                                                                <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                                <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <div class="mt-3">
-                                                            <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
-                                                            <div class="mt-1 grid grid-cols-2 gap-2">
-                                                                <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                                <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <div class="mt-3">
-                                                            <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
-                                                            <div class="mt-1 grid grid-cols-2 gap-2">
-                                                                <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                                <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        <div class="mt-3">
-                                                            <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
-                                                            <div class="space-y-2 mt-1">
-                                                                <div v-for="(tier, index) in state.promotions.perModel[group.namaModel]?.[channel.id]?.diskonBertingkat" :key="index" class="flex items-center gap-2">
-                                                                    <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                                    <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                                    <button @click="removePromotionTier(group.namaModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-                                                                </div>
-                                                            </div>
-                                                            <button @click="addPromotionTier(group.namaModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
-                                                        </div>
+                                                <div>
+                                                    <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
+                                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                                     </div>
                                                 </div>
-
-                                                <div class="mt-4 flex justify-end">
-                                                    <button 
-                                                        @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" 
-                                                        type="button" 
-                                                        class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
-                                                        :disabled="isSaving || !isSubscriptionActive"
-                                                    >
-                                                        <span v-if="isSaving">Menyimpan Promosi...</span>
-                                                        <span v-else>Simpan & Tutup</span>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        
-                                        <tr v-if="uiState.activeAccordion === `special-${v.sku}`" class="animate-fade-in">
-                                            <td colspan="5" class="p-6 bg-amber-50/50 border-b-2 border-amber-400/50">
-                                                <div class="space-y-4">
-                                                    <h4 class="text-sm font-bold text-slate-700">Atur Harga Spesial untuk Varian: {{ v.sku }}</h4>
-                                                    <p class="text-xs text-slate-500">Harga spesial menimpa harga jual normal dan diskon otomatis. Hanya berlaku untuk satu varian ini di channel tertentu.</p>
-                                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                        <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-3 border rounded-lg bg-white shadow-sm">
-                                                            <label class="block text-sm font-medium text-slate-600 mb-1">{{ channel.name }}</label>
-                                                            <div class="relative">
-                                                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                                                <input 
-                                                                    type="number" 
-                                                                    :value="state.specialPrices[channel.id]?.[v.sku]" 
-                                                                    @input="state.specialPrices[channel.id] = {...state.specialPrices[channel.id], [v.sku]: $event.target.value === '' ? null : parseFloat($event.target.value) }"
-                                                                    class="w-full p-2 pl-8 pr-8 border rounded-md text-right font-semibold text-amber-700" 
-                                                                    placeholder="Harga Spesial"
-                                                                >
-                                                                <button 
-                                                                    v-if="state.specialPrices[channel.id]?.[v.sku]"
-                                                                    @click.stop="deleteSpecialPrice(channel.id, v.sku)"
-                                                                    type="button"
-                                                                    class="absolute right-1 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 text-sm font-bold"
-                                                                >
-                                                                    &times;
-                                                                </button>
-                                                            </div>
-                                                            <p class="text-xs text-slate-500 mt-1">Normal: {{ formatCurrency(v.hargaJual[channel.id] || 0) }}</p>
-                                                        </div>
+                                                
+                                                <div class="mt-3">
+                                                    <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
+                                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                                     </div>
                                                 </div>
-
-                                                <div class="mt-4 flex justify-end">
-                                                    <button 
-                                                        @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" 
-                                                        type="button" 
-                                                        class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
-                                                        :disabled="isSaving || !isSubscriptionActive"
-                                                    >
-                                                        <span v-if="isSaving">Menyimpan Harga Spesial...</span>
-                                                        <span v-else>Simpan & Tutup</span>
-                                                    </button>
+                                                
+                                                <div class="mt-3">
+                                                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
+                                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                                        <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(product.nama, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(product.nama, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                    </div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    </template>
-                                </template>
+                                                
+                                                <div class="mt-3">
+                                                    <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
+                                                    <div class="space-y-2 mt-1">
+                                                        <div v-for="(tier, index) in state.promotions.perModel[product.nama]?.[channel.id]?.diskonBertingkat" :key="index" class="flex items-center gap-2">
+                                                            <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                            <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                            <button @click="removePromotionTier(product.nama, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
+                                                        </div>
+                                                    </div>
+                                                    <button @click="addPromotionTier(product.nama, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
                             </template>
                         </tbody>
                     </table>
