@@ -3232,78 +3232,71 @@ const kpiExplanations = {
 async function saveData() {
     if (!currentUser.value) return alert("Anda harus login untuk menyimpan data.");
 
-    // Cek apakah ada perubahan yang perlu disimpan
-    if (editedProducts.value.size === 0) {
-        alert('Tidak ada perubahan yang perlu disimpan.');
-        return;
-    }
+    // Cek jika ada perubahan pada produk. Jika tidak, kita anggap ini adalah penyimpanan pengaturan global.
+    const hasProductChanges = editedProducts.value.size > 0;
 
     isSaving.value = true;
     try {
         const userId = currentUser.value.uid;
         const batch = writeBatch(db);
 
-        // Simpan semua pengaturan (ini tetap karena pengaturan bersifat global)
+        // Bagian 1: Simpan Pengaturan Global (Settings, Promotions, Commissions)
+        // Ini akan selalu berjalan saat tombol simpan ditekan dari halaman pengaturan.
         const settingsRef = doc(db, "settings", userId);
-        const settingsData = {
+        batch.set(settingsRef, {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
             marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
             modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
-            categories: JSON.parse(JSON.stringify(state.settings.categories)),
-            inflowCategories: JSON.parse(JSON.stringify(state.settings.inflowCategories)),
-            userId: userId
-        };
-        batch.set(settingsRef, settingsData, { merge: true });
+            // ... (tambahkan field settings lain jika ada)
+        }, { merge: true });
 
         const promotionsRef = doc(db, "promotions", userId);
-        const promotionsData = {
+        batch.set(promotionsRef, {
             perChannel: JSON.parse(JSON.stringify(state.promotions.perChannel)),
             perModel: JSON.parse(JSON.stringify(state.promotions.perModel)),
-            userId: userId
-        };
-        batch.set(promotionsRef, promotionsData, { merge: true });
-        
+        }, { merge: true });
+
+        // --- INI BAGIAN PENTING YANG HILANG ---
+        // Selalu simpan data komisi jika yang login adalah admin
         if (isAdmin.value) {
             const commissionsRef = doc(db, "commissions", userId);
-            const commissionsData = {
+            batch.set(commissionsRef, {
                 perModel: state.commissions.perModel || {},
                 userId: userId
-            };
-            batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)), { merge: true });
+            }, { merge: true });
         }
+        // --- AKHIR BAGIAN PENTING ---
 
-        // --- INI BAGIAN UTAMA YANG BERUBAH ---
-        // Iterasi HANYA pada produk yang diedit
-        for (const productId of editedProducts.value) {
-            const product = state.produk.find(p => p.docId === productId);
-            if (!product) continue; // Lanjutkan jika produk tidak ditemukan
+        // Bagian 2: Simpan Perubahan Produk yang Spesifik (jika ada)
+        if (hasProductChanges) {
+            for (const productId of editedProducts.value) {
+                const product = state.produk.find(p => p.docId === productId);
+                if (!product) continue;
 
-            // Update HPP hanya untuk produk yang diedit
-            const productRef = doc(db, "products", product.docId);
-            batch.update(productRef, { hpp: product.hpp });
+                const productRef = doc(db, "products", product.docId);
+                batch.update(productRef, { hpp: product.hpp });
 
-            // Update Harga Jual hanya untuk produk yang diedit
-            for (const marketplaceId in product.hargaJual) {
-                const priceDocId = `${product.docId}-${marketplaceId}`;
-                const priceRef = doc(db, "product_prices", priceDocId);
-                batch.set(priceRef, {
-                    product_id: product.docId,
-                    product_sku: product.sku,
-                    marketplace_id: marketplaceId,
-                    price: product.hargaJual[marketplaceId] || 0,
-                    userId: userId
-                }, { merge: true });
+                for (const marketplaceId in product.hargaJual) {
+                    const priceDocId = `${product.docId}-${marketplaceId}`;
+                    const priceRef = doc(db, "product_prices", priceDocId);
+                    batch.set(priceRef, {
+                        product_id: product.docId,
+                        product_sku: product.sku,
+                        marketplace_id: marketplaceId,
+                        price: product.hargaJual[marketplaceId] || 0,
+                        userId: userId
+                    }, { merge: true });
+                }
             }
         }
-        // --- AKHIR PERUBAHAN UTAMA ---
-
+        
         await batch.commit();
         
         // Kosongkan daftar produk yang diedit setelah berhasil disimpan
         editedProducts.value.clear();
         
-        alert('Perubahan yang Anda buat berhasil disimpan!');
+        alert('Perubahan berhasil disimpan!');
 
     } catch (error) {
         console.error("Gagal menyimpan data ke Firebase:", error);
