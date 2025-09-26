@@ -4119,7 +4119,7 @@ function calculateSellingPrice() {
 }
 
 async function saveCommissionSettings() {
-    if (!currentUser.value || !isAdmin.value) {
+    if (!currentUser.value) {
         return alert("Aksi tidak diizinkan.");
     }
 
