@@ -7065,7 +7065,14 @@ watch(activePage, (newPage) => {
                                                 </div>
 
                                                 <div class="mt-4 flex justify-end">
-                                                    <button @click.stop="uiState.activeAccordion = group.namaModel" type="button" class="text-sm text-slate-600 hover:text-slate-800 font-semibold">Tutup Pengaturan Harga</button>
+                                                    <button @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" 
+    type="button" 
+    class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
+    :disabled="isSaving || !isSubscriptionActive"
+>
+    <span v-if="isSaving">Menyimpan Harga...</span>
+    <span v-else>Simpan & Tutup</span>
+</button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -7091,7 +7098,14 @@ watch(activePage, (newPage) => {
                                                     </div>
                                                 </div>
                                                 <div class="mt-4 flex justify-end">
-                                                    <button @click.stop="uiState.activeAccordion = group.namaModel" type="button" class="text-sm text-slate-600 hover:text-slate-800 font-semibold">Tutup Pengaturan Komisi</button>
+                                                    <button @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" 
+    type="button" 
+    class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
+    :disabled="isSaving || !isSubscriptionActive"
+>
+    <span v-if="isSaving">Menyimpan Komisi...</span>
+    <span v-else>Simpan & Tutup</span>
+</button>
                                                 </div>
                                             </td>
                                         </tr>
