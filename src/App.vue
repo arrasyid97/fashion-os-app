@@ -2855,33 +2855,53 @@ const filteredProduksiBatches = computed(() => {
 const sortedProduk = computed(() => {
     const products = [...state.produk];
 
+    // Objek untuk menentukan urutan ukuran khusus (logis)
     const sizeOrder = {
         'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
-        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, 
+        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
         '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
         'allsize': 90, 'satuukuran': 90
     };
 
-    const getNumericSize = (variantString) => {
-        const size = (variantString || '').toLowerCase().trim();
-        return sizeOrder[size] || 999;
-    };
+    // Fungsi perbandingan yang lebih cerdas
+    function compareSizes(a, b) {
+        const sizeA = (a || '').toLowerCase().trim();
+        const sizeB = (b || '').toLowerCase().trim();
+        
+        // Menggunakan nilai numerik dari sizeOrder untuk urutan yang konsisten
+        const orderA = sizeOrder[sizeA] || 999;
+        const orderB = sizeOrder[sizeB] || 999;
 
+        // Jika kedua ukuran ditemukan di sizeOrder, urutkan berdasarkan nilainya
+        if (orderA !== 999 && orderB !== 999) {
+            return orderA - orderB;
+        }
+
+        // Jika salah satu adalah angka murni (misal: "38"), urutkan secara numerik
+        const numA = parseInt(sizeA, 10);
+        const numB = parseInt(sizeB, 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB;
+        }
+        
+        // Jika tidak ada yang cocok, gunakan perbandingan string biasa
+        return sizeA.localeCompare(sizeB);
+    }
+
+    // Lakukan pengurutan bertingkat
     return products.sort((a, b) => {
-        // Urutan 1: Berdasarkan Nama Model (alfabetis)
+        // 1. Urutkan berdasarkan Nama Model
         const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama;
         const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama;
         const modelCompare = modelA.localeCompare(modelB);
         if (modelCompare !== 0) return modelCompare;
 
-        // Urutan 2: Berdasarkan Warna (alfabetis)
+        // 2. Urutkan berdasarkan Warna
         const colorCompare = (a.warna || '').localeCompare(b.warna || '');
         if (colorCompare !== 0) return colorCompare;
 
-        // Urutan 3: Berdasarkan Ukuran (logis, dari terkecil ke terbesar)
-        const sizeA = getNumericSize(a.varian);
-        const sizeB = getNumericSize(b.varian);
-        return sizeA - sizeB;
+        // 3. Urutkan berdasarkan Ukuran dengan fungsi perbandingan yang baru
+        return compareSizes(a.varian, b.varian);
     });
 });
 
