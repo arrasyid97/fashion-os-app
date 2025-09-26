@@ -1517,17 +1517,25 @@ async function processBatchOrders() {
             const finalTotal = subtotal - discount.totalDiscount;
             let totalBiaya = 0;
             const biayaList = [];
-            let totalKomisi = 0;
-            
-            for (const item of order.items) {
-                if (item.commissionRate > 0) {
-                    totalKomisi += (item.commissionRate / 100) * (item.hargaJualAktual * item.qty);
-                }
-            }
-            if (totalKomisi > 0) {
-                biayaList.push({ name: 'Komisi Produk', value: totalKomisi });
-                totalBiaya += totalKomisi;
-            }
+            let totalKomisiProduk = 0;
+
+for (const item of order.items) {
+    // Dapatkan Nama Model dari item yang terjual
+    const modelId = item.model_id; 
+    const modelName = state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama; 
+    
+    // Ambil tarif komisi dari state komisi per model
+    const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
+
+    if (commissionRate > 0) {
+        totalKomisiProduk += (commissionRate / 100) * (item.hargaJualAktual * item.qty);
+    }
+}
+
+if (totalKomisiProduk > 0) {
+    biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
+    totalBiaya += totalKomisiProduk;
+}
             
             if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
             if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
@@ -3815,17 +3823,27 @@ async function executeCompleteTransaction() {
 
     // --- [PERUBAIAN: Kalkulasi Biaya Komisi Baru] ---
     // Menghitung total komisi dari setiap item di keranjang
-    let totalKomisi = 0;
-    for (const item of activeCart.value) {
-        if (item.commissionRate > 0) {
-            // Komisi dihitung dari harga jual aktual item dikali kuantitasnya
-            totalKomisi += (item.commissionRate / 100) * (item.hargaJualAktual * item.qty);
-        }
+    let totalKomisiProduk = 0;
+
+for (const item of activeCart.value) {
+    // Cari nama model dari item yang terjual
+    const modelId = item.model_id; 
+    const modelName = state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama; 
+    
+    // Ambil tarif komisi dari state komisi per model
+    const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
+
+    if (commissionRate > 0) {
+        // Komisi dihitung dari Harga Jual Aktual item dikali kuantitasnya
+        totalKomisiProduk += (commissionRate / 100) * (item.hargaJualAktual * item.qty);
     }
-    if (totalKomisi > 0) {
-        biayaList.push({ name: 'Komisi Produk', value: totalKomisi });
-        totalBiaya += totalKomisi;
-    }
+}
+
+// Tambahkan Komisi ke Biaya Marketplace jika ada
+if (totalKomisiProduk > 0) {
+    biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
+    totalBiaya += totalKomisiProduk;
+}
     // --- [AKHIR PERUBAIAN] ---
 
     // Biaya Marketplace lainnya (baris 'marketplace.komisi' sudah dihapus)
