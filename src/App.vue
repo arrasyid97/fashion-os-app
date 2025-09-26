@@ -1753,7 +1753,7 @@ async function handleSubscriptionMayar(plan) {
         isSubscribingPlan.value = false;
     }
 }
-
+// eslint-disable-next-line no-unused-vars
 const voucherTokoMinBelanjaComputed = (channel) => computed({
     get() { 
         const promo = state.promotions.perChannel[channel.id]?.voucherToko;
@@ -1767,7 +1767,7 @@ const voucherTokoMinBelanjaComputed = (channel) => computed({
         state.promotions.perChannel[channel.id].voucherToko.minBelanja = parseInputNumber(newValue);
     }
 });
-
+// eslint-disable-next-line no-unused-vars
 const voucherTokoDiskonRateComputed = (channel) => computed({
     get() {
         const promo = state.promotions.perChannel[channel.id]?.voucherToko;
@@ -1781,7 +1781,7 @@ const voucherTokoDiskonRateComputed = (channel) => computed({
         state.promotions.perChannel[channel.id].voucherToko.diskonRate = parsePercentageInput(newValue);
     }
 });
-
+// eslint-disable-next-line no-unused-vars
 const voucherSemuaProdukMinBelanjaComputed = (channel) => computed({
     get() { 
         const promo = state.promotions.perChannel[channel.id]?.voucherSemuaProduk;
@@ -1795,7 +1795,7 @@ const voucherSemuaProdukMinBelanjaComputed = (channel) => computed({
         state.promotions.perChannel[channel.id].voucherSemuaProduk.minBelanja = parseInputNumber(newValue);
     }
 });
-
+// eslint-disable-next-line no-unused-vars
 const voucherSemuaProdukDiskonRateComputed = (channel) => computed({
     get() {
         const promo = state.promotions.perChannel[channel.id]?.voucherSemuaProduk;
@@ -1809,7 +1809,7 @@ const voucherSemuaProdukDiskonRateComputed = (channel) => computed({
         state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonRate = parsePercentageInput(newValue);
     }
 });
-
+// eslint-disable-next-line no-unused-vars
 const diskonMinBelanjaComputed = (modelName, channelId) => computed({
     get() { 
         return state.promotions.perModel[modelName]?.[channelId]?.minBelanja ? 'Rp ' + formatInputNumber(state.promotions.perModel[modelName][channelId].minBelanja) : '';
@@ -1824,7 +1824,7 @@ const diskonMinBelanjaComputed = (modelName, channelId) => computed({
         state.promotions.perModel[modelName][channelId].minBelanja = parseInputNumber(newValue);
     }
 });
-
+// eslint-disable-next-line no-unused-vars
 const diskonRateComputed = (modelName, channelId) => computed({
     get() { 
         return state.promotions.perModel[modelName]?.[channelId]?.diskonRate ? state.promotions.perModel[modelName][channelId].diskonRate + '%' : '';
@@ -1839,11 +1839,12 @@ const diskonRateComputed = (modelName, channelId) => computed({
         state.promotions.perModel[modelName][channelId].diskonRate = parsePercentageInput(newValue);
     }
 });
-
+// eslint-disable-next-line no-unused-vars
 const tieredMinComputed = (tier) => computed({
     get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
     set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
 });
+// eslint-disable-next-line no-unused-vars
 const tieredDiskonComputed = (tier) => computed({
     get() { return tier.diskon ? tier.diskon + '%' : ''; },
     set(newValue) { tier.diskon = parsePercentageInput(newValue); }
@@ -2853,7 +2854,7 @@ const filteredProduksiBatches = computed(() => {
 
     return filteredData;
 });
-
+// eslint-disable-next-line no-unused-vars
 const sortedProduk = computed(() => {
     const products = [...state.produk];
 
