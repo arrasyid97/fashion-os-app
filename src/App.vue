@@ -248,6 +248,8 @@ adminVerificationError: '',
 
 selectedProductForPurchase: null,
 
+hargaHppSort: 'nama-asc',
+
 hargaHppSelectedModelName: '',
 
 purchaseOrderSearch: '',
@@ -2855,7 +2857,6 @@ const filteredProduksiBatches = computed(() => {
 const sortedProduk = computed(() => {
     const products = [...state.produk];
 
-    // Objek untuk menentukan urutan ukuran khusus (logis)
     const sizeOrder = {
         'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
         '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
@@ -2863,7 +2864,6 @@ const sortedProduk = computed(() => {
         'allsize': 90, 'satuukuran': 90
     };
 
-    // Fungsi perbandingan yang lebih cerdas untuk ukuran
     function compareSizes(sizeA, sizeB) {
         const cleanA = (sizeA || '').toLowerCase().trim();
         const cleanB = (sizeB || '').toLowerCase().trim();
@@ -2884,32 +2884,25 @@ const sortedProduk = computed(() => {
         return cleanA.localeCompare(cleanB);
     }
     
+    // Logika pengurutan baru yang dinamis
     return products.sort((a, b) => {
-        // Fallback yang lebih baik: pisahkan model dari nama jika model_id tidak ada
-        const extractModelName = (product) => {
-            const model = state.settings.modelProduk.find(m => m.id === product.model_id);
-            if (model) return model.namaModel;
+        const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama;
+        const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama;
 
-            const nameParts = product.nama.split(' ');
-            if (nameParts.length > 2) {
-                // Asumsi nama model adalah dua kata pertama
-                return nameParts.slice(0, 2).join(' ');
-            }
-            return product.nama;
-        };
-
-        // 1. Urutkan berdasarkan Nama Model
-        const modelA = extractModelName(a);
-        const modelB = extractModelName(b);
-        const modelCompare = modelA.localeCompare(modelB);
-        if (modelCompare !== 0) return modelCompare;
-
-        // 2. Urutkan berdasarkan Warna
-        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
-        if (colorCompare !== 0) return colorCompare;
-
-        // 3. Urutkan berdasarkan Ukuran dengan fungsi perbandingan yang baru
-        return compareSizes(a.varian, b.varian);
+        switch (uiState.hargaHppSort) {
+            case 'nama-asc':
+                if (modelA.localeCompare(modelB) !== 0) return modelA.localeCompare(modelB);
+                return compareSizes(a.varian, b.varian);
+            case 'nama-desc':
+                if (modelB.localeCompare(modelA) !== 0) return modelB.localeCompare(modelA);
+                return compareSizes(b.varian, a.varian);
+            case 'size-asc':
+                return compareSizes(a.varian, b.varian);
+            case 'size-desc':
+                return compareSizes(b.varian, a.varian);
+            default:
+                return 0;
+        }
     });
 });
 
@@ -6945,7 +6938,15 @@ watch(activePage, (newPage) => {
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
                 
                 <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Daftar Produk</h3>
-
+<div class="mb-4">
+    <label for="sort-harga-hpp" class="block text-sm font-medium text-slate-700 mb-1">Urutkan Berdasarkan</label>
+    <select v-model="uiState.hargaHppSort" id="sort-harga-hpp" class="w-full md:w-auto p-2 border border-slate-300 rounded-md shadow-sm">
+        <option value="nama-asc">Nama Model (A-Z)</option>
+        <option value="nama-desc">Nama Model (Z-A)</option>
+        <option value="size-asc">Ukuran (Terkecil-Terbesar)</option>
+        <option value="size-desc">Ukuran (Terbesar-Terkecil)</option>
+    </select>
+</div>
                 <div class="overflow-x-auto max-h-[70vh]">
                     <table class="w-full text-sm text-left text-slate-500">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
@@ -7066,7 +7067,15 @@ watch(activePage, (newPage) => {
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
                 
                 <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Pengaturan Promosi per Produk</h3>
-
+<div class="mb-4">
+    <label for="sort-harga-hpp" class="block text-sm font-medium text-slate-700 mb-1">Urutkan Berdasarkan</label>
+    <select v-model="uiState.hargaHppSort" id="sort-harga-hpp" class="w-full md:w-auto p-2 border border-slate-300 rounded-md shadow-sm">
+        <option value="nama-asc">Nama Model (A-Z)</option>
+        <option value="nama-desc">Nama Model (Z-A)</option>
+        <option value="size-asc">Ukuran (Terkecil-Terbesar)</option>
+        <option value="size-desc">Ukuran (Terbesar-Terkecil)</option>
+    </select>
+</div>
                 <div class="overflow-x-auto max-h-[70vh]">
                     <table class="w-full text-sm text-left text-slate-500">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
