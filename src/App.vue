@@ -2913,6 +2913,7 @@ const commissionModelComputed = (modelName, channelId) => computed({
         if (!state.commissions.perModel[modelName]) {
             state.commissions.perModel[modelName] = {};
         }
+        // [PERBAIKAN SINI]: Set nilai PURE number, bukan string dengan '%'
         state.commissions.perModel[modelName][channelId] = parsePercentageInput(newValue);
     }
 });
@@ -7077,40 +7078,40 @@ watch(activePage, (newPage) => {
                                             </td>
                                         </tr>
                                         <tr v-if="uiState.activeAccordion === `komisi-${v.sku}`" class="animate-fade-in">
-                                            <td colspan="7" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
-                                                <div class="space-y-3">
-                                                    <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
-                                                    <p class="text-xs text-slate-500">Komisi ini akan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
-                                                    <div class="space-y-2">
-                                                        <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
-                                                            <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
-                                                            <div class="relative w-32">
-                                                                <input 
-    type="text" 
-    v-model="commissionModelComputed(group.namaModel, marketplace.id).value" 
-    class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
-    placeholder="0"
->
-                                                                    class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
-                                                                    placeholder="0"
-                                                                >
-                                                                <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="mt-4 flex justify-end">
-                                                    <button @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" 
-    type="button" 
-    class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
-    :disabled="isSaving || !isSubscriptionActive"
->
-    <span v-if="isSaving">Menyimpan Komisi...</span>
-    <span v-else>Simpan & Tutup</span>
-</button>
-                                                </div>
-                                            </td>
-                                        </tr>
+    <td colspan="7" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
+        <div class="space-y-3">
+            <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
+            <p class="text-xs text-slate-500">Komisi ini akan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
+            <div class="space-y-2">
+                
+                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
+                    <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
+                    
+                    <div class="relative w-32">
+                        <input 
+                            type="text" 
+                            v-model="commissionModelComputed(group.namaModel, marketplace.id).value" 
+                            class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
+                            placeholder="0"
+                        >
+                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 flex justify-end">
+            <button @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" 
+                type="button" 
+                class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
+                :disabled="isSaving || !isSubscriptionActive"
+            >
+                <span v-if="isSaving">Menyimpan Komisi...</span>
+                <span v-else>Simpan & Tutup</span>
+            </button>
+        </div>
+    </td>
+</tr>
                                     </template>
                                 </template>
                             </template>
