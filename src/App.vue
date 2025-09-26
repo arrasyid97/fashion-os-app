@@ -1513,20 +1513,18 @@ async function processBatchOrders() {
         const newTransactions = [];
         for (const order of ordersToProcess) {
             const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
-const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
-const finalTotal = subtotal - discount.totalDiscount;
-let totalBiaya = 0;
-const biayaList = [];
+            const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
+            const finalTotal = subtotal - discount.totalDiscount;
+            let totalBiaya = 0;
+            const biayaList = [];
+            let totalKomisiProduk = 0;
 
-// --- [Langkah 1: Hitung Komisi Produk (Biaya Bisnis)] ---
-let totalKomisiProduk = 0;
-
-for (const item of activeCart.value) { // Gunakan order.items di fungsi massal
-    // 1. Dapatkan Nama Model dari item yang terjual (menggunakan model_id yang sudah ada di keranjang)
+for (const item of order.items) {
+    // Dapatkan Nama Model dari item yang terjual
     const modelId = item.model_id; 
     const modelName = state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama; 
     
-    // 2. Ambil Rate Komisi dari State Commissions
+    // Ambil tarif komisi dari state komisi per model
     const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
 
     if (commissionRate > 0) {
@@ -1534,7 +1532,6 @@ for (const item of activeCart.value) { // Gunakan order.items di fungsi massal
     }
 }
 
-// Tambahkan Komisi ke Biaya Marketplace
 if (totalKomisiProduk > 0) {
     biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
     totalBiaya += totalKomisiProduk;
@@ -3226,12 +3223,14 @@ batch.set(promotionsRef, promotionsData);
 
         // ▼▼▼ PERUBAHAN KUNCI ADA DI SINI ▼▼▼
         // HANYA jalankan penyimpanan konfigurasi komisi JIKA pengguna adalah Admin
-        const commissionsRef = doc(db, "products_commissions", userId);
-const commissionsData = {
-    perModel: state.commissions.perModel || {},
-    userId: userId
-};
-batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)), { merge: true });
+        if (isAdmin.value) {
+            const commissionsRef = doc(db, "commissions", userId);
+            const commissionsData = {
+                perModel: state.commissions.perModel || {},
+                userId: userId
+            };
+            batch.set(commissionsRef, JSON.parse(JSON.stringify(commissionsData)));
+        }
         // ▲▲▲ AKHIR DARI PERUBAHAN ▲▲▲
 
         // Simpan HPP & Harga Jual
@@ -3760,29 +3759,20 @@ function addProductToCart(product, qty = 1) {
     const existingItem = cart.find(item => item.sku === product.sku);
 
     const specialPrice = state.specialPrices[uiState.activeCartChannel]?.[product.sku];
-    const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? 0;
+    const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? Object.values(product.hargaJual)[0] ?? 0;
     const finalPrice = specialPrice !== undefined ? specialPrice : regularPrice;
 
-    // --- PERBAIKAN: Dapatkan modelName berdasarkan model_id produk ---
-    const model = state.settings.modelProduk.find(m => m.id === product.model_id);
-    const modelName = model ? model.namaModel : product.nama;
-    
-    // Ambil komisi berdasarkan NAMA MODEL produk dari state global
-    const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
+    // --- [PERBAIKAN KUNCI DI SINI] ---
+    // Mengambil komisi berdasarkan NAMA MODEL produk dari state global, bukan dari produk itu sendiri.
+    const commissionRate = state.commissions.perModel[product.nama]?.[uiState.activeCartChannel] || 0;
 
     if (existingItem) {
         existingItem.qty += qty;
         existingItem.hargaJualAktual = finalPrice;
-        existingItem.commissionRate = commissionRate; // Update komisi
+        existingItem.commissionRate = commissionRate; // Update komisi juga
     } else {
-        // Menyimpan data produk lengkap, termasuk model_id yang diperlukan oleh logika transaksi
-        cart.push({ 
-            ...product, 
-            qty, 
-            hargaJualAktual: finalPrice, 
-            commissionRate: commissionRate,
-            model_id: product.model_id // PASTIKAN model_id DISIMPAN DI KERANJANG
-        });
+        // Saat menambahkan produk baru, sertakan commissionRate yang benar
+        cart.push({ ...product, qty, hargaJualAktual: finalPrice, commissionRate: commissionRate });
     }
 }
 
@@ -3834,12 +3824,9 @@ let totalBiaya = 0;
 // --- [Langkah 1: Hitung Komisi Produk (Biaya Bisnis)] ---
 let totalKomisiProduk = 0;
 
-for (const item of activeCart.value) { // Gunakan order.items di fungsi massal
-    // 1. Dapatkan Nama Model dari item yang terjual (menggunakan model_id yang sudah ada di keranjang)
+for (const item of activeCart.value) {
     const modelId = item.model_id; 
     const modelName = state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama; 
-    
-    // 2. Ambil Rate Komisi dari State Commissions
     const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
 
     if (commissionRate > 0) {
@@ -3847,7 +3834,7 @@ for (const item of activeCart.value) { // Gunakan order.items di fungsi massal
     }
 }
 
-// Tambahkan Komisi ke Biaya Marketplace
+// Tambahkan Komisi ke Biaya Marketplace di Awal
 if (totalKomisiProduk > 0) {
     biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
     totalBiaya += totalKomisiProduk;
@@ -6004,15 +5991,13 @@ const setupListeners = async (userId) => {
 const fetchStaticData = async (userId) => {
     try {
         const [
-            settingsSnap, promotionsSnap, productsCommissionsSnap, // <--- KOMISI SEKARANG DI INDEX 2
-            productsSnap, pricesSnap, allocationsSnap,
+            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
             transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
             categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap,
             suppliersSnap, purchaseOrdersSnap, notesSnap
         ] = await Promise.all([
             getDoc(doc(db, "settings", userId)),
             getDoc(doc(db, "promotions", userId)),
-            getDoc(doc(db, "products_commissions", userId)), // <--- SUMBER DATA KOMISI
             getDocs(query(collection(db, "products"), where("userId", "==", userId))),
             getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
             getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
@@ -6030,7 +6015,6 @@ const fetchStaticData = async (userId) => {
             getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))),
         ]);
 
-        // 1. Muat Settings
         if (settingsSnap.exists()) {
             const settingsData = settingsSnap.data();
             Object.assign(state.settings, settingsData);
@@ -6039,31 +6023,17 @@ const fetchStaticData = async (userId) => {
             }
         }
 
-        // 2. Muat User Data (inflow categories)
         const userDocRef = doc(db, "users", userId);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
-            currentUser.value.userData = { ...currentUser.value.userData, ...userData }; // Perbarui currentUser
             state.settings.inflowCategories = userData.inflowCategories || [];
         }
 
-        // 3. Muat Konfigurasi Komisi (products_commissions) - Diletakkan di sini setelah Promise.all selesai
-        if (productsCommissionsSnap.exists()) {
-            const commsData = productsCommissionsSnap.data();
-            state.commissions.perModel = commsData.perModel || {};
-        } else {
-            state.commissions.perModel = {};
-        }
-
-        // 4. Muat Promotions (memastikan logika komisi tidak lagi di sini)
         if (promotionsSnap.exists()) {
             const promoData = promotionsSnap.data();
             state.promotions.perChannel = promoData.perChannel || {};
             state.promotions.perModel = promoData.perModel || {};
-            
-            // JANGAN MUAT KOMISI DISINI. Logika Komisi ada di blok 3.
-            
             state.settings.marketplaces.forEach(channel => {
                 if (!state.promotions.perChannel[channel.id]) { state.promotions.perChannel[channel.id] = {}; }
                 if (!state.promotions.perChannel[channel.id].voucherToko) { state.promotions.perChannel[channel.id].voucherToko = {}; }
@@ -6083,8 +6053,6 @@ const fetchStaticData = async (userId) => {
         const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
 
-        // ... (lanjutkan sisa kode pemrosesan produk dan transaksi)
-
         state.produk = productsSnap.docs.map(docSnap => {
             const p = { id: docSnap.id, ...docSnap.data() };
             const hargaJual = {};
@@ -6099,7 +6067,7 @@ const fetchStaticData = async (userId) => {
                 docId: p.id,
                 sku: p.sku,
                 nama: p.product_name,
-                model_id: p.model_id, // *PENTING*: Pastikan model_id ada di objek produk
+                model_id: p.model_id,
                 warna: p.color,
                 varian: p.variant,
                 stokFisik: p.physical_stock,
@@ -6109,8 +6077,6 @@ const fetchStaticData = async (userId) => {
                 userId: p.userId
             };
         });
-
-        // ... (sisanya tetap sama)
 
         state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
@@ -6131,7 +6097,6 @@ const fetchStaticData = async (userId) => {
         changePage(activePage.value);
 
     } catch (error) {
-        // Ini adalah blok penanganan error yang memicu logout!
         console.error("Error memuat data statis:", error);
         alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
         handleLogout();
