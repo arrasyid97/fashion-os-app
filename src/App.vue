@@ -2608,8 +2608,9 @@ const filteredGudangKain = computed(() => {
 });
 const inventoryProductGroups = computed(() => {
     const grouped = state.produk.reduce((acc, product) => {
+        // Ambil nama model konseptual (misal: "SALWA")
         const model = state.settings.modelProduk.find(m => m.id === product.model_id);
-        const modelName = model ? model.namaModel : 'N/A';
+        const modelName = model ? model.namaModel.split(' ')[0] : 'N/A';
 
         if (!acc[modelName]) {
             acc[modelName] = {
@@ -2632,8 +2633,8 @@ const inventoryProductGroups = computed(() => {
     const minStock = state.settings.minStok;
 
     productGroups = productGroups.filter(group => {
-        const matchesSearch = (group.namaModel || '').toLowerCase().includes(searchTerm) ||
-                                group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm) || (v.nama || '').toLowerCase().includes(searchTerm));
+        const matchesSearch = (group.namaModel || '').toLowerCase().includes(searchTerm) || 
+                              group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm) || (v.nama || '').toLowerCase().includes(searchTerm));
         if (!matchesSearch) return false;
         
         const totalStock = group.variants.reduce((sum, v) => sum + (v.stokFisik || 0), 0);
@@ -2653,9 +2654,10 @@ const inventoryProductGroups = computed(() => {
         }
     });
     
+    // --- PERBAIKAN: SORTING VARIAN DI DALAM KELOMPOK ---
     const sizeOrder = {
         'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
-        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
+        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, 
         '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
         'allsize': 90, 'satuukuran': 90
     };
@@ -2907,49 +2909,6 @@ const sortedProduk = computed(() => {
         if (colorCompare !== 0) return colorCompare;
 
         // 3. Urutkan berdasarkan Ukuran dengan fungsi perbandingan yang baru
-        return compareSizes(a.varian, b.varian);
-    });
-});
-
-const sortedProductsForPriceAndPromo = computed(() => {
-    const products = [...state.produk];
-
-    const sizeOrder = {
-        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
-        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29,
-        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
-        'allsize': 90, 'satuukuran': 90
-    };
-
-    function compareSizes(sizeA, sizeB) {
-        const cleanA = (sizeA || '').toLowerCase().trim();
-        const cleanB = (sizeB || '').toLowerCase().trim();
-        
-        const orderA = sizeOrder[cleanA] || 999;
-        const orderB = sizeOrder[cleanB] || 999;
-
-        if (orderA !== 999 && orderB !== 999) {
-            return orderA - orderB;
-        }
-
-        const numA = parseInt(cleanA, 10);
-        const numB = parseInt(cleanB, 10);
-        if (!isNaN(numA) && !isNaN(numB)) {
-            return numA - numB;
-        }
-        
-        return cleanA.localeCompare(cleanB);
-    }
-    
-    return products.sort((a, b) => {
-        const modelA = state.settings.modelProduk.find(m => m.id === a.model_id)?.namaModel || a.nama;
-        const modelB = state.settings.modelProduk.find(m => m.id === b.model_id)?.namaModel || b.nama;
-        const modelCompare = modelA.localeCompare(modelB);
-        if (modelCompare !== 0) return modelCompare;
-
-        const colorCompare = (a.warna || '').localeCompare(b.warna || '');
-        if (colorCompare !== 0) return colorCompare;
-
         return compareSizes(a.varian, b.varian);
     });
 });
@@ -7001,7 +6960,7 @@ watch(activePage, (newPage) => {
                             <tr v-if="state.produk.length === 0">
                                 <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
                             </tr>
-                            <template v-for="product in sortedProductsForPriceAndPromo" :key="product.sku">
+                            <template v-for="product in sortedProduk" :key="product.sku">
                                 <tr class="bg-white hover:bg-slate-50/50 cursor-pointer" @click="uiState.activeAccordion = uiState.activeAccordion === product.sku ? null : product.sku">
                                     <td class="px-6 py-4 font-bold text-slate-800">
                                         <div class="flex items-center">
@@ -7123,7 +7082,7 @@ watch(activePage, (newPage) => {
                                 <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada produk di inventaris.</td>
                             </tr>
                             
-                            <template v-for="product in sortedProductsForPriceAndPromo" :key="product.sku">
+                            <template v-for="product in sortedProduk" :key="product.sku">
                                 <tr class="bg-white hover:bg-slate-50/50 cursor-pointer" @click="uiState.activeAccordion = uiState.activeAccordion === product.sku ? null : product.sku">
                                     <td class="px-6 py-4 font-bold text-slate-800">
                                         <div class="flex items-center">
