@@ -314,6 +314,17 @@ purchaseOrderSearch: '',
 
 });
 
+const dataFetched = reactive({
+  products: false,
+  transactions: false,
+  production: false,
+  finance: false,
+  suppliers: false,
+  returns: false,
+  notes: false,
+  // Tambahkan flag lain jika ada modul data besar lainnya
+});
+
 
 const unpaidCommissions = computed(() =>
     commissions.value.filter(c => c.status === 'unpaid')
@@ -5966,192 +5977,282 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 let unsubscribe = () => {}; 
 
 const setupListeners = async (userId) => {
-    // Hentikan semua listener yang mungkin aktif dari sesi sebelumnya
-    unsubscribe();
+  unsubscribe(); // Hentikan listener lama
 
-    // 1. Deklarasi dan inisialisasi listener untuk settings
-    const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
-        if (docSnap.exists()) {
-            const settingsData = docSnap.data();
-            Object.assign(state.settings, settingsData);
-            if (!state.settings.pinProtection) {
-                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
-            }
-        }
-    }, (error) => { console.error("Error fetching settings:", error); });
-    
-    // 2. Deklarasi dan inisialisasi listener untuk commissions (Hanya jika isPartner)
-    let commissionsListener = () => {};
-    if (currentUser.value?.isPartner) {
-        const commissionsQuery = query(
-            collection(db, 'commissions'),
-            where('partnerId', '==', currentUser.value.uid)
-        );
-        commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-            commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        });
+  // Listener untuk settings (real-time)
+  const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
+    if (docSnap.exists()) {
+      const settingsData = docSnap.data();
+      Object.assign(state.settings, settingsData);
     }
+  }, (error) => { console.error("Error fetching settings:", error); });
 
-    // 3. Panggil fungsi untuk mengambil data statis (sekali ambil)
-    await fetchStaticData(userId);
+  // Listener untuk komisi mitra (real-time jika dia adalah mitra)
+  let commissionsListener = () => {};
+  if (currentUser.value?.isPartner) {
+    const commissionsQuery = query(
+      collection(db, 'commissions'),
+      where('partnerId', '==', currentUser.value.uid)
+    );
+    commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+      commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    });
+  }
 
-    // 4. Gunakan listener di dalam fungsi unsubscribe
-    // Bagian ini sangat penting untuk memperbaiki error 'never used'
-    unsubscribe = () => {
-        settingsListener();
-        commissionsListener(); 
-    };
+  // Panggil data inti yang dibutuhkan segera
+  await fetchCoreData(userId);
+
+  // Fungsi untuk menghentikan listener saat logout
+  unsubscribe = () => {
+    settingsListener();
+    commissionsListener();
+  };
 };
 
-const fetchStaticData = async (userId) => {
+const fetchCoreData = async (userId) => {
+  try {
+    const [settingsSnap, promotionsSnap] = await Promise.all([
+      getDoc(doc(db, "settings", userId)),
+      getDoc(doc(db, "promotions", userId)),
+    ]);
+
+    if (settingsSnap.exists()) {
+      const settingsData = settingsSnap.data();
+      Object.assign(state.settings, settingsData);
+      if (!state.settings.pinProtection) {
+        state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
+      }
+    }
+
+    if (promotionsSnap.exists()) {
+      const promoData = promotionsSnap.data();
+      state.promotions.perChannel = promoData.perChannel || {};
+      state.promotions.perModel = promoData.perModel || {};
+    }
+  } catch (error) {
+    console.error("Error fetching core data:", error);
+  }
+};
+
+// Fungsi khusus untuk data produk, harga, dan alokasi
+const fetchProductData = async (userId) => {
+  if (dataFetched.products) return; // Jangan fetch ulang jika sudah ada
+  console.log("Fetching product data...");
+  try {
+    const [productsSnap, pricesSnap, allocationsSnap] = await Promise.all([
+      getDocs(query(collection(db, "products"), where("userId", "==", userId))),
+      getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
+      getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
+    ]);
+    
+    const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
+
+    state.produk = productsSnap.docs.map(docSnap => {
+      const p = { id: docSnap.id, ...docSnap.data() };
+      const hargaJual = {};
+      const stokAlokasi = {};
+      const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
+      (state.settings.marketplaces || []).forEach(mp => {
+        const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
+        hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+        stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+      });
+      return {
+        docId: p.id,
+        sku: p.sku,
+        nama: p.product_name,
+        model_id: p.model_id,
+        warna: p.color,
+        varian: p.variant,
+        stokFisik: p.physical_stock,
+        hpp: p.hpp,
+        hargaJual,
+        stokAlokasi,
+        userId: p.userId
+      };
+    });
+    dataFetched.products = true;
+  } catch (error) {
+    console.error("Error fetching product data:", error);
+  }
+};
+
+// Fungsi khusus untuk data transaksi dan retur
+const fetchTransactionData = async (userId) => {
+  if (dataFetched.transactions) return;
+  console.log("Fetching transaction data...");
+  try {
+    const [transactionsSnap] = await Promise.all([
+        getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
+    ]);
+    state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+    dataFetched.transactions = true;
+  } catch(error) {
+    console.error("Error fetching transaction data:", error);
+  }
+};
+
+const fetchReturnData = async (userId) => {
+    if (dataFetched.returns) return;
+    console.log("Fetching return data...");
     try {
-        const [
-            settingsSnap, promotionsSnap, productsSnap, pricesSnap, allocationsSnap,
-            transactionsSnap, keuanganSnap, returnsSnap, productionSnap, fabricSnap,
-            categoriesSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap,
-            suppliersSnap, purchaseOrdersSnap, notesSnap
-        ] = await Promise.all([
-            getDoc(doc(db, "settings", userId)),
-            getDoc(doc(db, "promotions", userId)),
-            getDocs(query(collection(db, "products"), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
-            getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
+        const [returnsSnap] = await Promise.all([
             getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "categories"), where("userId", "==", userId))),
+        ]);
+        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+        dataFetched.returns = true;
+    } catch(error) {
+        console.error("Error fetching return data:", error);
+    }
+};
+
+// Fungsi khusus untuk data produksi
+const fetchProductionData = async (userId) => {
+  if (dataFetched.production) return;
+  console.log("Fetching production data...");
+  try {
+    const [productionSnap, fabricSnap] = await Promise.all([
+      getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
+      getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
+    ]);
+    state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+    state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
+    dataFetched.production = true;
+  } catch (error) {
+    console.error("Error fetching production data:", error);
+  }
+};
+
+// Fungsi khusus untuk data keuangan dan investor
+const fetchFinanceData = async (userId) => {
+    if (dataFetched.finance) return;
+    console.log("Fetching finance data...");
+    try {
+        const [keuanganSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap] = await Promise.all([
+            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
             getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
             getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
             getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "suppliers"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "purchase_orders"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))),
         ]);
-
-        if (settingsSnap.exists()) {
-            const settingsData = settingsSnap.data();
-            Object.assign(state.settings, settingsData);
-            if (!state.settings.pinProtection) {
-                state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
-            }
-        }
-
-        const userDocRef = doc(db, "users", userId);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            state.settings.inflowCategories = userData.inflowCategories || [];
-        }
-
-        if (promotionsSnap.exists()) {
-            const promoData = promotionsSnap.data();
-            state.promotions.perChannel = promoData.perChannel || {};
-            state.promotions.perModel = promoData.perModel || {};
-            state.settings.marketplaces.forEach(channel => {
-                if (!state.promotions.perChannel[channel.id]) { state.promotions.perChannel[channel.id] = {}; }
-                if (!state.promotions.perChannel[channel.id].voucherToko) { state.promotions.perChannel[channel.id].voucherToko = {}; }
-                if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) { state.promotions.perChannel[channel.id].voucherSemuaProduk = {}; }
-            });
-            if (uiState.promosiSelectedModel) {
-                if (!state.promotions.perModel[uiState.promosiSelectedModel]) { state.promotions.perModel[uiState.promosiSelectedModel] = {}; }
-                state.settings.marketplaces.forEach(channel => {
-                    if (!state.promotions.perModel[uiState.promosiSelectedModel][channel.id]) { state.promotions.perModel[uiState.promosiSelectedModel][channel.id] = { minBelanja: null, diskonRate: null, diskonBertingkat: [] }; }
-                });
-            }
-        } else {
-            state.promotions.perChannel = {};
-            state.promotions.perModel = {};
-        }
-
-        const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
-
-        state.produk = productsSnap.docs.map(docSnap => {
-            const p = { id: docSnap.id, ...docSnap.data() };
-            const hargaJual = {};
-            const stokAlokasi = {};
-            const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
-            (state.settings.marketplaces || []).forEach(mp => {
-                const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-            });
-            return {
-                docId: p.id,
-                sku: p.sku,
-                nama: p.product_name,
-                model_id: p.model_id,
-                warna: p.color,
-                varian: p.variant,
-                stokFisik: p.physical_stock,
-                hpp: p.hpp,
-                hargaJual,
-                stokAlokasi,
-                userId: p.userId
-            };
-        });
-
-        state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
         state.bankAccounts = bankAccountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         state.investorPayments = investorPaymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), paymentDate: doc.data().paymentDate?.toDate() }));
-        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
-        state.settings.categories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        dataFetched.finance = true;
+    } catch (error) {
+        console.error("Error fetching finance data:", error);
+    }
+};
+
+// Fungsi khusus untuk data supplier dan purchase order
+const fetchSupplierData = async (userId) => {
+    if (dataFetched.suppliers) return;
+    console.log("Fetching supplier data...");
+    try {
+        const [suppliersSnap, purchaseOrdersSnap] = await Promise.all([
+            getDocs(query(collection(db, "suppliers"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "purchase_orders"), where("userId", "==", userId))),
+        ]);
         state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         state.purchaseOrders = purchaseOrdersSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        state.voucherNotes = notesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), endDate: doc.data().endDate?.toDate() }));
-        
-        console.log('Data statis berhasil dimuat.');
-        isLoading.value = false;
-        hasLoadedInitialData.value = true;
-        changePage(activePage.value);
-
+        dataFetched.suppliers = true;
     } catch (error) {
-        console.error("Error memuat data statis:", error);
-        alert("Gagal memuat data dari database. Mohon periksa koneksi internet atau aturan keamanan Anda.");
-        handleLogout();
+        console.error("Error fetching supplier data:", error);
+    }
+};
+
+// Fungsi khusus untuk catatan voucher
+const fetchNotesData = async (userId) => {
+    if (dataFetched.notes) return;
+    console.log("Fetching notes data...");
+    try {
+        const [notesSnap] = await Promise.all([
+            getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))),
+        ]);
+        state.voucherNotes = notesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), endDate: doc.data().endDate?.toDate() }));
+        dataFetched.notes = true;
+    } catch(error) {
+        console.error("Error fetching notes data:", error);
     }
 };
 
 onMounted(() => {
-    onAuthStateChanged(auth, async (user) => {
-        isLoading.value = true;
-        if (user) {
-            // Ambil data user dari Firestore
-            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-            const userData = userDocSnap.exists() ? userDocSnap.data() : {};
-            
-            // Gabungkan data user dari Auth dan Firestore ke dalam satu objek
-            currentUser.value = { ...user, userData };
-            
-            await setupListeners(user.uid);
-        } else {
-            currentUser.value = null;
-            activePage.value = 'login';
-            isLoading.value = false;
-            unsubscribe();
-        }
-    });
+  onAuthStateChanged(auth, async (user) => {
+    isLoading.value = true;
+    hasLoadedInitialData.value = false;
+    
+    // Reset status data yang sudah di-fetch setiap kali auth berubah
+    Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
+
+    if (user) {
+      const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+      currentUser.value = { ...user, userData };
+      
+      await setupListeners(user.uid);
+
+      // Pindahkan changePage ke dalam watcher agar data halaman pertama dimuat
+      // changePage(localStorage.getItem('lastActivePage') || 'dashboard');
+    } else {
+      currentUser.value = null;
+      activePage.value = 'login';
+      unsubscribe();
+    }
+    isLoading.value = false;
+    hasLoadedInitialData.value = true;
+  });
 });
 
 // Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
-watch(activePage, (newPage) => {
-    localStorage.setItem('lastActivePage', newPage);
-    if (newPage === 'dashboard') {
-        nextTick(renderCharts);
-    }
-    
-    // --- TAMBAHKAN KODE INI DI SINI ---
-    if (newPage === 'supplier') {
-        fetchSuppliers();
-        fetchPurchaseOrders(); // <--- TAMBAHKAN BARIS INI
-    }
-});
+watch(activePage, async (newPage) => {
+  localStorage.setItem('lastActivePage', newPage);
+  const userId = currentUser.value.uid;
+  if (!userId) return;
+
+  // Logika Lazy Loading
+  switch(newPage) {
+    case 'dashboard':
+      await fetchTransactionData(userId);
+      await fetchFinanceData(userId);
+      nextTick(renderCharts);
+      break;
+    case 'transaksi':
+    case 'bulk_process':
+      await fetchProductData(userId);
+      await fetchTransactionData(userId);
+      await fetchNotesData(userId);
+      break;
+    case 'inventaris':
+    case 'harga-hpp':
+      await fetchProductData(userId);
+      break;
+    case 'promosi':
+        await fetchProductData(userId);
+        await fetchNotesData(userId);
+        break;
+    case 'produksi':
+      await fetchProductData(userId);
+      await fetchProductionData(userId);
+      break;
+    case 'gudang-kain':
+      await fetchProductionData(userId);
+      break;
+    case 'keuangan':
+    case 'investasi':
+      await fetchFinanceData(userId);
+      break;
+    case 'supplier':
+        await fetchProductData(userId);
+        await fetchSupplierData(userId);
+        break;
+    case 'retur':
+        await fetchTransactionData(userId);
+        await fetchReturnData(userId);
+        await fetchProductData(userId);
+        break;
+  }
+}, { immediate: true }); // 'immediate: true' akan menjalankan watcher saat pertama kali dimuat
 
 </script>
 
