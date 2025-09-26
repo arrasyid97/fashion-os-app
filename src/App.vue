@@ -1558,7 +1558,7 @@ async function processBatchOrders() {
 for (const item of order.items) {
     // Dapatkan Nama Model dari item yang terjual
     const modelId = item.model_id; 
-    const modelName = state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama; 
+    const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
     
     // Ambil tarif komisi dari state komisi per model
     const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
@@ -3873,7 +3873,7 @@ let totalKomisiProduk = 0;
 
 for (const item of activeCart.value) {
     const modelId = item.model_id; 
-    const modelName = state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama; 
+    const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
     const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
 
     if (commissionRate > 0) {
