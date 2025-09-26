@@ -6939,16 +6939,14 @@ watch(activePage, (newPage) => {
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                            <tr>
-                                <th class="px-6 py-3 font-semibold">Nama Model</th>
-                                <th class="px-6 py-3 font-semibold">SKU</th>
-                                <th class="px-6 py-3 font-semibold">Warna</th>
-                                <th class="px-6 py-3 font-semibold">Ukuran</th>
-                                <th class="px-6 py-3 font-semibold text-center">Stok Fisik</th>
-                                <th class="px-6 py-3 font-semibold text-right">Nilai Stok (HPP)</th>
-                                <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
-                            </tr>
-                        </thead>
+    <tr>
+        <th class="px-6 py-3 font-semibold">Nama Model</th>
+        <th class="px-6 py-3 font-semibold">SKU</th>
+        <th class="px-6 py-3 font-semibold">Warna</th>
+        <th class="px-6 py-3 font-semibold">Ukuran</th>
+        <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
+    </tr>
+</thead>
                         <tbody>
                             <tr v-if="inventoryProductGroups.length === 0">
                                 <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
@@ -6968,10 +6966,8 @@ watch(activePage, (newPage) => {
                                             </div>
                                         </div>
                                     </td>
-                                    <td colspan="4"></td>
-                                    <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
-                                    <td class="px-6 py-3 text-center">
-                                        </td>
+                                    <td colspan="3"></td> <td class="px-6 py-3 text-center">
+        </td>
                                 </tr>
 
                                 <template v-if="uiState.activeAccordion === group.namaModel || group.variants.some(v => uiState.activeAccordion === `harga-${v.sku}` || uiState.activeAccordion === `komisi-${v.sku}`)">
@@ -6986,16 +6982,7 @@ watch(activePage, (newPage) => {
                                             <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
                                             <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
                                             <td class="px-6 py-3 text-slate-600">{{ v.varian }}</td>
-                                            <td class="px-6 py-3 text-center">
-                                                <span class="stock-badge" :class="{
-                                                    'stock-safe': v.stokFisik > state.settings.minStok,
-                                                    'stock-low': v.stokFisik > 0 && v.stokFisik <= state.settings.minStok,
-                                                    'stock-empty': v.stokFisik === 0
-                                                }">
-                                                    {{ formatNumber(v.stokFisik) }} pcs
-                                                </span>
-                                            </td>
-                                            <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
+                                            
                                             <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
                                                 
                                                 <button 
@@ -7022,7 +7009,7 @@ watch(activePage, (newPage) => {
                                         </tr>
 
                                         <tr v-if="uiState.activeAccordion === `harga-${v.sku}`" class="animate-fade-in">
-                                            <td colspan="7" class="p-6 bg-indigo-50/50 border-b-2 border-indigo-400/50">
+                                            <td colspan="5" class="p-6 bg-indigo-50/50 border-b-2 border-indigo-400/50">
                                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                     
                                                     <div>
@@ -7078,7 +7065,7 @@ watch(activePage, (newPage) => {
                                             </td>
                                         </tr>
                                         <tr v-if="uiState.activeAccordion === `komisi-${v.sku}`" class="animate-fade-in">
-    <td colspan="7" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
+    <td colspan="5" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
         <div class="space-y-3">
             <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
             <p class="text-xs text-slate-500">Komisi ini akan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
