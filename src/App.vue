@@ -1513,18 +1513,17 @@ async function processBatchOrders() {
         const newTransactions = [];
         for (const order of ordersToProcess) {
             const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
-            const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
-            const finalTotal = subtotal - discount.totalDiscount;
-            let totalBiaya = 0;
-            const biayaList = [];
-            let totalKomisiProduk = 0;
+const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
+const finalTotal = subtotal - discount.totalDiscount;
+let totalBiaya = 0;
+const biayaList = [];
+
+// --- [Langkah 1: Hitung Komisi Produk (Biaya Bisnis)] ---
+let totalKomisiProduk = 0;
 
 for (const item of order.items) {
-    // Dapatkan Nama Model dari item yang terjual
     const modelId = item.model_id; 
     const modelName = state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama; 
-    
-    // Ambil tarif komisi dari state komisi per model
     const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
 
     if (commissionRate > 0) {
@@ -3819,27 +3818,22 @@ async function executeCompleteTransaction() {
     }
 
     const biayaList = [];
-    let totalBiaya = 0;
+let totalBiaya = 0;
 
-    // --- [PERUBAIAN: Kalkulasi Biaya Komisi Baru] ---
-    // Menghitung total komisi dari setiap item di keranjang
-    let totalKomisiProduk = 0;
+// --- [Langkah 1: Hitung Komisi Produk (Biaya Bisnis)] ---
+let totalKomisiProduk = 0;
 
 for (const item of activeCart.value) {
-    // Cari nama model dari item yang terjual
     const modelId = item.model_id; 
     const modelName = state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama; 
-    
-    // Ambil tarif komisi dari state komisi per model
     const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
 
     if (commissionRate > 0) {
-        // Komisi dihitung dari Harga Jual Aktual item dikali kuantitasnya
         totalKomisiProduk += (commissionRate / 100) * (item.hargaJualAktual * item.qty);
     }
 }
 
-// Tambahkan Komisi ke Biaya Marketplace jika ada
+// Tambahkan Komisi ke Biaya Marketplace di Awal
 if (totalKomisiProduk > 0) {
     biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
     totalBiaya += totalKomisiProduk;
