@@ -325,6 +325,53 @@ const dataFetched = reactive({
   // Tambahkan flag lain jika ada modul data besar lainnya
 });
 
+const loadDataForPage = async (pageName) => {
+  if (!currentUser.value) return; // Pengaman utama: Jangan lakukan apa-apa jika user belum termuat
+  const userId = currentUser.value.uid;
+
+  // Logika Lazy Loading yang sudah ada, sekarang di dalam fungsi ini
+  switch(pageName) {
+    case 'dashboard':
+      await fetchTransactionData(userId);
+      await fetchFinanceData(userId);
+      nextTick(renderCharts);
+      break;
+    case 'transaksi':
+    case 'bulk_process':
+      await fetchProductData(userId);
+      await fetchTransactionData(userId);
+      await fetchNotesData(userId);
+      break;
+    case 'inventaris':
+    case 'harga-hpp':
+      await fetchProductData(userId);
+      break;
+    case 'promosi':
+        await fetchProductData(userId);
+        await fetchNotesData(userId);
+        break;
+    case 'produksi':
+      await fetchProductData(userId);
+      await fetchProductionData(userId);
+      break;
+    case 'gudang-kain':
+      await fetchProductionData(userId);
+      break;
+    case 'keuangan':
+    case 'investasi':
+      await fetchFinanceData(userId);
+      break;
+    case 'supplier':
+        await fetchProductData(userId);
+        await fetchSupplierData(userId);
+        break;
+    case 'retur':
+        await fetchTransactionData(userId);
+        await fetchReturnData(userId);
+        await fetchProductData(userId);
+        break;
+  }
+};
 
 const unpaidCommissions = computed(() =>
     commissions.value.filter(c => c.status === 'unpaid')
@@ -5886,7 +5933,7 @@ function deleteSpecialPrice(channelId, sku) {
     }
 }
 // --- LIFECYCLE & WATCHERS ---
-watch(activePage, (newPage) => { if (newPage === 'dashboard') nextTick(renderCharts); });
+
 watch(dashboardFilteredData, () => { if (activePage.value === 'dashboard') nextTick(renderCharts); });
 watch(() => uiState.activeCartChannel, (newChannel) => { if (newChannel && !state.carts[newChannel]) state.carts[newChannel] = []; });
 watch(() => uiState.promosiSelectedModel, (newModel) => {
@@ -6165,7 +6212,7 @@ onMounted(() => {
       currentUser.value = { ...user, userData };
       
       await setupListeners(user.uid);
-
+      loadDataForPage(activePage.value);
       // Pindahkan changePage ke dalam watcher agar data halaman pertama dimuat
       // changePage(localStorage.getItem('lastActivePage') || 'dashboard');
     } else {
@@ -6178,55 +6225,10 @@ onMounted(() => {
   });
 });
 
-// Aktifkan kembali watcher ini untuk menyimpan halaman aktif ke localStorage
-watch(activePage, async (newPage) => {
-  localStorage.setItem('lastActivePage', newPage);
-  const userId = currentUser.value.uid;
-  if (!userId) return;
-
-  // Logika Lazy Loading
-  switch(newPage) {
-    case 'dashboard':
-      await fetchTransactionData(userId);
-      await fetchFinanceData(userId);
-      nextTick(renderCharts);
-      break;
-    case 'transaksi':
-    case 'bulk_process':
-      await fetchProductData(userId);
-      await fetchTransactionData(userId);
-      await fetchNotesData(userId);
-      break;
-    case 'inventaris':
-    case 'harga-hpp':
-      await fetchProductData(userId);
-      break;
-    case 'promosi':
-        await fetchProductData(userId);
-        await fetchNotesData(userId);
-        break;
-    case 'produksi':
-      await fetchProductData(userId);
-      await fetchProductionData(userId);
-      break;
-    case 'gudang-kain':
-      await fetchProductionData(userId);
-      break;
-    case 'keuangan':
-    case 'investasi':
-      await fetchFinanceData(userId);
-      break;
-    case 'supplier':
-        await fetchProductData(userId);
-        await fetchSupplierData(userId);
-        break;
-    case 'retur':
-        await fetchTransactionData(userId);
-        await fetchReturnData(userId);
-        await fetchProductData(userId);
-        break;
-  }
-}, { immediate: true }); // 'immediate: true' akan menjalankan watcher saat pertama kali dimuat
+watch(activePage, (newPage) => {
+    localStorage.setItem('lastActivePage', newPage);
+    loadDataForPage(newPage);
+});
 
 </script>
 
