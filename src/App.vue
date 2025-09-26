@@ -4126,7 +4126,7 @@ async function saveCommissionSettings() {
     isSaving.value = true;
     try {
         const userId = currentUser.value.uid;
-        const commissionsRef = doc(db, "commissions", userId);
+        const commissionsRef = doc(db, "product_commissions", userId)
         
         // Langsung simpan state komisi saat ini ke database
         await setDoc(commissionsRef, {
@@ -6052,9 +6052,11 @@ const setupListeners = async (userId) => {
 
 const fetchCoreData = async (userId) => {
   try {
-    const [settingsSnap, promotionsSnap] = await Promise.all([
+    // BARIS BARU: Tambahkan 'commissionsSnap'
+    const [settingsSnap, promotionsSnap, commissionsSnap] = await Promise.all([
       getDoc(doc(db, "settings", userId)),
       getDoc(doc(db, "promotions", userId)),
+      getDoc(doc(db, "product_commissions", userId)), // BARIS BARU: Ambil data dari koleksi BARU
     ]);
 
     if (settingsSnap.exists()) {
@@ -6070,6 +6072,16 @@ const fetchCoreData = async (userId) => {
       state.promotions.perChannel = promoData.perChannel || {};
       state.promotions.perModel = promoData.perModel || {};
     }
+
+    // BLOK BARU: Proses data komisi yang sudah dimuat
+    if (commissionsSnap.exists()) {
+        const commsData = commissionsSnap.data();
+        state.commissions.perModel = commsData.perModel || {};
+    } else {
+        // Jika belum ada data komisi, pastikan objeknya ada
+        state.commissions.perModel = {};
+    }
+
   } catch (error) {
     console.error("Error fetching core data:", error);
   }
