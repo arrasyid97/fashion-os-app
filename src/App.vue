@@ -2723,13 +2723,13 @@ const inventoryProductGroups = computed(() => {
 });
 
 const promosiProductModels = computed(() => {
-  if (!state.produk || state.produk.length === 0) {
-    return [];
-  }
-  const modelNames = state.produk.map(product => {
+  if (!sortedProduk.value) return [];
+  // Mengambil nama model dasar dari setiap produk yang sudah terurut
+  const modelNames = sortedProduk.value.map(product => {
     const model = state.settings.modelProduk.find(m => m.id === product.model_id);
     return model ? model.namaModel.split(' ')[0] : 'N/A';
   });
+  // Mengembalikan daftar nama model yang unik dan terurut
   return Array.from(new Set(modelNames)).sort();
 });
 
