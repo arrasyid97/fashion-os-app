@@ -8553,7 +8553,7 @@ watch(activePage, (newPage) => {
                 <tr>
                     <th class="p-2 font-medium">NAMA</th>
                     <th class="p-2 font-medium">ADMIN</th>
-                    <th class="p-2 font-medium">LAYANAN</th>
+                    <th class="p-2 font-medium">LAYANAN G XTRA</th>
                     <th class="p-2 font-medium">PER PESANAN</th>
                     <th class="p-2 font-medium">PROGRAM</th> <th class="p-2 font-medium text-right">AKSI</th>
                 </tr>
@@ -12161,7 +12161,7 @@ watch(activePage, (newPage) => {
                         <ul class="mt-2 text-sm text-slate-600 space-y-1">
                             <li class="flex justify-between"><span>Biaya Admin ({{ uiState.priceCalculator.result.breakdown.admRate }}%)</span><span>-{{ formatCurrency(uiState.priceCalculator.result.breakdown.adminFee) }}</span></li>
                             <li class="flex justify-between"><span>Biaya Komisi ({{ uiState.priceCalculator.result.breakdown.komisiRate }}%)</span><span>-{{ formatCurrency(uiState.priceCalculator.result.breakdown.commission) }}</span></li>
-                            <li class="flex justify-between"><span>Biaya Layanan ({{ uiState.priceCalculator.result.breakdown.layananRate }}%)</span><span>-{{ formatCurrency(uiState.priceCalculator.result.breakdown.serviceFee) }}</span></li>
+                            <li class="flex justify-between"><span>Biaya Layanan G XTRA ({{ uiState.priceCalculator.result.breakdown.layananRate }}%)</span><span>-{{ formatCurrency(uiState.priceCalculator.result.breakdown.serviceFee) }}</span></li>
                              <li v-for="program in uiState.priceCalculator.result.breakdown.programFee" :key="program.name" class="flex justify-between">
                                 <span>- {{ program.name }} ({{ program.rate }}%)</span>
                                 <span>-{{ formatCurrency(program.fee) }}</span>
