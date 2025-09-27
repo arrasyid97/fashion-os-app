@@ -7489,43 +7489,43 @@ watch(activePage, (newPage) => {
             <h4 class="text-sm font-bold text-slate-700">Pengaturan Voucher Spesifik untuk Model: {{ group.namaModel }}</h4>
             <p class="text-xs text-slate-500 -mt-3">Diskon ini akan berlaku untuk semua varian di dalam model {{ group.namaModel }}.</p>
             <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-3 border border-slate-200 rounded-lg bg-white shadow-sm">
-                <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
-                <div class="mt-3">
-                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
-                    <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
-                       <span class="pl-1">Min. Belanja (Rp)</span>
-                       <span class="pl-1">Diskon (%)</span>
-                       <span class="pl-1">Diskon (Rp)</span>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <input type="text" v-model="diskonMinBelanjaComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                        <input type="text" v-model="diskonRateComputedUpdated(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                        <input type="text" v-model="diskonNominalComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                    </div>
-                </div>
-                <div class="mt-3">
-                    <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
-                    <div class="mt-2 grid grid-cols-[1fr,1fr,1fr,auto] gap-2 text-xs text-slate-500 font-semibold">
-                        <span class="pl-1">Min. Belanja (Rp)</span>
-                        <span class="pl-1">Diskon (%)</span>
-                        <span class="pl-1">Diskon (Rp)</span>
-                    </div>
-                    <div class="space-y-2">
-                       <div v-for="(tier, index) in state.promotions.perModel[group.namaModel]?.[channel.id]?.diskonBertingkat" :key="index" class="grid grid-cols-[1fr,1fr,1fr,auto] items-center gap-2">
-                            <input type="text" v-model="tieredMinComputed(tier).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                            <input type="text" v-model="tieredDiskonComputedUpdated(tier).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                            <input type="text" v-model="tieredDiskonNominalComputed(tier).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                            <button @click="removePromotionTier(group.namaModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-                        </div>
-                    </div>
-                    <button @click="addPromotionTier(group.namaModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
-                </div>
-                <div class="flex justify-end mt-4 pt-3 border-t">
-                     <button @click="saveModelPromotions(group.namaModel, channel.id)" :disabled="isSaving" class="bg-green-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-green-700 disabled:bg-green-300">
-                        Simpan Perubahan {{channel.name}}
-                    </button>
-                </div>
+    <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
+    <div class="mt-3">
+        <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
+        <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
+           <span class="pl-1">Min. Belanja (Rp)</span>
+           <span class="pl-1">Diskon (%)</span>
+           <span class="pl-1">Diskon (Rp)</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+            <input type="text" v-model="diskonMinBelanjaComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+            <input type="text" v-model="diskonRateComputedUpdated(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+            <input type="text" v-model="diskonNominalComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+        </div>
+    </div>
+    <div class="mt-3">
+        <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
+        <div class="mt-2 grid grid-cols-[1fr,1fr,1fr,auto] gap-2 text-xs text-slate-500 font-semibold">
+            <span class="pl-1">Min. Belanja (Rp)</span>
+            <span class="pl-1">Diskon (%)</span>
+            <span class="pl-1">Diskon (Rp)</span>
+        </div>
+        <div class="space-y-2">
+           <div v-for="(tier, index) in state.promotions.perModel[group.namaModel]?.[channel.id]?.diskonBertingkat" :key="index" class="grid grid-cols-[1fr,1fr,1fr,auto] items-center gap-2">
+                <input type="text" v-model="tieredMinComputed(tier).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+                <input type="text" v-model="tieredDiskonComputedUpdated(tier).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+                <input type="text" v-model="tieredDiskonNominalComputed(tier).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+                <button @click="removePromotionTier(group.namaModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
             </div>
+        </div>
+        <button @click="addPromotionTier(group.namaModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
+    </div>
+    <div class="flex justify-end mt-4 pt-3 border-t">
+         <button @click="saveModelPromotions(group.namaModel, channel.id)" :disabled="isSaving" class="bg-green-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-green-700 disabled:bg-green-300">
+            Simpan Perubahan {{channel.name}}
+        </button>
+    </div>
+</div>
         </div>
     </td>
 </tr>
@@ -12576,42 +12576,42 @@ watch(activePage, (newPage) => {
         
         <div class="flex-1 overflow-y-auto py-4 pr-2 space-y-4">
             <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200 rounded-lg bg-slate-50 shadow-sm">
-                <p class="font-semibold text-slate-700 mb-4 text-lg">{{ channel.name }}</p>
-                
-                <div class="mt-3">
-                    <label class="block text-sm font-medium text-slate-600">Voucher Ikuti Toko</label>
-                    <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
-                        <span class="pl-1">Min. Belanja (Rp)</span>
-                        <span class="pl-1">Diskon (%)</span>
-                        <span class="pl-1">Diskon (Rp)</span>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <input type="text" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                        <input type="text" v-model="voucherTokoDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                        <input type="text" v-model="voucherTokoDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                    </div>
-                </div>
+    <p class="font-semibold text-slate-700 mb-4 text-lg">{{ channel.name }}</p>
+    
+    <div class="mt-3">
+        <label class="block text-sm font-medium text-slate-600">Voucher Ikuti Toko</label>
+        <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
+            <span class="pl-1">Min. Belanja (Rp)</span>
+            <span class="pl-1">Diskon (%)</span>
+            <span class="pl-1">Diskon (Rp)</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+            <input type="text" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+            <input type="text" v-model="voucherTokoDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+            <input type="text" v-model="voucherTokoDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+        </div>
+    </div>
 
-                <div class="mt-4">
-                    <label class="block text-sm font-medium text-slate-600">Voucher Semua Produk</label>
-                    <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
-                        <span class="pl-1">Min. Belanja (Rp)</span>
-                        <span class="pl-1">Diskon (%)</span>
-                        <span class="pl-1">Diskon (Rp)</span>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <input type="text" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                        <input type="text" v-model="voucherSemuaProdukDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                        <input type="text" v-model="voucherSemuaProdukDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                    </div>
-                </div>
+    <div class="mt-4">
+        <label class="block text-sm font-medium text-slate-600">Voucher Semua Produk</label>
+        <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
+            <span class="pl-1">Min. Belanja (Rp)</span>
+            <span class="pl-1">Diskon (%)</span>
+            <span class="pl-1">Diskon (Rp)</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+            <input type="text" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+            <input type="text" v-model="voucherSemuaProdukDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+            <input type="text" v-model="voucherSemuaProdukDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+        </div>
+    </div>
 
-                <div class="flex justify-end mt-4 pt-3 border-t">
-                    <button @click="saveChannelPromotions(channel.id)" :disabled="isSaving" class="bg-green-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-green-700 disabled:bg-green-300">
-                        Simpan Perubahan {{channel.name}}
-                    </button>
-                </div>
-            </div>
+    <div class="flex justify-end mt-4 pt-3 border-t">
+        <button @click="saveChannelPromotions(channel.id)" :disabled="isSaving" class="bg-green-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-green-700 disabled:bg-green-300">
+            Simpan Perubahan {{channel.name}}
+        </button>
+    </div>
+</div>
         </div>
 
         <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
