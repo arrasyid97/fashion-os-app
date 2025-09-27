@@ -12484,7 +12484,7 @@ watch(activePage, (newPage) => {
                 </div>
             </form>
         </div>
-        </div>
+        
      <div v-if="uiState.modalType === 'voucherUmum'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Pengaturan Voucher Umum (Per Channel)</h3>
@@ -12529,6 +12529,7 @@ watch(activePage, (newPage) => {
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
 </div>
+        </div>
 </template>
 
 <style scoped>
