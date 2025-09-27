@@ -1068,6 +1068,17 @@ const filteredVoucherNotes = computed(() => {
     });
 });
 
+const filteredVoucherTypes = computed(() => {
+    if (uiState.notesData.type === 'model') {
+        return ['Voucher Produk Tertentu', 'Diskon Minimal Belanja Bertingkat'];
+    }
+    if (uiState.notesData.type === 'channel') {
+        return ['Voucher Ikuti Toko', 'Voucher Semua Produk'];
+    }
+    return []; // Default, jika belum dipilih
+});
+
+
 const monthlyPrice = ref(350000);
 const yearlyPrice = ref(4200000);
 const discountedMonthlyPrice = ref(250000);
@@ -2721,9 +2732,18 @@ const inventoryProductGroups = computed(() => {
 });
 
 const promosiProductModels = computed(() => {
-  // Kita gunakan 'sortedProduk' yang sudah ada untuk mendapatkan daftar varian yang terurut
-  if (!sortedProduk.value) return [];
-  return sortedProduk.value.map(p => p.nama);
+  if (!state.produk || state.produk.length === 0) {
+    return [];
+  }
+  // 1. Ambil semua nama model dasar (misal: "SALWA", "YONA") dari setiap produk
+  const modelNames = state.produk.map(product => {
+    const model = state.settings.modelProduk.find(m => m.id === product.model_id);
+    // Menggunakan logika yang sama seperti di inventoryProductGroups
+    return model ? model.namaModel.split(' ')[0] : 'N/A';
+  });
+
+  // 2. Gunakan Set untuk mendapatkan nama yang unik, lalu ubah kembali ke array dan urutkan
+  return Array.from(new Set(modelNames)).sort();
 });
 
 const modalStockSummary = computed(() => {
@@ -6142,6 +6162,12 @@ watch(() => uiState.bulk_scan_input, async (newValue) => {
     setTimeout(() => {
         uiState.bulk_scan_input = '';
     }, 200); // Jeda 200 milidetik (0.2 detik)
+});
+
+watch(() => uiState.notesData.type, (newType) => {
+    // Setiap kali tipe berubah (misal dari 'model' ke 'channel'),
+    // kosongkan pilihan jenis voucher untuk mencegah data yang tidak valid.
+    uiState.notesData.voucherType = '';
 });
 
 watch(() => uiState.pengaturanTab, (newTab) => {
@@ -9679,12 +9705,11 @@ watch(activePage, (newPage) => {
                     <div>
                         <label class="block text-sm font-medium">Jenis Voucher</label>
                         <select v-model="uiState.notesData.voucherType" class="mt-1 w-full p-2 border rounded-md" required>
-                            <option value="" disabled>-- Pilih Jenis Voucher --</option>
-                            <option value="Voucher Ikuti Toko">Voucher Ikuti Toko</option>
-                            <option value="Voucher Semua Produk">Voucher Semua Produk</option>
-                            <option value="Voucher Produk Tertentu">Voucher Produk Tertentu</option>
-                            <option value="Diskon Minimal Belanja Bertingkat">Diskon Minimal Belanja Bertingkat</option>
-                        </select>
+    <option value="" disabled>-- Pilih Jenis Voucher --</option>
+    <option v-for="type in filteredVoucherTypes" :key="type" :value="type">
+        {{ type }}
+    </option>
+</select>
                     </div>
                     <template v-if="uiState.notesData.voucherType">
                         <div v-if="uiState.notesData.type === 'model'">
