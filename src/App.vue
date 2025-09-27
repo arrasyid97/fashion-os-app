@@ -9505,37 +9505,7 @@ watch(activePage, (newPage) => {
             </table>
         </div>
     </div>
-    
-    <div v-if="isAnyProductPaymentInProgress" class="mt-4 p-4 border rounded-lg bg-slate-50 animate-fade-in">
-    <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-            <label class="block text-sm font-medium">Total yang Harus Dibayarkan</label>
-            <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(totalYangHarusDibayarkan) }}</p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium">Dibayarkan Berapa</label>
-            <input type="number" v-model.number="uiState.penerimaanBarangForm.dibayarkan" class="mt-1 w-full p-2 border rounded-md text-right" placeholder="0">
-        </div>
-        <div>
-            <label class="block text-sm font-medium">Sisa Pembayaran</label>
-            <p class="font-bold text-lg text-red-600">{{ formatCurrency(sisaPembayaran) }}</p>
-        </div>
-    </div>
-</div>
-
-<div class="flex justify-end gap-3 mt-8 pt-4 border-t">
-    <button @click.prevent="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-    <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
-</div>
-</form>
-                </div>
-            </div>
-            
-        </div>
-    </div>
-</div>
-<div v-if="uiState.activeSupplierView === 'produkList'" class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+            <div v-if="uiState.activeSupplierView === 'produkList'" class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
     <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Produk dari Supplier</h3>
     <div class="overflow-x-auto">
         <table class="w-full text-sm text-left text-slate-500">
@@ -9576,6 +9546,36 @@ watch(activePage, (newPage) => {
         </table>
     </div>
 </div>
+    <div v-if="isAnyProductPaymentInProgress" class="mt-4 p-4 border rounded-lg bg-slate-50 animate-fade-in">
+    <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm font-medium">Total yang Harus Dibayarkan</label>
+            <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(totalYangHarusDibayarkan) }}</p>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Dibayarkan Berapa</label>
+            <input type="number" v-model.number="uiState.penerimaanBarangForm.dibayarkan" class="mt-1 w-full p-2 border rounded-md text-right" placeholder="0">
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Sisa Pembayaran</label>
+            <p class="font-bold text-lg text-red-600">{{ formatCurrency(sisaPembayaran) }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="flex justify-end gap-3 mt-8 pt-4 border-t">
+    <button @click.prevent="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+    <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
+</div>
+</form>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
 <div v-if="activePage === 'langganan'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8 flex items-center justify-center">
 
