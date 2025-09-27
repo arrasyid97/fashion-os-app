@@ -2720,6 +2720,12 @@ const inventoryProductGroups = computed(() => {
     return productGroups;
 });
 
+const promosiProductModels = computed(() => {
+  // Kita gunakan 'sortedProduk' yang sudah ada untuk mendapatkan daftar varian yang terurut
+  if (!sortedProduk.value) return [];
+  return sortedProduk.value.map(p => p.nama);
+});
+
 const modalStockSummary = computed(() => {
     if (uiState.modalType !== 'kelolaStok' || !uiState.modalData.original) {
         return { teralokasi: 0, belumTeralokasi: 0 };
@@ -4041,7 +4047,11 @@ if (voucherSemuaProduk?.diskonRate > 0 && totalCartSubtotal >= (voucherSemuaProd
 function calculateSellingPrice() {
     const { hpp, targetMargin, selectedMarketplace, selectedModelName } = uiState.priceCalculator;
 
-    if (!hpp || !selectedMarketplace || !selectedModelName) {
+    // TAMBAHKAN 1 BARIS INI untuk mengambil nama model dasar
+    const baseModelName = selectedModelName ? selectedModelName.split(' ')[0] : null;
+
+    // PERBARUI VALIDASI ini untuk menggunakan baseModelName
+    if (!hpp || !selectedMarketplace || !baseModelName) {
         uiState.priceCalculator.result = null;
         return;
     }
@@ -4052,21 +4062,18 @@ function calculateSellingPrice() {
         return;
     }
 
-    // --- [PERUBAIAN 1: Mengambil Data Komisi yang Benar] ---
-    // Mengambil komisi berdasarkan Model Produk dan Marketplace yang dipilih
-    const commissionRate = (state.commissions.perModel[selectedModelName]?.[selectedMarketplace] || 0) / 100;
+    // PERBARUI BARIS INI untuk menggunakan baseModelName
+    const commissionRate = (state.commissions.perModel[baseModelName]?.[selectedMarketplace] || 0) / 100;
 
     const dummyProduct = {
         sku: 'calc-dummy',
-        nama: selectedModelName,
-        hargaJualAktual: hpp * 2, // Harga dummy untuk kalkulasi diskon
+        nama: baseModelName, // PERBARUI BARIS INI untuk menggunakan baseModelName
+        hargaJualAktual: hpp * 2,
         qty: 1
     };
     const discountInfo = calculateBestDiscount([dummyProduct], selectedMarketplace);
     const bestDiscountRate = (discountInfo.rate || 0) / 100;
 
-    // --- [PERUBAIAN 2: Menghapus Komisi Lama dari Kalkulasi] ---
-    // 'mp.komisi' sudah tidak digunakan di sini
     const totalMarketplacePercentageFees = (mp.adm || 0) + (mp.layanan || 0);
     const perOrderFee = mp.perPesanan || 0;
     const targetProfitPercentage = (targetMargin || 0) / 100;
@@ -4074,14 +4081,12 @@ function calculateSellingPrice() {
     const itemizedProgramFeesBase = (mp.programs || []).map(p => (parseFloat(p.rate) || 0) / 100);
     const totalProgramPercentage = itemizedProgramFeesBase.reduce((sum, rate) => sum + rate, 0);
 
-    // --- [PERUBAIAN 3: Menambahkan Komisi Baru ke Total Biaya Persentase] ---
     const allPercentageFees = (totalMarketplacePercentageFees / 100) + targetProfitPercentage + bestDiscountRate + totalProgramPercentage + commissionRate;
     
     const calculatedPrice = (hpp + perOrderFee) / (1 - allPercentageFees);
 
-    // --- [PERUBAIAN 4: Menghitung & Menampilkan Rincian Komisi Baru] ---
     const adminFee = calculatedPrice * (mp.adm || 0) / 100;
-    const commission = calculatedPrice * commissionRate; // Menghitung nilai komisi dalam Rupiah
+    const commission = calculatedPrice * commissionRate;
     const serviceFee = calculatedPrice * (mp.layanan || 0) / 100;
     const bestDiscount = calculatedPrice * bestDiscountRate;
 
@@ -4091,7 +4096,7 @@ function calculateSellingPrice() {
     });
     const totalProgramFeeValue = itemizedProgramFees.reduce((sum, item) => sum + item.fee, 0);
 
-    const totalFees = adminFee + commission + serviceFee + totalProgramFeeValue + perOrderFee; // Menambahkan 'commission' ke total biaya
+    const totalFees = adminFee + commission + serviceFee + totalProgramFeeValue + perOrderFee;
     const netProfit = calculatedPrice - hpp - bestDiscount - totalFees;
     const totalSemuaBiaya = hpp + bestDiscount + totalFees;
     const labaKotor = calculatedPrice - bestDiscount - hpp;
@@ -4108,8 +4113,8 @@ function calculateSellingPrice() {
             hpp,
             adminFee,
             admRate: mp.adm || 0,
-            commission, // Menampilkan nilai komisi baru
-            komisiRate: commissionRate * 100, // Menampilkan persentase komisi baru
+            commission,
+            komisiRate: commissionRate * 100,
             serviceFee,
             layananRate: mp.layanan || 0,
             programFee: itemizedProgramFees,
