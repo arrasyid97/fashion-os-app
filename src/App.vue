@@ -69,6 +69,7 @@ const state = reactive({
     produksi: [],    // --- START: KODE BARU UNTUK STOK KAIN ---
     gudangKain: [],
     suppliers: [],
+    purchaseOrders: [],
     voucherNotes: [],
     investor: [],
     bankAccounts: [],
