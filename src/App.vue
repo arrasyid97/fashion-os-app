@@ -1206,7 +1206,52 @@ async function deleteSupplier(supplierId) {
     }
 }
 
+async function addPurchaseOrderItemToInventory(item) {
+    if (!currentUser.value) return alert("Anda harus login.");
+    if (!confirm(`Anda yakin ingin memasukkan ${item.qty} pcs produk ${item.sku} ke inventaris? Stok akan bertambah.`)) {
+        return;
+    }
 
+    const productInState = state.produk.find(p => p.sku === item.sku);
+    if (!productInState) {
+        return alert(`Error: Produk dengan SKU ${item.sku} tidak ditemukan di inventaris.`);
+    }
+
+    isSaving.value = true;
+    try {
+        const batch = writeBatch(db);
+        
+        const productRef = doc(db, "products", productInState.docId);
+        const newStock = (productInState.stokFisik || 0) + (item.qty || 0);
+        batch.update(productRef, { physical_stock: newStock });
+
+        const orderRef = doc(db, "purchase_orders", item.orderId);
+        const orderInState = state.purchaseOrders.find(o => o.id === item.orderId);
+        
+        const updatedProdukItems = JSON.parse(JSON.stringify(orderInState.produk));
+        const itemToUpdate = updatedProdukItems.find(p => p.sku === item.sku && p.hargaJual === item.hargaJual && p.qty === item.qty && !p.isInventoried);
+        
+        if (itemToUpdate) {
+            itemToUpdate.isInventoried = true;
+        }
+        batch.update(orderRef, { produk: updatedProdukItems });
+        
+        await batch.commit();
+
+        productInState.stokFisik = newStock;
+        const originalItemInOrder = orderInState.produk.find(p => p.sku === item.sku && p.hargaJual === item.hargaJual && p.qty === item.qty && !p.isInventoried);
+        if (originalItemInOrder) {
+            originalItemInOrder.isInventoried = true;
+        }
+
+        alert('Stok berhasil dimasukkan ke inventaris!');
+    } catch (error) {
+        console.error("Gagal memasukkan stok ke inventaris:", error);
+        alert(`Gagal: ${error.message}`);
+    } finally {
+        isSaving.value = false;
+    }
+}
 
 async function deletePurchaseOrder(orderId) {
     if (!confirm("Anda yakin ingin menghapus riwayat penerimaan barang ini? Aksi ini tidak dapat dibatalkan.")) {
@@ -9203,14 +9248,22 @@ watch(activePage, (newPage) => {
 
             <div v-if="uiState.activeSupplierView === 'list'" class="animate-fade-in-up">
                 <div class="flex flex-wrap justify-between items-center gap-4 mb-8">
-                    <div>
-                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Supplier</h2>
-                        <p class="text-slate-500 mt-1">Kelola data supplier dan produk yang mereka sediakan.</p>
-                    </div>
-                    <button @click="showModal('addSupplier', { name: '', contact: '', products: [] })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors" :disabled="!isSubscriptionActive">
-    + Tambah Supplier Baru
-</button>
-                </div>
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Manajemen Supplier</h2>
+        <p class="text-slate-500 mt-1">Kelola data supplier dan riwayat pesanan pembelian Anda.</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <button v-if="uiState.activeSupplierView === 'produkList'" @click="uiState.activeSupplierView = 'list'" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
+            &laquo; Kembali ke Daftar Supplier
+        </button>
+        <button v-if="uiState.activeSupplierView === 'list'" @click="uiState.activeSupplierView = 'produkList'" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
+            Lihat Produk Supplier
+        </button>
+        <button @click="showModal('addSupplier', { name: '', contact: '' })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors" :disabled="!isSubscriptionActive">
+            + Tambah Supplier Baru
+        </button>
+    </div>
+</div>
 
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 mb-8">
                     <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Daftar Supplier</h3>
@@ -9452,7 +9505,47 @@ watch(activePage, (newPage) => {
             </table>
         </div>
     </div>
-    
+    <div v-if="uiState.activeSupplierView === 'produkList'" class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+    <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Produk dari Supplier</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left text-slate-500">
+            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                <tr>
+                    <th class="px-4 py-3">Tanggal</th>
+                    <th class="px-4 py-3">Supplier</th>
+                    <th class="px-4 py-3">Produk</th>
+                    <th class="px-4 py-3 text-right">Harga Beli</th>
+                    <th class="px-4 py-3 text-center">Qty</th>
+                    <th class="px-4 py-3 text-center">Status Inventaris</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200/50">
+                <tr v-if="itemizedPurchaseHistory.length === 0">
+                    <td colspan="6" class="p-10 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
+                </tr>
+                <tr v-for="(item, index) in itemizedPurchaseHistory" :key="`${item.orderId}-${index}`" class="hover:bg-slate-50/50">
+                    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
+                    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
+                    <td class="px-4 py-3">
+                        <p class="font-semibold">{{ item.modelName }}</p>
+                        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
+                    </td>
+                    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
+                    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
+                    <td class="px-4 py-3 text-center">
+                        <span v-if="item.isInventoried" class="text-green-600 font-bold flex items-center justify-center text-xs">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                            Sudah Masuk
+                        </span>
+                        <button v-else @click="addPurchaseOrderItemToInventory(item)" class="bg-blue-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-blue-700" :disabled="!isSubscriptionActive">
+                            Masukkan ke Inventaris
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
     <div v-if="isAnyProductPaymentInProgress" class="mt-4 p-4 border rounded-lg bg-slate-50 animate-fade-in">
     <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
