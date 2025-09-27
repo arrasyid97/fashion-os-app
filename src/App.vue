@@ -3025,8 +3025,10 @@ const filteredPurchaseOrders = computed(() => {
 
     // --- Terapkan Filter Status Proses ---
     if (uiState.purchaseOrderStatusProsesFilter !== 'all') {
-        orders = orders.filter(order => order.statusProses === uiState.purchaseOrderStatusProsesFilter);
-    }
+        orders = orders.filter(order => 
+        (order.produk || []).some(p => p.statusProses === uiState.purchaseOrderStatusProsesFilter)
+    );
+}
     
     // --- Terapkan Filter Status Bayar ---
     if (uiState.purchaseOrderStatusBayarFilter !== 'all') {
