@@ -9246,168 +9246,235 @@ watch(activePage, (newPage) => {
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
 
-            <div v-if="uiState.activeSupplierView === 'list'" class="animate-fade-in-up">
+            <div v-show="uiState.activeSupplierView !== 'form'" class="animate-fade-in-up">
+                
                 <div class="flex flex-wrap justify-between items-center gap-4 mb-8">
-    <div>
-        <h2 class="text-3xl font-bold text-slate-800">Manajemen Supplier</h2>
-        <p class="text-slate-500 mt-1">Kelola data supplier dan riwayat pesanan pembelian Anda.</p>
-    </div>
-    <div class="flex items-center gap-3">
-        <button v-if="uiState.activeSupplierView === 'produkList'" @click="uiState.activeSupplierView = 'list'" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
-            &laquo; Kembali ke Daftar Supplier
-        </button>
-        <button v-if="uiState.activeSupplierView === 'list'" @click="uiState.activeSupplierView = 'produkList'" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
-            Lihat Produk Supplier
-        </button>
-        <button @click="showModal('addSupplier', { name: '', contact: '' })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors" :disabled="!isSubscriptionActive">
-            + Tambah Supplier Baru
-        </button>
-    </div>
-</div>
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Supplier</h2>
+                        <p class="text-slate-500 mt-1">Kelola data supplier dan riwayat pesanan pembelian Anda.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button 
+                            v-if="uiState.activeSupplierView === 'produkList'" 
+                            @click="uiState.activeSupplierView = 'list'" 
+                            class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors"
+                        >
+                            &laquo; Kembali ke Daftar Supplier
+                        </button>
+                        <button 
+                            v-if="uiState.activeSupplierView === 'list'" 
+                            @click="uiState.activeSupplierView = 'produkList'" 
+                            class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors"
+                        >
+                            Lihat Produk Supplier
+                        </button>
+                        <button 
+                            @click="showModal('addSupplier', { name: '', contact: '' })" 
+                            class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors" 
+                            :disabled="!isSubscriptionActive"
+                        >
+                            + Tambah Supplier Baru
+                        </button>
+                    </div>
+                </div>
 
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 mb-8">
+                <div 
+                    v-show="uiState.activeSupplierView === 'list'" 
+                    class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 mb-8"
+                >
                     <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Daftar Supplier</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left text-slate-500">
-    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-        <tr>
-            <th class="px-6 py-3">Nama Supplier</th>
-            <th class="px-6 py-3">Kontak</th>
-            <th class="px-6 py-3 text-right" style="width: 250px;">Aksi</th>
-        </tr>
-    </thead>
-    <tbody class="divide-y divide-slate-200/50">
-        <tr v-if="state.suppliers.length === 0">
-            <td colspan="3" class="p-10 text-center text-slate-500">Tidak ada data supplier.</td>
-        </tr>
-        <tr v-for="supplier in state.suppliers" :key="supplier.id" class="hover:bg-slate-50/50">
-            <td class="px-6 py-4 font-semibold text-slate-800">{{ supplier.name }}</td>
-            <td class="px-6 py-4">{{ supplier.contact || '-' }}</td>
-            <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap" style="width: 250px;">
-                <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline" :disabled="!isSubscriptionActive">Buat Pesanan</button>
-                <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
-                <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">
-                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                </button>
-            </td>
-        </tr>
-    </tbody>
-</table>
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                                <tr>
+                                    <th class="px-6 py-3">Nama Supplier</th>
+                                    <th class="px-6 py-3">Kontak</th>
+                                    <th class="px-6 py-3 text-right" style="width: 250px;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/50">
+                                <tr v-if="state.suppliers.length === 0">
+                                    <td colspan="3" class="p-10 text-center text-slate-500">Tidak ada data supplier.</td>
+                                </tr>
+                                <tr v-for="supplier in state.suppliers" :key="supplier.id" class="hover:bg-slate-50/50">
+                                    <td class="px-6 py-4 font-semibold text-slate-800">{{ supplier.name }}</td>
+                                    <td class="px-6 py-4">{{ supplier.contact || '-' }}</td>
+                                    <td class="px-6 py-4 text-right space-x-3 whitespace-nowrap" style="width: 250px;">
+                                        <button @click="showPenerimaanBarangForm(supplier)" class="font-semibold text-green-500 hover:underline" :disabled="!isSubscriptionActive">Buat Pesanan</button>
+                                        <button @click="showModal('editSupplier', JSON.parse(JSON.stringify(supplier)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
+                                        <button @click="deleteSupplier(supplier.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">
+                                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
-    <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Penerimaan Barang</h3>
-    <div class="p-4 bg-slate-50/50 rounded-xl border shadow-sm mb-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-        <div>
-            <label class="block text-sm font-medium mb-1">Cari Supplier / SKU</label>
-            <input type="text" v-model="uiState.purchaseOrderSearch" placeholder="Ketik nama supplier atau SKU..." class="w-full p-2 border rounded-md bg-white shadow-sm">
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Filter Status Proses</label>
-            <select v-model="uiState.purchaseOrderStatusProsesFilter" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                <option value="all">Semua Status</option>
-                <option value="Dalam Proses">Dalam Proses</option>
-                <option value="Selesai">Selesai</option>
-                <option value="Revisi">Revisi</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Filter Status Bayar</label>
-            <select v-model="uiState.purchaseOrderStatusBayarFilter" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                <option value="all">Semua Status</option>
-                <option value="Belum Dibayar">Belum Dibayar</option>
-                <option value="Proses Pembayaran">Proses Pembayaran</option>
-                <option value="Sudah Dibayar">Sudah Dibayar</option>
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm font-medium mb-1">Urutkan</label>
-            <select v-model="uiState.purchaseOrderSort" class="w-full p-2 border rounded-md bg-white shadow-sm">
-                <option value="tanggal-desc">Tanggal (Terbaru)</option>
-                <option value="tanggal-asc">Tanggal (Terlama)</option>
-                <option value="total-desc">Total Nilai (Tertinggi)</option>
-                <option value="total-asc">Total Nilai (Terendah)</option>
-            </select>
-        </div>
-        <div class="lg:col-span-4">
-            <label class="block text-sm font-medium mb-1">Filter Waktu</label>
-            <div class="flex flex-wrap items-center gap-2">
-                <select v-model="uiState.purchaseOrderDateFilter" class="flex-grow bg-white border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                    <option value="all_time">Semua Waktu</option>
-                    <option value="today">Hari Ini</option>
-                    <option value="last_7_days">7 Hari Terakhir</option>
-                    <option value="last_30_days">30 Hari Terakhir</option>
-                    <option value="this_year">Tahun Ini</option>
-                    <option value="by_month_range">Rentang Bulan</option>
-                    <option value="by_year_range">Rentang Tahun</option>
-                </select>
-                <div v-if="uiState.purchaseOrderDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
-                    <select v-model.number="uiState.purchaseOrderStartMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                    <input type="number" v-model.number="uiState.purchaseOrderStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
-                    <span class="mx-2">s/d</span>
-                    <select v-model.number="uiState.purchaseOrderEndMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                    <input type="number" v-model.number="uiState.purchaseOrderEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                
+                <div 
+                    v-show="uiState.activeSupplierView === 'list'" 
+                    class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200"
+                >
+                    <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Penerimaan Barang</h3>
+                    <div class="p-4 bg-slate-50/50 rounded-xl border shadow-sm mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Cari Supplier / SKU</label>
+                                <input type="text" v-model="uiState.purchaseOrderSearch" placeholder="Ketik nama supplier atau SKU..." class="w-full p-2 border rounded-md bg-white shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Filter Status Proses</label>
+                                <select v-model="uiState.purchaseOrderStatusProsesFilter" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                                    <option value="all">Semua Status</option>
+                                    <option value="Dalam Proses">Dalam Proses</option>
+                                    <option value="Selesai">Selesai</option>
+                                    <option value="Revisi">Revisi</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Filter Status Bayar</label>
+                                <select v-model="uiState.purchaseOrderStatusBayarFilter" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                                    <option value="all">Semua Status</option>
+                                    <option value="Belum Dibayar">Belum Dibayar</option>
+                                    <option value="Proses Pembayaran">Proses Pembayaran</option>
+                                    <option value="Sudah Dibayar">Sudah Dibayar</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Urutkan</label>
+                                <select v-model="uiState.purchaseOrderSort" class="w-full p-2 border rounded-md bg-white shadow-sm">
+                                    <option value="tanggal-desc">Tanggal (Terbaru)</option>
+                                    <option value="tanggal-asc">Tanggal (Terlama)</option>
+                                    <option value="total-desc">Total Nilai (Tertinggi)</option>
+                                    <option value="total-asc">Total Nilai (Terendah)</option>
+                                </select>
+                            </div>
+                            <div class="lg:col-span-4">
+                                <label class="block text-sm font-medium mb-1">Filter Waktu</label>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <select v-model="uiState.purchaseOrderDateFilter" class="flex-grow bg-white border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                                        <option value="all_time">Semua Waktu</option>
+                                        <option value="today">Hari Ini</option>
+                                        <option value="last_7_days">7 Hari Terakhir</option>
+                                        <option value="last_30_days">30 Hari Terakhir</option>
+                                        <option value="this_year">Tahun Ini</option>
+                                        <option value="by_month_range">Rentang Bulan</option>
+                                        <option value="by_year_range">Rentang Tahun</option>
+                                    </select>
+                                    <div v-if="uiState.purchaseOrderDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
+                                        <select v-model.number="uiState.purchaseOrderStartMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                                        <input type="number" v-model.number="uiState.purchaseOrderStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                                        <span class="mx-2">s/d</span>
+                                        <select v-model.number="uiState.purchaseOrderEndMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                                        <input type="number" v-model.number="uiState.purchaseOrderEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                                    </div>
+                                    <div v-if="uiState.purchaseOrderDateFilter === 'by_year_range'" class="flex items-center gap-2">
+                                        <input type="number" v-model.number="uiState.purchaseOrderStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                                        <span>s/d</span>
+                                        <input type="number" v-model.number="uiState.purchaseOrderEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-4 flex justify-end">
+                            <button @click="exportPurchaseOrdersToExcel" class="bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-700 text-sm h-[42px] flex-shrink-0" :disabled="!isSubscriptionActive">
+                                Export ke Excel
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                                <tr>
+                                    <th class="px-4 py-3">Tanggal</th>
+                                    <th class="px-4 py-3">Supplier</th>
+                                    <th class="px-4 py-3">Produk</th>
+                                    <th class="px-4 py-3 text-right">Harga</th>
+                                    <th class="px-4 py-3 text-center">Jumlah Barang</th>
+                                    <th class="px-4 py-3 text-right">Total Nilai Barang</th>
+                                    <th class="px-4 py-3">Status Proses</th>
+                                    <th class="px-4 py-3">Status Bayar</th>
+                                    <th class="px-4 py-3">Retur</th>
+                                    <th class="px-4 py-3 text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/50">
+                                <tr v-if="itemizedPurchaseHistory.length === 0">
+                                    <td colspan="10" class="p-10 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
+                                </tr>
+                                <tr v-for="(item, index) in itemizedPurchaseHistory" :key="`${item.orderId}-${index}`" class="hover:bg-slate-50/50">
+                                    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
+                                    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-semibold">{{ item.modelName }}</p>
+                                        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
+                                    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
+                                    <td class="px-4 py-3 text-right font-bold text-green-600">{{ formatCurrency(item.hargaJual * item.qty) }}</td>
+                                    <td class="px-4 py-3">{{ item.statusProses }}</td>
+                                    <td class="px-4 py-3">{{ item.statusPembayaran }}</td>
+                                    <td class="px-4 py-3">{{ item.returReason || 'Tidak Retur' }}</td>
+                                    <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+                                        <button @click="showModal('viewPurchaseOrder', JSON.parse(JSON.stringify(filteredPurchaseOrders.find(o => o.id === item.orderId))))" class="font-semibold text-indigo-500 hover:underline">Detail</button>
+                                        <button @click="showEditPenerimaanBarangForm(filteredPurchaseOrders.find(o => o.id === item.orderId))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+                                        <button @click="deletePurchaseOrder(item.orderId)" class="text-red-500 hover:text-red-700">
+                                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div v-if="uiState.purchaseOrderDateFilter === 'by_year_range'" class="flex items-center gap-2">
-                    <input type="number" v-model.number="uiState.purchaseOrderStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-                    <span>s/d</span>
-                    <input type="number" v-model.number="uiState.purchaseOrderEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+
+                <div v-show="uiState.activeSupplierView === 'produkList'" class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Produk dari Supplier</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                                <tr>
+                                    <th class="px-4 py-3">Tanggal</th>
+                                    <th class="px-4 py-3">Supplier</th>
+                                    <th class="px-4 py-3">Produk</th>
+                                    <th class="px-4 py-3 text-right">Harga Beli</th>
+                                    <th class="px-4 py-3 text-center">Qty</th>
+                                    <th class="px-4 py-3 text-center">Status Inventaris</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200/50">
+                                <tr v-if="itemizedPurchaseHistory.length === 0">
+                                    <td colspan="6" class="p-10 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
+                                </tr>
+                                <tr v-for="(item, index) in itemizedPurchaseHistory" :key="`${item.orderId}-${index}`" class="hover:bg-slate-50/50">
+                                    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
+                                    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-semibold">{{ item.modelName }}</p>
+                                        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
+                                    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span v-if="item.isInventoried" class="text-green-600 font-bold flex items-center justify-center text-xs">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                            Sudah Masuk
+                                        </span>
+                                        <button 
+                                            v-else 
+                                            @click="addPurchaseOrderItemToInventory(item)" 
+                                            class="bg-blue-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-blue-700" 
+                                            :disabled="!isSubscriptionActive"
+                                        >
+                                            Masukkan ke Inventaris
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div class="lg:col-span-4 flex justify-end">
-            <button @click="exportPurchaseOrdersToExcel" class="bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-700 text-sm h-[42px] flex-shrink-0" :disabled="!isSubscriptionActive">
-                Export ke Excel
-            </button>
-        </div>
-    </div>
-</div>
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm text-left text-slate-500">
-            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                <tr>
-                    <th class="px-4 py-3">Tanggal</th>
-                    <th class="px-4 py-3">Supplier</th>
-                    <th class="px-4 py-3">Produk</th>
-                    <th class="px-4 py-3 text-right">Harga</th>
-                    <th class="px-4 py-3 text-center">Jumlah Barang</th>
-                    <th class="px-4 py-3 text-right">Total Nilai Barang</th>
-                    <th class="px-4 py-3">Status Proses</th>
-                    <th class="px-4 py-3">Status Bayar</th>
-                    <th class="px-4 py-3">Retur</th>
-                    <th class="px-4 py-3 text-right">Aksi</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200/50">
-                <tr v-if="itemizedPurchaseHistory.length === 0">
-                    <td colspan="10" class="p-10 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
-                </tr>
-                <tr v-for="(item, index) in itemizedPurchaseHistory" :key="`${item.orderId}-${index}`" class="hover:bg-slate-50/50">
-                    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
-                    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
-                    <td class="px-4 py-3">
-                        <p class="font-semibold">{{ item.modelName }}</p>
-                        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
-                    </td>
-                    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
-                    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
-                    <td class="px-4 py-3 text-right font-bold text-green-600">{{ formatCurrency(item.hargaJual * item.qty) }}</td>
-                    <td class="px-4 py-3">{{ item.statusProses }}</td>
-                    <td class="px-4 py-3">{{ item.statusPembayaran }}</td>
-                    <td class="px-4 py-3">{{ item.returReason || 'Tidak Retur' }}</td>
-                    <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
-                        <button @click="showModal('viewPurchaseOrder', JSON.parse(JSON.stringify(filteredPurchaseOrders.find(o => o.id === item.orderId))))" class="font-semibold text-indigo-500 hover:underline">Detail</button>
-                        <button @click="showEditPenerimaanBarangForm(filteredPurchaseOrders.find(o => o.id === item.orderId))" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                        <button @click="deletePurchaseOrder(item.orderId)" class="text-red-500 hover:text-red-700">
-                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        </button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
             </div>
 
             <div v-if="uiState.activeSupplierView === 'form'" class="animate-fade-in-up">
@@ -9420,155 +9487,114 @@ watch(activePage, (newPage) => {
 
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
                     <form @submit.prevent="submitPenerimaanBarang" class="space-y-4">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-            <label class="block text-sm font-medium">Tanggal</label>
-            <input type="date" v-model="uiState.penerimaanBarangForm.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
-        </div>
-        <div>
-            <label class="block text-sm font-medium">Catatan</label>
-            <input type="text" v-model="uiState.penerimaanBarangForm.catatan" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div class="relative">
-            <label class="block text-sm font-medium">Pilih Produk</label>
-            <div class="flex gap-2">
-                <select v-model="uiState.selectedProductForPurchase" class="mt-1 w-full p-2 border rounded-md" :class="{'text-slate-400': !uiState.selectedProductForPurchase}" required>
-                    <option :value="null" disabled>-- Pilih Produk Inventaris --</option>
-                    <option v-for="product in state.produk" :key="product.sku" :value="product">{{ product.nama }} ({{ product.sku }})</option>
-                </select>
-                <button @click.prevent="addProductFromSelection" type="button" class="bg-indigo-600 text-white font-bold px-4 rounded-lg flex-shrink-0" :disabled="!uiState.selectedProductForPurchase">+ Tambah</button>
-            </div>
-        </div>
-    </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium">Tanggal</label>
+                                <input type="date" v-model="uiState.penerimaanBarangForm.tanggal" class="mt-1 w-full p-2 border rounded-md" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium">Catatan</label>
+                                <input type="text" v-model="uiState.penerimaanBarangForm.catatan" class="mt-1 w-full p-2 border rounded-md">
+                            </div>
+                            <div class="relative">
+                                <label class="block text-sm font-medium">Pilih Produk</label>
+                                <div class="flex gap-2">
+                                    <select v-model="uiState.selectedProductForPurchase" class="mt-1 w-full p-2 border rounded-md" :class="{'text-slate-400': !uiState.selectedProductForPurchase}" required>
+                                        <option :value="null" disabled>-- Pilih Produk Inventaris --</option>
+                                        <option v-for="product in state.produk" :key="product.sku" :value="product">{{ product.nama }} ({{ product.sku }})</option>
+                                    </select>
+                                    <button @click.prevent="addProductFromSelection" type="button" class="bg-indigo-600 text-white font-bold px-4 rounded-lg flex-shrink-0" :disabled="!uiState.selectedProductForPurchase">+ Tambah</button>
+                                </div>
+                            </div>
+                        </div>
 
-    <div class="mt-8">
-        <h4 class="text-lg font-bold mb-2">Daftar Produk Pesanan</h4>
-        <div class="overflow-x-auto max-h-96">
-            <table class="w-full text-sm text-left text-slate-500">
-                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                    <tr>
-                        <th class="px-4 py-3">Produk</th>
-                        <th class="px-4 py-3 text-right">Harga Jual</th>
-                        <th class="px-4 py-3 text-center">Qty</th>
-                        <th class="px-4 py-3 text-right">Total</th>
-                        <th class="px-4 py-3">Status Proses</th>
-                        <th class="px-4 py-3">Status Bayar</th>
-                        <th class="px-4 py-3">Retur</th>
-                        <th class="px-4 py-3">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-if="uiState.penerimaanBarangForm.produk.length === 0">
-                        <td colspan="8" class="p-4 text-center text-slate-500">Daftar pesanan kosong.</td>
-                    </tr>
-                    <tr v-for="(p, index) in uiState.penerimaanBarangForm.produk" :key="p.sku">
-                        <td class="px-4 py-3">
-                            <p class="font-semibold text-slate-800">{{ p.nama }}</p>
-                            <p class="text-xs">{{ p.sku }} ({{ p.warna }} / {{ p.varian }})</p>
-                        </td>
-                        <td class="px-4 py-3">
-                            <input type="number" v-model.number="p.hargaJual" class="w-full p-1 border rounded-md text-sm text-right">
-                        </td>
-                        <td class="px-4 py-3">
-                            <input type="number" v-model.number="p.qty" class="w-20 p-1 border rounded-md text-sm text-center">
-                        </td>
-                        <td class="px-4 py-3 text-right font-bold text-indigo-600">
-                            {{ formatCurrency(p.hargaJual * p.qty) }}
-                        </td>
-                        <td class="px-4 py-3">
-                            <select v-model="p.statusProses" class="w-full p-1 border rounded-md text-xs">
-                                <option>Dalam Proses</option>
-                                <option>Selesai</option>
-                                <option>Revisi</option>
-                            </select>
-                        </td>
-                        <td class="px-4 py-3">
-                            <select v-model="p.statusPembayaran" class="w-full p-1 border rounded-md text-xs">
-    <option>Belum Dibayar</option>
-    <option>Proses Pembayaran</option>
-    <option>Sudah Dibayar</option>
-</select>
-                        </td>
-                        <td class="px-4 py-3">
-                            <select v-model="p.returReason" class="w-full p-1 border rounded-md text-xs">
-                                <option :value="null">Tidak Retur</option>
-                                <option>Cacat</option>
-                                <option>Salah Warna</option>
-                                <option>Salah Ukuran</option>
-                            </select>
-                        </td>
-                        <td class="px-4 py-3">
-                            <button @click.prevent="removeProductFromPenerimaanBarang(index)" type="button" class="text-red-500 hover:underline text-xs">Hapus</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <div v-if="uiState.activeSupplierView === 'produkList'" class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
-    <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Produk dari Supplier</h3>
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm text-left text-slate-500">
-            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                <tr>
-                    <th class="px-4 py-3">Tanggal</th>
-                    <th class="px-4 py-3">Supplier</th>
-                    <th class="px-4 py-3">Produk</th>
-                    <th class="px-4 py-3 text-right">Harga Beli</th>
-                    <th class="px-4 py-3 text-center">Qty</th>
-                    <th class="px-4 py-3 text-center">Status Inventaris</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200/50">
-                <tr v-if="itemizedPurchaseHistory.length === 0">
-                    <td colspan="6" class="p-10 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
-                </tr>
-                <tr v-for="(item, index) in itemizedPurchaseHistory" :key="`${item.orderId}-${index}`" class="hover:bg-slate-50/50">
-                    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
-                    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
-                    <td class="px-4 py-3">
-                        <p class="font-semibold">{{ item.modelName }}</p>
-                        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
-                    </td>
-                    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
-                    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
-                    <td class="px-4 py-3 text-center">
-                        <span v-if="item.isInventoried" class="text-green-600 font-bold flex items-center justify-center text-xs">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-                            Sudah Masuk
-                        </span>
-                        <button v-else @click="addPurchaseOrderItemToInventory(item)" class="bg-blue-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-blue-700" :disabled="!isSubscriptionActive">
-                            Masukkan ke Inventaris
-                        </button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-    <div v-if="isAnyProductPaymentInProgress" class="mt-4 p-4 border rounded-lg bg-slate-50 animate-fade-in">
-    <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-            <label class="block text-sm font-medium">Total yang Harus Dibayarkan</label>
-            <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(totalYangHarusDibayarkan) }}</p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium">Dibayarkan Berapa</label>
-            <input type="number" v-model.number="uiState.penerimaanBarangForm.dibayarkan" class="mt-1 w-full p-2 border rounded-md text-right" placeholder="0">
-        </div>
-        <div>
-            <label class="block text-sm font-medium">Sisa Pembayaran</label>
-            <p class="font-bold text-lg text-red-600">{{ formatCurrency(sisaPembayaran) }}</p>
-        </div>
-    </div>
-</div>
+                        <div class="mt-8">
+                            <h4 class="text-lg font-bold mb-2">Daftar Produk Pesanan</h4>
+                            <div class="overflow-x-auto max-h-96">
+                                <table class="w-full text-sm text-left text-slate-500">
+                                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                                        <tr>
+                                            <th class="px-4 py-3">Produk</th>
+                                            <th class="px-4 py-3 text-right">Harga Jual</th>
+                                            <th class="px-4 py-3 text-center">Qty</th>
+                                            <th class="px-4 py-3 text-right">Total</th>
+                                            <th class="px-4 py-3">Status Proses</th>
+                                            <th class="px-4 py-3">Status Bayar</th>
+                                            <th class="px-4 py-3">Retur</th>
+                                            <th class="px-4 py-3">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-if="uiState.penerimaanBarangForm.produk.length === 0">
+                                            <td colspan="8" class="p-4 text-center text-slate-500">Daftar pesanan kosong.</td>
+                                        </tr>
+                                        <tr v-for="(p, index) in uiState.penerimaanBarangForm.produk" :key="p.sku">
+                                            <td class="px-4 py-3">
+                                                <p class="font-semibold text-slate-800">{{ p.nama }}</p>
+                                                <p class="text-xs">{{ p.sku }} ({{ p.warna }} / {{ p.varian }})</p>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <input type="number" v-model.number="p.hargaJual" class="w-full p-1 border rounded-md text-sm text-right">
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <input type="number" v-model.number="p.qty" class="w-20 p-1 border rounded-md text-sm text-center">
+                                            </td>
+                                            <td class="px-4 py-3 text-right font-bold text-indigo-600">
+                                                {{ formatCurrency(p.hargaJual * p.qty) }}
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <select v-model="p.statusProses" class="w-full p-1 border rounded-md text-xs">
+                                                    <option>Dalam Proses</option>
+                                                    <option>Selesai</option>
+                                                    <option>Revisi</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <select v-model="p.statusPembayaran" class="w-full p-1 border rounded-md text-xs">
+                                                    <option>Belum Dibayar</option>
+                                                    <option>Proses Pembayaran</option>
+                                                    <option>Sudah Dibayar</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <select v-model="p.returReason" class="w-full p-1 border rounded-md text-xs">
+                                                    <option :value="null">Tidak Retur</option>
+                                                    <option>Cacat</option>
+                                                    <option>Salah Warna</option>
+                                                    <option>Salah Ukuran</option>
+                                                </select>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <button @click.prevent="removeProductFromPenerimaanBarang(index)" type="button" class="text-red-500 hover:underline text-xs">Hapus</button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div v-if="isAnyProductPaymentInProgress" class="mt-4 p-4 border rounded-lg bg-slate-50 animate-fade-in">
+                            <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium">Total yang Harus Dibayarkan</label>
+                                    <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(totalYangHarusDibayarkan) }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium">Dibayarkan Berapa</label>
+                                    <input type="number" v-model.number="uiState.penerimaanBarangForm.dibayarkan" class="mt-1 w-full p-2 border rounded-md text-right" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium">Sisa Pembayaran</label>
+                                    <p class="font-bold text-lg text-red-600">{{ formatCurrency(sisaPembayaran) }}</p>
+                                </div>
+                            </div>
+                        </div>
 
-<div class="flex justify-end gap-3 mt-8 pt-4 border-t">
-    <button @click.prevent="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-    <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
-</div>
-</form>
+                        <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
+                            <button @click.prevent="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan Penerimaan</button>
+                        </div>
+                    </form>
                 </div>
             </div>
             
