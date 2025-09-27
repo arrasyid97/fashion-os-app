@@ -1687,7 +1687,19 @@ async function submitVoucherNote() {
         const docRef = await addDoc(collection(db, "voucher_notes"), dataToSave);
         state.voucherNotes.push({ id: docRef.id, ...dataToSave, endDate: dataToSave.endDate });
         alert("Catatan voucher berhasil disimpan!");
-        hideModal();
+
+        // --- PERUBAHAN UTAMA DI SINI ---
+        // Baris hideModal() dihapus dan diganti dengan kode untuk mereset form
+        uiState.notesData.title = '';
+        uiState.notesData.endDate = new Date().toISOString().split('T')[0];
+        uiState.notesData.endHour = '23';
+        uiState.notesData.endMinute = '59';
+        uiState.notesData.modelName = '';
+        uiState.notesData.channelId = '';
+        uiState.notesData.voucherType = '';
+        uiState.notesData.type = 'model'; // Kembali ke default
+        // --- AKHIR PERUBAHAN ---
+
     } catch (error) {
         console.error("Gagal menyimpan catatan:", error);
         alert("Gagal menyimpan catatan. Silakan coba lagi.");
