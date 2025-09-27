@@ -9505,7 +9505,7 @@ watch(activePage, (newPage) => {
             </table>
         </div>
     </div>
-            <div v-if="uiState.activeSupplierView === 'produkList'" class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+    <div v-if="uiState.activeSupplierView === 'produkList'" class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
     <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Produk dari Supplier</h3>
     <div class="overflow-x-auto">
         <table class="w-full text-sm text-left text-slate-500">
