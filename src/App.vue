@@ -1068,15 +1068,6 @@ const filteredVoucherNotes = computed(() => {
     });
 });
 
-const filteredVoucherTypes = computed(() => {
-    if (uiState.notesData.type === 'model') {
-        return ['Voucher Produk Tertentu', 'Diskon Minimal Belanja Bertingkat'];
-    }
-    if (uiState.notesData.type === 'channel') {
-        return ['Voucher Ikuti Toko', 'Voucher Semua Produk'];
-    }
-    return []; // Default, jika belum dipilih
-});
 
 
 const monthlyPrice = ref(350000);
@@ -2735,15 +2726,21 @@ const promosiProductModels = computed(() => {
   if (!state.produk || state.produk.length === 0) {
     return [];
   }
-  // 1. Ambil semua nama model dasar (misal: "SALWA", "YONA") dari setiap produk
   const modelNames = state.produk.map(product => {
     const model = state.settings.modelProduk.find(m => m.id === product.model_id);
-    // Menggunakan logika yang sama seperti di inventoryProductGroups
     return model ? model.namaModel.split(' ')[0] : 'N/A';
   });
-
-  // 2. Gunakan Set untuk mendapatkan nama yang unik, lalu ubah kembali ke array dan urutkan
   return Array.from(new Set(modelNames)).sort();
+});
+
+const filteredVoucherTypes = computed(() => {
+    if (uiState.notesData.type === 'model') {
+        return ['Voucher Produk Tertentu', 'Diskon Minimal Belanja Bertingkat'];
+    }
+    if (uiState.notesData.type === 'channel') {
+        return ['Voucher Ikuti Toko', 'Voucher Semua Produk'];
+    }
+    return []; // Default, jika belum dipilih
 });
 
 const modalStockSummary = computed(() => {
