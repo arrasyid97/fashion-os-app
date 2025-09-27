@@ -1810,8 +1810,6 @@ const voucherTokoMinBelanjaComputed = (channel) => computed({
     }
 });
 
-
-
 const voucherSemuaProdukMinBelanjaComputed = (channel) => computed({
     get() { 
         const promo = state.promotions.perChannel[channel.id]?.voucherSemuaProduk;
@@ -1825,8 +1823,6 @@ const voucherSemuaProdukMinBelanjaComputed = (channel) => computed({
         state.promotions.perChannel[channel.id].voucherSemuaProduk.minBelanja = parseInputNumber(newValue);
     }
 });
-
-
 
 const diskonMinBelanjaComputed = (modelName, channelId) => computed({
     get() { 
@@ -1847,6 +1843,54 @@ const tieredMinComputed = (tier) => computed({
     get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
     set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
 });
+
+
+async function saveChannelPromotions(channelId) {
+    if (!currentUser.value) return alert("Anda harus login.");
+    isSaving.value = true;
+    try {
+        const userId = currentUser.value.uid;
+        const promotionsRef = doc(db, "promotions", userId);
+        const channelPromoData = state.promotions.perChannel[channelId];
+
+        // Hanya update data untuk channel yang spesifik ini
+        await updateDoc(promotionsRef, {
+            [`perChannel.${channelId}`]: JSON.parse(JSON.stringify(channelPromoData))
+        });
+
+        alert(`Pengaturan voucher untuk channel ini berhasil disimpan!`);
+    } catch (error) {
+        console.error("Gagal menyimpan promosi channel:", error);
+        alert("Gagal menyimpan promosi channel.");
+    } finally {
+        isSaving.value = false;
+    }
+}
+
+async function saveModelPromotions(modelName, channelId) {
+    if (!currentUser.value) return alert("Anda harus login.");
+    isSaving.value = true;
+    try {
+        const userId = currentUser.value.uid;
+        const promotionsRef = doc(db, "promotions", userId);
+        const modelPromoData = state.promotions.perModel[modelName]?.[channelId];
+
+        if (modelPromoData) {
+            // Hanya update data untuk model dan channel yang spesifik ini
+            await updateDoc(promotionsRef, {
+                [`perModel.${modelName}.${channelId}`]: JSON.parse(JSON.stringify(modelPromoData))
+            });
+            alert(`Promosi untuk model ${modelName} di channel ini berhasil disimpan!`);
+        } else {
+            alert('Tidak ada perubahan untuk disimpan.');
+        }
+    } catch (error) {
+        console.error("Gagal menyimpan promosi model:", error);
+        alert("Gagal menyimpan promosi model.");
+    } finally {
+        isSaving.value = false;
+    }
+}
 
 async function applyReferralCode() {
     if (currentUser.value?.userData?.referredBy) {
@@ -7357,20 +7401,10 @@ watch(activePage, (newPage) => {
                     <p class="text-slate-500 mt-1">Atur semua diskon dan voucher untuk setiap model produk.</p>
                 </div>
                 <div class="flex gap-3">
-    <button @click="showModal('voucherUmum')" class="bg-purple-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-purple-700 transition-colors shadow">
-        Atur Voucher Umum
-    </button>
-
-    <button @click="showNotesModal" class="bg-indigo-100 text-indigo-700 font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h-2a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2a1 1 0 01-1-1V2a1 1 0 10-2 0v1H9a1 1 0 00-1 1v1H6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd" /></svg>
-        Catatan
-    </button>
-
-    <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
-        <span v-if="isSaving">Menyimpan...</span>
-        <span v-else>Simpan Semua Perubahan</span>
-    </button>
-</div>
+                    <button @click="showModal('voucherUmum')" class="bg-purple-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-purple-700 transition-colors shadow">
+                        Atur Voucher Umum
+                    </button>
+                </div>
             </div>
 
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
@@ -7407,46 +7441,51 @@ watch(activePage, (newPage) => {
                                     </td>
                                 </tr>
                                 <tr v-if="uiState.activeAccordion === 'voucher-spesifik-' + group.namaModel" class="animate-fade-in">
-                                    <td colspan="3" class="p-4 bg-blue-50/50 border-b-2 border-blue-200">
-                                        <div class="space-y-4">
-                                            <h4 class="text-sm font-bold text-slate-700">Pengaturan Voucher Spesifik untuk Model: {{ group.namaModel }}</h4>
-                                            <p class="text-xs text-slate-500 -mt-3">Diskon ini akan berlaku untuk semua varian di dalam model {{ group.namaModel }}.</p>
-                                            <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-3 border border-slate-200 rounded-lg bg-white shadow-sm">
-                                                <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
-                                                <div class="mt-3">
-                                                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
-                                                    <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
-                                                       <span class="pl-1">Min. Belanja (Rp)</span>
-                                                       <span class="pl-1">Diskon (%)</span>
-                                                       <span class="pl-1">Diskon (Rp)</span>
-                                                    </div>
-                                                    <div class="grid grid-cols-3 gap-2">
-                                                        <input type="text" v-model="diskonMinBelanjaComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                        <input type="text" v-model="diskonRateComputedUpdated(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                        <input type="text" v-model="diskonNominalComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                    </div>
-                                                </div>
-                                                <div class="mt-3">
-                                                    <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
-                                                    <div class="mt-2 grid grid-cols-[1fr,1fr,1fr,auto] gap-2 text-xs text-slate-500 font-semibold">
-                                                        <span class="pl-1">Min. Belanja (Rp)</span>
-                                                        <span class="pl-1">Diskon (%)</span>
-                                                        <span class="pl-1">Diskon (Rp)</span>
-                                                    </div>
-                                                    <div class="space-y-2">
-                                                       <div v-for="(tier, index) in state.promotions.perModel[group.namaModel]?.[channel.id]?.diskonBertingkat" :key="index" class="grid grid-cols-[1fr,1fr,1fr,auto] items-center gap-2">
-                                                            <input type="text" v-model="tieredMinComputed(tier).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                            <input type="text" v-model="tieredDiskonComputedUpdated(tier).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                            <input type="text" v-model="tieredDiskonNominalComputed(tier).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                            <button @click="removePromotionTier(group.namaModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-                                                        </div>
-                                                    </div>
-                                                    <button @click="addPromotionTier(group.namaModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
+    <td colspan="3" class="p-4 bg-blue-50/50 border-b-2 border-blue-200">
+        <div class="space-y-4">
+            <h4 class="text-sm font-bold text-slate-700">Pengaturan Voucher Spesifik untuk Model: {{ group.namaModel }}</h4>
+            <p class="text-xs text-slate-500 -mt-3">Diskon ini akan berlaku untuk semua varian di dalam model {{ group.namaModel }}.</p>
+            <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-3 border border-slate-200 rounded-lg bg-white shadow-sm">
+                <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
+                <div class="mt-3">
+                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
+                    <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
+                       <span class="pl-1">Min. Belanja (Rp)</span>
+                       <span class="pl-1">Diskon (%)</span>
+                       <span class="pl-1">Diskon (Rp)</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <input type="text" v-model="diskonMinBelanjaComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                        <input type="text" v-model="diskonRateComputedUpdated(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                        <input type="text" v-model="diskonNominalComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
+                    <div class="mt-2 grid grid-cols-[1fr,1fr,1fr,auto] gap-2 text-xs text-slate-500 font-semibold">
+                        <span class="pl-1">Min. Belanja (Rp)</span>
+                        <span class="pl-1">Diskon (%)</span>
+                        <span class="pl-1">Diskon (Rp)</span>
+                    </div>
+                    <div class="space-y-2">
+                       <div v-for="(tier, index) in state.promotions.perModel[group.namaModel]?.[channel.id]?.diskonBertingkat" :key="index" class="grid grid-cols-[1fr,1fr,1fr,auto] items-center gap-2">
+                            <input type="text" v-model="tieredMinComputed(tier).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                            <input type="text" v-model="tieredDiskonComputedUpdated(tier).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                            <input type="text" v-model="tieredDiskonNominalComputed(tier).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                            <button @click="removePromotionTier(group.namaModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
+                        </div>
+                    </div>
+                    <button @click="addPromotionTier(group.namaModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
+                </div>
+                <div class="flex justify-end mt-4 pt-3 border-t">
+                     <button @click="saveModelPromotions(group.namaModel, channel.id)" :disabled="isSaving" class="bg-green-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-green-700 disabled:bg-green-300">
+                        Simpan Perubahan {{channel.name}}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </td>
+</tr>
                                 <template v-if="uiState.activeAccordion === group.namaModel">
                                     <tr v-for="v in group.variants" :key="v.docId" class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in">
                                         <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
@@ -12484,7 +12523,9 @@ watch(activePage, (newPage) => {
             </div>
         </form>
     </div>
-</div> <div v-if="uiState.modalType === 'voucherUmum'" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+</div>
+
+<div v-if="uiState.modalType === 'voucherUmum'" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col">
         <div class="flex-shrink-0 pb-4 border-b">
             <h3 class="text-2xl font-bold text-slate-800">Pengaturan Voucher Umum (Per Channel)</h3>
@@ -12519,8 +12560,14 @@ watch(activePage, (newPage) => {
                     <div class="grid grid-cols-3 gap-2">
                         <input type="text" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                         <input type="text" v-model="voucherSemuaProdukDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                        <input type="text" v-model="voucherSemuaProdukDiskonNominalComputed(channel).value" class="w-full p-1.sem text-sm border-slate-300 rounded-md">
+                        <input type="text" v-model="voucherSemuaProdukDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                     </div>
+                </div>
+
+                <div class="flex justify-end mt-4 pt-3 border-t">
+                    <button @click="saveChannelPromotions(channel.id)" :disabled="isSaving" class="bg-green-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-green-700 disabled:bg-green-300">
+                        Simpan Perubahan {{channel.name}}
+                    </button>
                 </div>
             </div>
         </div>
