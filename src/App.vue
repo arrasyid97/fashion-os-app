@@ -1810,19 +1810,7 @@ const voucherTokoMinBelanjaComputed = (channel) => computed({
     }
 });
 
-const voucherTokoDiskonRateComputed = (channel) => computed({
-    get() {
-        const promo = state.promotions.perChannel[channel.id]?.voucherToko;
-        return promo?.diskonRate ? promo.diskonRate + '%' : '';
-    },
-    set(newValue) {
-        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
-        if (!state.promotions.perChannel[channel.id].voucherToko || typeof state.promotions.perChannel[channel.id].voucherToko !== 'object') {
-            state.promotions.perChannel[channel.id].voucherToko = {};
-        }
-        state.promotions.perChannel[channel.id].voucherToko.diskonRate = parsePercentageInput(newValue);
-    }
-});
+
 
 const voucherSemuaProdukMinBelanjaComputed = (channel) => computed({
     get() { 
@@ -1838,19 +1826,7 @@ const voucherSemuaProdukMinBelanjaComputed = (channel) => computed({
     }
 });
 
-const voucherSemuaProdukDiskonRateComputed = (channel) => computed({
-    get() {
-        const promo = state.promotions.perChannel[channel.id]?.voucherSemuaProduk;
-        return promo?.diskonRate ? promo.diskonRate + '%' : '';
-    },
-    set(newValue) {
-        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
-        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk || typeof state.promotions.perChannel[channel.id].voucherSemuaProduk !== 'object') {
-            state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
-        }
-        state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonRate = parsePercentageInput(newValue);
-    }
-});
+
 
 const diskonMinBelanjaComputed = (modelName, channelId) => computed({
     get() { 
@@ -1867,28 +1843,9 @@ const diskonMinBelanjaComputed = (modelName, channelId) => computed({
     }
 });
 
-const diskonRateComputed = (modelName, channelId) => computed({
-    get() { 
-        return state.promotions.perModel[modelName]?.[channelId]?.diskonRate ? state.promotions.perModel[modelName][channelId].diskonRate + '%' : '';
-    },
-    set(newValue) {
-        if (!state.promotions.perModel[modelName]) {
-            state.promotions.perModel[modelName] = {};
-        }
-        if (!state.promotions.perModel[modelName][channelId]) {
-            state.promotions.perModel[modelName][channelId] = {};
-        }
-        state.promotions.perModel[modelName][channelId].diskonRate = parsePercentageInput(newValue);
-    }
-});
-
 const tieredMinComputed = (tier) => computed({
     get() { return tier.min ? 'Rp ' + formatInputNumber(tier.min) : ''; },
     set(newValue) { tier.min = parseInputNumber(newValue) || 0; }
-});
-const tieredDiskonComputed = (tier) => computed({
-    get() { return tier.diskon ? tier.diskon + '%' : ''; },
-    set(newValue) { tier.diskon = parsePercentageInput(newValue); }
 });
 
 async function applyReferralCode() {
@@ -1926,7 +1883,6 @@ async function applyReferralCode() {
         uiState.referralCodeApplied = false;
     }
 }
-
 
 
 async function addCategory() {
