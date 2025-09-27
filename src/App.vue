@@ -7429,10 +7429,16 @@ watch(activePage, (newPage) => {
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
             <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
-                <div>
-                    <h2 class="text-3xl font-bold text-slate-800">Manajemen Promosi & Voucher</h2>
-                    <p class="text-slate-500 mt-1">Atur semua diskon dan voucher untuk setiap model produk.</p>
-                </div>
+                <div class="flex items-center gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Manajemen Promosi & Voucher</h2>
+        <p class="text-slate-500 mt-1">Atur semua diskon dan voucher untuk setiap model produk.</p>
+    </div>
+    <button @click="showModal('panduanPromosi')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+        Informasi
+    </button>
+</div>
                 <div class="flex gap-3">
     <button @click="showModal('voucherUmum')" class="bg-purple-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-purple-700 transition-colors shadow">
         Atur Voucher Umum
