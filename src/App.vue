@@ -6164,9 +6164,7 @@ watch(() => uiState.bulk_scan_input, async (newValue) => {
     }, 200); // Jeda 200 milidetik (0.2 detik)
 });
 
-watch(() => uiState.notesData.type, (newType) => {
-    // Setiap kali tipe berubah (misal dari 'model' ke 'channel'),
-    // kosongkan pilihan jenis voucher untuk mencegah data yang tidak valid.
+watch(() => uiState.notesData.type, () => {
     uiState.notesData.voucherType = '';
 });
 
