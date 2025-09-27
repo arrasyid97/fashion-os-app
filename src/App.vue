@@ -3075,6 +3075,137 @@ const produksiDetailComputed = computed(() => {
     };
 });
 
+
+const voucherTokoDiskonNominalComputed = (channel) => computed({
+    get() {
+        const promo = state.promotions.perChannel[channel.id]?.voucherToko;
+        return promo?.diskonNominal ? formatInputNumber(promo.diskonNominal) : '';
+    },
+    set(newValue) {
+        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
+        if (!state.promotions.perChannel[channel.id].voucherToko) state.promotions.perChannel[channel.id].voucherToko = {};
+        
+        const nominal = parseInputNumber(newValue);
+        state.promotions.perChannel[channel.id].voucherToko.diskonNominal = nominal > 0 ? nominal : null;
+        // Otomatis kosongkan diskon rate jika nominal diisi
+        if (nominal > 0) {
+            state.promotions.perChannel[channel.id].voucherToko.diskonRate = null;
+        }
+    }
+});
+
+const voucherSemuaProdukDiskonNominalComputed = (channel) => computed({
+    get() {
+        const promo = state.promotions.perChannel[channel.id]?.voucherSemuaProduk;
+        return promo?.diskonNominal ? formatInputNumber(promo.diskonNominal) : '';
+    },
+    set(newValue) {
+        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
+        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+        
+        const nominal = parseInputNumber(newValue);
+        state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonNominal = nominal > 0 ? nominal : null;
+        if (nominal > 0) {
+            state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonRate = null;
+        }
+    }
+});
+
+const diskonNominalComputed = (modelName, channelId) => computed({
+    get() {
+        const promo = state.promotions.perModel[modelName]?.[channelId];
+        return promo?.diskonNominal ? formatInputNumber(promo.diskonNominal) : '';
+    },
+    set(newValue) {
+        if (!state.promotions.perModel[modelName]) state.promotions.perModel[modelName] = {};
+        if (!state.promotions.perModel[modelName][channelId]) state.promotions.perModel[modelName][channelId] = {};
+
+        const nominal = parseInputNumber(newValue);
+        state.promotions.perModel[modelName][channelId].diskonNominal = nominal > 0 ? nominal : null;
+        if (nominal > 0) {
+            state.promotions.perModel[modelName][channelId].diskonRate = null;
+        }
+    }
+});
+
+const tieredDiskonNominalComputed = (tier) => computed({
+    get() { 
+        return tier.diskonNominal ? formatInputNumber(tier.diskonNominal) : ''; 
+    },
+    set(newValue) { 
+        const nominal = parseInputNumber(newValue);
+        tier.diskonNominal = nominal > 0 ? nominal : null;
+        if (nominal > 0) {
+            tier.diskon = null;
+        }
+    }
+});
+
+// Perbarui computed property yang lama agar bisa mengosongkan nilai nominal
+const voucherTokoDiskonRateComputedUpdated = (channel) => computed({
+    get() {
+        const promo = state.promotions.perChannel[channel.id]?.voucherToko;
+        return promo?.diskonRate ? promo.diskonRate + '%' : '';
+    },
+    set(newValue) {
+        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
+        if (!state.promotions.perChannel[channel.id].voucherToko) state.promotions.perChannel[channel.id].voucherToko = {};
+        
+        const rate = parsePercentageInput(newValue);
+        state.promotions.perChannel[channel.id].voucherToko.diskonRate = rate > 0 ? rate : null;
+        if (rate > 0) {
+            state.promotions.perChannel[channel.id].voucherToko.diskonNominal = null;
+        }
+    }
+});
+
+const voucherSemuaProdukDiskonRateComputedUpdated = (channel) => computed({
+    get() {
+        const promo = state.promotions.perChannel[channel.id]?.voucherSemuaProduk;
+        return promo?.diskonRate ? promo.diskonRate + '%' : '';
+    },
+    set(newValue) {
+        if (!state.promotions.perChannel[channel.id]) state.promotions.perChannel[channel.id] = {};
+        if (!state.promotions.perChannel[channel.id].voucherSemuaProduk) state.promotions.perChannel[channel.id].voucherSemuaProduk = {};
+        
+        const rate = parsePercentageInput(newValue);
+        state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonRate = rate > 0 ? rate : null;
+        if (rate > 0) {
+            state.promotions.perChannel[channel.id].voucherSemuaProduk.diskonNominal = null;
+        }
+    }
+});
+
+const diskonRateComputedUpdated = (modelName, channelId) => computed({
+    get() {
+        const promo = state.promotions.perModel[modelName]?.[channelId];
+        return promo?.diskonRate ? promo.diskonRate + '%' : '';
+    },
+    set(newValue) {
+        if (!state.promotions.perModel[modelName]) state.promotions.perModel[modelName] = {};
+        if (!state.promotions.perModel[modelName][channelId]) state.promotions.perModel[modelName][channelId] = {};
+
+        const rate = parsePercentageInput(newValue);
+        state.promotions.perModel[modelName][channelId].diskonRate = rate > 0 ? rate : null;
+        if (rate > 0) {
+            state.promotions.perModel[modelName][channelId].diskonNominal = null;
+        }
+    }
+});
+
+const tieredDiskonComputedUpdated = (tier) => computed({
+    get() { 
+        return tier.diskon ? tier.diskon + '%' : ''; 
+    },
+    set(newValue) { 
+        const rate = parsePercentageInput(newValue);
+        tier.diskon = rate > 0 ? rate : null;
+        if (rate > 0) {
+            tier.diskonNominal = null;
+        }
+    }
+});
+
 const laporanSemuanyaData = computed(() => {
     // Awalnya, ambil semua item produksi dari setiap batch
     let semuaItemProduksi = state.produksi.flatMap(batch =>
@@ -3952,35 +4083,45 @@ function calculateBestDiscount(cart, channelId) {
     const eligiblePromotions = [];
     const totalCartSubtotal = cart.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
 
-    // 1. Kumpulkan promosi per channel (yang berlaku untuk seluruh keranjang)
+    // 1. Kumpulkan promosi per channel
     const channelPromos = state.promotions.perChannel[channelId] || {};
+    const voucherToko = channelPromos.voucherToko;
+    if (voucherToko && totalCartSubtotal >= (voucherToko.minBelanja || 0)) {
+        let discountValue = 0;
+        let discountDesc = '';
+        if (voucherToko.diskonNominal > 0) {
+            discountValue = voucherToko.diskonNominal;
+            discountDesc = `Voucher Ikuti Toko (${formatCurrency(discountValue)})`;
+        } else if (voucherToko.diskonRate > 0) {
+            discountValue = (voucherToko.diskonRate / 100) * totalCartSubtotal;
+            discountDesc = `Voucher Ikuti Toko (${voucherToko.diskonRate}%)`;
+        }
+        if (discountValue > 0) {
+            eligiblePromotions.push({ totalDiscount: discountValue, description: discountDesc, rate: voucherToko.diskonRate || 0 });
+        }
+    }
 
-// Periksa Voucher Ikuti Toko
-const voucherToko = channelPromos.voucherToko;
-if (voucherToko?.diskonRate > 0 && totalCartSubtotal >= (voucherToko?.minBelanja || 0)) {
-    eligiblePromotions.push({
-        totalDiscount: (voucherToko.diskonRate / 100) * totalCartSubtotal,
-        description: `Voucher Ikuti Toko (${voucherToko.diskonRate}%)`,
-        rate: voucherToko.diskonRate,
-        appliesTo: 'cart'
-    });
-}
-
-// Periksa Voucher Semua Produk
-const voucherSemuaProduk = channelPromos.voucherSemuaProduk;
-if (voucherSemuaProduk?.diskonRate > 0 && totalCartSubtotal >= (voucherSemuaProduk?.minBelanja || 0)) {
-    eligiblePromotions.push({
-        totalDiscount: (voucherSemuaProduk.diskonRate / 100) * totalCartSubtotal,
-        description: `Voucher Semua Produk (${voucherSemuaProduk.diskonRate}%)`,
-        rate: voucherSemuaProduk.diskonRate,
-        appliesTo: 'cart'
-    });
-}
+    const voucherSemuaProduk = channelPromos.voucherSemuaProduk;
+    if (voucherSemuaProduk && totalCartSubtotal >= (voucherSemuaProduk.minBelanja || 0)) {
+        let discountValue = 0;
+        let discountDesc = '';
+        if (voucherSemuaProduk.diskonNominal > 0) {
+            discountValue = voucherSemuaProduk.diskonNominal;
+            discountDesc = `Voucher Semua Produk (${formatCurrency(discountValue)})`;
+        } else if (voucherSemuaProduk.diskonRate > 0) {
+            discountValue = (voucherSemuaProduk.diskonRate / 100) * totalCartSubtotal;
+            discountDesc = `Voucher Semua Produk (${voucherSemuaProduk.diskonRate}%)`;
+        }
+        if (discountValue > 0) {
+            eligiblePromotions.push({ totalDiscount: discountValue, description: discountDesc, rate: voucherSemuaProduk.diskonRate || 0 });
+        }
+    }
 
     // 2. Kumpulkan promosi per model produk
     const allModelPromos = state.promotions.perModel || {};
     const itemsByModel = cart.reduce((acc, item) => {
-        const modelName = state.settings.modelProduk.find(m => m.id === item.model_id)?.namaModel || item.nama;
+        const modelInfo = state.settings.modelProduk.find(m => m.id === item.model_id);
+        const modelName = modelInfo ? modelInfo.namaModel.split(' ')[0] : (item.nama || '').split(' ')[0];
         if (!acc[modelName]) {
             acc[modelName] = { subtotal: 0, qty: 0 };
         }
@@ -3993,31 +4134,39 @@ if (voucherSemuaProduk?.diskonRate > 0 && totalCartSubtotal >= (voucherSemuaProd
         const modelData = itemsByModel[modelName];
         const modelPromosForChannel = (allModelPromos[modelName] || {})[channelId] || {};
         
-        // Cek diskon 'Voucher Produk Tertentu'
-        if (modelPromosForChannel.minBelanja > 0 && modelPromosForChannel.diskonRate > 0 && modelData.subtotal >= modelPromosForChannel.minBelanja) {
-            eligiblePromotions.push({
-                totalDiscount: (modelPromosForChannel.diskonRate / 100) * modelData.subtotal,
-                description: `Voucher ${modelName} (${modelPromosForChannel.diskonRate}%)`,
-                rate: modelPromosForChannel.diskonRate,
-                appliesTo: 'model'
-            });
+        // Cek Voucher Produk Tertentu
+        if (modelPromosForChannel.minBelanja > 0 && modelData.subtotal >= modelPromosForChannel.minBelanja) {
+            let discountValue = 0;
+            let discountDesc = '';
+            if (modelPromosForChannel.diskonNominal > 0) {
+                discountValue = modelPromosForChannel.diskonNominal;
+                discountDesc = `Voucher ${modelName} (${formatCurrency(discountValue)})`;
+            } else if (modelPromosForChannel.diskonRate > 0) {
+                discountValue = (modelPromosForChannel.diskonRate / 100) * modelData.subtotal;
+                discountDesc = `Voucher ${modelName} (${modelPromosForChannel.diskonRate}%)`;
+            }
+            if (discountValue > 0) {
+                eligiblePromotions.push({ totalDiscount: discountValue, description: discountDesc, rate: modelPromosForChannel.diskonRate || 0 });
+            }
         }
         
-        // Cek semua tingkatan di 'Diskon Minimal Belanja Bertingkat'
+        // Cek Diskon Bertingkat
         if (modelPromosForChannel.diskonBertingkat && modelPromosForChannel.diskonBertingkat.length > 0) {
-            // Sort tiers by discount percentage descending, so we check highest percentage first.
-            const sortedTiersByRate = [...modelPromosForChannel.diskonBertingkat].sort((a, b) => b.diskon - a.diskon);
-            
-            for (const tier of sortedTiersByRate) {
+            const sortedTiers = [...modelPromosForChannel.diskonBertingkat].sort((a, b) => (b.diskon || b.diskonNominal) - (a.diskon || a.diskonNominal));
+            for (const tier of sortedTiers) {
                 if (modelData.subtotal >= tier.min) {
-                    eligiblePromotions.push({
-                        totalDiscount: (tier.diskon / 100) * modelData.subtotal,
-                        description: `Diskon Bertingkat ${modelName} (${tier.diskon}%)`,
-                        rate: tier.diskon,
-                        appliesTo: 'model'
-                    });
-                    // Kita tidak perlu break di sini, kita akan membiarkan semua yang eligible masuk
-                    // dan baru memilih yang terbaik di akhir.
+                    let discountValue = 0;
+                    let discountDesc = '';
+                     if (tier.diskonNominal > 0) {
+                        discountValue = tier.diskonNominal;
+                        discountDesc = `Diskon Bertingkat ${modelName} (${formatCurrency(discountValue)})`;
+                    } else if (tier.diskon > 0) {
+                        discountValue = (tier.diskon / 100) * modelData.subtotal;
+                        discountDesc = `Diskon Bertingkat ${modelName} (${tier.diskon}%)`;
+                    }
+                    if (discountValue > 0) {
+                       eligiblePromotions.push({ totalDiscount: discountValue, description: discountDesc, rate: tier.diskon || 0 });
+                    }
                 }
             }
         }
@@ -4028,20 +4177,10 @@ if (voucherSemuaProduk?.diskonRate > 0 && totalCartSubtotal >= (voucherSemuaProd
         return { totalDiscount: 0, description: 'Tidak ada diskon yang berlaku', rate: 0 };
     }
     
-    // Perbaikan utama: Gunakan .reduce untuk menemukan promosi dengan persentase diskon tertinggi
-    const bestPromo = eligiblePromotions.reduce((best, current) => {
-        // Jika persentase saat ini lebih tinggi, pilih yang ini.
-        if (current.rate > best.rate) {
-            return current;
-        }
-        // Jika persentase sama, pilih yang memberikan nilai rupiah lebih besar.
-        if (current.rate === best.rate && current.totalDiscount > best.totalDiscount) {
-            return current;
-        }
-        return best;
-    }, { totalDiscount: 0, description: '', rate: 0 });
-    
-    return bestPromo;
+    // Cari promo dengan nilai diskon rupiah paling besar
+    return eligiblePromotions.reduce((best, current) => {
+        return current.totalDiscount > best.totalDiscount ? current : best;
+    });
 }
 
 function calculateSellingPrice() {
@@ -7262,15 +7401,15 @@ watch(activePage, (newPage) => {
                     <p class="text-slate-500 mt-1">Atur semua diskon dan voucher untuk setiap model produk.</p>
                 </div>
                 <div class="flex gap-3">
-    <button @click="showNotesModal" class="bg-indigo-100 text-indigo-700 font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h-2a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2a1 1 0 01-1-1V2a1 1 0 10-2 0v1H9a1 1 0 00-1 1v1H6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd" /></svg>
-        Catatan
-    </button>
-    <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
-        <span v-if="isSaving">Menyimpan...</span>
-        <span v-else>Simpan Semua Perubahan</span>
-    </button>
-</div>
+                     <button @click="showNotesModal" class="bg-indigo-100 text-indigo-700 font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h-2a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2a1 1 0 01-1-1V2a1 1 0 10-2 0v1H9a1 1 0 00-1 1v1H6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd" /></svg>
+                        Catatan
+                    </button>
+                    <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
+                        <span v-if="isSaving">Menyimpan...</span>
+                        <span v-else>Simpan Semua Perubahan</span>
+                    </button>
+                </div>
             </div>
 
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
@@ -7314,16 +7453,18 @@ watch(activePage, (newPage) => {
                                                 <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
                                                 <div>
                                                     <label class="block text-xs font-medium text-slate-600">Voucher Ikuti Toko</label>
-                                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                                    <div class="mt-1 grid grid-cols-3 gap-2">
                                                         <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherTokoDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (Rp)" v-model="voucherTokoDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                                     </div>
                                                 </div>
                                                 <div class="mt-3">
                                                     <label class="block text-xs font-medium text-slate-600">Voucher Semua Produk</label>
-                                                    <div class="mt-1 grid grid-cols-2 gap-2">
+                                                    <div class="mt-1 grid grid-cols-3 gap-2">
                                                         <input type="text" placeholder="Min. Belanja (Rp)" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (%)" v-model="voucherSemuaProdukDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                        <input type="text" placeholder="Diskon (Rp)" v-model="voucherSemuaProdukDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                                     </div>
                                                 </div>
                                             </div>
@@ -7349,9 +7490,10 @@ watch(activePage, (newPage) => {
                                                         <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
                                                         <div class="mt-3">
                                                             <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
-                                                            <div class="mt-1 grid grid-cols-2 gap-2">
+                                                            <div class="mt-1 grid grid-cols-3 gap-2">
                                                                 <input type="text" placeholder="Min. Belanja (Rp)" v-model="diskonMinBelanjaComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                                <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                                <input type="text" placeholder="Diskon (%)" v-model="diskonRateComputedUpdated(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                                <input type="text" placeholder="Diskon (Rp)" v-model="diskonNominalComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                                             </div>
                                                         </div>
                                                         <div class="mt-3">
@@ -7359,7 +7501,8 @@ watch(activePage, (newPage) => {
                                                             <div class="space-y-2 mt-1">
                                                                 <div v-for="(tier, index) in state.promotions.perModel[group.namaModel]?.[channel.id]?.diskonBertingkat" :key="index" class="flex items-center gap-2">
                                                                     <input type="text" v-model="tieredMinComputed(tier).value" placeholder="Min. Belanja (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
-                                                                    <input type="text" v-model="tieredDiskonComputed(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                                    <input type="text" v-model="tieredDiskonComputedUpdated(tier).value" placeholder="Diskon (%)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
+                                                                    <input type="text" v-model="tieredDiskonNominalComputed(tier).value" placeholder="Diskon (Rp)" class="w-full p-1.5 text-sm border-slate-300 rounded-md">
                                                                     <button @click="removePromotionTier(group.namaModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
                                                                 </div>
                                                             </div>
