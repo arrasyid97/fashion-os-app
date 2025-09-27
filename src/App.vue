@@ -7357,14 +7357,20 @@ watch(activePage, (newPage) => {
                     <p class="text-slate-500 mt-1">Atur semua diskon dan voucher untuk setiap model produk.</p>
                 </div>
                 <div class="flex gap-3">
-                    <button @click="showModal('voucherUmum')" class="bg-purple-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-purple-700 transition-colors shadow">
-                        Atur Voucher Umum
-                    </button>
-                    <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
-                        <span v-if="isSaving">Menyimpan...</span>
-                        <span v-else>Simpan Semua Perubahan</span>
-                    </button>
-                </div>
+    <button @click="showModal('voucherUmum')" class="bg-purple-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-purple-700 transition-colors shadow">
+        Atur Voucher Umum
+    </button>
+
+    <button @click="showNotesModal" class="bg-indigo-100 text-indigo-700 font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h-2a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2a1 1 0 01-1-1V2a1 1 0 10-2 0v1H9a1 1 0 00-1 1v1H6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd" /></svg>
+        Catatan
+    </button>
+
+    <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
+        <span v-if="isSaving">Menyimpan...</span>
+        <span v-else>Simpan Semua Perubahan</span>
+    </button>
+</div>
             </div>
 
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
