@@ -9509,12 +9509,13 @@ watch(activePage, (newPage) => {
     <td class="px-4 py-3">{{ item.returReason || 'Tidak Retur' }}</td>
 
     <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
-        <button 
-            v-if="item.orderStatusPembayaran !== 'Lunas'" 
-            @click="showModal('supplierPayment', filteredPurchaseOrders.find(o => o.id === item.orderId))" 
-            class="font-semibold text-green-500 hover:underline">
-            Bayar/Cicil
-        </button>
+        <button
+  v-if="item.orderStatusPembayaran !== 'Lunas'"
+  @click="showModal('supplierPayment', filteredPurchaseOrders.find(o => o.id === item.orderId))"
+  class="font-semibold text-green-500 hover:underline"
+>
+  Bayar/Cicil
+</button>
         <button @click="showModal('viewPurchaseOrder', JSON.parse(JSON.stringify(filteredPurchaseOrders.find(o => o.id === item.orderId))))" class="font-semibold text-indigo-500 hover:underline">Detail</button>
         <button @click="showEditPenerimaanBarangForm(filteredPurchaseOrders.find(o => o.id === item.orderId))" class="font-semibold text-blue-500 hover:underline">Edit</button>
         <button @click="deletePurchaseOrder(item.orderId)" class="text-red-500 hover:text-red-700">
