@@ -1206,6 +1206,78 @@ async function deleteSupplier(supplierId) {
     }
 }
 
+async function addSupplierPayment() {
+    if (!currentUser.value) return alert("Anda harus login.");
+    
+    const form = uiState.newPaymentData;
+    const order = uiState.modalData;
+
+    if (!form.amount || form.amount <= 0 || !form.date || !form.method) {
+        return alert("Jumlah, tanggal, dan metode pembayaran wajib diisi.");
+    }
+
+    isSaving.value = true;
+    try {
+        const batch = writeBatch(db);
+        const orderRef = doc(db, "purchase_orders", order.id);
+
+        // Siapkan data pembayaran baru
+        const newPayment = {
+            amount: form.amount,
+            date: new Date(form.date),
+            method: form.method,
+            notes: form.notes || ''
+        };
+
+        // Update data di pesanan
+        const newPaymentHistory = [...(order.paymentHistory || []), newPayment];
+        const newTotalPaid = newPaymentHistory.reduce((sum, p) => sum + p.amount, 0);
+        
+        let newStatus = 'Cicilan';
+        if (newTotalPaid >= order.totalQtyValue) {
+            newStatus = 'Lunas';
+        }
+
+        batch.update(orderRef, {
+            paymentHistory: newPaymentHistory,
+            dibayarkan: newTotalPaid,
+            statusPembayaran: newStatus
+        });
+
+        // Buat catatan pengeluaran baru di 'keuangan'
+        const expenseRef = doc(collection(db, "keuangan"));
+        const expenseData = {
+            tanggal: new Date(form.date),
+            jenis: 'pengeluaran',
+            kategori: 'Pembayaran Supplier',
+            jumlah: form.amount,
+            catatan: `Pembayaran untuk PO #${order.id.slice(-6)} ke ${order.supplierName}. Metode: ${form.method}.`,
+            userId: currentUser.value.uid
+        };
+        batch.set(expenseRef, expenseData);
+
+        await batch.commit();
+
+        // Update state lokal
+        const orderInState = state.purchaseOrders.find(o => o.id === order.id);
+        if (orderInState) {
+            orderInState.paymentHistory = newPaymentHistory;
+            orderInState.dibayarkan = newTotalPaid;
+            orderInState.statusPembayaran = newStatus;
+        }
+        state.keuangan.push({ id: expenseRef.id, ...expenseData });
+
+        alert('Pembayaran berhasil dicatat!');
+        hideModal();
+
+    } catch (error) {
+        console.error("Gagal menambah pembayaran:", error);
+        alert("Gagal menambah pembayaran. Silakan coba lagi.");
+    } finally {
+        isSaving.value = false;
+    }
+}
+
 async function addPurchaseOrderItemToInventory(item) {
     if (!currentUser.value) return alert("Anda harus login.");
     if (!confirm(`Anda yakin ingin memasukkan ${item.qty} pcs produk ${item.sku} ke inventaris? Stok akan bertambah.`)) {
@@ -1276,16 +1348,16 @@ function showEditPenerimaanBarangForm(order) {
 
 function showPenerimaanBarangForm(supplier) {
     uiState.penerimaanBarangForm = {
-        supplierId: supplier.id,
-        supplierName: supplier.name,
-        tanggal: new Date().toISOString().split('T')[0],
-        produk: [], // <-- GANTI DENGAN ARRAY KOSONG
-        statusProses: 'Dalam Proses',
-        statusPembayaran: 'Belum Dibayar',
-        dibayarkan: 0,
-        tanggalPembayaran: '',
-        catatan: '',
-    };
+    supplierId: supplier.id,
+    supplierName: supplier.name,
+    tanggal: new Date().toISOString().split('T')[0],
+    produk: [],
+    statusProses: 'Dalam Proses',
+    statusPembayaran: 'Belum Dibayar',
+    dibayarkan: 0, // <-- TAMBAHKAN INI
+    tanggalPembayaran: '', // <-- TAMBAHKAN INI
+    catatan: '',
+};
     uiState.selectedProductForPurchase = null; // <-- TAMBAHKAN BARIS INI
     uiState.activeSupplierView = 'form';
 }
@@ -1317,12 +1389,15 @@ async function submitPenerimaanBarang() {
     }
 
     // Perbaikan: Tentukan status pembayaran order secara keseluruhan
-    let orderPaymentStatus = 'Belum Dibayar';
-    if (form.produk.every(p => p.statusPembayaran === 'Sudah Dibayar')) {
-        orderPaymentStatus = 'Sudah Dibayar';
-    } else if (form.produk.some(p => p.statusPembayaran === 'Proses Pembayaran')) {
-        orderPaymentStatus = 'Proses Pembayaran';
-    }
+    let totalTagihan = form.produk.reduce((sum, p) => sum + (p.hargaJual || 0) * (p.qty || 0), 0);
+let sudahDibayar = form.dibayarkan || 0;
+let orderPaymentStatus = 'Belum Dibayar';
+
+if (sudahDibayar > 0 && sudahDibayar < totalTagihan) {
+    orderPaymentStatus = 'Cicilan';
+} else if (sudahDibayar >= totalTagihan && totalTagihan > 0) {
+    orderPaymentStatus = 'Lunas';
+}
 
     let totalQtyValue = form.produk.reduce((sum, p) => sum + (p.hargaJual || 0) * (p.qty || 0), 0);
     
@@ -9404,26 +9479,42 @@ watch(activePage, (newPage) => {
                                     <td colspan="10" class="p-10 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
                                 </tr>
                                 <tr v-for="(item, index) in itemizedPurchaseHistory" :key="`${item.orderId}-${index}`" class="hover:bg-slate-50/50">
-                                    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
-                                    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
-                                    <td class="px-4 py-3">
-                                        <p class="font-semibold">{{ item.modelName }}</p>
-                                        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
-                                    </td>
-                                    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
-                                    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
-                                    <td class="px-4 py-3 text-right font-bold text-green-600">{{ formatCurrency(item.hargaJual * item.qty) }}</td>
-                                    <td class="px-4 py-3">{{ item.statusProses }}</td>
-                                    <td class="px-4 py-3">{{ item.statusPembayaran }}</td>
-                                    <td class="px-4 py-3">{{ item.returReason || 'Tidak Retur' }}</td>
-                                    <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
-                                        <button @click="showModal('viewPurchaseOrder', JSON.parse(JSON.stringify(filteredPurchaseOrders.find(o => o.id === item.orderId))))" class="font-semibold text-indigo-500 hover:underline">Detail</button>
-                                        <button @click="showEditPenerimaanBarangForm(filteredPurchaseOrders.find(o => o.id === item.orderId))" class="font-semibold text-blue-500 hover:underline">Edit</button>
-                                        <button @click="deletePurchaseOrder(item.orderId)" class="text-red-500 hover:text-red-700">
-                                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </td>
-                                </tr>
+    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
+    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
+    <td class="px-4 py-3">
+        <p class="font-semibold">{{ item.modelName }}</p>
+        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
+    </td>
+    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
+    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
+    <td class="px-4 py-3 text-right font-bold text-green-600">{{ formatCurrency(item.hargaJual * item.qty) }}</td>
+    <td class="px-4 py-3">{{ item.statusProses }}</td>
+    <td class="px-4 py-3 text-center">
+        <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+              :class="{
+                'bg-green-100 text-green-800': item.orderStatusPembayaran === 'Lunas',
+                'bg-yellow-100 text-yellow-800': item.orderStatusPembayaran === 'Cicilan',
+                'bg-red-100 text-red-800': item.orderStatusPembayaran === 'Belum Dibayar',
+              }">
+            {{ item.orderStatusPembayaran }}
+        </span>
+    </td>
+    <td class="px-4 py-3">{{ item.returReason || 'Tidak Retur' }}</td>
+
+    <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+        <button 
+            v-if="item.orderStatusPembayaran !== 'Lunas'" 
+            @click="showModal('supplierPayment', filteredPurchaseOrders.find(o => o.id === item.orderId))" 
+            class="font-semibold text-green-500 hover:underline">
+            Bayar/Cicil
+        </button>
+        <button @click="showModal('viewPurchaseOrder', JSON.parse(JSON.stringify(filteredPurchaseOrders.find(o => o.id === item.orderId))))" class="font-semibold text-indigo-500 hover:underline">Detail</button>
+        <button @click="showEditPenerimaanBarangForm(filteredPurchaseOrders.find(o => o.id === item.orderId))" class="font-semibold text-blue-500 hover:underline">Edit</button>
+        <button @click="deletePurchaseOrder(item.orderId)" class="text-red-500 hover:text-red-700">
+            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+        </button>
+    </td>
+    </tr>
                             </tbody>
                         </table>
                     </div>
@@ -9572,23 +9663,27 @@ watch(activePage, (newPage) => {
                                 </table>
                             </div>
                         </div>
-                        <div v-if="isAnyProductPaymentInProgress" class="mt-4 p-4 border rounded-lg bg-slate-50 animate-fade-in">
-                            <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
-                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium">Total yang Harus Dibayarkan</label>
-                                    <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(totalYangHarusDibayarkan) }}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium">Dibayarkan Berapa</label>
-                                    <input type="number" v-model.number="uiState.penerimaanBarangForm.dibayarkan" class="mt-1 w-full p-2 border rounded-md text-right" placeholder="0">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium">Sisa Pembayaran</label>
-                                    <p class="font-bold text-lg text-red-600">{{ formatCurrency(sisaPembayaran) }}</p>
-                                </div>
-                            </div>
-                        </div>
+                        <div class="mt-4 p-4 border rounded-lg bg-slate-50">
+    <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div>
+            <label class="block text-sm font-medium">Total Tagihan</label>
+            <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(totalYangHarusDibayarkan) }}</p>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Dibayarkan (DP)</label>
+            <input type="number" v-model.number="uiState.penerimaanBarangForm.dibayarkan" class="mt-1 w-full p-2 border rounded-md text-right" placeholder="0">
+        </div>
+         <div>
+            <label class="block text-sm font-medium">Tgl. Bayar</label>
+            <input type="date" v-model="uiState.penerimaanBarangForm.tanggalPembayaran" class="mt-1 w-full p-2 border rounded-md">
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Sisa Tagihan</label>
+            <p class="font-bold text-lg text-red-600">{{ formatCurrency(sisaPembayaran) }}</p>
+        </div>
+    </div>
+</div>
 
                         <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
                             <button @click.prevent="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
@@ -12740,6 +12835,69 @@ watch(activePage, (newPage) => {
             <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
         </div>
     </div>
+<div v-if="uiState.modalType === 'supplierPayment'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Detail Pembayaran Pesanan</h3>
+        <p class="text-slate-500 mt-1">Pesanan untuk: <span class="font-semibold">{{ uiState.modalData.supplierName }}</span> | ID: #{{ uiState.modalData.id.slice(-6) }}</p>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto py-4 pr-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="space-y-4">
+            <h4 class="font-semibold text-lg text-slate-700">Ringkasan & Riwayat</h4>
+            <div class="p-4 bg-slate-50 rounded-lg border text-sm space-y-2">
+                <div class="flex justify-between"><span>Total Tagihan:</span><span class="font-bold text-lg text-indigo-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</span></div>
+                <div class="flex justify-between"><span>Sudah Dibayar:</span><span class="font-medium text-green-600">{{ formatCurrency(uiState.modalData.dibayarkan) }}</span></div>
+                <div class="flex justify-between font-bold border-t pt-2 mt-2"><span>Sisa Tagihan:</span><span class="text-red-600">{{ formatCurrency(uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan) }}</span></div>
+            </div>
+            <div class="border-t pt-4">
+                <p class="font-medium mb-2">Riwayat Cicilan:</p>
+                <p v-if="!uiState.modalData.paymentHistory || uiState.modalData.paymentHistory.length === 0" class="text-xs text-slate-500 text-center py-4">Belum ada riwayat pembayaran.</p>
+                <ul v-else class="space-y-2 max-h-48 overflow-y-auto">
+                    <li v-for="(payment, index) in uiState.modalData.paymentHistory" :key="index" class="flex justify-between items-center text-xs p-2 bg-white border rounded-md">
+                        <div>
+                            <p class="font-semibold">{{ formatCurrency(payment.amount) }}</p>
+                            <p class="text-slate-500">{{ new Date(payment.date.seconds * 1000).toLocaleDateString('id-ID') }} ({{ payment.method }})</p>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <form @submit.prevent="addSupplierPayment" class="space-y-4">
+                 <h4 class="font-semibold text-lg text-slate-700">Tambah Pembayaran Baru</h4>
+                 <div>
+                    <label class="block text-sm font-medium">Jumlah Dibayar (Rp)</label>
+                    <input type="number" v-model.number="uiState.newPaymentData.amount" class="mt-1 w-full p-2 border rounded-md" required>
+                 </div>
+                 <div>
+                    <label class="block text-sm font-medium">Tanggal Bayar</label>
+                    <input type="date" v-model="uiState.newPaymentData.date" class="mt-1 w-full p-2 border rounded-md" required>
+                 </div>
+                 <div>
+                    <label class="block text-sm font-medium">Metode Pembayaran</label>
+                    <select v-model="uiState.newPaymentData.method" class="mt-1 w-full p-2 border rounded-md" required>
+                        <option>Transfer</option><option>Tunai</option><option>Lainnya</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label class="block text-sm font-medium">Catatan (Opsional)</label>
+                    <textarea v-model="uiState.newPaymentData.notes" rows="2" class="mt-1 w-full p-2 border rounded-md"></textarea>
+                 </div>
+                 <div class="pt-4 border-t">
+                    <button type="submit" :disabled="isSaving" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-green-400">
+                        <span v-if="isSaving">Menyimpan...</span>
+                        <span v-else>+ Tambah & Catat Pembayaran</span>
+                    </button>
+                 </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+    </div>
+</div>    
 </div>
 </template>
 
