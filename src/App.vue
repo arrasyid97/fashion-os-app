@@ -12792,59 +12792,58 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'voucherUmum'" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col">
-        <div class="flex-shrink-0 pb-4 border-b">
-            <h3 class="text-2xl font-bold text-slate-800">Pengaturan Voucher Umum (Per Channel)</h3>
-            <p class="text-slate-500 mt-1">Pengaturan ini berlaku untuk semua produk di setiap channel penjualan.</p>
-        </div>
-        
-        <div class="flex-1 overflow-y-auto py-4 pr-2 space-y-4">
-            <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200 rounded-lg bg-slate-50 shadow-sm">
-                <p class="font-semibold text-slate-700 mb-4 text-lg">{{ channel.name }}</p>
-                
-                <div class="mt-3">
-                    <label class="block text-sm font-medium text-slate-600">Voucher Ikuti Toko</label>
-                    <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
-                        <span class="pl-1">Min. Belanja (Rp)</span>
-                        <span class="pl-1">Diskon (%)</span>
-                        <span class="pl-1">Diskon (Rp)</span>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <input type="text" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                        <input type="text" v-model="voucherTokoDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                        <input type="text" v-model="voucherTokoDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                    </div>
+<div v-if="uiState.modalType === 'voucherUmum'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Pengaturan Voucher Umum (Per Channel)</h3>
+        <p class="text-slate-500 mt-1">Pengaturan ini berlaku untuk semua produk di setiap channel penjualan.</p>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto py-4 pr-2 space-y-4">
+        <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-4 border border-slate-200 rounded-lg bg-slate-50 shadow-sm">
+            <p class="font-semibold text-slate-700 mb-4 text-lg">{{ channel.name }}</p>
+            
+            <div class="mt-3">
+                <label class="block text-sm font-medium text-slate-600">Voucher Ikuti Toko</label>
+                <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
+                    <span class="pl-1">Min. Belanja (Rp)</span>
+                    <span class="pl-1">Diskon (%)</span>
+                    <span class="pl-1">Diskon (Rp)</span>
                 </div>
-
-                <div class="mt-4">
-                    <label class="block text-sm font-medium text-slate-600">Voucher Semua Produk</label>
-                    <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
-                        <span class="pl-1">Min. Belanja (Rp)</span>
-                        <span class="pl-1">Diskon (%)</span>
-                        <span class="pl-1">Diskon (Rp)</span>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        <input type="text" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                        <input type="text" v-model="voucherSemuaProdukDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                        <input type="text" v-model="voucherSemuaProdukDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                    </div>
-                </div>
-
-                <div class="flex justify-end mt-4 pt-3 border-t">
-                    <button @click="saveChannelPromotions(channel.id)" :disabled="isSaving" class="bg-green-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-green-700 disabled:bg-green-300">
-                        <span v-if="isSaving">Menyimpan Perubahan {{ channel.name }}...</span>
-                        <span v-else>Simpan Perubahan {{channel.name}}</span>
-                    </button>
+                <div class="grid grid-cols-3 gap-2">
+                    <input type="text" v-model="voucherTokoMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+                    <input type="text" v-model="voucherTokoDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+                    <input type="text" v-model="voucherTokoDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
                 </div>
             </div>
-        </div>
 
-        <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-            <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-slate-600">Voucher Semua Produk</label>
+                <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
+                    <span class="pl-1">Min. Belanja (Rp)</span>
+                    <span class="pl-1">Diskon (%)</span>
+                    <span class="pl-1">Diskon (Rp)</span>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <input type="text" v-model="voucherSemuaProdukMinBelanjaComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+                    <input type="text" v-model="voucherSemuaProdukDiskonRateComputedUpdated(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+                    <input type="text" v-model="voucherSemuaProdukDiskonNominalComputed(channel).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
+                </div>
+            </div>
+
+            <div class="flex justify-end mt-4 pt-3 border-t">
+                <button @click="saveChannelPromotions(channel.id)" :disabled="isSaving" class="bg-green-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-green-700 disabled:bg-green-300">
+                    <span v-if="isSaving">Menyimpan Perubahan {{ channel.name }}...</span>
+                    <span v-else>Simpan Perubahan {{channel.name}}</span>
+                </button>
+            </div>
         </div>
     </div>
+
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+    </div>
 </div>
+
 
 <div v-if="uiState.modalType === 'supplierPayment'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 border-b">
@@ -12876,31 +12875,12 @@ watch(activePage, (newPage) => {
 
         <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <form @submit.prevent="addSupplierPayment" class="space-y-4">
-                 <h4 class="font-semibold text-lg text-slate-700">Tambah Pembayaran Baru</h4>
-                 <div>
-                    <label class="block text-sm font-medium">Jumlah Dibayar (Rp)</label>
-                    <input type="number" v-model.number="uiState.newPaymentData.amount" class="mt-1 w-full p-2 border rounded-md" required>
-                 </div>
-                 <div>
-                    <label class="block text-sm font-medium">Tanggal Bayar</label>
-                    <input type="date" v-model="uiState.newPaymentData.date" class="mt-1 w-full p-2 border rounded-md" required>
-                 </div>
-                 <div>
-                    <label class="block text-sm font-medium">Metode Pembayaran</label>
-                    <select v-model="uiState.newPaymentData.method" class="mt-1 w-full p-2 border rounded-md" required>
-                        <option>Transfer</option><option>Tunai</option><option>Lainnya</option>
-                    </select>
-                 </div>
-                 <div>
-                    <label class="block text-sm font-medium">Catatan (Opsional)</label>
-                    <textarea v-model="uiState.newPaymentData.notes" rows="2" class="mt-1 w-full p-2 border rounded-md"></textarea>
-                 </div>
-                 <div class="pt-4 border-t">
-                    <button type="submit" :disabled="isSaving" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-green-400">
-                        <span v-if="isSaving">Menyimpan...</span>
-                        <span v-else>+ Tambah & Catat Pembayaran</span>
-                    </button>
-                 </div>
+                <h4 class="font-semibold text-lg text-slate-700">Tambah Pembayaran Baru</h4>
+                <div><label class="block text-sm font-medium">Jumlah Dibayar (Rp)</label><input type="number" v-model.number="uiState.newPaymentData.amount" class="mt-1 w-full p-2 border rounded-md" required></div>
+                <div><label class="block text-sm font-medium">Tanggal Bayar</label><input type="date" v-model="uiState.newPaymentData.date" class="mt-1 w-full p-2 border rounded-md" required></div>
+                <div><label class="block text-sm font-medium">Metode Pembayaran</label><select v-model="uiState.newPaymentData.method" class="mt-1 w-full p-2 border rounded-md" required><option>Transfer</option><option>Tunai</option><option>Lainnya</option></select></div>
+                <div><label class="block text-sm font-medium">Catatan (Opsional)</label><textarea v-model="uiState.newPaymentData.notes" rows="2" class="mt-1 w-full p-2 border rounded-md"></textarea></div>
+                <div class="pt-4 border-t"><button type="submit" :disabled="isSaving" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-green-400"><span v-if="isSaving">Menyimpan...</span><span v-else>+ Tambah & Catat Pembayaran</span></button></div>
             </form>
         </div>
     </div>
@@ -12908,8 +12888,7 @@ watch(activePage, (newPage) => {
     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
- </div>
-
+</div>
 </template>
 
 <style scoped>
