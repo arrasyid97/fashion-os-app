@@ -175,6 +175,8 @@ const uiState = reactive({
     notesFilterChannel: '',
     notesSortBy: 'endDate-asc',
 
+    newPaymentData: {},
+
     supplierModalData: {},
     activeSupplierView: 'list', // 'list' atau 'form' <-- TAMBAHKAN BARIS INI
     penerimaanBarangForm: { // <-- TAMBAHKAN OBJEK INI
@@ -3933,7 +3935,18 @@ function showModal(type, data = {}) {
             if (!uiState.modalData.programs) {
                 uiState.modalData.programs = [];
             }
-        } else if (type === 'addProduksi') {
+        }
+        else if (type === 'supplierPayment') {
+        // Reset form untuk pembayaran baru setiap kali modal dibuka
+        uiState.newPaymentData = {
+            amount: null,
+            date: new Date().toISOString().split('T')[0],
+            method: 'Transfer',
+            notes: ''
+        };
+    } 
+        
+        else if (type === 'addProduksi') {
             if (!state.settings.modelProduk || state.settings.modelProduk.length === 0) {
                 alert("Data 'Model Produk' belum dibuat. silahkan kehalaman pengaturan untuk menambahkan model produk.");
                 hideModal(); // Langsung tutup lagi jika syarat tidak terpenuhi
@@ -12836,70 +12849,69 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'supplierPayment'" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
-        <div class="flex-shrink-0 pb-4 border-b">
-            <h3 class="text-2xl font-bold text-slate-800">Detail Pembayaran Pesanan</h3>
-            <p class="text-slate-500 mt-1">Pesanan untuk: <span class="font-semibold">{{ uiState.modalData.supplierName }}</span> | ID: #{{ uiState.modalData.id.slice(-6) }}</p>
-        </div>
-        
-        <div class="flex-1 overflow-y-auto py-4 pr-2 grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="space-y-4">
-                <h4 class="font-semibold text-lg text-slate-700">Ringkasan & Riwayat</h4>
-                <div class="p-4 bg-slate-50 rounded-lg border text-sm space-y-2">
-                    <div class="flex justify-between"><span>Total Tagihan:</span><span class="font-bold text-lg text-indigo-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</span></div>
-                    <div class="flex justify-between"><span>Sudah Dibayar:</span><span class="font-medium text-green-600">{{ formatCurrency(uiState.modalData.dibayarkan) }}</span></div>
-                    <div class="flex justify-between font-bold border-t pt-2 mt-2"><span>Sisa Tagihan:</span><span class="text-red-600">{{ formatCurrency(uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan) }}</span></div>
-                </div>
-                <div class="border-t pt-4">
-                    <p class="font-medium mb-2">Riwayat Cicilan:</p>
-                    <p v-if="!uiState.modalData.paymentHistory || uiState.modalData.paymentHistory.length === 0" class="text-xs text-slate-500 text-center py-4">Belum ada riwayat pembayaran.</p>
-                    <ul v-else class="space-y-2 max-h-48 overflow-y-auto">
-                        <li v-for="(payment, index) in uiState.modalData.paymentHistory" :key="index" class="flex justify-between items-center text-xs p-2 bg-white border rounded-md">
-                            <div>
-                                <p class="font-semibold">{{ formatCurrency(payment.amount) }}</p>
-                                <p class="text-slate-500">{{ new Date(payment.date.seconds * 1000).toLocaleDateString('id-ID') }} ({{ payment.method }})</p>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+<div v-if="uiState.modalType === 'supplierPayment'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Detail Pembayaran Pesanan</h3>
+        <p class="text-slate-500 mt-1">Pesanan untuk: <span class="font-semibold">{{ uiState.modalData.supplierName }}</span> | ID: #{{ uiState.modalData.id.slice(-6) }}</p>
+    </div>
 
-            <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <form @submit.prevent="addSupplierPayment" class="space-y-4">
-                    <h4 class="font-semibold text-lg text-slate-700">Tambah Pembayaran Baru</h4>
-                    <div>
-                        <label class="block text-sm font-medium">Jumlah Dibayar (Rp)</label>
-                        <input type="number" v-model.number="uiState.newPaymentData.amount" class="mt-1 w-full p-2 border rounded-md" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium">Tanggal Bayar</label>
-                        <input type="date" v-model="uiState.newPaymentData.date" class="mt-1 w-full p-2 border rounded-md" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium">Metode Pembayaran</label>
-                        <select v-model="uiState.newPaymentData.method" class="mt-1 w-full p-2 border rounded-md" required>
-                            <option>Transfer</option><option>Tunai</option><option>Lainnya</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium">Catatan (Opsional)</label>
-                        <textarea v-model="uiState.newPaymentData.notes" rows="2" class="mt-1 w-full p-2 border rounded-md"></textarea>
-                    </div>
-                    <div class="pt-4 border-t">
-                        <button type="submit" :disabled="isSaving" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-green-400">
-                            <span v-if="isSaving">Menyimpan...</span>
-                            <span v-else>+ Tambah & Catat Pembayaran</span>
-                        </button>
-                    </div>
-                </form>
+    <div class="flex-1 overflow-y-auto py-4 pr-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="space-y-4">
+            <h4 class="font-semibold text-lg text-slate-700">Ringkasan & Riwayat</h4>
+            <div class="p-4 bg-slate-50 rounded-lg border text-sm space-y-2">
+                <div class="flex justify-between"><span>Total Tagihan:</span><span class="font-bold text-lg text-indigo-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</span></div>
+                <div class="flex justify-between"><span>Sudah Dibayar:</span><span class="font-medium text-green-600">{{ formatCurrency(uiState.modalData.dibayarkan) }}</span></div>
+                <div class="flex justify-between font-bold border-t pt-2 mt-2"><span>Sisa Tagihan:</span><span class="text-red-600">{{ formatCurrency(uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan) }}</span></div>
+            </div>
+            <div class="border-t pt-4">
+                <p class="font-medium mb-2">Riwayat Cicilan:</p>
+                <p v-if="!uiState.modalData.paymentHistory || uiState.modalData.paymentHistory.length === 0" class="text-xs text-slate-500 text-center py-4">Belum ada riwayat pembayaran.</p>
+                <ul v-else class="space-y-2 max-h-48 overflow-y-auto">
+                    <li v-for="(payment, index) in (uiState.modalData.paymentHistory || [])" :key="index" class="flex justify-between items-center text-xs p-2 bg-white border rounded-md">
+                        <div>
+                            <p class="font-semibold">{{ formatCurrency(payment.amount) }}</p>
+                            <p class="text-slate-500">{{ new Date(payment.date.seconds ? payment.date.seconds * 1000 : payment.date).toLocaleDateString('id-ID') }} ({{ payment.method }})</p>
+                        </div>
+                    </li>
+                </ul>
             </div>
         </div>
 
-        <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-            <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+        <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <form @submit.prevent="addSupplierPayment" class="space-y-4">
+                 <h4 class="font-semibold text-lg text-slate-700">Tambah Pembayaran Baru</h4>
+                 <div>
+                    <label class="block text-sm font-medium">Jumlah Dibayar (Rp)</label>
+                    <input type="number" v-model.number="uiState.newPaymentData.amount" class="mt-1 w-full p-2 border rounded-md" required>
+                 </div>
+                 <div>
+                    <label class="block text-sm font-medium">Tanggal Bayar</label>
+                    <input type="date" v-model="uiState.newPaymentData.date" class="mt-1 w-full p-2 border rounded-md" required>
+                 </div>
+                 <div>
+                    <label class="block text-sm font-medium">Metode Pembayaran</label>
+                    <select v-model="uiState.newPaymentData.method" class="mt-1 w-full p-2 border rounded-md" required>
+                        <option>Transfer</option><option>Tunai</option><option>Lainnya</option>
+                    </select>
+                 </div>
+                 <div>
+                    <label class="block text-sm font-medium">Catatan (Opsional)</label>
+                    <textarea v-model="uiState.newPaymentData.notes" rows="2" class="mt-1 w-full p-2 border rounded-md"></textarea>
+                 </div>
+                 <div class="pt-4 border-t">
+                    <button type="submit" :disabled="isSaving" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-green-400">
+                        <span v-if="isSaving">Menyimpan...</span>
+                        <span v-else>+ Tambah & Catat Pembayaran</span>
+                    </button>
+                 </div>
+            </form>
         </div>
     </div>
+
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+    </div>
+ </div>
 </div>
 </template>
 
