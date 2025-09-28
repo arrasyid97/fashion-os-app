@@ -12844,6 +12844,79 @@ watch(activePage, (newPage) => {
     </div>
   </div>
 
+<div v-if="uiState.modalType === 'viewPurchaseOrder'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col animate-fade-in-up">
+    <h3 class="text-xl font-bold mb-4">Detail Penerimaan Barang</h3>
+    <div class="flex-1 overflow-y-auto pr-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-6">
+            <div>
+                <p class="text-sm text-slate-500">ID Pesanan:</p>
+                <p class="font-mono text-sm font-semibold text-slate-800">{{ uiState.modalData.id }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-slate-500">Supplier:</p>
+                <p class="font-bold text-lg text-indigo-600">{{ uiState.modalData.supplierName }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-slate-500">Tanggal:</p>
+                <p class="font-semibold">{{ new Date(uiState.modalData.tanggal).toLocaleDateString('id-ID') }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-slate-500">Total Nilai QTY:</p>
+                <p class="font-bold text-lg text-green-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</p>
+            </div>
+        </div>
+        <div v-if="uiState.modalData.statusPembayaran === 'Proses Pembayaran'" class="md:col-span-2">
+            <h4 class="text-base font-semibold mb-2 mt-4 border-t pt-4">Status Pembayaran Parsial</h4>
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium">Total Tagihan</label>
+                    <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Sudah Dibayarkan</label>
+                    <p class="font-bold text-lg">{{ formatCurrency(uiState.modalData.dibayarkan) }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium">Sisa Pembayaran</label>
+                    <p class="font-bold text-lg text-red-600">{{ formatCurrency(uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan) }}</p>
+                </div>
+            </div>
+        </div>
+        <h4 class="text-lg font-bold mt-4 mb-2">Daftar Produk</h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-slate-500">
+                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                    <tr>
+                        <th class="px-4 py-3">Produk</th>
+                        <th class="px-4 py-3 text-right">Harga Jual</th>
+                        <th class="px-4 py-3 text-center">Qty</th>
+                        <th class="px-4 py-3">Status Proses</th>
+                        <th class="px-4 py-3">Status Bayar</th>
+                        <th class="px-4 py-3">Retur</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(p, index) in uiState.modalData.produk" :key="index">
+                        <td class="px-4 py-3">
+                            <p class="font-semibold text-slate-800">{{ p.modelName }}</p>
+                            <p class="text-xs">{{ p.sku }} ({{ p.color }} / {{ p.size }})</p>
+                        </td>
+                        <td class="px-4 py-3 text-right">{{ formatCurrency(p.hargaJual) }}</td>
+                        <td class="px-4 py-3 text-center font-medium">{{ p.qty }}</td>
+                        <td class="px-4 py-3">{{ p.statusProses }}</td>
+                        <td class="px-4 py-3">{{ p.statusPembayaran }}</td>
+                        <td class="px-4 py-3">{{ p.returReason || 'Tidak Retur' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg">Tutup</button>
+    </div>
+  </div>
+
 <div v-if="uiState.modalType === 'supplierPayment'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4 sm:p-6">
   <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto transform scale-100 opacity-100 animate-fade-in-up">
     <h3 class="text-2xl font-bold mb-4 text-slate-800">Pembayaran Pesanan #{{ uiState.modalData.id.slice(-6) }}</h3>
