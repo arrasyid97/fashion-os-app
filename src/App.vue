@@ -2977,9 +2977,7 @@ const filteredRetur = computed(() => {
     return returData.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
 });
 
-const isAnyProductPaymentInProgress = computed(() => {
-    return uiState.penerimaanBarangForm.produk.some(p => p.statusPembayaran === 'Proses Pembayaran');
-});
+
 
 const totalYangHarusDibayarkan = computed(() => {
     return uiState.penerimaanBarangForm.produk.reduce((sum, p) => {
