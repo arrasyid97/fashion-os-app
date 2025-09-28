@@ -3919,15 +3919,14 @@ function unlockInvestasi() {
 function showModal(type, data = {}) {
     // Reset data modal untuk memastikan tidak ada data lama yang bocor
     uiState.modalData = {};
+    uiState.modalType = type;
+    uiState.isModalVisible = true; // Selalu set ke true untuk menampilkan container modal
 
     // Menggunakan nextTick untuk memastikan UI merespons reset sebelum data baru diisi
     nextTick(() => {
-        uiState.modalType = type;
-        uiState.isModalVisible = true; // Selalu set ke true untuk menampilkan container modal
-
         // Salin data dengan aman untuk menghindari referensi langsung
         if (data) {
-             uiState.modalData = JSON.parse(JSON.stringify(data));
+            uiState.modalData = JSON.parse(JSON.stringify(data));
         }
 
         // Logika khusus untuk modal tertentu
@@ -3935,18 +3934,15 @@ function showModal(type, data = {}) {
             if (!uiState.modalData.programs) {
                 uiState.modalData.programs = [];
             }
-        }
-        else if (type === 'supplierPayment') {
-        // Reset form untuk pembayaran baru setiap kali modal dibuka
-        uiState.newPaymentData = {
-            amount: null,
-            date: new Date().toISOString().split('T')[0],
-            method: 'Transfer',
-            notes: ''
-        };
-    } 
-        
-        else if (type === 'addProduksi') {
+        } else if (type === 'supplierPayment') {
+            // Reset form untuk pembayaran baru setiap kali modal dibuka
+            uiState.newPaymentData = {
+                amount: null,
+                date: new Date().toISOString().split('T')[0],
+                method: 'Transfer',
+                notes: ''
+            };
+        } else if (type === 'addProduksi') {
             if (!state.settings.modelProduk || state.settings.modelProduk.length === 0) {
                 alert("Data 'Model Produk' belum dibuat. silahkan kehalaman pengaturan untuk menambahkan model produk.");
                 hideModal(); // Langsung tutup lagi jika syarat tidak terpenuhi
