@@ -12792,7 +12792,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'voucherUmum'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col">
+<div v-if="uiState.modalType === 'voucherUmum'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col animate-fade-in-up">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Pengaturan Voucher Umum (Per Channel)</h3>
         <p class="text-slate-500 mt-1">Pengaturan ini berlaku untuk semua produk di setiap channel penjualan.</p>
@@ -12844,8 +12844,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-
-<div v-if="uiState.modalType === 'supplierPayment'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
+<div v-if="uiState.modalType === 'supplierPayment'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col animate-fade-in-up">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Detail Pembayaran Pesanan</h3>
         <p class="text-slate-500 mt-1">Pesanan untuk: <span class="font-semibold">{{ uiState.modalData.supplierName }}</span> | ID: #{{ uiState.modalData.id.slice(-6) }}</p>
