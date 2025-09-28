@@ -9925,7 +9925,56 @@ watch(activePage, (newPage) => {
             <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg">Tutup</button>
         </div>
     </div>
+<div v-if="uiState.modalType === 'supplierPayment'" class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto transform scale-100 opacity-100 animate-fade-in-up" @click.stop>
+        <h3 class="text-2xl font-bold mb-4 text-slate-800">Pembayaran Pesanan #{{ uiState.modalData.id.slice(-6) }}</h3>
+        <form @submit.prevent="addSupplierPayment" class="space-y-4">
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div class="flex justify-between items-center text-sm">
+                    <span>Total Tagihan:</span>
+                    <span class="font-bold text-lg text-indigo-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span>Sudah Dibayar:</span>
+                    <span class="font-medium text-green-600">{{ formatCurrency(uiState.modalData.dibayarkan) }}</span>
+                </div>
+                <div class="flex justify-between items-center text-sm font-bold border-t pt-2 mt-2">
+                    <span>Sisa Tagihan:</span>
+                    <span class="text-red-600">{{ formatCurrency(uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan) }}</span>
+                </div>
+            </div>
+            <div class="space-y-4 mt-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Jumlah Pembayaran</label>
+                    <input type="number" v-model.number="uiState.newPaymentData.amount" :max="uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan" class="mt-1 w-full p-2 border rounded-md" required placeholder="Masukkan jumlah pembayaran">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Tanggal Bayar</label>
+                    <input type="date" v-model="uiState.newPaymentData.date" class="mt-1 w-full p-2 border rounded-md" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Metode Pembayaran</label>
+                    <select v-model="uiState.newPaymentData.method" class="mt-1 w-full p-2 border rounded-md">
+                        <option>Transfer</option>
+                        <option>Tunai</option>
+                        <option>Lainnya</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Catatan (Opsional)</label>
+                    <textarea v-model="uiState.newPaymentData.notes" rows="2" class="mt-1 w-full p-2 border rounded-md"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <button type="button" @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Batal</button>
+                <button type="submit" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-green-400">
+                    <span v-if="isSaving">Menyimpan...</span>
+                    <span v-else>Catat Pembayaran</span>
+                </button>
+            </div>
+        </form>
+    </div>
 
+</div>
 <div v-if="uiState.modalType === 'notesModal'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col">
         <div class="flex-shrink-0 pb-4 border-b">
             <h3 class="text-2xl font-bold text-slate-800">Catatan Masa Berakhir Voucher</h3>
@@ -12712,7 +12761,7 @@ watch(activePage, (newPage) => {
 
 
       </div>
-    </div>
+    
   
     <div v-if="uiState.nestedModalType === 'manageInflowCategories'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-xl w-full max-h-[90vh] flex flex-col">
@@ -12845,57 +12894,8 @@ watch(activePage, (newPage) => {
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
   </div>
-
-
-<div v-if="uiState.modalType === 'supplierPayment'" class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto transform scale-100 opacity-100 animate-fade-in-up" @click.stop>
-        <h3 class="text-2xl font-bold mb-4 text-slate-800">Pembayaran Pesanan #{{ uiState.modalData.id.slice(-6) }}</h3>
-        <form @submit.prevent="addSupplierPayment" class="space-y-4">
-            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <div class="flex justify-between items-center text-sm">
-                    <span>Total Tagihan:</span>
-                    <span class="font-bold text-lg text-indigo-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</span>
-                </div>
-                <div class="flex justify-between items-center text-sm">
-                    <span>Sudah Dibayar:</span>
-                    <span class="font-medium text-green-600">{{ formatCurrency(uiState.modalData.dibayarkan) }}</span>
-                </div>
-                <div class="flex justify-between items-center text-sm font-bold border-t pt-2 mt-2">
-                    <span>Sisa Tagihan:</span>
-                    <span class="text-red-600">{{ formatCurrency(uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan) }}</span>
-                </div>
-            </div>
-            <div class="space-y-4 mt-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Jumlah Pembayaran</label>
-                    <input type="number" v-model.number="uiState.newPaymentData.amount" :max="uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan" class="mt-1 w-full p-2 border rounded-md" required placeholder="Masukkan jumlah pembayaran">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Tanggal Bayar</label>
-                    <input type="date" v-model="uiState.newPaymentData.date" class="mt-1 w-full p-2 border rounded-md" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Metode Pembayaran</label>
-                    <select v-model="uiState.newPaymentData.method" class="mt-1 w-full p-2 border rounded-md">
-                        <option>Transfer</option>
-                        <option>Tunai</option>
-                        <option>Lainnya</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Catatan (Opsional)</label>
-                    <textarea v-model="uiState.newPaymentData.notes" rows="2" class="mt-1 w-full p-2 border rounded-md"></textarea>
-                </div>
-            </div>
-            <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-                <button type="button" @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Batal</button>
-                <button type="submit" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-green-400">
-                    <span v-if="isSaving">Menyimpan...</span>
-                    <span v-else>Catat Pembayaran</span>
-                </button>
-            </div>
-        </form>
-    </div>
 </div>
+
 
 </template>
 
