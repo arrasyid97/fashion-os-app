@@ -255,6 +255,9 @@ adminVerificationError: '',
 
 selectedProductForPurchase: null,
 
+produksiLastVisible: null, // Untuk menyimpan dokumen produksi terakhir
+produksiHasMore: true,     // Flag untuk menandakan apakah masih ada data produksi
+
 hargaHppSelectedModelName: '',
 
 purchaseOrderSearch: '',
@@ -6460,20 +6463,56 @@ const fetchReturnData = async (userId) => {
 };
 
 // Fungsi khusus untuk data produksi
-const fetchProductionData = async (userId) => {
-  if (dataFetched.production) return;
-  console.log("Fetching production data...");
-  try {
-    const [productionSnap, fabricSnap] = await Promise.all([
-      getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
-      getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId))),
-    ]);
-    state.produksi = productionSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-    state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
-    dataFetched.production = true;
-  } catch (error) {
-    console.error("Error fetching production data:", error);
-  }
+const fetchProductionData = async (userId, loadMore = false) => {
+    const PRODUCTIONS_PER_PAGE = 9; // Muat 9 item (karena grid 3 kolom)
+
+    // Data stok kain tidak perlu paginasi
+    if (!dataFetched.fabric) {
+        console.log("Fetching fabric stock...");
+        try {
+            const fabricSnap = await getDocs(query(collection(db, "fabric_stock"), where("userId", "==", userId)));
+            state.gudangKain = fabricSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggalBeli: doc.data().tanggalBeli?.toDate() }));
+            dataFetched.fabric = true;
+        } catch (error) {
+            console.error("Error fetching fabric stock:", error);
+        }
+    }
+
+    // Paginasi untuk data produksi
+    if (loadMore && !uiState.produksiHasMore) return;
+
+    try {
+        let q = query(
+            collection(db, "production_batches"),
+            where("userId", "==", userId),
+            orderBy("tanggal", "desc"),
+            limit(PRODUCTIONS_PER_PAGE)
+        );
+
+        if (loadMore && uiState.produksiLastVisible) {
+            q = query(q, startAfter(uiState.produksiLastVisible));
+        } else {
+            state.produksi = []; // Reset data untuk fetch awal
+            uiState.produksiHasMore = true;
+        }
+
+        const productionSnap = await getDocs(q);
+
+        if (!productionSnap.empty) {
+            uiState.produksiLastVisible = productionSnap.docs[productionSnap.docs.length - 1];
+            productionSnap.forEach(doc => {
+                state.produksi.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
+            });
+        }
+        
+        if (productionSnap.docs.length < PRODUCTIONS_PER_PAGE) {
+            uiState.produksiHasMore = false;
+        }
+
+        dataFetched.production = true;
+    } catch (error) {
+        console.error("Error fetching production data:", error);
+    }
 };
 
 // Fungsi khusus untuk data keuangan dan investor
@@ -7814,6 +7853,11 @@ watch(activePage, (newPage) => {
                         </div>
                     </div>
                 </div>
+                <div v-if="uiState.produksiHasMore" class="mt-8 text-center">
+    <button @click="fetchProductionData(currentUser.uid, true)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
+        Muat Lebih Banyak
+    </button>
+</div>
             </div>
         </div>
     </div>
