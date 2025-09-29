@@ -6499,60 +6499,64 @@ const fetchFinanceData = async (userId) => {
 
 // Fungsi khusus untuk data supplier dan purchase order
 const fetchSupplierData = async (userId, loadMore = false) => {
-    const SUPPLIERS_PER_PAGE = 10; // Tentukan jumlah data per halaman
+    const SUPPLIERS_PER_PAGE = 10; // Jumlah data per halaman
 
-    // Bagian ini untuk data supplier, tidak perlu paginasi karena jumlahnya sedikit
-    if (!dataFetched.suppliers) {
-        console.log("Fetching supplier list...");
-        try {
-            const suppliersSnap = await getDocs(query(collection(db, "suppliers"), where("userId", "==", userId)));
-            state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            dataFetched.suppliers = true;
-        } catch (error) {
-            console.error("Error fetching suppliers:", error);
-        }
-    }
+    // Bagian ini untuk data supplier, tidak butuh paginasi karena jumlahnya sedikit
+    // dan hanya akan dijalankan sekali.
+    if (!dataFetched.suppliers) {
+        console.log("Fetching supplier list...");
+        try {
+            const suppliersSnap = await getDocs(query(collection(db, "suppliers"), where("userId", "==", userId)));
+            state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            dataFetched.suppliers = true;
+        } catch (error) {
+            console.error("Error fetching suppliers:", error);
+        }
+    }
 
-    // Bagian ini untuk Purchase Orders dengan Paginasi
-    if (dataFetched.purchaseOrders && !loadMore) return; // Jangan fetch ulang jika bukan 'load more'
-    if (loadMore && !uiState.purchaseOrdersHasMore) return; // Hentikan jika sudah tidak ada data lagi
-    
-    console.log(`Fetching purchase orders... ${loadMore ? '(Loading more)' : '(Initial)'}`);
-    try {
-        let q = query(
-            collection(db, "purchase_orders"),
-            where("userId", "==", userId),
-            orderBy("tanggal", "desc"), // Wajib ada orderBy untuk paginasi
-            limit(SUPPLIERS_PER_PAGE)
-        );
+    // --- BAGIAN INI YANG DIPERBAIKI ---
+    // Hentikan jika pengguna klik "Muat Lebih Banyak" padahal sudah tidak ada data lagi
+    if (loadMore && !uiState.purchaseOrdersHasMore) return; 
+    
+    try {
+        // Query dasar untuk mengambil data purchase order
+        let q = query(
+            collection(db, "purchase_orders"),
+            where("userId", "==", userId),
+            orderBy("tanggal", "desc"),
+            limit(SUPPLIERS_PER_PAGE)
+        );
 
-        if (loadMore && uiState.purchaseOrdersLastVisible) {
-            q = query(q, startAfter(uiState.purchaseOrdersLastVisible));
-        } else {
-            // Jika ini fetch awal, reset data
-            state.purchaseOrders = [];
-        }
+        // Jika ini adalah aksi "Muat Lebih Banyak", tambahkan 'startAfter' untuk memulai dari data terakhir
+        if (loadMore && uiState.purchaseOrdersLastVisible) {
+            q = query(q, startAfter(uiState.purchaseOrdersLastVisible));
+        } else {
+            // Jika ini adalah pemanggilan PERTAMA (bukan 'loadMore'), maka KOSONGKAN array
+            // Ini memastikan data tidak duplikat saat berpindah halaman
+            state.purchaseOrders = [];
+            uiState.purchaseOrdersHasMore = true; // Reset flag setiap kali data dimuat ulang dari awal
+        }
 
-        const poSnapshot = await getDocs(q);
+        const poSnapshot = await getDocs(q);
 
-        // Simpan dokumen terakhir untuk query berikutnya
-        const lastVisible = poSnapshot.docs[poSnapshot.docs.length - 1];
-        uiState.purchaseOrdersLastVisible = lastVisible;
+        if (!poSnapshot.empty) {
+            // Simpan dokumen terakhir yang terlihat untuk paginasi selanjutnya
+            uiState.purchaseOrdersLastVisible = poSnapshot.docs[poSnapshot.docs.length - 1];
+            
+            // Tambahkan data baru ke dalam array yang sudah ada
+            poSnapshot.forEach(doc => {
+                state.purchaseOrders.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
+            });
+        }
+        
+        // Jika data yang didapat lebih sedikit dari limit, berarti ini halaman terakhir
+        if (poSnapshot.docs.length < SUPPLIERS_PER_PAGE) {
+            uiState.purchaseOrdersHasMore = false;
+        }
 
-        // Tambahkan data baru ke state
-        poSnapshot.forEach(doc => {
-            state.purchaseOrders.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
-        });
-        
-        // Cek apakah masih ada data lagi
-        if (poSnapshot.docs.length < SUPPLIERS_PER_PAGE) {
-            uiState.purchaseOrdersHasMore = false;
-        }
-
-        dataFetched.purchaseOrders = true; // Tandai bahwa data awal sudah dimuat
-    } catch (error) {
-        console.error("Error fetching purchase orders:", error);
-    }
+    } catch (error) {
+        console.error("Error fetching purchase orders:", error);
+    }
 };
 
 // Fungsi khusus untuk catatan voucher
