@@ -10086,7 +10086,7 @@ watch(activePage, (newPage) => {
             <button @click="hideNestedModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
         </div>
     </div>
-
+</div>
 
 <div v-if="uiState.modalType === 'addSupplier' || uiState.modalType === 'editSupplier'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[50vh] flex flex-col">
@@ -12858,7 +12858,7 @@ watch(activePage, (newPage) => {
         </form>
     </div>
 </div>
-</div>
+
 </template>
 
 <style scoped>
