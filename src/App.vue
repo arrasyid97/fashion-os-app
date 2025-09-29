@@ -6530,27 +6530,28 @@ onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
     isLoading.value = true;
     hasLoadedInitialData.value = false;
-    
+
     // Reset status data yang sudah di-fetch setiap kali auth berubah
     Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
 
     if (user) {
-      const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-      const userData = userDocSnap.exists() ? userDocSnap.data() : {};
-      currentUser.value = { ...user, userData };
-      
-      await setupListeners(user.uid);
-      loadDataForPage(activePage.value);
-      // Pindahkan changePage ke dalam watcher agar data halaman pertama dimuat
-      // changePage(localStorage.getItem('lastActivePage') || 'dashboard');
+        // --- INI BAGIAN UTAMA PERBAIKAN ---
+        const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+        const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+        currentUser.value = { ...user, userData, isPartner: userData.isPartner || false }; // <-- GABUNGKAN DATA
+        // --- AKHIR DARI PERBAIKAN ---
+
+        await setupListeners(user.uid);
+        loadDataForPage(activePage.value);
+
     } else {
-      currentUser.value = null;
-      activePage.value = 'login';
-      unsubscribe();
+        currentUser.value = null;
+        activePage.value = 'login';
+        unsubscribe();
     }
     isLoading.value = false;
     hasLoadedInitialData.value = true;
-  });
+});
 });
 
 watch(activePage, (newPage) => {
