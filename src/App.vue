@@ -5798,21 +5798,21 @@ async function saveStockAllocation() {
         // --- PERBAIKAN UTAMA: CARA UPDATE STATE LOKAL YANG LEBIH AMAN ---
         const index = state.produk.findIndex(p => p.docId === original.docId);
         if (index !== -1) {
-            // Ambil data produk yang ada
-            const existingProduct = state.produk[index];
-            // Buat objek baru dengan data yang diperbarui
-            const updatedProduct = {
-                ...existingProduct,
-                stokFisik: product.stokFisik,
-                stokAlokasi: { ...product.stokAlokasi }
-            };
-            // Gantii objek lama dengan yang baru di dalam array
-            state.produk[index] = updatedProduct;
-        }
-        const targetModel = state.settings.modelProduk.find(m => m.id === updatedProduct.model_id);
-        if (targetModel) {
-            lastEditedModel.value = targetModel.namaModel.split(' ')[0];
-        }
+    // Buat objek baru dengan data yang diperbarui
+    const updatedProduct = {
+        ...state.produk[index], // Ambil semua data lama
+        stokFisik: product.stokFisik, // Perbarui stok fisik
+        stokAlokasi: { ...product.stokAlokasi } // Perbarui alokasi stok
+    };
+    // Ganti objek lama dengan yang baru di dalam array
+    state.produk[index] = updatedProduct;
+
+    // "Mengingat" model mana yang baru diedit untuk keperluan scroll
+    const targetModel = state.settings.modelProduk.find(m => m.id === updatedProduct.model_id);
+    if (targetModel) {
+        lastEditedModel.value = targetModel.namaModel.split(' ')[0];
+    }
+}
         hideModal();
         alert("Perubahan stok fisik dan alokasi berhasil disimpan!");
 
