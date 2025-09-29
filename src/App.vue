@@ -261,6 +261,9 @@ produksiHasMore: true,     // Flag untuk menandakan apakah masih ada data produk
 transaksiLastVisible: null, // Untuk menyimpan dokumen transaksi terakhir
 transaksiHasMore: true,     // Flag untuk menandakan apakah masih ada data transaksi
 
+returLastVisible: null, // Untuk menyimpan dokumen retur terakhir
+returHasMore: true,     // Flag untuk menandakan apakah masih ada data retur
+
 hargaHppSelectedModelName: '',
 
 purchaseOrderSearch: '',
@@ -6438,20 +6441,46 @@ const fetchProductData = async (userId) => {
 
 const fetchTransactionAndReturnData = async (userId, loadMore = false) => {
     const TRANSACTIONS_PER_PAGE = 15;
+    const RETURNS_PER_PAGE = 10; // Menentukan jumlah data retur per halaman
 
-    // Data retur tidak perlu paginasi
-    if (!dataFetched.returns) {
-        console.log("Fetching return data...");
+    // Paginasi untuk data retur
+    if (loadMore && !uiState.returHasMore) {
+        // Jika hanya memuat retur, hentikan jika sudah tidak ada lagi
+    } else {
         try {
-            const returnsSnap = await getDocs(query(collection(db, "returns"), where("userId", "==", userId)));
-            state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+            let returnQuery = query(
+                collection(db, "returns"),
+                where("userId", "==", userId),
+                orderBy("tanggal", "desc"),
+                limit(RETURNS_PER_PAGE)
+            );
+
+            if (loadMore && uiState.returLastVisible) {
+                returnQuery = query(returnQuery, startAfter(uiState.returLastVisible));
+            } else if (!loadMore) {
+                state.retur = [];
+                uiState.returHasMore = true;
+            }
+
+            const returnsSnap = await getDocs(returnQuery);
+
+            if (!returnsSnap.empty) {
+                uiState.returLastVisible = returnsSnap.docs[returnsSnap.docs.length - 1];
+                returnsSnap.forEach(doc => {
+                    state.retur.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
+                });
+            }
+            
+            if (returnsSnap.docs.length < RETURNS_PER_PAGE) {
+                uiState.returHasMore = false;
+            }
             dataFetched.returns = true;
-        } catch(error) {
+        } catch (error) {
             console.error("Error fetching return data:", error);
         }
     }
 
-    // Paginasi untuk data transaksi
+    // Paginasi untuk data transaksi (logika ini tetap sama)
     if (loadMore && !uiState.transaksiHasMore) return;
 
     try {
@@ -8574,13 +8603,13 @@ watch(activePage, (newPage) => {
                         <p class="text-slate-500 mt-1">Lacak dan kelola semua pengembalian produk dari pelanggan.</p>
                     </div>
                     <div class="flex items-center gap-4">
-                         <button @click="showModal('panduanRetur')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                        <button @click="showModal('panduanRetur')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
                             Informasi
                         </button>
                         <button @click="showModal('addRetur', { tanggal: new Date().toISOString().split('T')[0], transactionIdSearch: '', foundTransaction: null, items: [] })" class="bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 shadow transition-colors" :disabled="!isSubscriptionActive">
-    + Tambah Retur
-</button>
+                            + Tambah Retur
+                        </button>
                     </div>
                 </div>
 
@@ -8670,13 +8699,13 @@ watch(activePage, (newPage) => {
                                 <td class="px-6 py-4">{{ item.alasan }}</td>
                                 <td class="px-6 py-4">
                                     <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                                          :class="{
-                                              'bg-yellow-100 text-yellow-800': item.tindakLanjut === 'Refund',
-                                              'bg-green-100 text-green-800': item.tindakLanjut === 'Ganti Baru',
-                                              'bg-blue-100 text-blue-800': item.tindakLanjut === 'Tukar Ukuran',
-                                              'bg-cyan-100 text-cyan-800': item.tindakLanjut === 'Tukar Warna',
-                                              'bg-purple-100 text-purple-800': item.tindakLanjut === 'Perbaiki',
-                                          }">
+                                            :class="{
+                                            'bg-yellow-100 text-yellow-800': item.tindakLanjut === 'Refund',
+                                            'bg-green-100 text-green-800': item.tindakLanjut === 'Ganti Baru',
+                                            'bg-blue-100 text-blue-800': item.tindakLanjut === 'Tukar Ukuran',
+                                            'bg-cyan-100 text-cyan-800': item.tindakLanjut === 'Tukar Warna',
+                                            'bg-purple-100 text-purple-800': item.tindakLanjut === 'Perbaiki',
+                                            }">
                                         {{ item.tindakLanjut }}
                                     </span>
                                 </td>
@@ -8687,6 +8716,13 @@ watch(activePage, (newPage) => {
                         </tbody>
                     </table>
                 </div>
+                
+                <div v-if="uiState.returHasMore" class="mt-4 text-center">
+                    <button @click="fetchTransactionAndReturnData(currentUser.uid, true)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
+                        Muat Lebih Banyak
+                    </button>
+                </div>
+
             </div>
         </div>
     </div>
