@@ -264,6 +264,11 @@ transaksiHasMore: true,     // Flag untuk menandakan apakah masih ada data trans
 returLastVisible: null, // Untuk menyimpan dokumen retur terakhir
 returHasMore: true,     // Flag untuk menandakan apakah masih ada data retur
 
+productsLastVisible: null, // Untuk menyimpan dokumen produk terakhir
+productsHasMore: true,     // Flag untuk menandakan apakah masih ada data produk
+
+
+
 hargaHppSelectedModelName: '',
 
 purchaseOrderSearch: '',
@@ -6395,49 +6400,88 @@ const fetchCoreData = async (userId) => {
 };
 
 // Fungsi khusus untuk data produk, harga, dan alokasi
-const fetchProductData = async (userId) => {
-  if (dataFetched.products) return; // Jangan fetch ulang jika sudah ada
-  console.log("Fetching product data...");
-  try {
-    const [productsSnap, pricesSnap, allocationsSnap] = await Promise.all([
-      getDocs(query(collection(db, "products"), where("userId", "==", userId))),
-      getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-      getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
-    ]);
-    
-    const pricesData = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const allocationsData = allocationsSnap.docs.map(doc => ({ sku: doc.id, ...doc.data() }));
+const fetchProductData = async (userId, loadMore = false) => {
+    const PRODUCTS_PER_PAGE = 20;
 
-    state.produk = productsSnap.docs.map(docSnap => {
-      const p = { id: docSnap.id, ...docSnap.data() };
-      const hargaJual = {};
-      const stokAlokasi = {};
-      const productAllocation = allocationsData.find(alloc => alloc.sku === p.id);
-      (state.settings.marketplaces || []).forEach(mp => {
-        const priceInfo = pricesData.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-        hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-        stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-      });
-      return {
-        docId: p.id,
-        sku: p.sku,
-        nama: p.product_name,
-        model_id: p.model_id,
-        warna: p.color,
-        varian: p.variant,
-        stokFisik: p.physical_stock,
-        hpp: p.hpp,
-        hargaJual,
-        stokAlokasi,
-        userId: p.userId
-      };
-    });
-    dataFetched.products = true;
-  } catch (error) {
-    console.error("Error fetching product data:", error);
-  }
+    // Bagian ini hanya dijalankan SEKALI untuk mengambil semua data harga & alokasi
+    if (!dataFetched.pricesAndAllocations) {
+        console.log("Fetching all prices and allocations (one time)...");
+        try {
+            const [pricesSnap, allocationsSnap] = await Promise.all([
+                getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
+                getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
+            ]);
+            // Simpan ke dalam state agar tidak perlu fetch ulang
+            state.productPrices = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            state.stockAllocations = allocationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            dataFetched.pricesAndAllocations = true;
+        } catch (error) {
+            console.error("Error fetching prices/allocations:", error);
+        }
+    }
+
+    // Paginasi untuk data produk
+    if (loadMore && !uiState.productsHasMore) return;
+
+    try {
+        let q = query(
+            collection(db, "products"),
+            where("userId", "==", userId),
+            orderBy("product_name", "asc"), // Mengurutkan berdasarkan nama produk
+            limit(PRODUCTS_PER_PAGE)
+        );
+
+        if (loadMore && uiState.productsLastVisible) {
+            q = query(q, startAfter(uiState.productsLastVisible));
+        } else {
+            state.produk = []; // Reset hanya jika ini pemuatan awal
+            uiState.productsHasMore = true;
+        }
+
+        const productSnap = await getDocs(q);
+
+        if (!productSnap.empty) {
+            uiState.productsLastVisible = productSnap.docs[productSnap.docs.length - 1];
+            
+            const newProducts = productSnap.docs.map(docSnap => {
+                const p = { id: docSnap.id, ...docSnap.data() };
+                const hargaJual = {};
+                const stokAlokasi = {};
+                const productAllocation = state.stockAllocations.find(alloc => alloc.id === p.id);
+                
+                (state.settings.marketplaces || []).forEach(mp => {
+                    const priceInfo = state.productPrices.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
+                    hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+                    stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+                });
+
+                return {
+                    docId: p.id,
+                    sku: p.sku,
+                    nama: p.product_name,
+                    model_id: p.model_id,
+                    warna: p.color,
+                    varian: p.variant,
+                    stokFisik: p.physical_stock,
+                    hpp: p.hpp,
+                    hargaJual,
+                    stokAlokasi,
+                    userId: p.userId
+                };
+            });
+
+            state.produk.push(...newProducts);
+        }
+        
+        if (productSnap.docs.length < PRODUCTS_PER_PAGE) {
+            uiState.productsHasMore = false;
+        }
+
+        dataFetched.products = true;
+    } catch (error) {
+        console.error("Error fetching paginated products:", error);
+    }
 };
-
 
 const fetchTransactionAndReturnData = async (userId, loadMore = false) => {
     const TRANSACTIONS_PER_PAGE = 15;
@@ -7432,7 +7476,7 @@ watch(activePage, (newPage) => {
         </tr>
     </thead>
     <tbody>
-        <tr v-if="inventoryProductGroups.length === 0">
+        <tr v-if="inventoryProductGroups.length === 0 && !uiState.productsHasMore">
             <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
         </tr>
         <template v-for="group in inventoryProductGroups" :key="group.namaModel">
@@ -7484,7 +7528,16 @@ watch(activePage, (newPage) => {
             </template>
         </template>
     </tbody>
-</table>
+    <tfoot v-if="uiState.productsHasMore">
+        <tr>
+            <td colspan="7" class="text-center p-4">
+                <button @click="fetchProductData(currentUser.uid, true)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
+                    Muat Lebih Banyak
+                </button>
+            </td>
+        </tr>
+    </tfoot>
+    </table>
                 </div>
             </div>
 
