@@ -5806,7 +5806,7 @@ async function saveStockAllocation() {
                 stokFisik: product.stokFisik,
                 stokAlokasi: { ...product.stokAlokasi }
             };
-            // Ganti objek lama dengan yang baru di dalam array
+            // Gantii objek lama dengan yang baru di dalam array
             state.produk[index] = updatedProduct;
         }
         const targetModel = state.settings.modelProduk.find(m => m.id === updatedProduct.model_id);
