@@ -10088,25 +10088,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'addSupplier' || uiState.modalType === 'editSupplier'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
-    <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[50vh] flex flex-col">
-        <h3 class="text-xl font-bold mb-4">{{ uiState.modalType === 'addSupplier' ? 'Tambah Supplier Baru' : 'Edit Supplier' }}</h3>
-        <form @submit.prevent="uiState.modalType === 'addSupplier' ? addSupplier() : updateSupplier()" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium">Nama Supplier</label>
-                <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md" required>
-            </div>
-            <div>
-                <label class="block text-sm font-medium">Kontak (Opsional)</label>
-                <input type="text" v-model="uiState.modalData.contact" class="mt-1 w-full p-2 border rounded-md" placeholder="Contoh: 0812xxxxxx">
-            </div>
-            <div class="flex justify-end gap-3 pt-4 border-t mt-4">
-                <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg" :disabled="!isSubscriptionActive">Simpan</button>
-            </div>
-        </form>
-    </div>
-</div>
+
 
 
 
@@ -12838,7 +12820,25 @@ watch(activePage, (newPage) => {
     </div>
 
 </div>
-
+<div v-if="uiState.modalType === 'addSupplier' || uiState.modalType === 'editSupplier'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
+    <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full h-full md:max-h-[50vh] flex flex-col">
+        <h3 class="text-xl font-bold mb-4">{{ uiState.modalType === 'addSupplier' ? 'Tambah Supplier Baru' : 'Edit Supplier' }}</h3>
+        <form @submit.prevent="uiState.modalType === 'addSupplier' ? addSupplier() : updateSupplier()" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium">Nama Supplier</label>
+                <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Kontak (Opsional)</label>
+                <input type="text" v-model="uiState.modalData.contact" class="mt-1 w-full p-2 border rounded-md" placeholder="Contoh: 0812xxxxxx">
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t mt-4">
+                <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg" :disabled="!isSubscriptionActive">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
 <div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
         <h3 class="text-lg font-bold text-slate-800 mb-2">Konfirmasi Aksi</h3>
