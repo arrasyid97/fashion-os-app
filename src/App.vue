@@ -6538,7 +6538,7 @@ onMounted(() => {
         // --- INI BAGIAN UTAMA PERBAIKAN ---
         const userDocSnap = await getDoc(doc(db, 'users', user.uid));
         const userData = userDocSnap.exists() ? userDocSnap.data() : {};
-        currentUser.value = { ...user, userData, isPartner: userData.isPartner || false }; // <-- GABUNGKAN DATA
+        currentUser.value = { ...user, userData, isPartner: userData.isPartner || false, referralCode: userData.referralCode || null };
         // --- AKHIR DARI PERBAIKAN ---
 
         await setupListeners(user.uid);
