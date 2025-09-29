@@ -258,6 +258,9 @@ selectedProductForPurchase: null,
 hargaHppSelectedModelName: '',
 
 purchaseOrderSearch: '',
+purchaseOrdersLastVisible: null, // Untuk menyimpan dokumen terakhir yang terlihat
+purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data untuk dimuat
+
     purchaseOrderStatusProsesFilter: 'all', // 'all', 'Dalam Proses', 'Selesai'
     purchaseOrderStatusBayarFilter: 'all', // 'all', 'Belum Dibayar', 'Proses Pembayaran', 'Sudah Dibayar'
     purchaseOrderSort: 'tanggal-desc', // 'total-desc', 'total-asc'
@@ -6495,20 +6498,61 @@ const fetchFinanceData = async (userId) => {
 };
 
 // Fungsi khusus untuk data supplier dan purchase order
-const fetchSupplierData = async (userId) => {
-    if (dataFetched.suppliers) return;
-    console.log("Fetching supplier data...");
-    try {
-        const [suppliersSnap, purchaseOrdersSnap] = await Promise.all([
-            getDocs(query(collection(db, "suppliers"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "purchase_orders"), where("userId", "==", userId))),
-        ]);
-        state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.purchaseOrders = purchaseOrdersSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        dataFetched.suppliers = true;
-    } catch (error) {
-        console.error("Error fetching supplier data:", error);
-    }
+const fetchSupplierData = async (userId, loadMore = false) => {
+    const SUPPLIERS_PER_PAGE = 10; // Tentukan jumlah data per halaman
+
+    // Bagian ini untuk data supplier, tidak perlu paginasi karena jumlahnya sedikit
+    if (!dataFetched.suppliers) {
+        console.log("Fetching supplier list...");
+        try {
+            const suppliersSnap = await getDocs(query(collection(db, "suppliers"), where("userId", "==", userId)));
+            state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            dataFetched.suppliers = true;
+        } catch (error) {
+            console.error("Error fetching suppliers:", error);
+        }
+    }
+
+    // Bagian ini untuk Purchase Orders dengan Paginasi
+    if (dataFetched.purchaseOrders && !loadMore) return; // Jangan fetch ulang jika bukan 'load more'
+    if (loadMore && !uiState.purchaseOrdersHasMore) return; // Hentikan jika sudah tidak ada data lagi
+    
+    console.log(`Fetching purchase orders... ${loadMore ? '(Loading more)' : '(Initial)'}`);
+    try {
+        let q = query(
+            collection(db, "purchase_orders"),
+            where("userId", "==", userId),
+            orderBy("tanggal", "desc"), // Wajib ada orderBy untuk paginasi
+            limit(SUPPLIERS_PER_PAGE)
+        );
+
+        if (loadMore && uiState.purchaseOrdersLastVisible) {
+            q = query(q, startAfter(uiState.purchaseOrdersLastVisible));
+        } else {
+            // Jika ini fetch awal, reset data
+            state.purchaseOrders = [];
+        }
+
+        const poSnapshot = await getDocs(q);
+
+        // Simpan dokumen terakhir untuk query berikutnya
+        const lastVisible = poSnapshot.docs[poSnapshot.docs.length - 1];
+        uiState.purchaseOrdersLastVisible = lastVisible;
+
+        // Tambahkan data baru ke state
+        poSnapshot.forEach(doc => {
+            state.purchaseOrders.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
+        });
+        
+        // Cek apakah masih ada data lagi
+        if (poSnapshot.docs.length < SUPPLIERS_PER_PAGE) {
+            uiState.purchaseOrdersHasMore = false;
+        }
+
+        dataFetched.purchaseOrders = true; // Tandai bahwa data awal sudah dimuat
+    } catch (error) {
+        console.error("Error fetching purchase orders:", error);
+    }
 };
 
 // Fungsi khusus untuk catatan voucher
@@ -9520,7 +9564,11 @@ watch(activePage, (newPage) => {
                         </table>
                     </div>
                 </div>
-
+<div v-if="uiState.purchaseOrdersHasMore" class="mt-4 text-center">
+    <button @click="fetchSupplierData(currentUser.uid, true)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
+        Muat Lebih Banyak
+    </button>
+</div>
                 <div v-show="uiState.activeSupplierView === 'produkList'" class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
                     <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Produk dari Supplier</h3>
                     <div class="overflow-x-auto">
