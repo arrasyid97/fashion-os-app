@@ -5809,7 +5809,7 @@ async function saveStockAllocation() {
             // Ganti objek lama dengan yang baru di dalam array
             state.produk[index] = updatedProduct;
         }
-        const targetModel = state.settings.modelProduk.find(m => m.id === updatedProduct.model_id);
+        const targetModel = state.settings.modelProduk.find(m => m.id === existingProduct.model_id);
         if (targetModel) {
             lastEditedModel.value = targetModel.namaModel.split(' ')[0];
         }
