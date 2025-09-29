@@ -7350,20 +7350,16 @@ watch(activePage, (newPage) => {
         <div class="max-w-7xl mx-auto">
             
             <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
-                <div>
-                    <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga, HPP & Komisi</h2>
-                    <p class="text-slate-500 mt-1">Atur profitabilitas untuk setiap varian produk di semua channel penjualan.</p>
-                </div>
-                <div class="flex gap-3">
-                    <button @click="showModal('priceCalculator')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors" :disabled="!isSubscriptionActive">
-                        Kalkulator Harga
-                    </button>
-                    <button @click="saveData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors shadow disabled:bg-green-400 disabled:shadow-none">
-                        <span v-if="isSaving">Menyimpan...</span>
-                        <span v-else>Simpan Semua Perubahan</span>
-                    </button>
-                </div>
-            </div>
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga, HPP & Komisi</h2>
+        <p class="text-slate-500 mt-1">Atur profitabilitas untuk setiap varian produk di semua channel penjualan.</p>
+    </div>
+    <div class="flex gap-3">
+        <button @click="showModal('priceCalculator')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors" :disabled="!isSubscriptionActive">
+            Kalkulator Harga
+        </button>
+    </div>
+</div>
 
             <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
                 
