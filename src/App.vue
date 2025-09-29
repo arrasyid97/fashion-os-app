@@ -258,6 +258,9 @@ selectedProductForPurchase: null,
 produksiLastVisible: null, // Untuk menyimpan dokumen produksi terakhir
 produksiHasMore: true,     // Flag untuk menandakan apakah masih ada data produksi
 
+transaksiLastVisible: null, // Untuk menyimpan dokumen transaksi terakhir
+transaksiHasMore: true,     // Flag untuk menandakan apakah masih ada data transaksi
+
 hargaHppSelectedModelName: '',
 
 purchaseOrderSearch: '',
@@ -347,10 +350,10 @@ const loadDataForPage = async (pageName) => {
       break;
     case 'transaksi':
     case 'bulk_process':
-      await fetchProductData(userId);
-      await fetchTransactionData(userId);
-      await fetchNotesData(userId);
-      break;
+    await fetchProductData(userId);
+    await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
+    await fetchNotesData(userId);
+    break;
     case 'inventaris':
     case 'harga-hpp':
       await fetchProductData(userId);
@@ -6433,32 +6436,56 @@ const fetchProductData = async (userId) => {
   }
 };
 
-// Fungsi khusus untuk data transaksi dan retur
-const fetchTransactionData = async (userId) => {
-  if (dataFetched.transactions) return;
-  console.log("Fetching transaction data...");
-  try {
-    const [transactionsSnap] = await Promise.all([
-        getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
-    ]);
-    state.transaksi = transactionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-    dataFetched.transactions = true;
-  } catch(error) {
-    console.error("Error fetching transaction data:", error);
-  }
-};
 
-const fetchReturnData = async (userId) => {
-    if (dataFetched.returns) return;
-    console.log("Fetching return data...");
+const fetchTransactionAndReturnData = async (userId, loadMore = false) => {
+    const TRANSACTIONS_PER_PAGE = 15;
+
+    // Data retur tidak perlu paginasi
+    if (!dataFetched.returns) {
+        console.log("Fetching return data...");
+        try {
+            const returnsSnap = await getDocs(query(collection(db, "returns"), where("userId", "==", userId)));
+            state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
+            dataFetched.returns = true;
+        } catch(error) {
+            console.error("Error fetching return data:", error);
+        }
+    }
+
+    // Paginasi untuk data transaksi
+    if (loadMore && !uiState.transaksiHasMore) return;
+
     try {
-        const [returnsSnap] = await Promise.all([
-            getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
-        ]);
-        state.retur = returnsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
-        dataFetched.returns = true;
-    } catch(error) {
-        console.error("Error fetching return data:", error);
+        let q = query(
+            collection(db, "transactions"),
+            where("userId", "==", userId),
+            orderBy("tanggal", "desc"),
+            limit(TRANSACTIONS_PER_PAGE)
+        );
+
+        if (loadMore && uiState.transaksiLastVisible) {
+            q = query(q, startAfter(uiState.transaksiLastVisible));
+        } else {
+            state.transaksi = [];
+            uiState.transaksiHasMore = true;
+        }
+
+        const transactionSnap = await getDocs(q);
+
+        if (!transactionSnap.empty) {
+            uiState.transaksiLastVisible = transactionSnap.docs[transactionSnap.docs.length - 1];
+            transactionSnap.forEach(doc => {
+                state.transaksi.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
+            });
+        }
+        
+        if (transactionSnap.docs.length < TRANSACTIONS_PER_PAGE) {
+            uiState.transaksiHasMore = false;
+        }
+
+        dataFetched.transactions = true;
+    } catch (error) {
+        console.error("Error fetching transaction data:", error);
     }
 };
 
@@ -7058,116 +7085,120 @@ watch(activePage, (newPage) => {
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 
                 <div class="lg:col-span-2 space-y-8">
-                    <div class="animate-fade-in-up">
-                        <div class="flex items-center gap-4">
-                            <h2 class="text-3xl font-bold text-slate-800">Kasir (Point of Sale)</h2>
-                            <button @click="showModal('panduanPOS')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                                Panduan
-                            </button>
-                        </div>
-                        <p class="text-slate-500 mt-1">Scan atau ketik produk, lalu scan atau ketik ID Resi untuk menyelesaikan transaksi.</p>
-                    </div>
+    <div class="animate-fade-in-up">
+        <div class="flex items-center gap-4">
+            <h2 class="text-3xl font-bold text-slate-800">Kasir (Point of Sale)</h2>
+            <button @click="showModal('panduanPOS')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                Panduan
+            </button>
+        </div>
+        <p class="text-slate-500 mt-1">Scan atau ketik produk, lalu scan atau ketik ID Resi untuk menyelesaikan transaksi.</p>
+    </div>
 
-                    <div class="relative z-20 bg-white/70 backdrop-blur-sm p-4 rounded-xl border shadow-lg animate-fade-in-up" style="animation-delay: 100ms;">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Cari di Sini</label>
-                        <div class="relative flex items-center gap-2">
-                            <form @submit.prevent="handlePosSubmit" class="flex-grow">
-                                <input type="text" v-model="uiState.pos_scan_input" @input="handlePosSearch" :disabled="!uiState.activeCartChannel || !!uiState.pos_order_id" :placeholder="uiState.activeCartChannel ? 'Scan/Ketik Produk atau Resi...' : 'Pilih channel dulu...'" :class="{'bg-slate-100 cursor-not-allowed': !!uiState.pos_order_id}" class="w-full p-4 text-lg border-2 border-slate-300 rounded-lg shadow-inner" autocomplete="off">
-                                <div v-if="uiState.posSearchRecommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg">
-                                    <div v-for="p in uiState.posSearchRecommendations" :key="p.sku" @click="selectPosRecommendation(p)" class="p-3 hover:bg-slate-100 cursor-pointer border-b">
-                                        <p class="font-semibold">{{ p.nama }} - {{ p.varian }}</p>
-                                        <p class="text-xs text-slate-500">SKU: {{ p.sku }}</p>
-                                    </div>
-                                </div>
-                            </form>
-                            <button @click="handlePosSubmit" :disabled="activeCart.length === 0 || !uiState.pos_scan_input || !!uiState.pos_order_id" class="bg-indigo-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
-                                Jadikan ID Pesanan
-                            </button>
-                        </div>
-                        <div v-if="uiState.pos_order_id" class="mt-3 p-2 bg-green-50 text-green-800 rounded-md border border-green-200">
-                            <span class="text-sm font-semibold">ID Pesanan Tercatat:</span>
-                            <span class="font-mono ml-2">{{ uiState.pos_order_id }}</span>
-                            <span class="text-xs italic ml-2">(Keranjang terkunci)</span>
-                        </div>
+    <div class="relative z-20 bg-white/70 backdrop-blur-sm p-4 rounded-xl border shadow-lg animate-fade-in-up" style="animation-delay: 100ms;">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Cari di Sini</label>
+        <div class="relative flex items-center gap-2">
+            <form @submit.prevent="handlePosSubmit" class="flex-grow">
+                <input type="text" v-model="uiState.pos_scan_input" @input="handlePosSearch" :disabled="!uiState.activeCartChannel || !!uiState.pos_order_id" :placeholder="uiState.activeCartChannel ? 'Scan/Ketik Produk atau Resi...' : 'Pilih channel dulu...'" :class="{'bg-slate-100 cursor-not-allowed': !!uiState.pos_order_id}" class="w-full p-4 text-lg border-2 border-slate-300 rounded-lg shadow-inner" autocomplete="off">
+                <div v-if="uiState.posSearchRecommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg">
+                    <div v-for="p in uiState.posSearchRecommendations" :key="p.sku" @click="selectPosRecommendation(p)" class="p-3 hover:bg-slate-100 cursor-pointer border-b">
+                        <p class="font-semibold">{{ p.nama }} - {{ p.varian }}</p>
+                        <p class="text-xs text-slate-500">SKU: {{ p.sku }}</p>
                     </div>
-
-                    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                        <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-    <div class="flex flex-wrap justify-between items-center mb-4 pb-4 border-b border-slate-200/80">
-        <h3 class="text-xl font-semibold text-slate-800">Riwayat Transaksi</h3>
-        <div class="flex items-center gap-2">
-            <select v-model="uiState.posDateFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                <option value="today">hari ini</option>
-                <option value="last_7_days">7 hari terakhir</option>
-                <option value="last_30_days">30 hari terakhir</option>
-                <option value="this_year">tahun ini</option>
-                <option value="by_date_range">rentang tanggal</option>
-                <option value="by_month_range">rentang bulan</option>
-                <option value="by_year_range">rentang tahun</option>
-                <option value="all_time">semua</option>
-            </select>
-            <select v-model="uiState.posChannelFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                <option value="all">Semua Channel</option>
-                <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
-            </select>
-            <button @click="exportTransactionsToExcel" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px] flex-shrink-0">Export</button>
+                </div>
+            </form>
+            <button @click="handlePosSubmit" :disabled="activeCart.length === 0 || !uiState.pos_scan_input || !!uiState.pos_order_id" class="bg-indigo-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
+                Jadikan ID Pesanan
+            </button>
+        </div>
+        <div v-if="uiState.pos_order_id" class="mt-3 p-2 bg-green-50 text-green-800 rounded-md border border-green-200">
+            <span class="text-sm font-semibold">ID Pesanan Tercatat:</span>
+            <span class="font-mono ml-2">{{ uiState.pos_order_id }}</span>
+            <span class="text-xs italic ml-2">(Keranjang terkunci)</span>
         </div>
     </div>
-    <div class="mb-4 space-y-2">
-        <div v-if="uiState.posDateFilter === 'by_date_range'" class="flex items-center gap-2 animate-fade-in">
-            <input type="date" v-model="uiState.posStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-            <span>s/d</span>
-            <input type="date" v-model="uiState.posEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+
+    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+        <div class="flex flex-wrap justify-between items-center mb-4 pb-4 border-b border-slate-200/80">
+            <h3 class="text-xl font-semibold text-slate-800">Riwayat Transaksi</h3>
+            <div class="flex items-center gap-2">
+                <select v-model="uiState.posDateFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                    <option value="today">hari ini</option>
+                    <option value="last_7_days">7 hari terakhir</option>
+                    <option value="last_30_days">30 hari terakhir</option>
+                    <option value="this_year">tahun ini</option>
+                    <option value="by_date_range">rentang tanggal</option>
+                    <option value="by_month_range">rentang bulan</option>
+                    <option value="by_year_range">rentang tahun</option>
+                    <option value="all_time">semua</option>
+                </select>
+                <select v-model="uiState.posChannelFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
+                    <option value="all">Semua Channel</option>
+                    <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
+                </select>
+                <button @click="exportTransactionsToExcel" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px] flex-shrink-0">Export</button>
+            </div>
         </div>
-        <div v-if="uiState.posDateFilter === 'by_month_range'" class="flex items-center gap-2 animate-fade-in">
-            <select v-model.number="uiState.posStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
-            </select>
-            <input type="number" v-model.number="uiState.posStartYear" placeholder="Tahun" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-            <span>s/d</span>
-            <select v-model.number="uiState.posEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
-            </select>
-            <input type="number" v-model.number="uiState.posEndYear" placeholder="Tahun" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+        <div class="mb-4 space-y-2">
+            <div v-if="uiState.posDateFilter === 'by_date_range'" class="flex items-center gap-2 animate-fade-in">
+                <input type="date" v-model="uiState.posStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                <span>s/d</span>
+                <input type="date" v-model="uiState.posEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+            </div>
+            <div v-if="uiState.posDateFilter === 'by_month_range'" class="flex items-center gap-2 animate-fade-in">
+                <select v-model.number="uiState.posStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                    <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
+                </select>
+                <input type="number" v-model.number="uiState.posStartYear" placeholder="Tahun" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+                <span>s/d</span>
+                <select v-model.number="uiState.posEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                    <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
+                </select>
+                <input type="number" v-model.number="uiState.posEndYear" placeholder="Tahun" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+            </div>
+            <div v-if="uiState.posDateFilter === 'by_year_range'" class="flex items-center gap-2 animate-fade-in">
+                <input type="number" v-model.number="uiState.posStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                <span>s/d</span>
+                <input type="number" v-model.number="uiState.posEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+            </div>
         </div>
-        <div v-if="uiState.posDateFilter === 'by_year_range'" class="flex items-center gap-2 animate-fade-in">
-            <input type="number" v-model.number="uiState.posStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-            <span>s/d</span>
-            <input type="number" v-model.number="uiState.posEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+        <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-sm text-left text-slate-500">
+                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
+                    <tr>
+                        <th class="px-6 py-3">ID Pesanan</th>
+                        <th class="px-6 py-3">Tanggal</th>
+                        <th class="px-6 py-3">Channel</th>
+                        <th class="px-6 py-3">Total</th>
+                        <th class="px-6 py-3">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200/50">
+                    <tr v-if="filteredTransaksi.length === 0">
+                        <td colspan="5" class="text-center py-4">Belum ada transaksi pada periode ini.</td>
+                    </tr>
+                    <tr v-for="trx in filteredTransaksi" :key="trx.id" class="hover:bg-slate-50/50">
+                        <td class="px-6 py-4 font-mono text-xs">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</td>
+                        <td class="px-6 py-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
+                        <td class="px-6 py-4">{{ trx.channel }}</td>
+                        <td class="px-6 py-4 font-semibold">{{ formatCurrency(trx.total) }}</td>
+                        <td class="px-6 py-4 space-x-3">
+                            <button @click="showModal('transactionDetail', trx)" class="font-semibold text-indigo-600 hover:underline">Detail</button>
+                            <button @click="deleteTransaction(trx.id)" class="font-semibold text-red-500 hover:underline">Hapus</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div v-if="uiState.transaksiHasMore" class="mt-4 text-center">
+            <button @click="fetchTransactionAndReturnData(currentUser.uid, true)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
+                Muat Lebih Banyak
+            </button>
         </div>
     </div>
 </div>
-                        <div class="overflow-x-auto max-h-96">
-                            <table class="w-full text-sm text-left text-slate-500">
-                                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                                    <tr>
-                                        <th class="px-6 py-3">ID Pesanan</th>
-                                        <th class="px-6 py-3">Tanggal</th>
-                                        <th class="px-6 py-3">Channel</th>
-                                        <th class="px-6 py-3">Total</th>
-                                        <th class="px-6 py-3">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-200/50">
-                                    <tr v-if="filteredTransaksi.length === 0">
-                                        <td colspan="5" class="text-center py-4">Belum ada transaksi pada periode ini.</td>
-                                    </tr>
-                                    <tr v-for="trx in filteredTransaksi" :key="trx.id" class="hover:bg-slate-50/50">
-                                        <td class="px-6 py-4 font-mono text-xs">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</td>
-                                        <td class="px-6 py-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
-                                        <td class="px-6 py-4">{{ trx.channel }}</td>
-                                        <td class="px-6 py-4 font-semibold">{{ formatCurrency(trx.total) }}</td>
-                                        <td class="px-6 py-4 space-x-3">
-                                            <button @click="showModal('transactionDetail', trx)" class="font-semibold text-indigo-600 hover:underline">Detail</button>
-                                            <button @click="deleteTransaction(trx.id)" class="font-semibold text-red-500 hover:underline">Hapus</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
 
                 <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 lg:sticky lg:top-8 animate-fade-in-up" style="animation-delay: 300ms;">
                     <div class="mb-4">
