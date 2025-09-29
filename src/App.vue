@@ -2981,17 +2981,6 @@ const filteredRetur = computed(() => {
 
 
 
-const totalYangHarusDibayarkan = computed(() => {
-    return uiState.penerimaanBarangForm.produk.reduce((sum, p) => {
-        return sum + (p.hargaJual || 0) * (p.qty || 0);
-    }, 0);
-});
-
-const sisaPembayaran = computed(() => {
-    return totalYangHarusDibayarkan.value - (uiState.penerimaanBarangForm.dibayarkan || 0);
-});
-
-
 const filteredMarketplaces = computed(() => {
     // Memberikan nilai default array kosong jika state.settings.marketplaces undefined
     const marketplacesData = state.settings.marketplaces || [];
@@ -9679,27 +9668,7 @@ watch(activePage, (newPage) => {
                                 </table>
                             </div>
                         </div>
-                        <div class="mt-4 p-4 border rounded-lg bg-slate-50">
-    <h4 class="text-base font-semibold mb-2">Informasi Pembayaran</h4>
-    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div>
-            <label class="block text-sm font-medium">Total Tagihan</label>
-            <p class="font-bold text-lg text-indigo-600">{{ formatCurrency(totalYangHarusDibayarkan) }}</p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium">Dibayarkan (DP)</label>
-            <input type="number" v-model.number="uiState.penerimaanBarangForm.dibayarkan" class="mt-1 w-full p-2 border rounded-md text-right" placeholder="0">
-        </div>
-         <div>
-            <label class="block text-sm font-medium">Tgl. Bayar</label>
-            <input type="date" v-model="uiState.penerimaanBarangForm.tanggalPembayaran" class="mt-1 w-full p-2 border rounded-md">
-        </div>
-        <div>
-            <label class="block text-sm font-medium">Sisa Tagihan</label>
-            <p class="font-bold text-lg text-red-600">{{ formatCurrency(sisaPembayaran) }}</p>
-        </div>
-    </div>
-</div>
+                        
 
                         <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
                             <button @click.prevent="hidePenerimaanBarangForm" type="button" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
