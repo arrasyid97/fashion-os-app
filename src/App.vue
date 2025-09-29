@@ -344,7 +344,7 @@ const loadDataForPage = async (pageName) => {
   // Logika Lazy Loading yang sudah ada, sekarang di dalam fungsi ini
   switch(pageName) {
     case 'dashboard':
-      await fetchTransactionData(userId);
+      await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
       await fetchFinanceData(userId);
       nextTick(renderCharts);
       break;
@@ -378,10 +378,9 @@ const loadDataForPage = async (pageName) => {
         await fetchSupplierData(userId);
         break;
     case 'retur':
-        await fetchTransactionData(userId);
-        await fetchReturnData(userId);
-        await fetchProductData(userId);
-        break;
+      await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
+      await fetchProductData(userId);
+      break;
   }
 };
 
