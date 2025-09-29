@@ -5418,7 +5418,7 @@ async function submitReturForm() {
         await batch.commit();
 
         // Perbarui state lokal secara langsung
-        state.retur.unshift({ id: returnRef.id, ...dataToSave, tanggal: dataToSave.tanggal.toDate() });
+        state.retur.unshift({ id: returnRef.id, ...dataToSave });
         for (const item of selectedItems) {
             const productInState = state.produk.find(p => p.sku === item.sku);
             if (productInState) {
