@@ -9486,15 +9486,15 @@ watch(activePage, (newPage) => {
     <td class="px-4 py-3 text-right font-bold text-green-600">{{ formatCurrency(item.hargaJual * item.qty) }}</td>
     <td class="px-4 py-3">{{ item.statusProses }}</td>
     <td class="px-4 py-3 text-center">
-        <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-              :class="{
-                'bg-green-100 text-green-800': item.orderStatusPembayaran === 'Lunas',
-                'bg-yellow-100 text-yellow-800': item.orderStatusPembayaran === 'Cicilan',
-                'bg-red-100 text-red-800': item.orderStatusPembayaran === 'Belum Dibayar',
-              }">
-            {{ item.orderStatusPembayaran }}
-        </span>
-    </td>
+    <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+          :class="{
+            'bg-green-100 text-green-800': item.orderStatusPembayaran === 'Lunas' || item.orderStatusPembayaran === 'Sudah Dibayar',
+            'bg-yellow-100 text-yellow-800': item.orderStatusPembayaran === 'Cicilan' || item.orderStatusPembayaran === 'Proses Pembayaran',
+            'bg-red-100 text-red-800': item.orderStatusPembayaran === 'Belum Dibayar',
+          }">
+        {{ item.orderStatusPembayaran }}
+    </span>
+</td>
     <td class="px-4 py-3">{{ item.returReason || 'Tidak Retur' }}</td>
 
     <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
