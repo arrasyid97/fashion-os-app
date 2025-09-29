@@ -392,6 +392,9 @@ const loadDataForPage = async (pageName) => {
   }
 };
 
+const lastEditedModel = ref(null);
+const groupRefs = ref({});
+
 const unpaidCommissions = computed(() =>
     commissions.value.filter(c => c.status === 'unpaid')
         .sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000))
@@ -4060,9 +4063,21 @@ function exportLaporanSemuaToExcel() {
 }
 
 function hideModal() {
+    const modelToScrollTo = lastEditedModel.value;
+
     uiState.isModalVisible = false;
     uiState.modalType = '';
     uiState.modalData = {};
+    lastEditedModel.value = null; // Reset setelah digunakan
+
+    if (modelToScrollTo && groupRefs.value[modelToScrollTo]) {
+        nextTick(() => {
+            groupRefs.value[modelToScrollTo].scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        });
+    }
 }
 
 // TAMBAHKAN FUNGSI BARU INI
@@ -5771,21 +5786,33 @@ async function saveStockAllocation() {
         const batch = writeBatch(db);
 
         // Operasi 1: Update stok fisik di koleksi 'products'
-        const productRef = doc(db, "products", original.docId); // <-- PERBAIKAN: Gunakan original.docId
+        const productRef = doc(db, "products", original.docId);
         batch.update(productRef, { physical_stock: product.stokFisik });
         
         // Operasi 2: Simpan/Update data alokasi di koleksi 'stock_allocations'
-        const allocationRef = doc(db, "stock_allocations", original.docId); // <-- PERBAIKAN: Gunakan original.docId
+        const allocationRef = doc(db, "stock_allocations", original.docId);
         batch.set(allocationRef, { ...cleanAllocationData, userId: userId });
 
         await batch.commit();
 
-        const targetProduct = state.produk.find(p => p.docId === original.docId);
-        if (targetProduct) {
-            targetProduct.stokFisik = product.stokFisik;
-            targetProduct.stokAlokasi = { ...product.stokAlokasi };
+        // --- PERBAIKAN UTAMA: CARA UPDATE STATE LOKAL YANG LEBIH AMAN ---
+        const index = state.produk.findIndex(p => p.docId === original.docId);
+        if (index !== -1) {
+            // Ambil data produk yang ada
+            const existingProduct = state.produk[index];
+            // Buat objek baru dengan data yang diperbarui
+            const updatedProduct = {
+                ...existingProduct,
+                stokFisik: product.stokFisik,
+                stokAlokasi: { ...product.stokAlokasi }
+            };
+            // Ganti objek lama dengan yang baru di dalam array
+            state.produk[index] = updatedProduct;
         }
-        
+        const targetModel = state.settings.modelProduk.find(m => m.id === updatedProduct.model_id);
+        if (targetModel) {
+            lastEditedModel.value = targetModel.namaModel.split(' ')[0];
+        }
         hideModal();
         alert("Perubahan stok fisik dan alokasi berhasil disimpan!");
 
@@ -7480,7 +7507,7 @@ watch(activePage, (newPage) => {
             <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
         </tr>
         <template v-for="group in inventoryProductGroups" :key="group.namaModel">
-            <tr class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel">
+            <tr :ref="el => { if (el) groupRefs[group.namaModel] = el }" class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel">
                 <td class="px-6 py-4 font-bold text-slate-800">
                     <div class="flex items-center">
                         <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.namaModel }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
