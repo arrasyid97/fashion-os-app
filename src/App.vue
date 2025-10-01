@@ -4278,7 +4278,7 @@ if (totalKomisiProduk > 0) {
         await batch.commit();
 
         const finalTransactionForUI = { ...newTransactionData, id: transactionRef.id, tanggal: newTransactionData.tanggal.toISOString().split('T')[0] };
-        state.transaksi.unshift(finalTransactionForUI);
+        await fetchTransactionAndReturnData(currentUser.value.uid, false);
         
         activeCart.value.forEach(item => {
             const productInState = state.produk.find(p => p.docId === item.docId);
