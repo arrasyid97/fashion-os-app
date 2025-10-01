@@ -4277,7 +4277,7 @@ if (totalKomisiProduk > 0) {
 
         await batch.commit();
 
-        const finalTransactionForUI = { ...newTransactionData, id: transactionRef.id, tanggal: newTransactionData.tanggal.toISOString().split('T')[0] };
+        
         await fetchTransactionAndReturnData(currentUser.value.uid, false);
         
         activeCart.value.forEach(item => {
