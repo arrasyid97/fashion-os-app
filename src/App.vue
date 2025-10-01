@@ -268,6 +268,7 @@ productsLastVisible: null, // Untuk menyimpan dokumen produk terakhir
 productsHasMore: true,     // Flag untuk menandakan apakah masih ada data produk
 
 
+summaryData: {},
 
 hargaHppSelectedModelName: '',
 
@@ -352,8 +353,8 @@ const loadDataForPage = async (pageName) => {
   // Logika Lazy Loading yang sudah ada, sekarang di dalam fungsi ini
   switch(pageName) {
     case 'dashboard':
-      await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
-      await fetchFinanceData(userId);
+      await fetchSummaryData(userId); // <-- CUKUP PANGGIL FUNGSI INI
+      // Kita tidak perlu lagi fetchTransaction/Finance untuk dashboard
       nextTick(renderCharts);
       break;
     case 'transaksi':
@@ -462,6 +463,18 @@ const isSubscriptionActive = computed(() => {
     }
     return false;
 });
+
+const fetchSummaryData = async (userId) => {
+  if (!userId) return;
+  const summaryRef = doc(db, "user_summaries", userId);
+  const docSnap = await getDoc(summaryRef);
+  if (docSnap.exists()) {
+    state.summaryData = docSnap.data();
+  } else {
+    console.log("Dokumen ringkasan belum ada, akan dibuat otomatis oleh Cloud Function.");
+    state.summaryData = {}; // Kosongkan jika belum ada
+  }
+};
 
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
@@ -2671,67 +2684,59 @@ const filteredInvestorPayments = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    const { transaksi = [], keuangan = [], retur = [] } = dashboardFilteredData.value || {};
-    
-    // --- 1. HITUNG TOTAL DARI TRANSAKSI PENJUALAN ---
-    const totalOmsetKotorPenjualan = transaksi.reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
-    const totalDiskonPenjualan = transaksi.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
-    const totalHppTerjualPenjualan = transaksi.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * (item.qty || 0), 0), 0);
-    const totalBiayaTransaksiPenjualan = transaksi.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
+  const now = new Date();
+  const totals = {
+    omsetKotor: 0, totalDiskon: 0, hppTerjual: 0, biayaTransaksi: 0,
+    biayaOperasional: 0, nilaiRetur: 0, omsetBersih: 0, labaKotor: 0,
+    labaBersihOperasional: 0, saldoKas: 0,
+  };
 
-    // --- 2. HITUNG TOTAL DARI DATA RETUR ---
-    let totalNilaiRetur_Net = 0;        // Uang yang kembali ke pelanggan (Net)
-    let totalHppRetur = 0;            // Nilai HPP barang yang kembali
-    let totalDiskonBatal = 0;         // Diskon yang dibatalkan karena retur
-    let totalBiayaMarketplaceBatal = 0; // Biaya MP yang dibatalkan karena retur
+  const processSummary = (summaryObject) => {
+    if (!summaryObject) return;
+    totals.omsetKotor += summaryObject.omsetKotor || 0;
+    totals.totalDiskon += summaryObject.totalDiskon || 0;
+    totals.hppTerjual += summaryObject.hppTerjual || 0;
+    totals.biayaTransaksi += summaryObject.biayaTransaksi || 0;
+    totals.biayaOperasional += summaryObject.biayaOperasional || 0;
+    totals.nilaiRetur += summaryObject.nilaiRetur || 0;
+    totals.omsetBersih += summaryObject.omsetBersih || 0;
+    totals.labaKotor += summaryObject.labaKotor || 0;
+    totals.labaBersihOperasional += summaryObject.labaBersihOperasional || 0;
+  };
 
-    retur.forEach(returDoc => {
-        (returDoc.items || []).forEach(item => {
-            totalNilaiRetur_Net += (item.nilaiRetur || 0);
-            totalDiskonBatal += (item.nilaiDiskon || 0);
-            totalBiayaMarketplaceBatal += (item.biayaMarketplace || 0);
-            const product = getProductBySku(item.sku);
-            if (product) {
-                totalHppRetur += (product.hpp || 0) * (item.qty || 0);
-            }
-        });
-    });
-    // Sesuai permintaan: Nilai retur kotor adalah nilai bersih ditambah diskon yang batal
-    const totalNilaiRetur_Kotor = totalNilaiRetur_Net + totalDiskonBatal;
+  const year = uiState.dashboardStartYear;
+  const month = uiState.dashboardStartMonth.toString().padStart(2, "0");
+  
+  if (uiState.dashboardDateFilter === 'by_month_range') {
+    const summary = state.summaryData?.[`summary_${year}`]?.months?.[month];
+    processSummary(summary);
+  } else if (uiState.dashboardDateFilter === 'this_year') {
+    const summary = state.summaryData?.[`summary_${now.getFullYear()}`]?.yearlyTotals;
+    processSummary(summary);
+  } else if (uiState.dashboardDateFilter === 'all_time') {
+    for (const key in state.summaryData) {
+      if (key.startsWith('summary_')) {
+        processSummary(state.summaryData[key].yearlyTotals);
+      }
+    }
+  }
+  
+  const allTimeTotals = {omsetBersih: 0, biayaTransaksi: 0, biayaOperasional: 0, nilaiRetur: 0};
+  for (const key in state.summaryData) {
+      if (key.startsWith('summary_')) {
+        const yearly = state.summaryData[key].yearlyTotals;
+        allTimeTotals.omsetBersih += yearly.omsetBersih || 0;
+        allTimeTotals.biayaTransaksi += yearly.biayaTransaksi || 0;
+        allTimeTotals.biayaOperasional += yearly.biayaOperasional || 0;
+        allTimeTotals.nilaiRetur += yearly.nilaiRetur || 0;
+      }
+  }
+  totals.saldoKas = allTimeTotals.omsetBersih - allTimeTotals.biayaTransaksi - allTimeTotals.biayaOperasional - allTimeTotals.nilaiRetur;
+  
+  totals.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
+  totals.totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
-    // --- 3. HITUNG NILAI FINAL SETELAH DISESUAIKAN RETUR ---
-    const finalOmsetKotor = totalOmsetKotorPenjualan - totalNilaiRetur_Kotor;
-    const finalDiskon = totalDiskonPenjualan - totalDiskonBatal;
-    const finalOmsetBersih = finalOmsetKotor - finalDiskon;
-    const finalHppTerjual = totalHppTerjualPenjualan - totalHppRetur;
-    const finalBiayaTransaksi = totalBiayaTransaksiPenjualan - totalBiayaMarketplaceBatal;
-    
-    // --- 4. HITUNG METRIK PROFITABILITAS FINAL ---
-    const finalLabaKotor = finalOmsetBersih - finalHppTerjual;
-    const totalBiayaOperasional = keuangan.filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + i.jumlah, 0);
-    const finalLabaBersihOperasional = finalLabaKotor - totalBiayaOperasional - finalBiayaTransaksi;
-
-    // --- 5. KALKULASI LAINNYA ---
-    const totalPemasukanLain = keuangan.filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + i.jumlah, 0);
-    const saldoKas = (totalOmsetKotorPenjualan - totalDiskonPenjualan - totalBiayaTransaksiPenjualan) - totalBiayaOperasional - totalNilaiRetur_Net + totalPemasukanLain;
-    const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
-    const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
-
-    // --- 6. KEMBALIKAN SEMUA NILAI FINAL KE TAMPILAN ---
-    return {
-        saldoKas,
-        omsetBersih: finalOmsetBersih,
-        labaKotor: finalLabaKotor,
-        labaBersihOperasional: finalLabaBersihOperasional,
-        totalBiayaOperasional,
-        totalUnitStok,
-        totalNilaiStokHPP,
-        totalNilaiRetur: totalNilaiRetur_Kotor, // Menampilkan nilai retur kotor
-        totalOmsetKotor: finalOmsetKotor,
-        totalDiskon: finalDiskon,
-        totalHppTerjual: finalHppTerjual,
-        totalBiayaTransaksi: finalBiayaTransaksi,
-    };
+  return totals;
 });
 const namaKainHistory = computed(() => {
     const uniqueNames = new Set(state.gudangKain.map(k => k.namaKain).filter(Boolean));
