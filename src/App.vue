@@ -464,18 +464,31 @@ const isSubscriptionActive = computed(() => {
     return false;
 });
 
-const fetchSummaryData = async (userId) => {
-  if (!userId) return;
-  const summaryRef = doc(db, "user_summaries", userId);
-  const docSnap = await getDoc(summaryRef);
-  if (docSnap.exists()) {
-    state.summaryData = docSnap.data();
-  } else {
-    console.log("Dokumen ringkasan belum ada, akan dibuat otomatis oleh Cloud Function.");
-    state.summaryData = {}; // Kosongkan jika belum ada
-  }
-};
+let unsubscribeSummary = null; // Variabel untuk menyimpan listener
 
+const fetchSummaryData = (userId) => {
+    if (unsubscribeSummary) {
+        unsubscribeSummary(); // Hentikan listener lama jika ada
+    }
+
+    if (!userId) {
+        state.summaryData = {};
+        return;
+    }
+
+    const summaryRef = doc(db, "user_summaries", userId);
+    // Gunakan onSnapshot untuk 'mendengarkan' perubahan secara real-time
+    unsubscribeSummary = onSnapshot(summaryRef, (docSnap) => {
+        if (docSnap.exists()) {
+            state.summaryData = docSnap.data();
+        } else {
+            console.log("Dokumen ringkasan belum ada, akan dibuat otomatis oleh Cloud Function.");
+            state.summaryData = {};
+        }
+    }, (error) => {
+        console.error("Gagal mendengarkan summary data:", error);
+    });
+};
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
     if (!isAdmin.value) return; // Hanya jalankan jika admin
