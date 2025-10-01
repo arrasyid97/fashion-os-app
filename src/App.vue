@@ -2768,7 +2768,7 @@ const dashboardKpis = computed(() => {
     }
   }
   // Rumus Saldo Kas yang sudah diperbaiki
-  totals.saldoKas = allTimeOmsetBersih - allTimeBiayaTransaksi - allTimeBiayaOperasional;
+  totals.saldoKas = allTimeOmsetBersih - allTimeBiayaTransaksi - allTimeBiayaOperasional - allTimeNilaiRetur;
 
   // Stok selalu real-time dari state.produk
   totals.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
