@@ -6647,18 +6647,17 @@ const fetchKeuanganData = async () => {
     if (!currentUser.value) return;
     const userId = currentUser.value.uid;
     
-    // Query Firestore (tetap membutuhkan index komposit yang sudah dibuat)
+    // Query untuk menyimpan data terbaru di bagian bawah tabel (Ascending)
+    // Urutan: userId (WHERE), tanggal (ASC)
     const q = query(
-        collection(db, "keuangan"),
+        collection(db, "keuangan"), 
         where("userId", "==", userId),
-        orderBy("tanggal", "desc"), 
-        orderBy(documentId(), "desc") 
+        orderBy("tanggal", "asc") // KRITIS: Urutan Ascending. Data terbaru akan ada di AKHIR LIST
     );
 
     try {
         const keuanganSnap = await getDocs(q);
         
-        // 1. Ambil dan Konversi Data
         const fetchedKeuangan = keuanganSnap.docs.map(doc => {
             const data = doc.data();
             const docId = doc.id;
@@ -6671,27 +6670,11 @@ const fetchKeuanganData = async () => {
             return { 
                 id: docId, 
                 ...data, 
-                tanggal: dateObject // Menyimpan sebagai objek Date
+                tanggal: dateObject
             };
         });
         
-        // 2. KRITIS: LAKUKAN SORTING MANUAL YANG BENAR DI SISI KLIEN UNTUK STABILITAS
-        fetchedKeuangan.sort((a, b) => {
-            // Urutan Primer: Tanggal (Descending: b - a)
-            const dateA = new Date(a.tanggal).getTime();
-            const dateB = new Date(b.tanggal).getTime();
-
-            if (dateB !== dateA) {
-                return dateB - dateA; // Tanggal terbaru (B) di atas
-            }
-
-            // Urutan Sekunder: ID Dokumen (Descending)
-            // Menggunakan localeCompare untuk perbandingan string Descending yang benar
-            return b.id.localeCompare(a.id); 
-        });
-
-
-        // 3. Update State dengan data yang sudah terurut stabil
+        // Tidak perlu sort manual di klien karena Ascending adalah default yang stabil
         state.keuangan = fetchedKeuangan; 
         
         dataFetched.finance = true;
