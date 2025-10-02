@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, orderBy, limit, startAfter } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, orderBy, limit, startAfter, documentId } from 'firebase/firestore';
 let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
@@ -5120,7 +5120,7 @@ async function submitBiaya() {
     
     isLoading.value = true;
     try {
-        await addDoc(collection(db, "keuangan"), { // docRef tidak lagi dibutuhkan
+        await addDoc(collection(db, "keuangan"), { 
             kategori: form.kategori,
             jumlah: totalPengeluaran,
             catatan: catatanLengkap,
@@ -5163,7 +5163,7 @@ async function submitPemasukan() {
     if (!currentUser.value) return alert("Anda harus login untuk mengelola pemasukan.");
     isLoading.value = true;
     try {
-        await addDoc(collection(db, "keuangan"), { // docRef tidak lagi dibutuhkan
+        await addDoc(collection(db, "keuangan"), {
             kategori: uiState.modalData.kategori,
             jumlah: uiState.modalData.jumlah,
             catatan: uiState.modalData.catatan,
@@ -5172,7 +5172,7 @@ async function submitPemasukan() {
             tanggal: new Date(uiState.modalData.tanggal)
         });
 
-        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
+        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
         await fetchKeuanganData(); 
 
         hideModal();
@@ -6647,18 +6647,19 @@ const fetchKeuanganData = async () => {
     if (!currentUser.value) return;
     const userId = currentUser.value.uid;
     
-    // Query untuk mengambil semua data Keuangan milik user ini
-    // Memerlukan index komposit: userId (asc), tanggal (desc)
+    // Query Firestore (tetap membutuhkan index komposit yang sudah dibuat)
     const q = query(
         collection(db, "keuangan"),
         where("userId", "==", userId),
-        orderBy("tanggal", "desc") // Harus didukung oleh index
+        orderBy("tanggal", "desc"), 
+        orderBy(documentId(), "desc") 
     );
 
     try {
         const keuanganSnap = await getDocs(q);
         
-        state.keuangan = keuanganSnap.docs.map(doc => {
+        // 1. Ambil dan Konversi Data
+        const fetchedKeuangan = keuanganSnap.docs.map(doc => {
             const data = doc.data();
             const docId = doc.id;
 
@@ -6674,14 +6675,30 @@ const fetchKeuanganData = async () => {
             };
         });
         
+        // 2. KRITIS: LAKUKAN SORTING MANUAL YANG BENAR DI SISI KLIEN UNTUK STABILITAS
+        fetchedKeuangan.sort((a, b) => {
+            // Urutan Primer: Tanggal (Descending: b - a)
+            const dateA = new Date(a.tanggal).getTime();
+            const dateB = new Date(b.tanggal).getTime();
+
+            if (dateB !== dateA) {
+                return dateB - dateA; // Tanggal terbaru (B) di atas
+            }
+
+            // Urutan Sekunder: ID Dokumen (Descending)
+            // Menggunakan localeCompare untuk perbandingan string Descending yang benar
+            return b.id.localeCompare(a.id); 
+        });
+
+
+        // 3. Update State dengan data yang sudah terurut stabil
+        state.keuangan = fetchedKeuangan; 
+        
         dataFetched.finance = true;
         console.log(`[Keuangan] Berhasil memuat ${state.keuangan.length} data.`);
 
     } catch (error) {
-        console.error("FATAL ERROR FETCHING KEUANGAN DATA:", error);
-        // Tambahkan peringatan jika fetch gagal
-        // Ini memastikan masalahnya bukan pada sisi klien.
-        alert("Gagal memuat data keuangan. Cek log konsol untuk detail index yang hilang.");
+        console.error("Error fetching Keuangan data:", error);
     }
 };
 // Fungsi khusus untuk data supplier dan purchase order
