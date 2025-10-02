@@ -405,8 +405,8 @@ const riwayatPengeluaran = computed(() => {
     // 1. Filter: Hanya Pengeluaran (pengeluaran atau biaya)
     let filtered = state.keuangan.filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya');
 
-    // 2. Sort: Tanggal ASC (Terbaru di Bawah)
-    return filtered.sort((a, b) => {
+    // KRITIS: Membuat DEEP COPY ([...filtered]) untuk memastikan Vue melacak perubahan array
+    return [...filtered].sort((a, b) => {
         // Bandingkan berdasarkan tanggal, lalu ID untuk tie-breaker
         const dateA = new Date(a.tanggal).getTime();
         const dateB = new Date(b.tanggal).getTime();
@@ -418,12 +418,13 @@ const riwayatPengeluaran = computed(() => {
     });
 });
 
+// --- GANTI SELURUH COMPUTED PROPERTY riwayatPemasukan DENGAN KODE INI ---
 const riwayatPemasukan = computed(() => {
     // 1. Filter: Hanya Pemasukan
     let filtered = state.keuangan.filter(k => k.jenis === 'pemasukan_lain');
 
-    // 2. Sort: Tanggal ASC (Terbaru di Bawah)
-    return filtered.sort((a, b) => {
+    // KRITIS: Membuat DEEP COPY ([...filtered]) untuk memastikan Vue melacak perubahan array
+    return [...filtered].sort((a, b) => {
         const dateA = new Date(a.tanggal).getTime();
         const dateB = new Date(b.tanggal).getTime();
         if (dateA !== dateB) {
