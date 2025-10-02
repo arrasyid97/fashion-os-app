@@ -2524,42 +2524,65 @@ const getProductBySku = (sku) => {
 const getMarketplaceById = (id) => state.settings.marketplaces.find(mp => mp.id === id);
 
 function filterDataByDate(data, filterType, startDateStr, endDateStr, startMonth, startYear, endMonth, endYear) {
-    if (!data) return [];
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset waktu untuk perbandingan 'today' yang akurat
+    if (!data) return [];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); 
 
-    return data.filter(item => {
-        if (!item.tanggal) return false;
-        
-        // KRITIS: Pastikan konversi ke Date dan waktu di-reset
-        const itemDate = (item.tanggal instanceof Date) ? new Date(item.tanggal) : new Date(item.tanggal);
-        itemDate.setHours(0, 0, 0, 0); 
+    return data.filter(item => {
+        if (!item.tanggal) return false;
+        
+        // KRITIS: Pastikan konversi ke Date dan waktu di-reset
+        const itemDate = (item.tanggal instanceof Date) ? new Date(item.tanggal) : new Date(item.tanggal);
+        itemDate.setHours(0, 0, 0, 0); 
 
-        switch (filterType) {
-            case 'today':
-                // Membandingkan hanya bagian tanggal
-                return itemDate.toDateString() === today.toDateString();
+        switch (filterType) {
+            case 'today':
+                return itemDate.toDateString() === today.toDateString();
 
-            case 'last_7_days': {
-                const sevenDaysAgo = new Date(today);
-                sevenDaysAgo.setDate(today.getDate() - 7);
-                return itemDate >= sevenDaysAgo;
-            }
-            case 'last_30_days': {
-                const thirtyDaysAgo = new Date(today);
-                thirtyDaysAgo.setDate(today.getDate() - 30);
-                return itemDate >= thirtyDaysAgo;
-            }
-            case 'this_year':
-                return itemDate.getFullYear() === today.getFullYear();
-            
-            // ... (Logika filter lainnya dipertahankan)
-            case 'all_time':
-            default:
-                return true;
-        }
-    });
+            case 'last_7_days': {
+                const sevenDaysAgo = new Date(today);
+                sevenDaysAgo.setDate(today.getDate() - 7);
+                return itemDate >= sevenDaysAgo;
+            }
+            case 'last_30_days': {
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                return itemDate >= thirtyDaysAgo;
+            }
+            case 'this_year':
+                return itemDate.getFullYear() === today.getFullYear();
+
+            case 'by_date_range': {
+                if (!startDateStr || !endDateStr) return true;
+                const start = new Date(startDateStr);
+                const end = new Date(endDateStr);
+                start.setHours(0, 0, 0, 0);
+                end.setHours(23, 59, 59, 999);
+                return itemDate >= start && itemDate <= end;
+            }
+            
+            case 'by_month_range': {
+                if (!startMonth || !startYear || !endMonth || !endYear) return true;
+                const start = new Date(startYear, startMonth - 1, 1);
+                const end = new Date(endYear, endMonth, 0); 
+                end.setHours(23, 59, 59, 999);
+                return itemDate >= start && itemDate <= end;
+            }
+            
+            case 'by_year_range': {
+                if (!startYear || !endYear) return true;
+                const start = new Date(startYear, 0, 1);
+                const end = new Date(endYear, 11, 31);
+                end.setHours(23, 59, 59, 999);
+                return itemDate >= start && itemDate <= end;
+            }
+            
+            case 'all_time':
+            default:
+                return true;
+        }
+    });
 }
 
 const formatInputNumber = (value) => {
