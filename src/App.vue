@@ -401,6 +401,39 @@ const loadDataForPage = async (pageName) => {
 const lastEditedModel = ref(null);
 const groupRefs = ref({});
 
+const riwayatPengeluaran = computed(() => {
+    // 1. Filter: Hanya Pengeluaran (pengeluaran atau biaya)
+    let filtered = state.keuangan.filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya');
+
+    // 2. Sort: Tanggal ASC (Terbaru di Bawah)
+    return filtered.sort((a, b) => {
+        // Bandingkan berdasarkan tanggal, lalu ID untuk tie-breaker
+        const dateA = new Date(a.tanggal).getTime();
+        const dateB = new Date(b.tanggal).getTime();
+        if (dateA !== dateB) {
+            return dateA - dateB; // ASCENDING: Terlama (A) dulu
+        }
+        // Tie-breaker menggunakan ID dokumen (string comparison Ascending)
+        return a.id.localeCompare(b.id);
+    });
+});
+
+const riwayatPemasukan = computed(() => {
+    // 1. Filter: Hanya Pemasukan
+    let filtered = state.keuangan.filter(k => k.jenis === 'pemasukan_lain');
+
+    // 2. Sort: Tanggal ASC (Terbaru di Bawah)
+    return filtered.sort((a, b) => {
+        const dateA = new Date(a.tanggal).getTime();
+        const dateB = new Date(b.tanggal).getTime();
+        if (dateA !== dateB) {
+            return dateA - dateB; // ASCENDING: Terlama (A) dulu
+        }
+        // Tie-breaker menggunakan ID dokumen
+        return a.id.localeCompare(b.id);
+    });
+});
+
 const unpaidCommissions = computed(() =>
     commissions.value.filter(c => c.status === 'unpaid')
         .sort((a, b) => new Date(b.createdAt.seconds * 1000) - new Date(a.createdAt.seconds * 1000))
@@ -8168,7 +8201,7 @@ watch(activePage, (newPage) => {
                             </thead>
                             <tbody class="divide-y divide-slate-200/50">
                                 <tr v-if="state.keuangan.filter(k => k.jenis === 'pengeluaran').length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
-                                <tr v-for="item in state.keuangan.filter(k => k.jenis === 'pengeluaran')" :key="item.id" class="hover:bg-slate-50/50">
+                                <tr v-for="item in riwayatPengeluaran" :key="item.id" class="hover:bg-slate-50/50">
                                     <td class="px-4 py-3 align-top">
                                         <p class="font-semibold text-slate-800">{{ item.kategori }}</p>
                                         <p class="text-xs">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
@@ -8252,7 +8285,7 @@ watch(activePage, (newPage) => {
                                 </thead>
                                 <tbody class="divide-y divide-slate-200/50">
                                     <tr v-if="state.keuangan.filter(k => k.jenis === 'pemasukan_lain').length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
-                                    <tr v-for="item in state.keuangan.filter(k => k.jenis === 'pemasukan_lain')" :key="item.id" class="hover:bg-slate-50/50">
+                                    <tr v-for="item in riwayatPemasukan" :key="item.id" class="hover:bg-slate-50/50">
                                         <td class="px-4 py-3 align-top">
                                             <p class="font-semibold text-slate-800">{{ item.kategori }}</p>
                                             <p class="text-xs">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
