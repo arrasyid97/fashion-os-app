@@ -6645,7 +6645,7 @@ const fetchInvestorsAndBanksData = async (userId) => {
 // Fungsi baru yang canggih untuk data keuangan dengan filter & paginasi
 const fetchKeuanganData = async () => {
     if (!currentUser.value) return;
-    const userId = currentUser.value.uid;
+    const userId = currentUser.value.uid; // <-- DEKLARASI INI YANG BENAR
     
     // Query yang sudah benar: Mengambil semua data keuangan untuk userId ini
     const q = query(
@@ -6656,7 +6656,6 @@ const fetchKeuanganData = async () => {
 
     try {
         const keuanganSnap = await getDocs(q);
-        const fetchedData = [];
         
         state.keuangan = keuanganSnap.docs.map(doc => {
             const data = doc.data();
@@ -6683,7 +6682,6 @@ const fetchKeuanganData = async () => {
         console.error("Error fetching Keuangan data:", error);
     }
 };
-
 // Fungsi khusus untuk data supplier dan purchase order
 const fetchSupplierData = async (userId, loadMore = false) => {
     const SUPPLIERS_PER_PAGE = 10; // Jumlah data per halaman
