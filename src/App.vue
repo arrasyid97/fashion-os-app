@@ -348,35 +348,34 @@ const dataFetched = reactive({
 });
 
 const loadDataForPage = async (pageName) => {
-  if (!currentUser.value) return; // Pengaman utama: Jangan lakukan apa-apa jika user belum termuat
+  if (!currentUser.value) return;
   const userId = currentUser.value.uid;
 
-  // Logika Lazy Loading yang sudah ada, sekarang di dalam fungsi ini
   switch(pageName) {
     case 'dashboard':
-  // Memuat semua data yang dibutuhkan oleh dashboard secara bersamaan
-  await Promise.all([
-    fetchSummaryData(userId),
-    fetchProductData(userId),
-    fetchTransactionAndReturnData(userId),
-    fetchFinanceData(userId)
-  ]);
-  nextTick(renderCharts);
-  break;
+      // Memuat semua data yang dibutuhkan oleh dashboard secara bersamaan
+      await Promise.all([
+        fetchSummaryData(userId),
+        fetchProductData(userId),
+        fetchTransactionAndReturnData(userId),
+        fetchKeuanganData() // Panggil fungsi keuangan yang baru
+      ]);
+      nextTick(renderCharts);
+      break;
     case 'transaksi':
     case 'bulk_process':
-    await fetchProductData(userId);
-    await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
-    await fetchNotesData(userId);
-    break;
+      await fetchProductData(userId);
+      await fetchTransactionAndReturnData(userId);
+      await fetchNotesData(userId);
+      break;
     case 'inventaris':
     case 'harga-hpp':
       await fetchProductData(userId);
       break;
     case 'promosi':
-        await fetchProductData(userId);
-        await fetchNotesData(userId);
-        break;
+      await fetchProductData(userId);
+      await fetchNotesData(userId);
+      break;
     case 'produksi':
       await fetchProductData(userId);
       await fetchProductionData(userId);
@@ -385,17 +384,17 @@ const loadDataForPage = async (pageName) => {
       await fetchProductionData(userId);
       break;
     case 'keuangan':
-    await fetchKeuanganData();
-    break;
+      await fetchKeuanganData();
+      break;
     case 'investasi':
-    await fetchInvestorsAndBanksData(userId);
-    break;
+      await fetchInvestorsAndBanksData(userId);
+      break;
     case 'supplier':
-        await fetchProductData(userId);
-        await fetchSupplierData(userId);
-        break;
+      await fetchProductData(userId);
+      await fetchSupplierData(userId);
+      break;
     case 'retur':
-      await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
+      await fetchTransactionAndReturnData(userId);
       await fetchProductData(userId);
       break;
   }
