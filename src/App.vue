@@ -474,27 +474,25 @@ const isSubscriptionActive = computed(() => {
 let unsubscribeSummary = null; // Variabel untuk menyimpan listener
 
 const fetchSummaryData = (userId) => {
-    if (unsubscribeSummary) {
-        unsubscribeSummary(); // Hentikan listener lama jika ada
-    }
-
-    if (!userId) {
-        state.summaryData = {};
-        return;
-    }
-
-    const summaryRef = doc(db, "user_summaries", userId);
-    // Gunakan onSnapshot untuk 'mendengarkan' perubahan secara real-time
-    unsubscribeSummary = onSnapshot(summaryRef, (docSnap) => {
-        if (docSnap.exists()) {
-            state.summaryData = docSnap.data();
-        } else {
-            console.log("Dokumen ringkasan belum ada, akan dibuat otomatis oleh Cloud Function.");
-            state.summaryData = {};
-        }
-    }, (error) => {
-        console.error("Gagal mendengarkan summary data:", error);
-    });
+    if (unsubscribeSummary) {
+        unsubscribeSummary();
+    }
+    if (!userId) {
+        state.summaryData = {};
+        return;
+    }
+    const summaryRef = doc(db, "user_summaries", userId);
+    unsubscribeSummary = onSnapshot(summaryRef, (docSnap) => {
+        if (docSnap.exists()) {
+            console.log('✅ fetchSummaryData: Dokumen DITEMUKAN, isinya:', docSnap.data()); // <-- LOG 1
+            state.summaryData = docSnap.data();
+        } else {
+            console.warn('⚠️ fetchSummaryData: Dokumen ringkasan TIDAK ADA.'); // <-- LOG 2
+            state.summaryData = {};
+        }
+    }, (error) => {
+        console.error("❌ Gagal mendengarkan summary data:", error); // <-- LOG 3
+    });
 };
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
@@ -526,50 +524,45 @@ async function fetchCommissionPayouts() {
 }
 
 const fetchDashboardRangeData = async () => {
-    if (!currentUser.value) return;
-    const userId = currentUser.value.uid;
-
-    // Tentukan rentang tanggal dari UI state
-    let startDate, endDate;
-    const now = new Date();
-    // ... (logika penentuan startDate dan endDate berdasarkan uiState.dashboardDateFilter) ...
-    // Untuk mempersingkat, kita akan langsung implementasikan logika lengkapnya.
-    // Kode ini akan secara otomatis menentukan rentang tanggal yang benar.
-    switch (uiState.dashboardDateFilter) {
-        case 'today':
-            startDate = new Date(now.setHours(0, 0, 0, 0));
-            endDate = new Date(now.setHours(23, 59, 59, 999));
-            break;
-        case 'last_7_days':
-            endDate = new Date(now.setHours(23, 59, 59, 999));
-            startDate = new Date(new Date().setDate(now.getDate() - 7));
-            startDate.setHours(0, 0, 0, 0);
-            break;
-        // Tambahkan case lain jika perlu
-        default:
-            // Jika filter panjang, kita tidak perlu fetch data detail
-            state.dashboardData = { transaksi: [], keuangan: [], retur: [] };
-            return;
-    }
-
-    // Buat query dengan filter tanggal
-    const transaksiQuery = query(collection(db, "transactions"), where("userId", "==", userId), where("tanggal", ">=", startDate), where("tanggal", "<=", endDate));
-    const keuanganQuery = query(collection(db, "keuangan"), where("userId", "==", userId), where("tanggal", ">=", startDate), where("tanggal", "<=", endDate));
-    const returQuery = query(collection(db, "returns"), where("userId", "==", userId), where("tanggal", ">=", startDate), where("tanggal", "<=", endDate));
-
-    try {
-        const [transaksiSnap, keuanganSnap, returSnap] = await Promise.all([
-            getDocs(transaksiQuery),
-            getDocs(keuanganQuery),
-            getDocs(returQuery)
-        ]);
-
-        state.dashboardData.transaksi = transaksiSnap.docs.map(doc => ({...doc.data(), tanggal: doc.data().tanggal.toDate()}));
-        state.dashboardData.keuangan = keuanganSnap.docs.map(doc => ({...doc.data(), tanggal: doc.data().tanggal.toDate()}));
-        state.dashboardData.retur = returSnap.docs.map(doc => ({...doc.data(), tanggal: doc.data().tanggal.toDate()}));
-    } catch (error) {
-        console.error("Error fetching dashboard range data:", error);
-    }
+    console.log('... fetchDashboardRangeData: Mulai mengambil data untuk filter pendek...'); // <-- LOG 4
+    if (!currentUser.value) return;
+    const userId = currentUser.value.uid;
+    let startDate, endDate;
+    const now = new Date();
+    switch (uiState.dashboardDateFilter) {
+        case 'today':
+            startDate = new Date(new Date().setHours(0, 0, 0, 0));
+            endDate = new Date(new Date().setHours(23, 59, 59, 999));
+            break;
+        case 'last_7_days':
+            endDate = new Date(new Date().setHours(23, 59, 59, 999));
+            startDate = new Date(new Date().setDate(now.getDate() - 7));
+            startDate.setHours(0, 0, 0, 0);
+            break;
+        default:
+            state.dashboardData = { transaksi: [], keuangan: [], retur: [] };
+            return;
+    }
+    const transaksiQuery = query(collection(db, "transactions"), where("userId", "==", userId), where("tanggal", ">=", startDate), where("tanggal", "<=", endDate));
+    const keuanganQuery = query(collection(db, "keuangan"), where("userId", "==", userId), where("tanggal", ">=", startDate), where("tanggal", "<=", endDate));
+    const returQuery = query(collection(db, "returns"), where("userId", "==", userId), where("tanggal", ">=", startDate), where("tanggal", "<=", endDate));
+    try {
+        const [transaksiSnap, keuanganSnap, returSnap] = await Promise.all([
+            getDocs(transaksiQuery),
+            getDocs(keuanganQuery),
+            getDocs(returQuery)
+        ]);
+        console.log('✅ fetchDashboardRangeData: Query SUKSES, hasilnya:', {
+            transaksi: transaksiSnap.docs.length,
+            keuangan: keuanganSnap.docs.length,
+            retur: returSnap.docs.length
+        }); // <-- LOG 5
+        state.dashboardData.transaksi = transaksiSnap.docs.map(doc => ({...doc.data(), tanggal: doc.data().tanggal.toDate()}));
+        state.dashboardData.keuangan = keuanganSnap.docs.map(doc => ({...doc.data(), tanggal: doc.data().tanggal.toDate()}));
+        state.dashboardData.retur = returSnap.docs.map(doc => ({...doc.data(), tanggal: doc.data().tanggal.toDate()}));
+    } catch (error) {
+        console.error('❌ fetchDashboardRangeData: GAGAL! Error:', error); // <-- LOG 6
+    }
 };
 
 // 3. Watcher untuk memanggil fungsi di atas secara otomatis
