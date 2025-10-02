@@ -353,15 +353,14 @@ const loadDataForPage = async (pageName) => {
 
   switch(pageName) {
     case 'dashboard':
-      // Memuat semua data yang dibutuhkan oleh dashboard secara bersamaan
+      // Memuat SEMUA data yang dibutuhkan dashboard secara bersamaan saat halaman dibuka
       await Promise.all([
         fetchSummaryData(userId),
         fetchProductData(userId),
-        fetchDashboardRangeData() // <-- FUNGSI INI KITA TAMBAHKAN DI SINI
+        fetchDashboardRangeData() // <-- INI YANG PALING PENTING
       ]);
       nextTick(renderCharts);
       break;
-    // ... case lain tetap sama ...
     case 'transaksi':
     case 'bulk_process':
       await fetchProductData(userId);
