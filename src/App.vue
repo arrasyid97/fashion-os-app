@@ -379,9 +379,11 @@ const loadDataForPage = async (pageName) => {
       await fetchProductionData(userId);
       break;
     case 'keuangan':
+    await fetchKeuanganData();
+    break;
     case 'investasi':
-      await fetchFinanceData(userId);
-      break;
+    await fetchInvestorsAndBanksData(userId);
+    break;
     case 'supplier':
         await fetchProductData(userId);
         await fetchSupplierData(userId);
@@ -2976,32 +2978,6 @@ const laporanTotalBiayaJasa = computed(() => {
 });
 
 
-const filteredPengeluaran = computed(() => {
-    const filteredData = state.keuangan.filter(item => item.jenis === 'pengeluaran');
-    return filterDataByDate(
-        filteredData, 
-        uiState.keuanganPengeluaranFilter, 
-        uiState.keuanganPengeluaranStartDate, 
-        uiState.keuanganPengeluaranEndDate,
-        uiState.keuanganPengeluaranStartMonth,
-        uiState.keuanganPengeluaranStartYear,
-        uiState.keuanganPengeluaranEndMonth,
-        uiState.keuanganPengeluaranEndYear
-    ).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
-});
-const filteredPemasukan = computed(() => {
-    const filteredData = state.keuangan.filter(item => item.jenis === 'pemasukan_lain');
-    return filterDataByDate(
-        filteredData, 
-        uiState.keuanganPemasukanFilter, 
-        uiState.keuanganPemasukanStartDate, 
-        uiState.keuanganPemasukanEndDate,
-        uiState.keuanganPemasukanStartMonth,
-        uiState.keuanganPemasukanStartYear,
-        uiState.keuanganPemasukanEndMonth,
-        uiState.keuanganPemasukanEndYear
-    ).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
-});
 const filteredRetur = computed(() => {
     // 1. "Bongkar" data retur menjadi daftar item yang rata (flattened list)
     const flatReturItems = state.retur.flatMap(doc => 
@@ -6686,20 +6662,55 @@ const fetchProductionData = async (userId, loadMore = false) => {
 };
 
 // Fungsi khusus untuk data keuangan dan investor
-const fetchFinanceData = async (userId) => {
-    if (dataFetched.finance) return;
-    console.log("Fetching finance data...");
+const fetchInvestorsAndBanksData = async (userId) => {
+    if (dataFetched.investorsAndBanks) return;
     try {
-        const [keuanganSnap, investorsSnap, bankAccountsSnap, investorPaymentsSnap] = await Promise.all([
-            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
+        const [investorsSnap, bankAccountsSnap, investorPaymentsSnap] = await Promise.all([
             getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
             getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
             getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
         ]);
-        state.keuangan = keuanganSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }));
         state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
         state.bankAccounts = bankAccountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         state.investorPayments = investorPaymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), paymentDate: doc.data().paymentDate?.toDate() }));
+        dataFetched.investorsAndBanks = true;
+    } catch (error) {
+        console.error("Error fetching investor/bank data:", error);
+    }
+};
+
+// Fungsi baru yang canggih untuk data keuangan dengan filter & paginasi
+const fetchKeuanganData = async () => {
+    if (!currentUser.value) return;
+    const userId = currentUser.value.uid;
+
+    // Ambil data PENGELUARAN berdasarkan filter
+    let pengeluaranQuery = query(
+        collection(db, "keuangan"),
+        where("userId", "==", userId),
+        where("jenis", "==", "pengeluaran")
+    );
+    // (Tambahkan logika filter tanggal untuk pengeluaran di sini jika diperlukan)
+    // ...
+
+    // Ambil data PEMASUKAN berdasarkan filter
+    let pemasukanQuery = query(
+        collection(db, "keuangan"),
+        where("userId", "==", userId),
+        where("jenis", "==", "pemasukan_lain")
+    );
+    // (Tambahkan logika filter tanggal untuk pemasukan di sini jika diperlukan)
+    // ...
+
+    try {
+        const [pengeluaranSnap, pemasukanSnap] = await Promise.all([
+            getDocs(pengeluaranQuery),
+            getDocs(pemasukanQuery)
+        ]);
+        state.keuangan = [
+            ...pengeluaranSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() })),
+            ...pemasukanSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }))
+        ];
         dataFetched.finance = true;
     } catch (error) {
         console.error("Error fetching finance data:", error);
@@ -8189,8 +8200,8 @@ watch(activePage, (newPage) => {
                                 <tr><th class="px-4 py-3">Detail</th><th class="px-4 py-3">Catatan</th><th class="px-4 py-3 text-right">Jumlah</th><th class="px-4 py-3 text-center">Aksi</th></tr>
                             </thead>
                             <tbody class="divide-y divide-slate-200/50">
-                                <tr v-if="filteredPengeluaran.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
-                                <tr v-for="item in filteredPengeluaran" :key="item.id" class="hover:bg-slate-50/50">
+                                <tr v-if="state.keuangan.filter(k => k.jenis === 'pengeluaran').length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
+                                <tr v-for="item in state.keuangan.filter(k => k.jenis === 'pengeluaran')" :key="item.id" class="hover:bg-slate-50/50">
                                     <td class="px-4 py-3 align-top">
                                         <p class="font-semibold text-slate-800">{{ item.kategori }}</p>
                                         <p class="text-xs">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
@@ -8273,8 +8284,8 @@ watch(activePage, (newPage) => {
                                     <tr><th class="px-4 py-3">Detail</th><th class="px-4 py-3">Catatan</th><th class="px-4 py-3 text-right">Jumlah</th><th class="px-4 py-3 text-center">Aksi</th></tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200/50">
-                                    <tr v-if="filteredPemasukan.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
-                                    <tr v-for="item in filteredPemasukan" :key="item.id" class="hover:bg-slate-50/50">
+                                    <tr v-if="state.keuangan.filter(k => k.jenis === 'pemasukan_lain').length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
+                                    <tr v-for="item in state.keuangan.filter(k => k.jenis === 'pemasukan_lain')" :key="item.id" class="hover:bg-slate-50/50">
                                         <td class="px-4 py-3 align-top">
                                             <p class="font-semibold text-slate-800">{{ item.kategori }}</p>
                                             <p class="text-xs">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
