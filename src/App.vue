@@ -353,13 +353,15 @@ const loadDataForPage = async (pageName) => {
 
   switch(pageName) {
     case 'dashboard':
+      // Memuat semua data yang dibutuhkan oleh dashboard secara bersamaan
       await Promise.all([
         fetchSummaryData(userId),
-        fetchProductData(userId) 
+        fetchProductData(userId),
+        fetchDashboardRangeData() // <-- FUNGSI INI KITA TAMBAHKAN DI SINI
       ]);
-      // fetchDashboardRangeData() akan dipanggil otomatis oleh watcher
       nextTick(renderCharts);
       break;
+    // ... case lain tetap sama ...
     case 'transaksi':
     case 'bulk_process':
       await fetchProductData(userId);
@@ -577,7 +579,7 @@ watch(() => [uiState.dashboardDateFilter, uiState.dashboardStartDate, uiState.da
     if (!isLongTermFilter) {
         fetchDashboardRangeData();
     }
-}, { immediate: true }); // 'immediate: true' akan menjalankannya saat pertama kali dimuat
+});
 
 // Fungsi baru untuk membuat kode rujukan yang lebih profesional
 function generatePartnerCode() {
