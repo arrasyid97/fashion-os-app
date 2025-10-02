@@ -2600,7 +2600,7 @@ const parseInputNumber = (value) => {
 
 // --- COMPUTED PROPERTIES ---
 const dashboardFilteredData = computed(() => {
-    // 1. Map data live dan pastikan 'tanggal' adalah objek Date, BUKAN Timestamp/Proxy
+    // Memastikan konversi ke objek Date agar filter berfungsi dengan benar
     const mapToDateObject = (dataArray) => {
         return (dataArray || []).map(item => {
             const itemDate = (item.tanggal && item.tanggal.toDate) ? item.tanggal.toDate() : (item.tanggal instanceof Date ? item.tanggal : new Date(item.tanggal));
@@ -2608,6 +2608,7 @@ const dashboardFilteredData = computed(() => {
         });
     };
 
+    // Menggunakan mapToDateObject untuk memastikan semua tanggal valid
     const keuanganData = mapToDateObject(state.keuangan);
     const transaksiData = mapToDateObject(state.transaksi);
     const returData = mapToDateObject(state.retur);
@@ -2631,31 +2632,6 @@ const dashboardFilteredData = computed(() => {
         keuangan: filteredKeuangan,
         retur: filteredRetur
     };
-});
-
-const investorLedger = computed(() => {
-    if (!state.investor || state.investor.length === 0) {
-        return [];
-    }
-
-    // 1. Filter investor berdasarkan status yang dipilih di UI
-    const filteredInvestors = state.investor.filter(inv => {
-        if (uiState.investorStatusFilter === 'semua') return true;
-        return inv.status === uiState.investorStatusFilter;
-    });
-
-    // 2. Hitung total pembayaran dan ROI untuk setiap investor yang sudah difilter
-    return filteredInvestors.map(inv => {
-        const payments = state.investorPayments.filter(p => p.investorId === inv.id);
-        const totalPayout = payments.reduce((sum, p) => sum + p.investorShare, 0);
-        const roi = inv.amount > 0 ? (totalPayout / inv.amount) * 100 : 0;
-
-        return {
-            ...inv,
-            totalPayout,
-            roi
-        };
-    });
 });
 
 const filteredInvestorPayments = computed(() => {
@@ -2688,7 +2664,7 @@ const filteredInvestorPayments = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    // 1. Inisialisasi Total Awal
+    // 1. Inisialisasi Totals
     const totals = {
         omsetKotor: 0,
         totalDiskon: 0,
@@ -2697,58 +2673,60 @@ const dashboardKpis = computed(() => {
         biayaOperasional: 0,
         nilaiRetur: 0,
     };
-    
-    // Default: Gunakan All Time Totals
-    let summaryDataToUse = state.summaryData?.allTimeTotals || {};
 
     const filter = uiState.dashboardDateFilter;
-    const currentYear = new Date().getFullYear();
-    const currentMonth = (new Date().getMonth() + 1).toString().padStart(2, "0");
+    // Tentukan filter Jangka Panjang
+    const isLongTermFilter = ['by_month_range', 'this_year', 'all_time', 'by_year_range'].includes(filter);
 
-    // 2. Logika Pemilihan Sumber Data Berdasarkan Filter
-    if (filter === 'today') {
-        // PERBAIKAN: Untuk 'Hari Ini', kita tetap harus mengambil data Live, 
-        // tapi kita hanya akan mengambil data summary-nya untuk menghemat resource.
-        // Cukup tampilkan data dari bulan berjalan saja (paling dekat)
-        summaryDataToUse = state.summaryData?.[`summary_${currentYear}`]?.months?.[currentMonth] || {};
-    } else if (filter === 'last_7_days' || filter === 'last_30_days') {
-        // Untuk periode singkat, ambil data bulanan saat ini (paling dekat)
-        summaryDataToUse = state.summaryData?.[`summary_${currentYear}`]?.months?.[currentMonth] || {};
-    } else if (filter === 'this_year') {
-        summaryDataToUse = state.summaryData?.[`summary_${currentYear}`]?.yearlyTotals || {};
-    } else if (filter === 'by_month_range') {
-        const year = uiState.dashboardStartYear;
-        const month = uiState.dashboardStartMonth.toString().padStart(2, "0");
-        // Catatan: Karena Summary hanya mencatat per bulan, rentang bulan yang kompleks akan 
-        // menampilkan data dari bulan awal yang dipilih (sebagai kompromi)
-        summaryDataToUse = state.summaryData?.[`summary_${year}`]?.months?.[month] || {};
-    } else if (filter === 'by_year_range') {
-        // Untuk rentang tahun, gunakan data all time (terbaik yang bisa dilakukan summary saat ini)
-        summaryDataToUse = state.summaryData?.allTimeTotals || {};
+    if (isLongTermFilter) {
+        // --- LOGIKA UTAMA DARI REKAPITULASI (CLOUDFUNCTIONS) ---
+        const getSummaryForFilter = (summaryObject) => {
+            if (!summaryObject) return;
+            totals.omsetKotor = (summaryObject.omsetKotor || 0);
+            totals.totalDiskon = (summaryObject.totalDiskon || 0);
+            totals.hppTerjual = (summaryObject.hppTerjual || 0);
+            totals.biayaTransaksi = (summaryObject.biayaTransaksi || 0);
+            totals.biayaOperasional = (summaryObject.biayaOperasional || 0);
+            totals.nilaiRetur = (summaryObject.nilaiRetur || 0);
+        };
+        
+        // Logika untuk mengambil data summary dari struktur Anda
+        if (filter === 'by_month_range' || filter === 'by_year_range') {
+             // Untuk Rentang Bulan/Tahun, kita ambil data All Time (Kompromi terbaik dengan struktur Summary yang ada)
+             getSummaryForFilter(state.summaryData?.allTimeTotals);
+        } else if (filter === 'this_year') {
+            const year = new Date().getFullYear();
+            getSummaryForFilter(state.summaryData?.[`summary_${year}`]?.yearlyTotals);
+        } else if (filter === 'all_time') {
+            getSummaryForFilter(state.summaryData?.allTimeTotals); 
+        }
+
+    } else {
+        // --- LOGIKA DARI DATA LIVE (REAL-TIME FILTERING) ---
+        // Digunakan untuk filter Hari Ini, 7 Hari, 30 Hari, dan by_date_range
+        const { transaksi, keuangan, retur } = dashboardFilteredData.value;
+        
+        totals.omsetKotor = transaksi.reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
+        totals.totalDiskon = transaksi.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
+        totals.hppTerjual = transaksi.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * (item.qty || 0), 0), 0);
+        totals.biayaTransaksi = transaksi.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
+        totals.biayaOperasional = keuangan.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+        totals.nilaiRetur = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
     }
 
-    // 3. Memasukkan Data ke Objek Totals
-    // Jika data summary tersedia, kita isi semua kolom. Jika tidak, tetap 0.
-    totals.omsetKotor = summaryDataToUse.omsetKotor || 0;
-    totals.totalDiskon = summaryDataToUse.totalDiskon || 0;
-    totals.hppTerjual = summaryDataToUse.hppTerjual || 0;
-    totals.biayaTransaksi = summaryDataToUse.biayaTransaksi || 0;
-    totals.biayaOperasional = summaryDataToUse.biayaOperasional || 0;
-    totals.nilaiRetur = summaryDataToUse.nilaiRetur || 0;
-
-
-    // 4. Perhitungan Akhir (Hanya Kalkulasi Sederhana)
+    // --- KALKULASI FINAL (SELALU DILAKUKAN) ---
+    // Logika ini menggunakan 'totals' yang sudah terisi dari live/summary
     const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
     const labaKotor = omsetBersih - totals.hppTerjual;
     const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
 
-    // 5. Data Statis (Stok dan Saldo Kas All Time)
-    const totalsAllTime = state.summaryData?.allTimeTotals || {};
+    // --- PERBAIKAN KRITIS SALDO KAS (ALL TIME) ---
+    // Saldo Kas dihitung dari data keuangan LIVE (All Time) karena tidak ada field Inflow/Outflow di Summary
+    const pemasukan = (state.keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+    const pengeluaran = (state.keuangan || []).filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+    const saldoKas = pemasukan - pengeluaran; 
     
-    // PERBAIKAN SALDO KAS: Kita paksakan menggunakan totalInflow/Outflow ALL TIME 
-    // karena Saldo Kas harus mencerminkan saldo keseluruhan, bukan hanya saldo hari ini.
-    const saldoKas = (totalsAllTime.totalInflow || 0) - (totalsAllTime.totalOutflow || 0);
-
+    // Perhitungan Stok (tetap live)
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
