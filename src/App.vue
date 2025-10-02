@@ -353,11 +353,10 @@ const loadDataForPage = async (pageName) => {
 
   switch(pageName) {
     case 'dashboard':
-      // Memuat SEMUA data yang dibutuhkan dashboard secara bersamaan saat halaman dibuka
+      // Memuat data produk dan data transaksi/keuangan/retur jangka pendek
       await Promise.all([
-        fetchSummaryData(userId),
         fetchProductData(userId),
-        fetchDashboardRangeData() // <-- INI YANG PALING PENTING
+        fetchDashboardRangeData() 
       ]);
       nextTick(renderCharts);
       break;
@@ -6825,36 +6824,46 @@ const fetchNotesData = async (userId) => {
 };
 
 onMounted(() => {
-  onAuthStateChanged(auth, async (user) => {
-    isLoading.value = true;
-    hasLoadedInitialData.value = false;
+    onAuthStateChanged(auth, async (user) => {
+        isLoading.value = true;
+        hasLoadedInitialData.value = false;
 
-    // Reset status data yang sudah di-fetch setiap kali auth berubah
-    Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
+        // 1. Reset status data yang sudah di-fetch setiap kali auth berubah
+        Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
 
-    if (user) {
-        // --- INI BAGIAN UTAMA PERBAIKAN ---
-        const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-        const userData = userDocSnap.exists() ? userDocSnap.data() : {};
-        currentUser.value = { ...user, userData, isPartner: userData.isPartner || false, referralCode: userData.referralCode || null };
-        // --- AKHIR DARI PERBAIKAN ---
+        if (user) {
+            // A. Ambil data pengguna (role, partner status, dll)
+            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+            const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+            currentUser.value = { ...user, userData, isPartner: userData.isPartner || false, referralCode: userData.referralCode || null };
 
-        await setupListeners(user.uid);
-        loadDataForPage(activePage.value);
+            // B. Setup listener untuk settings & commissions, dan fetch core settings.
+            await setupListeners(user.uid);
 
-    } else {
-        currentUser.value = null;
-        activePage.value = 'login';
-        unsubscribe();
-    }
-    isLoading.value = false;
-    hasLoadedInitialData.value = true;
-});
+            // C. PENTING: Panggil listener summary di sini, setelah currentUser set.
+            // Listener ini akan terus aktif dan mengupdate state.summaryData.
+            fetchSummaryData(user.uid); 
+            
+            // D. Load data spesifik untuk halaman yang aktif (termasuk dashboard)
+            await loadDataForPage(activePage.value);
+
+        } else {
+            currentUser.value = null;
+            activePage.value = 'login';
+            unsubscribe();
+        }
+        isLoading.value = false;
+        hasLoadedInitialData.value = true;
+    });
 });
 
 watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
-    loadDataForPage(newPage);
+    
+    // Perbaikan: Hanya panggil loadDataForPage jika sudah login
+    if (currentUser.value) {
+        loadDataForPage(newPage);
+    }
 });
 
 </script>
