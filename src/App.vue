@@ -6647,12 +6647,12 @@ const fetchKeuanganData = async () => {
     if (!currentUser.value) return;
     const userId = currentUser.value.uid;
     
-    // Query untuk menyimpan data terbaru di bagian bawah tabel (Ascending)
-    // Urutan: userId (WHERE), tanggal (ASC)
+    // Kueri Paling Stabil: Menggunakan 3 field untuk memastikan urutan Ascending yang sempurna.
     const q = query(
         collection(db, "keuangan"), 
         where("userId", "==", userId),
-        orderBy("tanggal", "asc") // KRITIS: Urutan Ascending. Data terbaru akan ada di AKHIR LIST
+        orderBy("tanggal", "asc"),      // 1. Urutan Primer: Tanggal terlama di atas (Terbaru di bawah)
+        orderBy(documentId(), "asc")    // 2. Urutan Sekunder: ID Dokumen terkecil di atas (Terbaru di bawah)
     );
 
     try {
@@ -6674,7 +6674,7 @@ const fetchKeuanganData = async () => {
             };
         });
         
-        // Tidak perlu sort manual di klien karena Ascending adalah default yang stabil
+        // Update State dengan data yang sudah terurut stabil
         state.keuangan = fetchedKeuangan; 
         
         dataFetched.finance = true;
