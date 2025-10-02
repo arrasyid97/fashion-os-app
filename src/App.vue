@@ -10,7 +10,7 @@ import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, orderBy, limit, startAfter } from 'firebase/firestore';
-
+let bulkSearchDebounceTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
     onAuthStateChanged, 
@@ -22,7 +22,7 @@ import { 
     createUserWithEmailAndPassword, 
     signInWithEmailAndPassword 
 } from "firebase/auth";
-let bulkSearchDebounceTimer = null;
+
 // --- STATE MANAGEMENT ---
 const activePage = ref(localStorage.getItem('lastActivePage') || 'dashboard');
 const isLoading = ref(true);
@@ -67,7 +67,6 @@ const state = reactive({
     commissions: { perModel: {} },
     specialPrices: {},
     produksi: [],    // --- START: KODE BARU UNTUK STOK KAIN ---
-    dashboardData: { transaksi: [], keuangan: [], retur: [] },
     gudangKain: [],
     suppliers: [],
     purchaseOrders: [],
@@ -348,32 +347,30 @@ const dataFetched = reactive({
 });
 
 const loadDataForPage = async (pageName) => {
-  if (!currentUser.value) return;
+  if (!currentUser.value) return; // Pengaman utama: Jangan lakukan apa-apa jika user belum termuat
   const userId = currentUser.value.uid;
 
+  // Logika Lazy Loading yang sudah ada, sekarang di dalam fungsi ini
   switch(pageName) {
     case 'dashboard':
-      // Memuat data produk dan data transaksi/keuangan/retur jangka pendek
-      await Promise.all([
-        fetchProductData(userId),
-        fetchDashboardRangeData() 
-      ]);
+      await fetchSummaryData(userId); // <-- CUKUP PANGGIL FUNGSI INI
+      // Kita tidak perlu lagi fetchTransaction/Finance untuk dashboard
       nextTick(renderCharts);
       break;
     case 'transaksi':
     case 'bulk_process':
-      await fetchProductData(userId);
-      await fetchTransactionAndReturnData(userId);
-      await fetchNotesData(userId);
-      break;
+    await fetchProductData(userId);
+    await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
+    await fetchNotesData(userId);
+    break;
     case 'inventaris':
     case 'harga-hpp':
       await fetchProductData(userId);
       break;
     case 'promosi':
-      await fetchProductData(userId);
-      await fetchNotesData(userId);
-      break;
+        await fetchProductData(userId);
+        await fetchNotesData(userId);
+        break;
     case 'produksi':
       await fetchProductData(userId);
       await fetchProductionData(userId);
@@ -382,35 +379,20 @@ const loadDataForPage = async (pageName) => {
       await fetchProductionData(userId);
       break;
     case 'keuangan':
-      await fetchKeuanganData();
-      break;
+    await fetchKeuanganData();
+    break;
     case 'investasi':
-      await fetchInvestorsAndBanksData(userId);
-      break;
+    await fetchInvestorsAndBanksData(userId);
+    break;
     case 'supplier':
-      await fetchProductData(userId);
-      await fetchSupplierData(userId);
-      break;
+        await fetchProductData(userId);
+        await fetchSupplierData(userId);
+        break;
     case 'retur':
-      await fetchTransactionAndReturnData(userId);
+      await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
       await fetchProductData(userId);
       break;
   }
-};
-
-const safeToDate = (firebaseTimestamp) => {
-  if (firebaseTimestamp && typeof firebaseTimestamp.toDate === 'function') {
-    return firebaseTimestamp.toDate();
-  }
-  // Jika datanya string atau format lain, coba konversi
-  try {
-    const d = new Date(firebaseTimestamp);
-    if (!isNaN(d.getTime())) return d;
-  } catch (e) {
-    // Abaikan jika gagal konversi
-  }
-  // Jika gagal, kembalikan null agar tidak error
-  return null; 
 };
 
 const lastEditedModel = ref(null);
@@ -487,25 +469,27 @@ const isSubscriptionActive = computed(() => {
 let unsubscribeSummary = null; // Variabel untuk menyimpan listener
 
 const fetchSummaryData = (userId) => {
-    if (unsubscribeSummary) {
-        unsubscribeSummary();
-    }
-    if (!userId) {
-        state.summaryData = {};
-        return;
-    }
-    const summaryRef = doc(db, "user_summaries", userId);
-    unsubscribeSummary = onSnapshot(summaryRef, (docSnap) => {
-        if (docSnap.exists()) {
-            console.log('✅ fetchSummaryData: Dokumen DITEMUKAN, isinya:', docSnap.data()); // <-- LOG 1
-            state.summaryData = docSnap.data();
-        } else {
-            console.warn('⚠️ fetchSummaryData: Dokumen ringkasan TIDAK ADA.'); // <-- LOG 2
-            state.summaryData = {};
-        }
-    }, (error) => {
-        console.error("❌ Gagal mendengarkan summary data:", error); // <-- LOG 3
-    });
+    if (unsubscribeSummary) {
+        unsubscribeSummary(); // Hentikan listener lama jika ada
+    }
+
+    if (!userId) {
+        state.summaryData = {};
+        return;
+    }
+
+    const summaryRef = doc(db, "user_summaries", userId);
+    // Gunakan onSnapshot untuk 'mendengarkan' perubahan secara real-time
+    unsubscribeSummary = onSnapshot(summaryRef, (docSnap) => {
+        if (docSnap.exists()) {
+            state.summaryData = docSnap.data();
+        } else {
+            console.log("Dokumen ringkasan belum ada, akan dibuat otomatis oleh Cloud Function.");
+            state.summaryData = {};
+        }
+    }, (error) => {
+        console.error("Gagal mendengarkan summary data:", error);
+    });
 };
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
@@ -535,57 +519,6 @@ async function fetchCommissionPayouts() {
         alert("Gagal mengambil riwayat pencairan komisi.");
     }
 }
-
-const fetchDashboardRangeData = async () => {
-    console.log('... fetchDashboardRangeData: Mulai mengambil data untuk filter pendek...'); // <-- LOG 4
-    if (!currentUser.value) return;
-    const userId = currentUser.value.uid;
-    let startDate, endDate;
-    const now = new Date();
-    switch (uiState.dashboardDateFilter) {
-        case 'today':
-            startDate = new Date(new Date().setHours(0, 0, 0, 0));
-            endDate = new Date(new Date().setHours(23, 59, 59, 999));
-            break;
-        case 'last_7_days':
-            endDate = new Date(new Date().setHours(23, 59, 59, 999));
-            startDate = new Date(new Date().setDate(now.getDate() - 7));
-            startDate.setHours(0, 0, 0, 0);
-            break;
-        default:
-            state.dashboardData = { transaksi: [], keuangan: [], retur: [] };
-            return;
-    }
-    const transaksiQuery = query(collection(db, "transactions"), where("userId", "==", userId), where("tanggal", ">=", startDate), where("tanggal", "<=", endDate));
-    const keuanganQuery = query(collection(db, "keuangan"), where("userId", "==", userId), where("tanggal", ">=", startDate), where("tanggal", "<=", endDate));
-    const returQuery = query(collection(db, "returns"), where("userId", "==", userId), where("tanggal", ">=", startDate), where("tanggal", "<=", endDate));
-    try {
-        const [transaksiSnap, keuanganSnap, returSnap] = await Promise.all([
-            getDocs(transaksiQuery),
-            getDocs(keuanganQuery),
-            getDocs(returQuery)
-        ]);
-        console.log('✅ fetchDashboardRangeData: Query SUKSES, hasilnya:', {
-            transaksi: transaksiSnap.docs.length,
-            keuangan: keuanganSnap.docs.length,
-            retur: returSnap.docs.length
-        }); // <-- LOG 5
-        state.dashboardData.transaksi = transaksiSnap.docs.map(doc => ({...doc.data(), tanggal: safeToDate(doc.data().tanggal) }));
-    state.dashboardData.keuangan = keuanganSnap.docs.map(doc => ({...doc.data(), tanggal: safeToDate(doc.data().tanggal) }));
-    state.dashboardData.retur = returSnap.docs.map(doc => ({...doc.data(), tanggal: safeToDate(doc.data().tanggal) }));
-    } catch (error) {
-        console.error('❌ fetchDashboardRangeData: GAGAL! Error:', error); // <-- LOG 6
-    }
-};
-
-// 3. Watcher untuk memanggil fungsi di atas secara otomatis
-watch(() => [uiState.dashboardDateFilter, uiState.dashboardStartDate, uiState.dashboardEndDate], () => {
-    const filter = uiState.dashboardDateFilter;
-    const isLongTermFilter = ['by_month_range', 'this_year', 'all_time'].includes(filter);
-    if (!isLongTermFilter) {
-        fetchDashboardRangeData();
-    }
-});
 
 // Fungsi baru untuk membuat kode rujukan yang lebih profesional
 function generatePartnerCode() {
@@ -2666,6 +2599,50 @@ const parseInputNumber = (value) => {
 
 
 // --- COMPUTED PROPERTIES ---
+const dashboardFilteredData = computed(() => {
+    // Memastikan state.keuangan dan state.transaksi adalah array, bahkan jika masih kosong
+    const keuanganData = state.keuangan || [];
+    const transaksiData = state.transaksi || [];
+
+    const filteredKeuangan = filterDataByDate(
+        keuanganData, 
+        uiState.dashboardDateFilter, 
+        uiState.dashboardStartDate, 
+        uiState.dashboardEndDate,
+        uiState.dashboardStartMonth,
+        uiState.dashboardStartYear,
+        uiState.dashboardEndMonth,
+        uiState.dashboardEndYear
+    );
+
+    const filteredTransaksi = filterDataByDate(
+        transaksiData, 
+        uiState.dashboardDateFilter, 
+        uiState.dashboardStartDate, 
+        uiState.dashboardEndDate,
+        uiState.dashboardStartMonth,
+        uiState.dashboardStartYear,
+        uiState.dashboardEndMonth,
+        uiState.dashboardEndYear
+    );
+
+    const filteredRetur = filterDataByDate(
+        state.retur, 
+        uiState.dashboardDateFilter, 
+        uiState.dashboardStartDate, 
+        uiState.dashboardEndDate,
+        uiState.dashboardStartMonth,
+        uiState.dashboardStartYear,
+        uiState.dashboardEndMonth,
+        uiState.dashboardEndYear
+    );
+
+    return {
+        transaksi: filteredTransaksi,
+        keuangan: filteredKeuangan,
+        retur: filteredRetur
+    };
+});
 
 const investorLedger = computed(() => {
     if (!state.investor || state.investor.length === 0) {
@@ -2722,84 +2699,84 @@ const filteredInvestorPayments = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    const filter = uiState.dashboardDateFilter;
-    const isLongTermFilter = ['by_month_range', 'this_year', 'all_time'].includes(filter);
+  // Objek untuk menampung hasil akhir
+  const totals = {
+    omsetKotor: 0, totalDiskon: 0, hppTerjual: 0, biayaTransaksi: 0,
+    biayaOperasional: 0, nilaiRetur: 0, omsetBersih: 0, labaKotor: 0,
+    labaBersihOperasional: 0, saldoKas: 0,
+  };
 
-    let totals = {
-        omsetKotor: 0, totalDiskon: 0, hppTerjual: 0, biayaTransaksi: 0,
-        biayaOperasional: 0, nilaiRetur: 0,
+  // --- LOGIKA HIBRIDA ---
+  const filter = uiState.dashboardDateFilter;
+
+  // 1. GUNAKAN DATA RINGKASAN (CEPAT) UNTUK FILTER PANJANG
+  if (filter === 'by_month_range' || filter === 'this_year' || filter === 'all_time') {
+    const processSummary = (summaryObject) => {
+        if (!summaryObject) return;
+        totals.omsetKotor += summaryObject.omsetKotor || 0;
+        totals.totalDiskon += summaryObject.totalDiskon || 0;
+        totals.hppTerjual += summaryObject.hppTerjual || 0;
+        totals.biayaTransaksi += summaryObject.biayaTransaksi || 0;
+        totals.biayaOperasional += summaryObject.biayaOperasional || 0;
+        totals.nilaiRetur += summaryObject.nilaiRetur || 0;
     };
-
-    if (isLongTermFilter) {
-        // --- LOGIKA UNTUK FILTER JANGKA PANJANG (BULAN/TAHUN/SEMUA) ---
-        const now = new Date();
-        const processSummary = (summaryObject) => {
-            if (!summaryObject) return;
-            totals.omsetKotor += summaryObject.omsetKotor || 0;
-            totals.totalDiskon += summaryObject.totalDiskon || 0;
-            totals.hppTerjual += summaryObject.hppTerjual || 0;
-            totals.biayaTransaksi += summaryObject.biayaTransaksi || 0;
-            totals.biayaOperasional += summaryObject.biayaOperasional || 0;
-            totals.nilaiRetur += summaryObject.nilaiRetur || 0;
-        };
-        
-        if (filter === 'by_month_range') {
-            const year = uiState.dashboardStartYear;
-            const month = uiState.dashboardStartMonth.toString().padStart(2, "0");
-            processSummary(state.summaryData?.[`summary_${year}`]?.months?.[month]);
-        } else if (filter === 'this_year') {
-            processSummary(state.summaryData?.[`summary_${now.getFullYear()}`]?.yearlyTotals);
-        } else if (filter === 'all_time') {
-            for (const key in state.summaryData) {
-                if (key.startsWith('summary_')) {
-                    processSummary(state.summaryData[key].yearlyTotals);
-                }
+    
+    if (filter === 'by_month_range') {
+        const year = uiState.dashboardStartYear;
+        const month = uiState.dashboardStartMonth.toString().padStart(2, "0");
+        const summary = state.summaryData?.[`summary_${year}`]?.months?.[month];
+        processSummary(summary);
+    } else if (filter === 'this_year') {
+        const year = new Date().getFullYear();
+        const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
+        processSummary(summary);
+    } else if (filter === 'all_time') {
+        for (const key in state.summaryData) {
+            if (key.startsWith('summary_')) {
+                processSummary(state.summaryData[key].yearlyTotals);
             }
         }
-    } else {
-        // --- LOGIKA UNTUK FILTER JANGKA PENDEK (HARI INI/7 HARI/DLL) ---
-        const { transaksi = [], keuangan = [], retur = [] } = state.dashboardData || {};
-        
-        totals.omsetKotor = transaksi.reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
-        totals.totalDiskon = transaksi.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
-        totals.hppTerjual = transaksi.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * (item.qty || 0), 0), 0);
-        totals.biayaTransaksi = transaksi.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-        totals.biayaOperasional = keuangan.filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + i.jumlah, 0);
-        totals.nilaiRetur = retur.reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
     }
 
-    // --- KALKULASI FINAL (BERLAKU UNTUK SEMUA FILTER) ---
-    const finalOmsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
-    const finalLabaKotor = finalOmsetBersih - totals.hppTerjual;
-    const finalLabaBersihOperasional = finalLabaKotor - totals.biayaTransaksi - totals.biayaOperasional;
+  // 2. GUNAKAN PERHITUNGAN LANGSUNG (AKURAT) UNTUK FILTER PENDEK
+  } else {
+    const { transaksi = [], keuangan = [] } = dashboardFilteredData.value || {};
+    totals.omsetKotor = transaksi.reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
+    totals.totalDiskon = transaksi.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
+    totals.hppTerjual = transaksi.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
+    totals.biayaTransaksi = transaksi.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
+    totals.biayaOperasional = keuangan.filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + i.jumlah, 0);
+    // (Untuk retur, kita asumsikan untuk filter pendek datanya sudah ter-load)
+    totals.nilaiRetur = (dashboardFilteredData.value.retur || []).reduce((sum, returDoc) => sum + (returDoc.items || []).reduce((itemSum, item) => itemSum + (item.nilaiRetur || 0) + (item.nilaiDiskon || 0), 0), 0);
+  }
 
-    let saldoKas = 0;
-    for (const key in state.summaryData) {
-      if (key.startsWith('summary_')) {
-        const yearly = state.summaryData[key].yearlyTotals;
-        if(yearly) {
-          saldoKas += (yearly.omsetBersih || 0) - (yearly.biayaTransaksi || 0) - (yearly.biayaOperasional || 0);
-        }
+  // 3. HITUNG NILAI TURUNAN (BERLAKU UNTUK SEMUA FILTER)
+  totals.omsetBersih = totals.omsetKotor - totals.totalDiskon;
+  totals.labaKotor = totals.omsetBersih - totals.hppTerjual;
+  totals.labaBersihOperasional = totals.labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
+
+  // 4. HITUNG KPI NON-TRANSAKSIONAL
+  // Saldo Kas dihitung dari total sepanjang masa agar akurat
+  let allTimeOmsetBersih = 0, allTimeBiayaTransaksi = 0, allTimeBiayaOperasional = 0, allTimeNilaiRetur = 0;
+  for (const key in state.summaryData) {
+    if (key.startsWith('summary_')) {
+      const yearly = state.summaryData[key].yearlyTotals;
+      if(yearly) {
+        allTimeOmsetBersih += yearly.omsetBersih || 0;
+        allTimeBiayaTransaksi += yearly.biayaTransaksi || 0;
+        allTimeBiayaOperasional += yearly.biayaOperasional || 0;
+        allTimeNilaiRetur += yearly.nilaiRetur || 0;
       }
     }
+  }
+  // Rumus Saldo Kas yang sudah diperbaiki
+  totals.saldoKas = allTimeOmsetBersih - allTimeBiayaTransaksi - allTimeBiayaOperasional - allTimeNilaiRetur;
 
-    const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
-    const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
+  // Stok selalu real-time dari state.produk
+  totals.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
+  totals.totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
-    return {
-        saldoKas,
-        omsetBersih: finalOmsetBersih,
-        labaKotor: finalLabaKotor,
-        labaBersihOperasional: finalLabaBersihOperasional,
-        totalBiayaOperasional: totals.biayaOperasional,
-        totalUnitStok,
-        totalNilaiStokHPP,
-        totalNilaiRetur: totals.nilaiRetur,
-        totalOmsetKotor: totals.omsetKotor,
-        totalDiskon: totals.totalDiskon,
-        totalHppTerjual: totals.hppTerjual,
-        totalBiayaTransaksi: totals.biayaTransaksi,
-    };
+  return totals;
 });
 
 const namaKainHistory = computed(() => {
@@ -4596,7 +4573,7 @@ function renderCharts() {
     if (salesChannelChart) salesChannelChart.destroy();
     
     // Gunakan nilai default array kosong untuk mencegah error
-    const { transaksi = [], keuangan = [] } = state.dashboardData || {};
+    const { transaksi = [], keuangan = [] } = dashboardFilteredData.value || {};
     const ctxProfit = document.getElementById('profitExpenseChart')?.getContext('2d');
     const ctxSales = document.getElementById('salesChannelChart')?.getContext('2d');
     
@@ -6338,7 +6315,7 @@ function deleteSpecialPrice(channelId, sku) {
 }
 // --- LIFECYCLE & WATCHERS ---
 
-
+watch(dashboardFilteredData, () => { if (activePage.value === 'dashboard') nextTick(renderCharts); });
 watch(() => uiState.activeCartChannel, (newChannel) => { if (newChannel && !state.carts[newChannel]) state.carts[newChannel] = []; });
 watch(() => uiState.promosiSelectedModel, (newModel) => {
   if (newModel) {
@@ -6824,46 +6801,36 @@ const fetchNotesData = async (userId) => {
 };
 
 onMounted(() => {
-    onAuthStateChanged(auth, async (user) => {
-        isLoading.value = true;
-        hasLoadedInitialData.value = false;
+  onAuthStateChanged(auth, async (user) => {
+    isLoading.value = true;
+    hasLoadedInitialData.value = false;
 
-        // 1. Reset status data yang sudah di-fetch setiap kali auth berubah
-        Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
+    // Reset status data yang sudah di-fetch setiap kali auth berubah
+    Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
 
-        if (user) {
-            // A. Ambil data pengguna (role, partner status, dll)
-            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-            const userData = userDocSnap.exists() ? userDocSnap.data() : {};
-            currentUser.value = { ...user, userData, isPartner: userData.isPartner || false, referralCode: userData.referralCode || null };
+    if (user) {
+        // --- INI BAGIAN UTAMA PERBAIKAN ---
+        const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+        const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+        currentUser.value = { ...user, userData, isPartner: userData.isPartner || false, referralCode: userData.referralCode || null };
+        // --- AKHIR DARI PERBAIKAN ---
 
-            // B. Setup listener untuk settings & commissions, dan fetch core settings.
-            await setupListeners(user.uid);
+        await setupListeners(user.uid);
+        loadDataForPage(activePage.value);
 
-            // C. PENTING: Panggil listener summary di sini, setelah currentUser set.
-            // Listener ini akan terus aktif dan mengupdate state.summaryData.
-            fetchSummaryData(user.uid); 
-            
-            // D. Load data spesifik untuk halaman yang aktif (termasuk dashboard)
-            await loadDataForPage(activePage.value);
-
-        } else {
-            currentUser.value = null;
-            activePage.value = 'login';
-            unsubscribe();
-        }
-        isLoading.value = false;
-        hasLoadedInitialData.value = true;
-    });
+    } else {
+        currentUser.value = null;
+        activePage.value = 'login';
+        unsubscribe();
+    }
+    isLoading.value = false;
+    hasLoadedInitialData.value = true;
+});
 });
 
 watch(activePage, (newPage) => {
     localStorage.setItem('lastActivePage', newPage);
-    
-    // Perbaikan: Hanya panggil loadDataForPage jika sudah login
-    if (currentUser.value) {
-        loadDataForPage(newPage);
-    }
+    loadDataForPage(newPage);
 });
 
 </script>
