@@ -5091,125 +5091,115 @@ function exportGroupedProduksiToExcel() {
 }
 
 async function submitBiaya() {
-    if (!currentUser.value) return alert("Anda harus login.");
-    const form = uiState.modalData;
+    if (!currentUser.value) return alert("Anda harus login.");
+    const form = uiState.modalData;
 
-    // Validasi dasar
-    if (!form.kategori || !form.jumlah) {
-        return alert("Tanggal, Kategori, dan Jumlah Pokok wajib diisi.");
-    }
+    // Validasi dasar
+    if (!form.kategori || !form.jumlah) {
+        return alert("Tanggal, Kategori, dan Jumlah Pokok wajib diisi.");
+    }
 
-    const paymentMethod = form.paymentMethod;
-    const adminFee = paymentMethod === 'transfer' ? (form.adminFee || 0) : 0;
-    const totalPengeluaran = form.jumlah + adminFee;
-    let catatanLengkap = form.catatan || '';
+    const paymentMethod = form.paymentMethod;
+    const adminFee = paymentMethod === 'transfer' ? (form.adminFee || 0) : 0;
+    const totalPengeluaran = form.jumlah + adminFee;
+    let catatanLengkap = form.catatan || '';
 
-    // Buat catatan otomatis berdasarkan metode pembayaran
-    if (paymentMethod === 'transfer') {
-        if (!form.selectedBankAccountId) return alert("Pilih rekening tujuan untuk transfer.");
-        const bank = state.bankAccounts.find(b => b.id === form.selectedBankAccountId);
-        let detailTransfer = `(Pembayaran via Transfer ke ${bank.bankName} - ${bank.accountNumber} a.n ${bank.accountName}`;
-        if (adminFee > 0) {
-            detailTransfer += `, Biaya Admin: ${formatCurrency(adminFee)}`;
-        }
-        detailTransfer += `)`;
-        catatanLengkap = `${catatanLengkap} ${detailTransfer}`.trim();
-    } else {
-        catatanLengkap = `${catatanLengkap} (Pembayaran via Tunai)`.trim();
-    }
-    
-    isLoading.value = true;
-    try {
-        const docRef = await addDoc(collection(db, "keuangan"), {
-            kategori: form.kategori,
-            jumlah: totalPengeluaran, // Simpan jumlah total (termasuk admin)
-            catatan: catatanLengkap,
-            jenis: 'pengeluaran',
-            userId: currentUser.value.uid,
-            tanggal: new Date(form.tanggal)
-        });
+    // Buat catatan otomatis berdasarkan metode pembayaran
+    if (paymentMethod === 'transfer') {
+        if (!form.selectedBankAccountId) return alert("Pilih rekening tujuan untuk transfer.");
+        const bank = state.bankAccounts.find(b => b.id === form.selectedBankAccountId);
+        let detailTransfer = `(Pembayaran via Transfer ke ${bank.bankName} - ${bank.accountNumber} a.n ${bank.accountName}`;
+        if (adminFee > 0) {
+            detailTransfer += `, Biaya Admin: ${formatCurrency(adminFee)}`;
+        }
+        detailTransfer += `)`;
+        catatanLengkap = `${catatanLengkap} ${detailTransfer}`.trim();
+    } else {
+        catatanLengkap = `${catatanLengkap} (Pembayaran via Tunai)`.trim();
+    }
+    
+    isLoading.value = true;
+    try {
+        await addDoc(collection(db, "keuangan"), { // docRef tidak lagi dibutuhkan
+            kategori: form.kategori,
+            jumlah: totalPengeluaran,
+            catatan: catatanLengkap,
+            jenis: 'pengeluaran',
+            userId: currentUser.value.uid,
+            tanggal: new Date(form.tanggal)
+        });
 
-        // Update state lokal
-        state.keuangan.push({
-            id: docRef.id,
-            kategori: form.kategori,
-            jumlah: totalPengeluaran,
-            catatan: catatanLengkap,
-            jenis: 'pengeluaran',
-            tanggal: new Date(form.tanggal)
-        });
-        await fetchKeuanganData();
-        hideModal();
-        alert('Data pengeluaran berhasil disimpan!');
-    } catch (e) {
-        console.error("Error menyimpan biaya:", e);
-        alert("Gagal menyimpan data pengeluaran.");
-    } finally {
-        isLoading.value = false;
-    }
+        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
+        await fetchKeuanganData(); 
+        
+        hideModal();
+        alert('Data pengeluaran berhasil disimpan!');
+    } catch (e) {
+        console.error("Error menyimpan biaya:", e);
+        alert("Gagal menyimpan data pengeluaran.");
+    } finally {
+        isLoading.value = false;
+    }
 }
 
 async function deleteBiaya(id) {
-    if (!currentUser.value) return alert("Anda harus login untuk mengelola biaya.");
-    if (!confirm('Anda yakin ingin menghapus data pengeluaran ini?')) return;
-    try {
-        // PERBAIKAN: Hapus dari koleksi 'keuangan'
-        await deleteDoc(doc(db, "keuangan", id)); 
-        // Perbarui state lokal
-        state.keuangan = state.keuangan.filter(b => b.id !== id);
-        await fetchKeuanganData();
-        alert('Data pengeluaran berhasil dihapus.');
-    } catch (error) {
-        console.error("Error menghapus biaya:", error);
-        alert("Gagal menghapus data pengeluaran.");
-    }
+    if (!currentUser.value) return alert("Anda harus login untuk mengelola biaya.");
+    if (!confirm('Anda yakin ingin menghapus data pengeluaran ini?')) return;
+    try {
+        // PERBAIKAN: Hapus dari koleksi 'keuangan'
+        await deleteDoc(doc(db, "keuangan", id)); 
+        
+        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
+        await fetchKeuanganData(); 
+        
+        alert('Data pengeluaran berhasil dihapus.');
+    } catch (error) {
+        console.error("Error menghapus biaya:", error);
+        alert("Gagal menghapus data pengeluaran.");
+    }
 }
-async function submitPemasukan() {
-    if (!currentUser.value) return alert("Anda harus login untuk mengelola pemasukan.");
-    isLoading.value = true;
-    try {
-        const docRef = await addDoc(collection(db, "keuangan"), {
-            kategori: uiState.modalData.kategori, // <-- GANTI DARI 'tipe'
-            jumlah: uiState.modalData.jumlah,
-            catatan: uiState.modalData.catatan,
-            jenis: 'pemasukan_lain',
-            userId: currentUser.value.uid,
-            tanggal: new Date(uiState.modalData.tanggal)
-        });
 
-        // PERBAIKAN: Tambahkan data baru ke array lokal setelah berhasil
-        state.keuangan.push({
-            id: docRef.id,
-            kategori: uiState.modalData.kategori, // <-- GANTI DARI 'tipe'
-            jumlah: uiState.modalData.jumlah,
-            catatan: uiState.modalData.catatan,
-            jenis: 'pemasukan_lain',
-            tanggal: new Date(uiState.modalData.tanggal)
-        });
-await fetchKeuanganData();
-        hideModal();
-        alert('Data pemasukan berhasil disimpan!');
-    } catch (e) {
-        console.error("Error menyimpan pemasukan:", e);
-        alert("Gagal menyimpan data pemasukan.");
-    } finally {
-        isLoading.value = false;
-    }
+async function submitPemasukan() {
+    if (!currentUser.value) return alert("Anda harus login untuk mengelola pemasukan.");
+    isLoading.value = true;
+    try {
+        await addDoc(collection(db, "keuangan"), { // docRef tidak lagi dibutuhkan
+            kategori: uiState.modalData.kategori,
+            jumlah: uiState.modalData.jumlah,
+            catatan: uiState.modalData.catatan,
+            jenis: 'pemasukan_lain',
+            userId: currentUser.value.uid,
+            tanggal: new Date(uiState.modalData.tanggal)
+        });
+
+        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
+        await fetchKeuanganData(); 
+
+        hideModal();
+        alert('Data pemasukan berhasil disimpan!');
+    } catch (e) {
+        console.error("Error menyimpan pemasukan:", e);
+        alert("Gagal menyimpan data pemasukan.");
+    } finally {
+        isLoading.value = false;
+    }
 }
 
 async function deletePemasukan(id) {
-    if (!currentUser.value) return alert("Anda harus login untuk mengelola pemasukan.");
-    if (!confirm('Anda yakin ingin menghapus data pemasukan ini?')) return;
-    try {
-        // PERBAIKAN: Hapus dari koleksi 'keuangan'
-        await deleteDoc(doc(db, "keuangan", id)); 
-        // Perbarui state lokal
-        state.keuangan = state.keuangan.filter(p => p.id !== id);
-        alert('Data pemasukan berhasil dihapus.');
-    } catch (error) {
-        console.error("Error menghapus pemasukan:", error);
-        alert("Gagal menghapus data pemasukan.");
-    }
+    if (!currentUser.value) return alert("Anda harus login untuk mengelola pemasukan.");
+    if (!confirm('Anda yakin ingin menghapus data pemasukan ini?')) return;
+    try {
+        // PERBAIKAN: Hapus dari koleksi 'keuangan'
+        await deleteDoc(doc(db, "keuangan", id)); 
+        
+        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
+        await fetchKeuanganData(); 
+        
+        alert('Data pemasukan berhasil dihapus.');
+    } catch (error) {
+        console.error("Error menghapus pemasukan:", error);
+        alert("Gagal menghapus data pemasukan.");
+    }
 }
 
 async function addInflowCategory() {
@@ -6657,29 +6647,40 @@ const fetchKeuanganData = async () => {
     if (!currentUser.value) return;
     const userId = currentUser.value.uid;
     
-    // Asumsi: Kita hanya butuh data keuangan yang relevan untuk dashboard
+    // Query yang sudah benar: Mengambil semua data keuangan untuk userId ini
     const q = query(
-        collection(db, "keuangan"),
+        collection(db, "keuangan"), // Menggunakan koleksi tingkat atas
         where("userId", "==", userId),
-        orderBy("tanggal", "desc") // Mengurutkan agar filter tanggal lebih mudah
+        orderBy("tanggal", "desc") 
     );
 
     try {
         const keuanganSnap = await getDocs(q);
+        const fetchedData = [];
         
-        // Pastikan konversi ke Date object dilakukan di sini
         state.keuangan = keuanganSnap.docs.map(doc => {
             const data = doc.data();
+            
+            // KRITIS: Menambahkan ID dokumen secara eksplisit di sini
+            const docId = doc.id;
+
+            // Konversi Firestore Timestamp ke JavaScript Date
+            const dateObject = (data.tanggal && typeof data.tanggal.toDate === 'function') 
+                               ? data.tanggal.toDate() 
+                               : data.tanggal; 
+            
             return { 
-                id: doc.id, 
+                id: docId, 
                 ...data, 
-                tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : data.tanggal 
+                tanggal: dateObject // Menyimpan sebagai objek Date
             };
         });
         
         dataFetched.finance = true;
+        console.log(`[Keuangan] Berhasil memuat ${state.keuangan.length} data.`);
+
     } catch (error) {
-        console.error("Error fetching finance data:", error);
+        console.error("Error fetching Keuangan data:", error);
     }
 };
 
