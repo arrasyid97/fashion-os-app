@@ -354,10 +354,15 @@ const loadDataForPage = async (pageName) => {
   // Logika Lazy Loading yang sudah ada, sekarang di dalam fungsi ini
   switch(pageName) {
     case 'dashboard':
-      await fetchSummaryData(userId); // <-- CUKUP PANGGIL FUNGSI INI
-      // Kita tidak perlu lagi fetchTransaction/Finance untuk dashboard
-      nextTick(renderCharts);
-      break;
+  // Memuat semua data yang dibutuhkan oleh dashboard secara bersamaan
+  await Promise.all([
+    fetchSummaryData(userId),
+    fetchProductData(userId),
+    fetchTransactionAndReturnData(userId),
+    fetchFinanceData(userId)
+  ]);
+  nextTick(renderCharts);
+  break;
     case 'transaksi':
     case 'bulk_process':
     await fetchProductData(userId);
