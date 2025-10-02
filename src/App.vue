@@ -6647,22 +6647,20 @@ const fetchKeuanganData = async () => {
     if (!currentUser.value) return;
     const userId = currentUser.value.uid;
     
-    // Query yang sudah benar: Mengambil semua data keuangan untuk userId ini
-    // KRITIS: Tambahkan orderBy(documentId(), "desc") sebagai sort sekunder
+    // Query Firestore (tetap membutuhkan index komposit yang sudah dibuat)
     const q = query(
-        collection(db, "keuangan"), // Menggunakan koleksi tingkat atas
+        collection(db, "keuangan"),
         where("userId", "==", userId),
-        orderBy("tanggal", "desc"), // Urutan Primer: Tanggal terbaru di atas
-        orderBy(documentId(), "desc") // Urutan Sekunder: ID dokumen terbaru (yang paling akhir dibuat) di atas
+        orderBy("tanggal", "desc"), 
+        orderBy(documentId(), "desc") 
     );
 
     try {
         const keuanganSnap = await getDocs(q);
         
-        state.keuangan = keuanganSnap.docs.map(doc => {
+        // 1. Ambil dan Konversi Data
+        const fetchedKeuangan = keuanganSnap.docs.map(doc => {
             const data = doc.data();
-            
-            // KRITIS: Menambahkan ID dokumen secara eksplisit di sini
             const docId = doc.id;
 
             // Konversi Firestore Timestamp ke JavaScript Date
@@ -6676,6 +6674,27 @@ const fetchKeuanganData = async () => {
                 tanggal: dateObject // Menyimpan sebagai objek Date
             };
         });
+        
+        // 2. KRITIS: LAKUKAN SORTING MANUAL DI SISI KLIEN UNTUK STABILITAS
+        fetchedKeuangan.sort((a, b) => {
+            // Urutan Primer: Tanggal (Descending: b - a)
+            const dateA = new Date(a.tanggal).getTime();
+            const dateB = new Date(b.tanggal).getTime();
+
+            if (dateB !== dateA) {
+                return dateB - dateA; // Tanggal terbaru (B) di atas
+            }
+
+            // Urutan Sekunder: ID Dokumen (Descending: B > A)
+            // ID Firestore diurutkan berdasarkan waktu pembuatan, jadi ID yang lebih "besar" lebih baru.
+            if (b.id < a.id) return -1;
+            if (b.id > a.id) return 1;
+            return 0; // Sama
+        });
+
+
+        // 3. Update State dengan data yang sudah terurut stabil
+        state.keuangan = fetchedKeuangan; 
         
         dataFetched.finance = true;
         console.log(`[Keuangan] Berhasil memuat ${state.keuangan.length} data.`);
