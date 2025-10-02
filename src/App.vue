@@ -6315,7 +6315,7 @@ function deleteSpecialPrice(channelId, sku) {
 }
 // --- LIFECYCLE & WATCHERS ---
 
-watch(dashboardFilteredData, () => { if (activePage.value === 'dashboard') nextTick(renderCharts); });
+
 watch(() => uiState.activeCartChannel, (newChannel) => { if (newChannel && !state.carts[newChannel]) state.carts[newChannel] = []; });
 watch(() => uiState.promosiSelectedModel, (newModel) => {
   if (newModel) {
