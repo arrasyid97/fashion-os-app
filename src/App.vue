@@ -4573,7 +4573,7 @@ function renderCharts() {
     if (salesChannelChart) salesChannelChart.destroy();
     
     // Gunakan nilai default array kosong untuk mencegah error
-    const { transaksi = [], keuangan = [] } = dashboardFilteredData.value || {};
+    const { transaksi = [], keuangan = [] } = state.dashboardData || {};
     const ctxProfit = document.getElementById('profitExpenseChart')?.getContext('2d');
     const ctxSales = document.getElementById('salesChannelChart')?.getContext('2d');
     
