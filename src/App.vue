@@ -353,15 +353,17 @@ const loadDataForPage = async (pageName) => {
 
   switch(pageName) {
     case 'dashboard':
-      // Memuat semua data yang dibutuhkan oleh dashboard secara bersamaan
-      await Promise.all([
-        fetchSummaryData(userId),
-        fetchProductData(userId),
-        fetchTransactionAndReturnData(userId),
-        fetchKeuanganData() // Panggil fungsi keuangan yang baru
-      ]);
-      nextTick(renderCharts);
-      break;
+  // Memuat semua data yang dibutuhkan oleh dashboard secara bersamaan
+  await Promise.all([
+    fetchSummaryData(userId),
+    fetchProductData(userId),
+    // Kita TIDAK perlu memanggil fetch lain di sini,
+    // karena watcher untuk filter tanggal akan menanganinya secara otomatis.
+  ]);
+  // `fetchDashboardRangeData()` akan dipanggil secara otomatis oleh `watch`
+  // jadi kita tidak perlu memanggilnya di sini.
+  nextTick(renderCharts);
+  break;
     case 'transaksi':
     case 'bulk_process':
       await fetchProductData(userId);
