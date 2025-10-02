@@ -353,10 +353,13 @@ const loadDataForPage = async (pageName) => {
   // Logika Lazy Loading yang sudah ada, sekarang di dalam fungsi ini
   switch(pageName) {
     case 'dashboard':
-      await fetchSummaryData(userId); // <-- CUKUP PANGGIL FUNGSI INI
-      // Kita tidak perlu lagi fetchTransaction/Finance untuk dashboard
-      nextTick(renderCharts);
-      break;
+      // Memuat data rekap (summary) terlebih dahulu
+      await fetchSummaryData(userId); 
+      // **MEMUAT DATA LIVE** untuk kalkulasi harian (agar KPI Rp 0 teratasi)
+      await fetchTransactionAndReturnData(userId, false, true); // (Tambahkan fetch Keuangan di langkah 3)
+      await fetchKeuanganData(); // Memuat data keuangan untuk Saldo Kas & Biaya Operasional Live
+      nextTick(renderCharts);
+      break;
     case 'transaksi':
     case 'bulk_process':
     await fetchProductData(userId);
@@ -2677,10 +2680,9 @@ const dashboardKpis = computed(() => {
     const isShortTermFilter = ['today', 'last_7_days', 'last_30_days', 'by_date_range'].includes(filter);
 
     if (isShortTermFilter) {
-        // --- LOGIKA DARI DATA LIVE (REAL-TIME FILTERING) ---
+        // --- LOGIKA DARI DATA LIVE (WAJIB UNTUK FILTER JANGKA PENDEK) ---
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
         
-        // Memastikan omset, diskon, dan biaya terhitung dengan benar dari data live yang sudah difilter
         totals.omsetKotor = transaksi.reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
         totals.totalDiskon = transaksi.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
         totals.hppTerjual = transaksi.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + ((item.hpp || 0) * (item.qty || 0)), 0), 0);
@@ -2705,25 +2707,25 @@ const dashboardKpis = computed(() => {
             const year = new Date().getFullYear();
             getSummaryForFilter(state.summaryData?.[`summary_${year}`]?.yearlyTotals);
         } else if (filter === 'all_time' || filter === 'by_month_range' || filter === 'by_year_range') {
-            // Jika filter terlalu luas, gunakan All Time Totals yang paling diandalkan
             getSummaryForFilter(state.summaryData?.allTimeTotals); 
         }
     }
 
-    // --- KALKULASI FINAL UTAMA ---
-    const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
-    const labaKotor = omsetBersih - totals.hppTerjual;
-    const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
-
     // --- PERBAIKAN KRITIS SALDO KAS (ALL TIME) ---
     // Saldo Kas harus dihitung dari total seluruh Pemasukan - Pengeluaran (All Time)
+    // Ini memastikan SALDO KAS selalu terisi terlepas dari filter tanggal manapun.
     const pemasukanAllTime = (state.keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     const pengeluaranAllTime = (state.keuangan || []).filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     const saldoKas = pemasukanAllTime - pengeluaranAllTime; 
     
-    // Perhitungan Stok (Diambil dari produk live yang di-update Cloud Function)
+    // Perhitungan Stok (tetap live)
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
+
+    const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
+    const labaKotor = omsetBersih - totals.hppTerjual;
+    const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
+
 
     return {
         saldoKas,
@@ -5136,7 +5138,7 @@ async function submitBiaya() {
             jenis: 'pengeluaran',
             tanggal: new Date(form.tanggal)
         });
-        
+        await fetchKeuanganData();
         hideModal();
         alert('Data pengeluaran berhasil disimpan!');
     } catch (e) {
@@ -5155,6 +5157,7 @@ async function deleteBiaya(id) {
         await deleteDoc(doc(db, "keuangan", id)); 
         // Perbarui state lokal
         state.keuangan = state.keuangan.filter(b => b.id !== id);
+        await fetchKeuanganData();
         alert('Data pengeluaran berhasil dihapus.');
     } catch (error) {
         console.error("Error menghapus biaya:", error);
@@ -5183,7 +5186,7 @@ async function submitPemasukan() {
             jenis: 'pemasukan_lain',
             tanggal: new Date(uiState.modalData.tanggal)
         });
-
+await fetchKeuanganData();
         hideModal();
         alert('Data pemasukan berhasil disimpan!');
     } catch (e) {
@@ -6393,7 +6396,9 @@ const fetchCoreData = async (userId) => {
         state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
       }
     }
-
+if (currentUser.value?.userData?.inflowCategories) {
+        state.settings.inflowCategories = currentUser.value.userData.inflowCategories;
+     }
     if (promotionsSnap.exists()) {
       const promoData = promotionsSnap.data();
       state.promotions.perChannel = promoData.perChannel || {};
