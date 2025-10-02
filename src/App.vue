@@ -5332,7 +5332,15 @@ async function deleteInflowCategory(categoryId) {
 }
 
 function exportKeuangan(type) {
-    const data = type === 'pengeluaran' ? filteredPengeluaran.value : filteredPemasukan.value;
+    const dataToFilter = state.keuangan || [];
+    let data;
+
+    if (type === 'pengeluaran') {
+        data = dataToFilter.filter(k => k.jenis === 'pengeluaran');
+    } else {
+        data = dataToFilter.filter(k => k.jenis === 'pemasukan_lain');
+    }
+    
     const sheetName = type === 'pengeluaran' ? 'Laporan Pengeluaran' : 'Laporan Pemasukan';
     if (data.length === 0) {
         alert(`Tidak ada data ${type} untuk diexport.`);
@@ -5350,8 +5358,6 @@ function exportKeuangan(type) {
     worksheet["!cols"] = [ { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 40 } ];
     XLSX.writeFile(workbook, `${sheetName.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
-
-
 // FUNGSI HAPUS RETUR (SEKARANG LEBIH SEDERHANA)
 
 async function deleteReturnItem(itemToDelete) {
