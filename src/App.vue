@@ -399,6 +399,21 @@ const loadDataForPage = async (pageName) => {
   }
 };
 
+const safeToDate = (firebaseTimestamp) => {
+  if (firebaseTimestamp && typeof firebaseTimestamp.toDate === 'function') {
+    return firebaseTimestamp.toDate();
+  }
+  // Jika datanya string atau format lain, coba konversi
+  try {
+    const d = new Date(firebaseTimestamp);
+    if (!isNaN(d.getTime())) return d;
+  } catch (e) {
+    // Abaikan jika gagal konversi
+  }
+  // Jika gagal, kembalikan null agar tidak error
+  return null; 
+};
+
 const lastEditedModel = ref(null);
 const groupRefs = ref({});
 
@@ -556,9 +571,9 @@ const fetchDashboardRangeData = async () => {
             keuangan: keuanganSnap.docs.length,
             retur: returSnap.docs.length
         }); // <-- LOG 5
-        state.dashboardData.transaksi = transaksiSnap.docs.map(doc => ({...doc.data(), tanggal: doc.data().tanggal.toDate()}));
-        state.dashboardData.keuangan = keuanganSnap.docs.map(doc => ({...doc.data(), tanggal: doc.data().tanggal.toDate()}));
-        state.dashboardData.retur = returSnap.docs.map(doc => ({...doc.data(), tanggal: doc.data().tanggal.toDate()}));
+        state.dashboardData.transaksi = transaksiSnap.docs.map(doc => ({...doc.data(), tanggal: safeToDate(doc.data().tanggal) }));
+    state.dashboardData.keuangan = keuanganSnap.docs.map(doc => ({...doc.data(), tanggal: safeToDate(doc.data().tanggal) }));
+    state.dashboardData.retur = returSnap.docs.map(doc => ({...doc.data(), tanggal: safeToDate(doc.data().tanggal) }));
     } catch (error) {
         console.error('❌ fetchDashboardRangeData: GAGAL! Error:', error); // <-- LOG 6
     }
