@@ -6645,13 +6645,14 @@ const fetchInvestorsAndBanksData = async (userId) => {
 // Fungsi baru yang canggih untuk data keuangan dengan filter & paginasi
 const fetchKeuanganData = async () => {
     if (!currentUser.value) return;
-    const userId = currentUser.value.uid; // <-- DEKLARASI INI YANG BENAR
+    const userId = currentUser.value.uid;
     
-    // Query yang sudah benar: Mengambil semua data keuangan untuk userId ini
+    // Query untuk mengambil semua data Keuangan milik user ini
+    // Memerlukan index komposit: userId (asc), tanggal (desc)
     const q = query(
-        collection(db, "keuangan"), // Menggunakan koleksi tingkat atas
+        collection(db, "keuangan"),
         where("userId", "==", userId),
-        orderBy("tanggal", "desc") 
+        orderBy("tanggal", "desc") // Harus didukung oleh index
     );
 
     try {
@@ -6659,8 +6660,6 @@ const fetchKeuanganData = async () => {
         
         state.keuangan = keuanganSnap.docs.map(doc => {
             const data = doc.data();
-            
-            // KRITIS: Menambahkan ID dokumen secara eksplisit di sini
             const docId = doc.id;
 
             // Konversi Firestore Timestamp ke JavaScript Date
@@ -6679,7 +6678,10 @@ const fetchKeuanganData = async () => {
         console.log(`[Keuangan] Berhasil memuat ${state.keuangan.length} data.`);
 
     } catch (error) {
-        console.error("Error fetching Keuangan data:", error);
+        console.error("FATAL ERROR FETCHING KEUANGAN DATA:", error);
+        // Tambahkan peringatan jika fetch gagal
+        // Ini memastikan masalahnya bukan pada sisi klien.
+        alert("Gagal memuat data keuangan. Cek log konsol untuk detail index yang hilang.");
     }
 };
 // Fungsi khusus untuk data supplier dan purchase order
