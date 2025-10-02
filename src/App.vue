@@ -2600,12 +2600,19 @@ const parseInputNumber = (value) => {
 
 // --- COMPUTED PROPERTIES ---
 const dashboardFilteredData = computed(() => {
-    // Memastikan state.keuangan dan state.transaksi adalah array, bahkan jika masih kosong
-    const keuanganData = state.keuangan || [];
-    const transaksiData = state.transaksi || [];
+    // 1. Map data live dan pastikan 'tanggal' adalah objek Date, BUKAN Timestamp/Proxy
+    const mapToDateObject = (dataArray) => {
+        return (dataArray || []).map(item => {
+            const itemDate = (item.tanggal && item.tanggal.toDate) ? item.tanggal.toDate() : (item.tanggal instanceof Date ? item.tanggal : new Date(item.tanggal));
+            return { ...item, tanggal: itemDate };
+        });
+    };
 
-    const filteredKeuangan = filterDataByDate(
-        keuanganData, 
+    const keuanganData = mapToDateObject(state.keuangan);
+    const transaksiData = mapToDateObject(state.transaksi);
+    const returData = mapToDateObject(state.retur);
+
+    const filterOptions = [
         uiState.dashboardDateFilter, 
         uiState.dashboardStartDate, 
         uiState.dashboardEndDate,
@@ -2613,29 +2620,11 @@ const dashboardFilteredData = computed(() => {
         uiState.dashboardStartYear,
         uiState.dashboardEndMonth,
         uiState.dashboardEndYear
-    );
+    ];
 
-    const filteredTransaksi = filterDataByDate(
-        transaksiData, 
-        uiState.dashboardDateFilter, 
-        uiState.dashboardStartDate, 
-        uiState.dashboardEndDate,
-        uiState.dashboardStartMonth,
-        uiState.dashboardStartYear,
-        uiState.dashboardEndMonth,
-        uiState.dashboardEndYear
-    );
-
-    const filteredRetur = filterDataByDate(
-        state.retur, 
-        uiState.dashboardDateFilter, 
-        uiState.dashboardStartDate, 
-        uiState.dashboardEndDate,
-        uiState.dashboardStartMonth,
-        uiState.dashboardStartYear,
-        uiState.dashboardEndMonth,
-        uiState.dashboardEndYear
-    );
+    const filteredKeuangan = filterDataByDate(keuanganData, ...filterOptions);
+    const filteredTransaksi = filterDataByDate(transaksiData, ...filterOptions);
+    const filteredRetur = filterDataByDate(returData, ...filterOptions);
 
     return {
         transaksi: filteredTransaksi,
@@ -2699,7 +2688,7 @@ const filteredInvestorPayments = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    // 1. Definisikan totals untuk data yang dihitung langsung dari data live
+    // 1. Inisialisasi Totals
     const totals = {
         omsetKotor: 0,
         totalDiskon: 0,
@@ -2710,38 +2699,33 @@ const dashboardKpis = computed(() => {
     };
 
     const filter = uiState.dashboardDateFilter;
-    // Tentukan apakah kita harus menggunakan data Ringkasan (Cloud Functions)
-    const useSummary = !['today', 'last_7_days'].includes(filter) && state.summaryData?.allTimeTotals;
+    const isLongTermFilter = ['by_month_range', 'this_year', 'all_time', 'by_year_range'].includes(filter);
 
-    if (useSummary) {
-        // --- LOGIKA MENGGUNAKAN DATA RINGKASAN (LEBIH CEPAT) ---
-        const processSummary = (summaryObject) => {
+    if (isLongTermFilter) {
+        // --- LOGIKA DARI REKAPITULASI (CLOUDFUNCTIONS) ---
+        const getSummaryForFilter = (summaryObject) => {
             if (!summaryObject) return;
-            totals.omsetKotor += summaryObject.omsetKotor || 0;
-            totals.totalDiskon += summaryObject.totalDiskon || 0;
-            totals.hppTerjual += summaryObject.hppTerjual || 0;
-            totals.biayaTransaksi += summaryObject.biayaTransaksi || 0;
-            totals.biayaOperasional += summaryObject.biayaOperasional || 0;
-            totals.nilaiRetur += summaryObject.nilaiRetur || 0;
+            totals.omsetKotor = (summaryObject.omsetKotor || 0);
+            totals.totalDiskon = (summaryObject.totalDiskon || 0);
+            totals.hppTerjual = (summaryObject.hppTerjual || 0);
+            totals.biayaTransaksi = (summaryObject.biayaTransaksi || 0);
+            totals.biayaOperasional = (summaryObject.biayaOperasional || 0);
+            totals.nilaiRetur = (summaryObject.nilaiRetur || 0);
         };
         
         if (filter === 'by_month_range') {
             const year = uiState.dashboardStartYear;
-            // Gunakan hanya bulan pertama dari rentang, asumsi ini adalah data per bulan
-            const month = uiState.dashboardStartMonth.toString().padStart(2, "0"); 
-            const summary = state.summaryData?.[`summary_${year}`]?.months?.[month];
-            processSummary(summary);
+            const month = uiState.dashboardStartMonth.toString().padStart(2, "0");
+            getSummaryForFilter(state.summaryData?.[`summary_${year}`]?.months?.[month]);
         } else if (filter === 'this_year') {
             const year = new Date().getFullYear();
-            const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
-            processSummary(summary);
+            getSummaryForFilter(state.summaryData?.[`summary_${year}`]?.yearlyTotals);
         } else if (filter === 'all_time' || filter === 'by_year_range') {
-            // Gunakan allTimeTotals untuk semua data historis dan total
-            processSummary(state.summaryData.allTimeTotals); 
+            getSummaryForFilter(state.summaryData?.allTimeTotals); 
         }
 
     } else {
-        // --- LOGIKA MENGGUNAKAN DATA LIVE (Hanya untuk Hari Ini & 7 Hari Terakhir) ---
+        // --- LOGIKA DARI DATA LIVE (REAL-TIME FILTERING) ---
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
         
         totals.omsetKotor = transaksi.reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
@@ -2749,13 +2733,14 @@ const dashboardKpis = computed(() => {
         totals.hppTerjual = transaksi.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
         totals.biayaTransaksi = transaksi.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
         
-        // Logika Biaya Operasional: Memfilter jenis 'pengeluaran' DAN 'biaya' dari koleksi keuangan
-        totals.biayaOperasional = keuangan.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + i.jumlah, 0); 
+        // Memastikan jenis pengeluaran lain dihitung untuk Biaya Operasional
+        totals.biayaOperasional = keuangan.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
         
+        // Memastikan nilai retur dari data live dihitung.
         totals.nilaiRetur = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
     }
 
-    // --- KALKULASI FINAL (SELALU BERLAKU) ---
+    // --- KALKULASI FINAL (SELALU DILAKUKAN) ---
     const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
     const labaKotor = omsetBersih - totals.hppTerjual;
     const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
@@ -2765,6 +2750,7 @@ const dashboardKpis = computed(() => {
     const saldoKas = (totalsAllTime.totalInflow || 0) - (totalsAllTime.totalOutflow || 0);
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
+
 
     return {
         saldoKas,
