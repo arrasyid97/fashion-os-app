@@ -5120,7 +5120,7 @@ async function submitBiaya() {
     
     isLoading.value = true;
     try {
-        await addDoc(collection(db, "keuangan"), { // docRef tidak lagi dibutuhkan
+        await addDoc(collection(db, "keuangan"), { 
             kategori: form.kategori,
             jumlah: totalPengeluaran,
             catatan: catatanLengkap,
@@ -5163,7 +5163,7 @@ async function submitPemasukan() {
     if (!currentUser.value) return alert("Anda harus login untuk mengelola pemasukan.");
     isLoading.value = true;
     try {
-        await addDoc(collection(db, "keuangan"), { // docRef tidak lagi dibutuhkan
+        await addDoc(collection(db, "keuangan"), {
             kategori: uiState.modalData.kategori,
             jumlah: uiState.modalData.jumlah,
             catatan: uiState.modalData.catatan,
@@ -5172,7 +5172,7 @@ async function submitPemasukan() {
             tanggal: new Date(uiState.modalData.tanggal)
         });
 
-        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
+        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
         await fetchKeuanganData(); 
 
         hideModal();
