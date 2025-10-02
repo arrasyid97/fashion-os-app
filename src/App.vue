@@ -2741,13 +2741,17 @@ const dashboardKpis = computed(() => {
     }
 
     // --- KALKULASI FINAL (SELALU DILAKUKAN) ---
+    // Logika ini menggunakan 'totals' yang sudah terisi, baik dari Summary (long-term) maupun Live (short-term)
     const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
     const labaKotor = omsetBersih - totals.hppTerjual;
     const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
 
-    // Data Statis/Global (Stok dan Saldo Kas) selalu diambil dari summary
+    // Data Statis/Global (Stok dan Saldo Kas) selalu diambil dari allTimeTotals
     const totalsAllTime = state.summaryData?.allTimeTotals || {};
-    const saldoKas = (totalsAllTime.totalInflow || 0) - (totalsAllTime.totalOutflow || 0);
+    // Saldo Kas dihitung dari Inflow vs Outflow ALL TIME
+    const saldoKas = (totalsAllTime.totalInflow || 0) - (totalsAllTime.totalOutflow || 0); 
+    
+    // Perhitungan Stok tetap diambil dari state.produk (di-update oleh Cloud Function)
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
@@ -6678,34 +6682,27 @@ const fetchInvestorsAndBanksData = async (userId) => {
 const fetchKeuanganData = async () => {
     if (!currentUser.value) return;
     const userId = currentUser.value.uid;
-
-    // Ambil data PENGELUARAN berdasarkan filter
-    let pengeluaranQuery = query(
+    
+    // Asumsi: Kita hanya butuh data keuangan yang relevan untuk dashboard
+    const q = query(
         collection(db, "keuangan"),
         where("userId", "==", userId),
-        where("jenis", "==", "pengeluaran")
+        orderBy("tanggal", "desc") // Mengurutkan agar filter tanggal lebih mudah
     );
-    // (Tambahkan logika filter tanggal untuk pengeluaran di sini jika diperlukan)
-    // ...
-
-    // Ambil data PEMASUKAN berdasarkan filter
-    let pemasukanQuery = query(
-        collection(db, "keuangan"),
-        where("userId", "==", userId),
-        where("jenis", "==", "pemasukan_lain")
-    );
-    // (Tambahkan logika filter tanggal untuk pemasukan di sini jika diperlukan)
-    // ...
 
     try {
-        const [pengeluaranSnap, pemasukanSnap] = await Promise.all([
-            getDocs(pengeluaranQuery),
-            getDocs(pemasukanQuery)
-        ]);
-        state.keuangan = [
-            ...pengeluaranSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() })),
-            ...pemasukanSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() }))
-        ];
+        const keuanganSnap = await getDocs(q);
+        
+        // Pastikan konversi ke Date object dilakukan di sini
+        state.keuangan = keuanganSnap.docs.map(doc => {
+            const data = doc.data();
+            return { 
+                id: doc.id, 
+                ...data, 
+                tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : data.tanggal 
+            };
+        });
+        
         dataFetched.finance = true;
     } catch (error) {
         console.error("Error fetching finance data:", error);
