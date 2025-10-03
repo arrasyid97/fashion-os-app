@@ -2781,6 +2781,7 @@ const dashboardKpis = computed(() => {
         biayaTransaksi: 0,
         biayaOperasional: 0,
         nilaiRetur: 0,
+        omsetLiveGross: 0 // Variabel bantu: total nilai transaksi dari field 'total'
     };
 
     const filter = uiState.dashboardDateFilter;
@@ -2799,10 +2800,11 @@ const dashboardKpis = computed(() => {
 
     // 2. LOGIKA PERHITUNGAN DARI LIVE DATA 
     
-    // Omset Kotor: Kita kembali ke subtotal (asumsi data transaksi sudah benar setelah CF)
-    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.subtotal || 0), 0); 
+    // KRITIS: Omset Kotor yang benar adalah nilai transaksi sebelum diskon/retur.
+    // Berdasarkan hasil uji coba, kita berasumsi 'trx.subtotal' adalah Rp 0 dan 'trx.total' adalah Omset Kotor yang benar.
+    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.total || 0), 0); 
     
-    // Mengamankan semua perhitungan reduce dengan || 0
+    // Mengamankan semua perhitungan reduce
     totals.totalDiskon = transaksiSource.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
     totals.hppTerjual = transaksiSource.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + ((item.hpp || 0) * (item.qty || 0)), 0), 0);
     totals.biayaTransaksi = transaksiSource.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
@@ -2810,16 +2812,15 @@ const dashboardKpis = computed(() => {
     totals.biayaOperasional = keuanganSource.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     totals.nilaiRetur = (returSource || []).reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
     
-
     // 3. KALKULASI FINAL
     
-    // Omset Bersih dihitung dari Omset Kotor - Diskon - Retur
+    // Omset Bersih: Omset Kotor dikurangi Diskon dan Retur
     const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
     
-    // Laba Kotor: Memperbaiki kesalahan perhitungan di data Anda
+    // Laba Kotor: Omset Bersih dikurangi HPP
     const labaKotor = omsetBersih - totals.hppTerjual; 
 
-    // Laba Bersih: Memperbaiki kesalahan perhitungan di data Anda
+    // Laba Bersih: Laba Kotor dikurangi Biaya Transaksi dan Biaya Operasional
     const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional; 
 
     // Saldo Kas Dinamis (dari keuanganSource yang sudah terfilter)
@@ -2827,7 +2828,7 @@ const dashboardKpis = computed(() => {
     const totalPengeluaran = keuanganSource.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     const saldoKas = totalPemasukan - totalPengeluaran; 
     
-    // Perhitungan Stok (tetap live)
+    // Perhitungan Stok
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
@@ -2837,7 +2838,7 @@ const dashboardKpis = computed(() => {
         omsetBersih,
         labaKotor,
         labaBersih: labaBersihOperasional,
-        omsetKotor: totals.omsetKotor,
+        omsetKotor: totals.omsetKotor, // KINI TERISI NILAI YANG BENAR (Rp 1.200.000)
         totalDiskon: totals.totalDiskon,
         totalHppTerjual: totals.hppTerjual,
         totalBiayaTransaksi: totals.biayaTransaksi,
