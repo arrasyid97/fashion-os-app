@@ -2773,6 +2773,7 @@ const investorLedger = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
+    // 1. Inisialisasi Total Metrik
     const totals = {
         omsetKotor: 0,
         totalDiskon: 0,
@@ -2783,44 +2784,38 @@ const dashboardKpis = computed(() => {
     };
 
     const filter = uiState.dashboardDateFilter;
-    // Filter Jangka Pendek: today, last_7_days, last_30_days, by_date_range
-    const isShortTermFilter = ['today', 'last_7_days', 'last_30_days', 'by_date_range'].includes(filter);
+    
+    // Tentukan data yang akan difilter (Live Data untuk semua filter, menggunakan Filter Tanggal jika bukan 'all_time')
+    let transaksiSource = state.transaksi || [];
+    let keuanganSource = state.keuangan || [];
+    let returSource = state.retur || [];
 
-    if (isShortTermFilter) {
-        // --- LOGIKA DARI DATA LIVE (WAJIB UNTUK FILTER JANGKA PENDEK) ---
+    if (filter !== 'all_time') {
+        // Jika bukan ALL TIME, gunakan data yang sudah difilter oleh dashboardFilteredData
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
-        
-        totals.omsetKotor = transaksi.reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
-        totals.totalDiskon = transaksi.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
-        totals.hppTerjual = transaksi.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + ((item.hpp || 0) * (item.qty || 0)), 0), 0);
-        totals.biayaTransaksi = transaksi.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-        totals.biayaOperasional = keuangan.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-        totals.nilaiRetur = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
+        transaksiSource = transaksi;
+        keuanganSource = keuangan;
+        returSource = retur;
+    } 
+    // Catatan: Jika filter='all_time', kita menggunakan data state.transaksi/keuangan/retur RAW (all time)
 
-    } else {
-        // --- LOGIKA DARI REKAPITULASI (CLOUDFUNCTIONS) ---
-        // Digunakan untuk filter Jangka Panjang (this_year, all_time, by_month/year_range)
-        const getSummaryForFilter = (summaryObject) => {
-            if (!summaryObject) return;
-            totals.omsetKotor = (summaryObject.omsetKotor || 0);
-            totals.totalDiskon = (summaryObject.totalDiskon || 0);
-            totals.hppTerjual = (summaryObject.hppTerjual || 0);
-            totals.biayaTransaksi = (summaryObject.biayaTransaksi || 0);
-            totals.biayaOperasional = (summaryObject.biayaOperasional || 0);
-            totals.nilaiRetur = (summaryObject.nilaiRetur || 0);
-        };
-        
-        if (filter === 'this_year') {
-            const year = new Date().getFullYear();
-            getSummaryForFilter(state.summaryData?.[`summary_${year}`]?.yearlyTotals);
-        } else if (filter === 'all_time' || filter === 'by_month_range' || filter === 'by_year_range') {
-            getSummaryForFilter(state.summaryData?.allTimeTotals); 
-        }
-    }
+    // 2. LOGIKA PERHITUNGAN DARI LIVE DATA (SANGAT ROBUST)
+    
+    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
+    totals.totalDiskon = transaksiSource.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
+    totals.hppTerjual = transaksiSource.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + ((item.hpp || 0) * (item.qty || 0)), 0), 0);
+    totals.biayaTransaksi = transaksiSource.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
+    
+    totals.biayaOperasional = keuanganSource.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+    totals.nilaiRetur = (returSource || []).reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
+    
 
-    // --- PERBAIKAN KRITIS SALDO KAS (ALL TIME) ---
-    // Saldo Kas harus dihitung dari total seluruh Pemasukan - Pengeluaran (All Time)
-    // Ini memastikan SALDO KAS selalu terisi terlepas dari filter tanggal manapun.
+    // 3. KALKULASI FINAL
+    const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
+    const labaKotor = omsetBersih - totals.hppTerjual;
+    const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
+
+    // Saldo Kas (ALL TIME - dari data keuangan yang dimuat live)
     const pemasukanAllTime = (state.keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     const pengeluaranAllTime = (state.keuangan || []).filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     const saldoKas = pemasukanAllTime - pengeluaranAllTime; 
@@ -2828,10 +2823,6 @@ const dashboardKpis = computed(() => {
     // Perhitungan Stok (tetap live)
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
-
-    const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
-    const labaKotor = omsetBersih - totals.hppTerjual;
-    const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
 
 
     return {
