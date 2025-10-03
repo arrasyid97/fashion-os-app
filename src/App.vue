@@ -2808,7 +2808,7 @@ const investorLedger = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    // --- PERBAIKAN 1: Tambahkan 'by_year_range' ke dalam daftar ---
+    // --- PERBAIKAN: Tambahkan pengecekan 'by_year_range' ---
     const isLongTermFilter = ['by_month_range', 'this_year', 'all_time', 'by_year_range'].includes(uiState.dashboardDateFilter);
 
     let kpis = {
@@ -2817,8 +2817,9 @@ const dashboardKpis = computed(() => {
         totalBiayaOperasional: 0, totalNilaiRetur: 0
     };
 
-    if (isLongTermFilter && Object.keys(state.summaryData).length > 0) {
-        // --- LOGIKA UNTUK FILTER JANGKA PANJANG (CEPAT & HEMAT) ---
+    // --- PERBAIKAN: Pastikan state.summaryData tidak null sebelum diakses ---
+    if (isLongTermFilter && state.summaryData && Object.keys(state.summaryData).length > 0) {
+        // ... (seluruh isi blok 'if' ini biarkan sama persis seperti sebelumnya) ...
         const processSummary = (summary) => {
             if (!summary) return;
             kpis.omsetKotor += summary.omsetKotor || 0;
@@ -2842,7 +2843,6 @@ const dashboardKpis = computed(() => {
             const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
             processSummary(summary);
         } 
-        // --- PERBAIKAN 2: Tambahkan logika untuk 'by_year_range' ---
         else if (uiState.dashboardDateFilter === 'by_year_range') {
             for (let year = uiState.dashboardStartYear; year <= uiState.dashboardEndYear; year++) {
                 const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
@@ -2857,22 +2857,17 @@ const dashboardKpis = computed(() => {
             }
         }
         kpis.saldoKas = (kpis.omsetBersih) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
-
     } else {
-        // --- LOGIKA UNTUK FILTER JANGKA PENDEK (REAL-TIME & AKURAT) ---
-        // (Blok ini tidak perlu diubah, sudah benar)
+        // ... (seluruh isi blok 'else' ini biarkan sama persis seperti sebelumnya) ...
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
-        
         const omsetKotorAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
         const totalDiskonAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
         const totalHppTerjualAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
         const totalBiayaTransaksiAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-
         let totalNilaiReturGross = 0;
         let totalDiskonBatal = 0;
         let totalHppRetur = 0;
         let biayaMarketplaceBatal = 0;
-
         (retur || []).forEach(r => {
             (r.items || []).forEach(item => {
                 totalNilaiReturGross += (item.nilaiRetur || 0) + (item.nilaiDiskon || 0);
@@ -2884,10 +2879,8 @@ const dashboardKpis = computed(() => {
                 }
             });
         });
-
         kpis.totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
         const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-
         kpis.omsetKotor = omsetKotorAwal - totalNilaiReturGross;
         kpis.totalDiskon = totalDiskonAwal - totalDiskonBatal;
         kpis.totalHppTerjual = totalHppTerjualAwal - totalHppRetur;
