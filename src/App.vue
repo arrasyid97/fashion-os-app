@@ -1813,29 +1813,27 @@ async function processBatchOrders() {
         const newTransactions = [];
         for (const order of ordersToProcess) {
             const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
-            const discount = calculateBestDiscount(order.items, uiState.activeCartChannel);
-            const finalTotal = subtotal - discount.totalDiscount;
+            
+            const diskon = calculateBestDiscount(order.items, uiState.activeCartChannel);
+            const finalTotal = subtotal - diskon.totalDiscount;
+
             let totalBiaya = 0;
             const biayaList = [];
             let totalKomisiProduk = 0;
 
-for (const item of order.items) {
-    // Dapatkan Nama Model dari item yang terjual
-    const modelId = item.model_id; 
-    const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
-    
-    // Ambil tarif komisi dari state komisi per model
-    const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
+            for (const item of order.items) {
+                const modelId = item.model_id;
+                const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
+                const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
+                if (commissionRate > 0) {
+                    totalKomisiProduk += (commissionRate / 100) * (item.hargaJualAktual * item.qty);
+                }
+            }
 
-    if (commissionRate > 0) {
-        totalKomisiProduk += (commissionRate / 100) * (item.hargaJualAktual * item.qty);
-    }
-}
-
-if (totalKomisiProduk > 0) {
-    biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
-    totalBiaya += totalKomisiProduk;
-}
+            if (totalKomisiProduk > 0) {
+                biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
+                totalBiaya += totalKomisiProduk;
+            }
             
             if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
             if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
@@ -1846,7 +1844,11 @@ if (totalKomisiProduk > 0) {
                 marketplaceOrderId: order.marketplaceOrderId,
                 tanggal: new Date(),
                 items: order.items.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
-                subtotal, discount, total: finalTotal, channel: marketplace.name, channelId: uiState.activeCartChannel,
+                subtotal,
+                diskon,
+                total: finalTotal,
+                channel: marketplace.name,
+                channelId: uiState.activeCartChannel,
                 biaya: { rincian: biayaList, total: totalBiaya },
                 userId: currentUser.value.uid
             };
@@ -1867,7 +1869,6 @@ if (totalKomisiProduk > 0) {
         
         await batch.commit();
 
-        // Perbarui state lokal secara langsung
         state.transaksi.unshift(...newTransactions);
         ordersToProcess.forEach(order => {
             order.items.forEach(item => {
