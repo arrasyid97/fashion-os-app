@@ -402,35 +402,58 @@ const lastEditedModel = ref(null);
 const groupRefs = ref({});
 
 const riwayatPengeluaran = computed(() => {
-    // 1. Filter: Hanya Pengeluaran (pengeluaran atau biaya)
-    let filtered = state.keuangan.filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya');
+    // 1. Filter Awal: Hanya Pengeluaran (pengeluaran atau biaya)
+    const pengeluaranData = state.keuangan.filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya');
 
-    // KRITIS: Membuat DEEP COPY ([...filtered]) untuk memastikan Vue melacak perubahan array
-    return [...filtered].sort((a, b) => {
-        // Bandingkan berdasarkan tanggal, lalu ID untuk tie-breaker
+    // 2. Filter Waktu: Menerapkan filter tanggal yang dipilih
+    const filteredByDate = filterDataByDate(
+        pengeluaranData,
+        uiState.keuanganPengeluaranFilter,
+        uiState.keuanganPengeluaranStartDate,
+        uiState.keuanganPengeluaranEndDate,
+        uiState.keuanganPengeluaranStartMonth,
+        uiState.keuanganPengeluaranStartYear,
+        uiState.keuanganPengeluaranEndMonth,
+        uiState.keuanganPengeluaranEndYear
+    );
+
+    // 3. Sort Stabil: Tanggal ASC (Terbaru di Bawah)
+    return filteredByDate.sort((a, b) => {
         const dateA = new Date(a.tanggal).getTime();
         const dateB = new Date(b.tanggal).getTime();
         if (dateA !== dateB) {
-            return dateA - dateB; // ASCENDING: Terlama (A) dulu
+            return dateA - dateB; // ASCENDING
         }
-        // Tie-breaker menggunakan ID dokumen (string comparison Ascending)
         return a.id.localeCompare(b.id);
     });
 });
+// --- AKHIR PENGGANTIAN riwayatPengeluaran ---
+
 
 // --- GANTI SELURUH COMPUTED PROPERTY riwayatPemasukan DENGAN KODE INI ---
 const riwayatPemasukan = computed(() => {
-    // 1. Filter: Hanya Pemasukan
-    let filtered = state.keuangan.filter(k => k.jenis === 'pemasukan_lain');
+    // 1. Filter Awal: Hanya Pemasukan
+    const pemasukanData = state.keuangan.filter(k => k.jenis === 'pemasukan_lain');
 
-    // KRITIS: Membuat DEEP COPY ([...filtered]) untuk memastikan Vue melacak perubahan array
-    return [...filtered].sort((a, b) => {
+    // 2. Filter Waktu: Menerapkan filter tanggal yang dipilih
+    const filteredByDate = filterDataByDate(
+        pemasukanData,
+        uiState.keuanganPemasukanFilter,
+        uiState.keuanganPemasukanStartDate,
+        uiState.keuanganPemasukanEndDate,
+        uiState.keuanganPemasukanStartMonth,
+        uiState.keuanganPemasukanStartYear,
+        uiState.keuanganPemasukanEndMonth,
+        uiState.keuanganPemasukanEndYear
+    );
+
+    // 3. Sort Stabil: Tanggal ASC (Terbaru di Bawah)
+    return filteredByDate.sort((a, b) => {
         const dateA = new Date(a.tanggal).getTime();
         const dateB = new Date(b.tanggal).getTime();
         if (dateA !== dateB) {
-            return dateA - dateB; // ASCENDING: Terlama (A) dulu
+            return dateA - dateB; // ASCENDING
         }
-        // Tie-breaker menggunakan ID dokumen
         return a.id.localeCompare(b.id);
     });
 });
