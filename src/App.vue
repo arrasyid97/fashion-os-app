@@ -2694,31 +2694,83 @@ const dashboardFilteredData = computed(() => {
 });
 
 const filteredInvestorPayments = computed(() => {
+    // Ambil data pembayaran dan pastikan array tidak null
     const payments = state.investorPayments || [];
 
-    // Gunakan fungsi filterDataByDate untuk menyaring data berdasarkan tanggal
+    // Map data untuk membuat properti 'tanggal' yang aman sebelum filtering
+    const paymentsForFilter = payments.map(p => {
+        // Jika p.paymentDate null, gunakan Date(0) (tanggal awal) sebagai fallback yang aman
+        const safeDate = p.paymentDate || new Date(0); 
+        return { 
+            ...p, 
+            tanggal: safeDate 
+        };
+    });
+    
+    // 1. Terapkan filter tanggal (Filter Waktu)
     let filteredData = filterDataByDate(
-        payments.map(p => ({ ...p, tanggal: p.paymentDate })),
+        paymentsForFilter,
         uiState.investorPaymentFilter,
-        null,
-        null,
+        uiState.investorPaymentStartDate,
+        uiState.investorPaymentEndDate,
         uiState.investorPaymentStartMonth,
         uiState.investorPaymentStartYear,
         uiState.investorPaymentEndMonth,
         uiState.investorPaymentEndYear
     );
 
-    // Filter berdasarkan pencarian jika ada
+    // 2. Filter berdasarkan pencarian (diperkuat dengan guards)
     const searchQuery = uiState.investorPaymentSearch.toLowerCase();
     if (searchQuery) {
         filteredData = filteredData.filter(p => 
-            p.investorName.toLowerCase().includes(searchQuery) ||
-            p.period.toLowerCase().includes(searchQuery) ||
-            p.paymentMethod.toLowerCase().includes(searchQuery)
+            // Pastikan kita tidak memanggil toLowerCase() pada null
+            (p.investorName || '').toLowerCase().includes(searchQuery) ||
+            (p.period || '').toLowerCase().includes(searchQuery) ||
+            (p.paymentMethod || '').toLowerCase().includes(searchQuery) ||
+            (p.bankDetails?.bankName || '').toLowerCase().includes(searchQuery)
         );
     }
     
-    return filteredData.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+    // 3. Sort: Terbaru lebih dulu (Desc)
+    return filteredData.sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+});
+
+const investorLedger = computed(() => {
+    // 1. Hitung total pembayaran per investor
+    const paymentsByInvestor = (state.investorPayments || []).reduce((acc, p) => {
+        const invId = p.investorId;
+        if (!acc[invId]) {
+            acc[invId] = { totalPayout: 0 };
+        }
+        // Pastikan totalPayment ada
+        acc[invId].totalPayout += (p.totalPayment || 0); 
+        return acc;
+    }, {});
+
+    // 2. Gabungkan dengan data investor dan hitung ROI
+    return (state.investor || []).map(inv => {
+        const totalPayout = paymentsByInvestor[inv.id]?.totalPayout || 0;
+        const modal = inv.amount || 0;
+        
+        let roi = 0;
+        if (modal > 0) {
+            // ROI = (Total Dibayarkan / Modal) * 100
+            roi = (totalPayout / modal) * 100;
+        }
+
+        return {
+            ...inv,
+            totalPayout: totalPayout,
+            roi: roi,
+            // Menggunakan Date.getTime() untuk memastikan nilai numerik yang dapat diurutkan
+            startDate: inv.startDate instanceof Date ? inv.startDate.getTime() : new Date(inv.startDate).getTime()
+        };
+    }).filter(inv => {
+        // Filter status
+        if (uiState.investorStatusFilter === 'aktif') return inv.status === 'aktif';
+        if (uiState.investorStatusFilter === 'selesai') return inv.status === 'selesai';
+        return true; // 'semua'
+    });
 });
 
 // GANTI SELURUH COMPUTED PROPERTY INI
