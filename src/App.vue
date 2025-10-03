@@ -2787,41 +2787,46 @@ const investorLedger = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    // Ambil data yang sudah difilter berdasarkan pilihan waktu di dashboard
     const { transaksi, keuangan, retur } = dashboardFilteredData.value;
 
-    // 1. Kalkulasi dari data Penjualan Sukses
-    const omsetKotor = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
-    const totalDiskon = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
-    const totalHppTerjualAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
-    const biayaTransaksiPenjualan = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
+    // 1. Kalkulasi dari data Penjualan Awal (sebelum disesuaikan)
+    let omsetKotorAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
+    let totalDiskonAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
+    let totalHppTerjualAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
+    let totalBiayaTransaksiAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
 
     // 2. Kalkulasi dari data Retur
-    const totalNilaiReturNet = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((itemSum, item) => itemSum + (item.nilaiRetur || 0), 0), 0);
-    const biayaMarketplaceBatal = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((itemSum, item) => itemSum + (item.biayaMarketplace || 0), 0), 0);
-    const totalNilaiReturGross = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((itemSum, item) => itemSum + (item.nilaiRetur || 0) + (item.nilaiDiskon || 0), 0), 0);
-    
-    // --- PERBAIKAN UTAMA DI SINI ---
-    // Hitung total HPP dari barang yang dikembalikan
-    const totalHppRetur = (retur || []).reduce((sum, r) => {
-        const hppPerRetur = (r.items || []).reduce((itemSum, item) => {
+    let totalNilaiReturGross = 0;
+    let totalDiskonBatal = 0;
+    let totalHppRetur = 0;
+    let biayaMarketplaceBatal = 0;
+
+    (retur || []).forEach(r => {
+        (r.items || []).forEach(item => {
+            totalNilaiReturGross += (item.nilaiRetur || 0) + (item.nilaiDiskon || 0);
+            totalDiskonBatal += (item.nilaiDiskon || 0);
+            biayaMarketplaceBatal += (item.biayaMarketplace || 0);
+
             const product = getProductBySku(item.sku);
             if (product) {
-                return itemSum + (product.hpp || 0) * (item.qty || 0);
+                totalHppRetur += (product.hpp || 0) * (item.qty || 0);
             }
-            return itemSum;
-        }, 0);
-        return sum + hppPerRetur;
-    }, 0);
+        });
+    });
 
+    // --- PERBAIKAN UTAMA DI SINI ---
+    // Sesuaikan semua metrik penjualan dengan data retur
+    const omsetKotor = omsetKotorAwal - totalNilaiReturGross;
+    const totalDiskon = totalDiskonAwal - totalDiskonBatal;
+    const totalHppTerjual = totalHppTerjualAwal - totalHppRetur;
+    const totalBiayaTransaksi = totalBiayaTransaksiAwal - biayaMarketplaceBatal;
+    
     // 3. Kalkulasi dari data Keuangan (Operasional)
     const totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
 
-    // 4. Kalkulasi Metrik Gabungan Final (dengan semua penyesuaian)
-    const totalHppTerjual = totalHppTerjualAwal - totalHppRetur; // HPP disesuaikan dengan retur
-    const totalBiayaTransaksi = biayaTransaksiPenjualan - biayaMarketplaceBatal;
-    const omsetBersih = omsetKotor - totalDiskon - totalNilaiReturNet;
+    // 4. Kalkulasi Metrik Gabungan Final
+    const omsetBersih = omsetKotor - totalDiskon;
     const labaKotor = omsetBersih - totalHppTerjual;
     const labaBersih = labaKotor - totalBiayaTransaksi - totalBiayaOperasional;
     const saldoKas = (omsetBersih + pemasukanLain) - (totalBiayaTransaksi + totalBiayaOperasional);
@@ -2840,7 +2845,7 @@ const dashboardKpis = computed(() => {
         totalHppTerjual,
         totalBiayaTransaksi,
         totalBiayaOperasional,
-        totalNilaiRetur: totalNilaiReturGross,
+        totalNilaiRetur: totalNilaiReturGross, // Tetap tampilkan nilai retur kotor sebagai informasi
         totalUnitStok,
         totalNilaiStokHPP,
     };
