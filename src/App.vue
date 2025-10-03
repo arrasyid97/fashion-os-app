@@ -347,53 +347,67 @@ const dataFetched = reactive({
 });
 
 const loadDataForPage = async (pageName) => {
-  if (!currentUser.value) return; // Pengaman utama: Jangan lakukan apa-apa jika user belum termuat
-  const userId = currentUser.value.uid;
+    if (!currentUser.value) return;
+    const userId = currentUser.value.uid;
 
-  // Logika Lazy Loading yang sudah ada, sekarang di dalam fungsi ini
-  switch(pageName) {
-    case 'dashboard':
-        await fetchSummaryData(userId);
-        await fetchTransactionAndReturnData(userId, false, true); 
-        await fetchKeuanganData(); 
-        nextTick(renderCharts);
-        break;
-    case 'transaksi':
-    case 'bulk_process':
-    await fetchProductData(userId);
-    await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
-    await fetchNotesData(userId);
-    break;
-    case 'inventaris':
-    case 'harga-hpp':
-      await fetchProductData(userId);
-      break;
-    case 'promosi':
-        await fetchProductData(userId);
-        await fetchNotesData(userId);
-        break;
-    case 'produksi':
-      await fetchProductData(userId);
-      await fetchProductionData(userId);
-      break;
-    case 'gudang-kain':
-      await fetchProductionData(userId);
-      break;
-    case 'keuangan':
-    await fetchKeuanganData();
-    break;
-    case 'investasi':
-    await fetchInvestorsAndBanksData(userId);
-    break;
-    case 'supplier':
-        await fetchProductData(userId);
-        await fetchSupplierData(userId);
-        break;
-    case 'retur':
-      await fetchTransactionAndReturnData(userId); // <-- Menggunakan fungsi baru
-      await fetchProductData(userId);
-      break;
-  }
+    try {
+        const dataPromises = [];
+
+        switch(pageName) {
+            case 'dashboard':
+                dataPromises.push(fetchSummaryData(userId));
+                dataPromises.push(fetchProductData(userId));
+                dataPromises.push(fetchTransactionAndReturnData(userId));
+                dataPromises.push(fetchKeuanganData());
+                break;
+            case 'transaksi':
+            case 'bulk_process':
+                dataPromises.push(fetchProductData(userId));
+                dataPromises.push(fetchTransactionAndReturnData(userId));
+                dataPromises.push(fetchNotesData(userId));
+                break;
+            case 'inventaris':
+            case 'harga-hpp':
+                dataPromises.push(fetchProductData(userId));
+                break;
+            case 'promosi':
+                dataPromises.push(fetchProductData(userId));
+                dataPromises.push(fetchNotesData(userId));
+                break;
+            case 'produksi':
+                dataPromises.push(fetchProductData(userId));
+                dataPromises.push(fetchProductionData(userId));
+                break;
+            case 'gudang-kain':
+                dataPromises.push(fetchProductionData(userId));
+                break;
+            case 'keuangan':
+                dataPromises.push(fetchKeuanganData());
+                break;
+            case 'investasi':
+                dataPromises.push(fetchInvestorsAndBanksData(userId));
+                break;
+            case 'supplier':
+                dataPromises.push(fetchProductData(userId));
+                dataPromises.push(fetchSupplierData(userId));
+                break;
+            case 'retur':
+                dataPromises.push(fetchTransactionAndReturnData(userId));
+                dataPromises.push(fetchProductData(userId));
+                break;
+        }
+
+        if (dataPromises.length > 0) {
+            await Promise.all(dataPromises);
+        }
+
+        if (pageName === 'dashboard') {
+            nextTick(renderCharts);
+        }
+
+    } catch (error) {
+        console.error(`Failed to load data for page ${pageName}:`, error);
+    }
 };
 
 const lastEditedModel = ref(null);
