@@ -2773,7 +2773,7 @@ const investorLedger = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    // 1. Inisialisasi Total Metrik
+    // Objek untuk menampung hasil akhir
     const totals = {
         omsetKotor: 0,
         totalDiskon: 0,
@@ -2784,49 +2784,61 @@ const dashboardKpis = computed(() => {
     };
 
     const filter = uiState.dashboardDateFilter;
-    
-    // Tentukan data yang akan difilter (Live Data untuk semua filter, menggunakan Filter Tanggal jika bukan 'all_time')
-    let transaksiSource = state.transaksi || [];
-    let keuanganSource = state.keuangan || [];
-    let returSource = state.retur || [];
+    const isLongTermFilter = ['by_month_range', 'this_year', 'all_time'].includes(filter);
 
-    if (filter !== 'all_time') {
-        // Jika bukan ALL TIME, gunakan data yang sudah difilter oleh dashboardFilteredData
+    if (isLongTermFilter && Object.keys(state.summaryData).length > 0) {
+        // Logika untuk filter jangka panjang (menggunakan summaryData dari Cloud Function)
+        const processSummary = (summaryObject) => {
+            if (!summaryObject) return;
+            totals.omsetKotor += summaryObject.omsetKotor || 0;
+            totals.totalDiskon += summaryObject.totalDiskon || 0;
+            totals.hppTerjual += summaryObject.hppTerjual || 0;
+            totals.biayaTransaksi += summaryObject.biayaTransaksi || 0;
+            totals.biayaOperasional += summaryObject.biayaOperasional || 0;
+            totals.nilaiRetur += summaryObject.nilaiRetur || 0;
+        };
+        
+        if (filter === 'by_month_range') {
+            const year = uiState.dashboardStartYear;
+            const month = uiState.dashboardStartMonth.toString().padStart(2, "0");
+            const summary = state.summaryData?.[`summary_${year}`]?.months?.[month];
+            processSummary(summary);
+        } else if (filter === 'this_year') {
+            const year = new Date().getFullYear();
+            const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
+            processSummary(summary);
+        } else if (filter === 'all_time') {
+            for (const key in state.summaryData) {
+                if (key.startsWith('summary_')) {
+                    processSummary(state.summaryData[key].yearlyTotals);
+                }
+            }
+        }
+    } else {
+        // Logika untuk filter jangka pendek (menggunakan data real-time dari state)
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
-        transaksiSource = transaksi;
-        keuanganSource = keuangan;
-        returSource = retur;
-    } 
-    // Catatan: Jika filter='all_time', kita menggunakan data state.transaksi/keuangan/retur RAW (all time)
+        
+        totals.omsetKotor = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0); // Menggunakan trx.subtotal
+        totals.totalDiskon = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
+        totals.hppTerjual = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
+        totals.biayaTransaksi = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
+        totals.biayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + i.jumlah, 0);
+        totals.nilaiRetur = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
+    }
 
-    // 2. LOGIKA PERHITUNGAN DARI LIVE DATA (SANGAT ROBUST)
-    
-    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.totalAmount || 0), 0);
-    totals.totalDiskon = transaksiSource.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
-    totals.hppTerjual = transaksiSource.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + ((item.hpp || 0) * (item.qty || 0)), 0), 0);
-    totals.biayaTransaksi = transaksiSource.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-    
-    totals.biayaOperasional = keuanganSource.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-    totals.nilaiRetur = (returSource || []).reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
-    
-
-    // 3. KALKULASI FINAL
+    // KALKULASI FINAL (berlaku untuk semua filter)
     const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
     const labaKotor = omsetBersih - totals.hppTerjual;
     const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
 
-    // Saldo Kas (ALL TIME - dari data keuangan yang dimuat live)
-    let saldoKasSource = keuanganSource; // Gunakan sumber yang sudah difilter/dipilih di awal computed
-    
-    const totalPemasukan = saldoKasSource.filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-    const totalPengeluaran = saldoKasSource.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-    
-    const saldoKas = totalPemasukan - totalPengeluaran; 
-    
-    // Perhitungan Stok (tetap live)
+    // KALKULASI TERPISAH (selalu real-time)
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
-
+    let saldoKas = 0;
+    if(state.summaryData && state.summaryData.allTimeTotals) {
+        const totalsAllTime = state.summaryData.allTimeTotals;
+        saldoKas = (totalsAllTime.totalInflow || 0) - (totalsAllTime.totalOutflow || 0);
+    }
 
     return {
         saldoKas,
@@ -2834,10 +2846,10 @@ const dashboardKpis = computed(() => {
         labaKotor,
         labaBersih: labaBersihOperasional,
         omsetKotor: totals.omsetKotor,
-        totalDiskon: totals.totalDiskon,
+        diskon: totals.totalDiskon, // Diubah dari totalDiskon
         totalHppTerjual: totals.hppTerjual,
-        totalBiayaTransaksi: totals.biayaTransaksi,
-        totalBiayaOperasional: totals.biayaOperasional,
+        biayaTransaksi: totals.biayaTransaksi, // Diubah dari totalBiayaTransaksi
+        biayaOperasional: totals.biayaOperasional, // Diubah dari totalBiayaOperasional
         totalNilaiRetur: totals.nilaiRetur,
         totalUnitStok,
         totalNilaiStokHPP,
@@ -7185,17 +7197,17 @@ watch(activePage, (newPage) => {
                     <button @click="showModal('kpiHelp', kpiExplanations['laba-bersih-operasional'])" class="help-icon-button">?</button>
                 </div>
                 <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 500ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
-                           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Omset Kotor</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.totalOmsetKotor) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['omset-kotor'])" class="help-icon-button">?</button>
-                </div>
+    <div class="flex items-start gap-4">
+        <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
+           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+            <h3 class="text-sm font-medium text-slate-500">Omset Kotor</h3>
+            <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.omsetKotor) }}</p>
+        </div>
+    </div>
+    <button @click="showModal('kpiHelp', kpiExplanations['omset-kotor'])" class="help-icon-button">?</button>
+</div>
                 <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 600ms;">
                     <div class="flex items-start gap-4">
                         <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
