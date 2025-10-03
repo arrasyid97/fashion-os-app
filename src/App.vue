@@ -2781,28 +2781,32 @@ const dashboardKpis = computed(() => {
     const totalDiskon = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
     const totalHppTerjual = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
     const biayaTransaksi = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-    const totalNilaiRetur = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
+    // --- PERBAIKAN DI SINI ---
+    const totalNilaiRetur = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((itemSum, item) => itemSum + (item.nilaiRetur || 0), 0), 0);
 
     // 2. Kalkulasi dari data Keuangan
     const biayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+    // --- PERBAIKAN DI SINI ---
     const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
 
     // 3. Kalkulasi Metrik Gabungan
     const omsetBersih = omsetKotor - totalDiskon - totalNilaiRetur;
     const labaKotor = omsetBersih - totalHppTerjual;
     const labaBersih = labaKotor - biayaTransaksi - biayaOperasional;
-    const saldoKas = pemasukanLain - biayaOperasional;
+    
+    // Ini adalah Arus Kas untuk PERIODE TERPILIH, bukan saldo total.
+    const saldoKasPeriodeIni = (omsetBersih + pemasukanLain) - (biayaTransaksi + biayaOperasional);
 
     // 4. Kalkulasi Data Stok (selalu real-time dari data inventaris lengkap)
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
     return {
-        saldoKas,
+        saldoKas: saldoKasPeriodeIni,
         omsetBersih,
         labaKotor,
-        labaBersih, // Menggunakan nama yang lebih singkat
-        omsetKotor, // Menggunakan nama yang konsisten
+        labaBersih,
+        omsetKotor,
         totalDiskon,
         totalHppTerjual,
         biayaTransaksi,
