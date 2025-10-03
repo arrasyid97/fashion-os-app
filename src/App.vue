@@ -2800,7 +2800,7 @@ const dashboardKpis = computed(() => {
     // 2. LOGIKA PERHITUNGAN DARI LIVE DATA (SANGAT ROBUST)
     
     // ASUMSI: Omset Kotor adalah field 'subtotal' di dokumen transaksi
-    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.subtotal || 0), 0); 
+    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.total || 0), 0); 
     
     totals.totalDiskon = transaksiSource.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
     totals.hppTerjual = transaksiSource.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + ((item.hpp || 0) * (item.qty || 0)), 0), 0);
