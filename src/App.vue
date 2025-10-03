@@ -2785,23 +2785,23 @@ const dashboardKpis = computed(() => {
 
     const filter = uiState.dashboardDateFilter;
     
-    // Tentukan data yang akan difilter (Live Data untuk semua filter, menggunakan Filter Tanggal jika bukan 'all_time')
+    // Tentukan sumber data (Live Data untuk semua filter)
     let transaksiSource = state.transaksi || [];
     let keuanganSource = state.keuangan || [];
     let returSource = state.retur || [];
 
     if (filter !== 'all_time') {
-        // Jika bukan ALL TIME, gunakan data yang sudah difilter oleh dashboardFilteredData
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
         transaksiSource = transaksi;
         keuanganSource = keuangan;
         returSource = retur;
     } 
-    // Catatan: Jika filter='all_time', kita menggunakan data state.transaksi/keuangan/retur RAW (all time)
 
     // 2. LOGIKA PERHITUNGAN DARI LIVE DATA (SANGAT ROBUST)
     
-    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.totalAmount || 0), 0);
+    // ASUMSI: Omset Kotor adalah field 'subtotal' di dokumen transaksi
+    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.subtotal || 0), 0); 
+    
     totals.totalDiskon = transaksiSource.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
     totals.hppTerjual = transaksiSource.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + ((item.hpp || 0) * (item.qty || 0)), 0), 0);
     totals.biayaTransaksi = transaksiSource.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
@@ -2811,16 +2811,14 @@ const dashboardKpis = computed(() => {
     
 
     // 3. KALKULASI FINAL
+    // Omset Bersih dihitung dari Omset Kotor - Diskon - Retur
     const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
     const labaKotor = omsetBersih - totals.hppTerjual;
     const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
 
-    // Saldo Kas (ALL TIME - dari data keuangan yang dimuat live)
-    let saldoKasSource = keuanganSource; // Gunakan sumber yang sudah difilter/dipilih di awal computed
-    
-    const totalPemasukan = saldoKasSource.filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-    const totalPengeluaran = saldoKasSource.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-    
+    // Saldo Kas Dinamis (dari keuanganSource yang sudah terfilter)
+    const totalPemasukan = keuanganSource.filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+    const totalPengeluaran = keuanganSource.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     const saldoKas = totalPemasukan - totalPengeluaran; 
     
     // Perhitungan Stok (tetap live)
