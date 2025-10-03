@@ -353,13 +353,11 @@ const loadDataForPage = async (pageName) => {
   // Logika Lazy Loading yang sudah ada, sekarang di dalam fungsi ini
   switch(pageName) {
     case 'dashboard':
-      // Memuat data rekap (summary) terlebih dahulu
-      await fetchSummaryData(userId); 
-      // **MEMUAT DATA LIVE** untuk kalkulasi harian (agar KPI Rp 0 teratasi)
-      await fetchTransactionAndReturnData(userId, false, true); // (Tambahkan fetch Keuangan di langkah 3)
-      await fetchKeuanganData(); // Memuat data keuangan untuk Saldo Kas & Biaya Operasional Live
-      nextTick(renderCharts);
-      break;
+        await fetchSummaryData(userId);
+        await fetchTransactionAndReturnData(userId, false, true); 
+        await fetchKeuanganData(); 
+        nextTick(renderCharts);
+        break;
     case 'transaksi':
     case 'bulk_process':
     await fetchProductData(userId);
