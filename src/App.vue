@@ -2801,7 +2801,7 @@ const dashboardKpis = computed(() => {
 
     // 2. LOGIKA PERHITUNGAN DARI LIVE DATA (SANGAT ROBUST)
     
-    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
+    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.totalAmount || 0), 0);
     totals.totalDiskon = transaksiSource.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
     totals.hppTerjual = transaksiSource.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + ((item.hpp || 0) * (item.qty || 0)), 0), 0);
     totals.biayaTransaksi = transaksiSource.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
@@ -2816,9 +2816,12 @@ const dashboardKpis = computed(() => {
     const labaBersihOperasional = labaKotor - totals.biayaTransaksi - totals.biayaOperasional;
 
     // Saldo Kas (ALL TIME - dari data keuangan yang dimuat live)
-    const pemasukanAllTime = (state.keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-    const pengeluaranAllTime = (state.keuangan || []).filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-    const saldoKas = pemasukanAllTime - pengeluaranAllTime; 
+    let saldoKasSource = keuanganSource; // Gunakan sumber yang sudah difilter/dipilih di awal computed
+    
+    const totalPemasukan = saldoKasSource.filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+    const totalPengeluaran = saldoKasSource.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+    
+    const saldoKas = totalPemasukan - totalPengeluaran; 
     
     // Perhitungan Stok (tetap live)
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
