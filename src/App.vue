@@ -2808,68 +2808,101 @@ const investorLedger = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    const { transaksi, keuangan, retur } = dashboardFilteredData.value;
+    // --- PERBAIKAN 1: Tambahkan 'by_year_range' ke dalam daftar ---
+    const isLongTermFilter = ['by_month_range', 'this_year', 'all_time', 'by_year_range'].includes(uiState.dashboardDateFilter);
 
-    // 1. Kalkulasi dari data Penjualan Awal (sebelum disesuaikan)
-    let omsetKotorAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
-    let totalDiskonAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
-    let totalHppTerjualAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
-    let totalBiayaTransaksiAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-
-    // 2. Kalkulasi dari data Retur
-    let totalNilaiReturGross = 0;
-    let totalDiskonBatal = 0;
-    let totalHppRetur = 0;
-    let biayaMarketplaceBatal = 0;
-
-    (retur || []).forEach(r => {
-        (r.items || []).forEach(item => {
-            totalNilaiReturGross += (item.nilaiRetur || 0) + (item.nilaiDiskon || 0);
-            totalDiskonBatal += (item.nilaiDiskon || 0);
-            biayaMarketplaceBatal += (item.biayaMarketplace || 0);
-
-            const product = getProductBySku(item.sku);
-            if (product) {
-                totalHppRetur += (product.hpp || 0) * (item.qty || 0);
-            }
-        });
-    });
-
-    // --- PERBAIKAN UTAMA DI SINI ---
-    // Sesuaikan semua metrik penjualan dengan data retur
-    const omsetKotor = omsetKotorAwal - totalNilaiReturGross;
-    const totalDiskon = totalDiskonAwal - totalDiskonBatal;
-    const totalHppTerjual = totalHppTerjualAwal - totalHppRetur;
-    const totalBiayaTransaksi = totalBiayaTransaksiAwal - biayaMarketplaceBatal;
-    
-    // 3. Kalkulasi dari data Keuangan (Operasional)
-    const totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-    const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-
-    // 4. Kalkulasi Metrik Gabungan Final
-    const omsetBersih = omsetKotor - totalDiskon;
-    const labaKotor = omsetBersih - totalHppTerjual;
-    const labaBersih = labaKotor - totalBiayaTransaksi - totalBiayaOperasional;
-    const saldoKas = (omsetBersih + pemasukanLain) - (totalBiayaTransaksi + totalBiayaOperasional);
-
-    // 5. Kalkulasi Data Stok (selalu real-time)
-    const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
-    const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
-
-    return {
-        saldoKas,
-        omsetBersih,
-        labaKotor,
-        labaBersih,
-        omsetKotor,
-        totalDiskon,
-        totalHppTerjual,
-        totalBiayaTransaksi,
-        totalBiayaOperasional,
-        totalNilaiRetur: totalNilaiReturGross, // Tetap tampilkan nilai retur kotor sebagai informasi
-        totalUnitStok,
-        totalNilaiStokHPP,
+    let kpis = {
+        saldoKas: 0, omsetBersih: 0, labaKotor: 0, labaBersih: 0, omsetKotor: 0,
+        totalDiskon: 0, totalHppTerjual: 0, totalBiayaTransaksi: 0,
+        totalBiayaOperasional: 0, totalNilaiRetur: 0
     };
+
+    if (isLongTermFilter && Object.keys(state.summaryData).length > 0) {
+        // --- LOGIKA UNTUK FILTER JANGKA PANJANG (CEPAT & HEMAT) ---
+        const processSummary = (summary) => {
+            if (!summary) return;
+            kpis.omsetKotor += summary.omsetKotor || 0;
+            kpis.totalDiskon += summary.totalDiskon || 0;
+            kpis.omsetBersih += summary.omsetBersih || 0;
+            kpis.totalHppTerjual += summary.hppTerjual || 0;
+            kpis.labaKotor += summary.labaKotor || 0;
+            kpis.totalBiayaTransaksi += summary.biayaTransaksi || 0;
+            kpis.totalBiayaOperasional += summary.biayaOperasional || 0;
+            kpis.labaBersih += summary.labaBersihOperasional || 0;
+            kpis.totalNilaiRetur += summary.nilaiRetur || 0;
+        };
+
+        if (uiState.dashboardDateFilter === 'by_month_range') {
+            const year = uiState.dashboardStartYear;
+            const month = uiState.dashboardStartMonth.toString().padStart(2, "0");
+            const summary = state.summaryData?.[`summary_${year}`]?.months?.[month];
+            processSummary(summary);
+        } else if (uiState.dashboardDateFilter === 'this_year') {
+            const year = new Date().getFullYear();
+            const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
+            processSummary(summary);
+        } 
+        // --- PERBAIKAN 2: Tambahkan logika untuk 'by_year_range' ---
+        else if (uiState.dashboardDateFilter === 'by_year_range') {
+            for (let year = uiState.dashboardStartYear; year <= uiState.dashboardEndYear; year++) {
+                const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
+                processSummary(summary);
+            }
+        } 
+        else if (uiState.dashboardDateFilter === 'all_time') {
+            for (const key in state.summaryData) {
+                if (key.startsWith('summary_')) {
+                    processSummary(state.summaryData[key].yearlyTotals);
+                }
+            }
+        }
+        kpis.saldoKas = (kpis.omsetBersih) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
+
+    } else {
+        // --- LOGIKA UNTUK FILTER JANGKA PENDEK (REAL-TIME & AKURAT) ---
+        // (Blok ini tidak perlu diubah, sudah benar)
+        const { transaksi, keuangan, retur } = dashboardFilteredData.value;
+        
+        const omsetKotorAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
+        const totalDiskonAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
+        const totalHppTerjualAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
+        const totalBiayaTransaksiAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
+
+        let totalNilaiReturGross = 0;
+        let totalDiskonBatal = 0;
+        let totalHppRetur = 0;
+        let biayaMarketplaceBatal = 0;
+
+        (retur || []).forEach(r => {
+            (r.items || []).forEach(item => {
+                totalNilaiReturGross += (item.nilaiRetur || 0) + (item.nilaiDiskon || 0);
+                totalDiskonBatal += (item.nilaiDiskon || 0);
+                biayaMarketplaceBatal += (item.biayaMarketplace || 0);
+                const product = getProductBySku(item.sku);
+                if (product) {
+                    totalHppRetur += (product.hpp || 0) * (item.qty || 0);
+                }
+            });
+        });
+
+        kpis.totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+        const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+
+        kpis.omsetKotor = omsetKotorAwal - totalNilaiReturGross;
+        kpis.totalDiskon = totalDiskonAwal - totalDiskonBatal;
+        kpis.totalHppTerjual = totalHppTerjualAwal - totalHppRetur;
+        kpis.totalBiayaTransaksi = totalBiayaTransaksiAwal - biayaMarketplaceBatal;
+        kpis.totalNilaiRetur = totalNilaiReturGross;
+        kpis.omsetBersih = kpis.omsetKotor - kpis.totalDiskon;
+        kpis.labaKotor = kpis.omsetBersih - kpis.totalHppTerjual;
+        kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
+        kpis.saldoKas = (kpis.omsetBersih + pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
+    }
+    
+    kpis.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
+    kpis.totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
+
+    return kpis;
 });
 
 const namaKainHistory = computed(() => {
