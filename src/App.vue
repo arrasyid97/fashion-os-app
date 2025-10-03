@@ -354,35 +354,32 @@ const loadDataForPage = async (pageName) => {
         const dataPromises = [];
 
         switch(pageName) {
-            case 'dashboard':
-    // --- LOGIKA BARU UNTUK MENGHITUNG RENTANG TANGGAL ---
-    const now = new Date();
-    let startDate = new Date();
-    let endDate = new Date();
+            case 'dashboard': { // <-- PERBAIKAN 1: Tambahkan kurung kurawal {
+                const now = new Date();
+                let startDate = new Date();
+                let endDate = new Date();
 
-    if (uiState.dashboardDateFilter === 'today') {
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-    } else if (uiState.dashboardDateFilter === 'last_7_days') {
-        startDate.setDate(now.getDate() - 7);
-        startDate.setHours(0, 0, 0, 0);
-    } else if (uiState.dashboardDateFilter === 'last_30_days') {
-        startDate.setDate(now.getDate() - 30);
-        startDate.setHours(0, 0, 0, 0);
-    }
-    // (Untuk filter jangka panjang seperti 'this_year' atau 'all_time', kita asumsikan Cloud Function yang bekerja, jadi tidak perlu query besar)
+                if (uiState.dashboardDateFilter === 'today') {
+                    startDate.setHours(0, 0, 0, 0);
+                    endDate.setHours(23, 59, 59, 999);
+                } else if (uiState.dashboardDateFilter === 'last_7_days') {
+                    startDate.setDate(now.getDate() - 7);
+                    startDate.setHours(0, 0, 0, 0);
+                } else if (uiState.dashboardDateFilter === 'last_30_days') {
+                    startDate.setDate(now.getDate() - 30);
+                    startDate.setHours(0, 0, 0, 0);
+                }
 
-    dataPromises.push(fetchSummaryData(userId));
-    dataPromises.push(fetchProductData(userId));
-    // Panggil fungsi dengan parameter tanggal HANYA untuk filter jangka pendek
-    if (['today', 'last_7_days', 'last_30_days'].includes(uiState.dashboardDateFilter)) {
-        dataPromises.push(fetchTransactionAndReturnData(userId, false, startDate, endDate));
-    } else {
-        // Untuk filter lain, gunakan cara lama (ambil 15 terbaru)
-        dataPromises.push(fetchTransactionAndReturnData(userId));
-    }
-    dataPromises.push(fetchKeuanganData());
-    break;
+                dataPromises.push(fetchSummaryData(userId));
+                dataPromises.push(fetchProductData(userId));
+                if (['today', 'last_7_days', 'last_30_days'].includes(uiState.dashboardDateFilter)) {
+                    dataPromises.push(fetchTransactionAndReturnData(userId, false, startDate, endDate));
+                } else {
+                    dataPromises.push(fetchTransactionAndReturnData(userId));
+                }
+                dataPromises.push(fetchKeuanganData());
+                break;
+            } // <-- PERBAIKAN 1: Tambahkan kurung kurawal }
             case 'transaksi':
             case 'bulk_process':
                 dataPromises.push(fetchProductData(userId));
@@ -6626,7 +6623,7 @@ const fetchProductData = async (userId, loadMore = false) => {
 
 const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate = null, endDate = null) => {
     const TRANSACTIONS_PER_PAGE = 15;
-    const RETURNS_PER_PAGE = 10;
+    
 
     // --- Logika untuk Transaksi ---
     try {
