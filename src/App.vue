@@ -2790,24 +2790,29 @@ const dashboardKpis = computed(() => {
     // Ambil data yang sudah difilter berdasarkan pilihan waktu di dashboard
     const { transaksi, keuangan, retur } = dashboardFilteredData.value;
 
-    // 1. Kalkulasi dari data Transaksi & Retur
+    // 1. Kalkulasi dari data Transaksi
     const omsetKotor = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
     const totalDiskon = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
     const totalHppTerjual = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
     const totalBiayaTransaksi = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-    const totalNilaiRetur = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((itemSum, item) => itemSum + (item.nilaiRetur || 0), 0), 0);
+
+    // --- PERBAIKAN 2: Logika Nilai Retur ---
+    // Nilai retur BERSIH (setelah diskon) untuk kalkulasi internal yang akurat
+    const totalNilaiReturNet = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((itemSum, item) => itemSum + (item.nilaiRetur || 0), 0), 0);
+    // Nilai retur KOTOR (sebelum diskon) untuk ditampilkan di kartu KPI sesuai permintaan Anda
+    const totalNilaiReturGross = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((itemSum, item) => itemSum + (item.nilaiRetur || 0) + (item.nilaiDiskon || 0), 0), 0);
 
     // 2. Kalkulasi dari data Keuangan
     const totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
 
-    // 3. Kalkulasi Metrik Gabungan
-    const omsetBersih = omsetKotor - totalDiskon - totalNilaiRetur;
+    // 3. Kalkulasi Metrik Gabungan (Menggunakan Nilai Retur NET untuk akurasi)
+    const omsetBersih = omsetKotor - totalDiskon - totalNilaiReturNet;
     const labaKotor = omsetBersih - totalHppTerjual;
-    const labaBersihOperasional = labaKotor - totalBiayaTransaksi - totalBiayaOperasional;
+    const labaBersih = labaKotor - totalBiayaTransaksi - totalBiayaOperasional;
     const saldoKas = (omsetBersih + pemasukanLain) - (totalBiayaTransaksi + totalBiayaOperasional + totalHppTerjual);
 
-    // 4. Kalkulasi Data Stok (selalu real-time dari data inventaris lengkap)
+    // 4. Kalkulasi Data Stok (selalu real-time)
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
@@ -2815,13 +2820,13 @@ const dashboardKpis = computed(() => {
         saldoKas,
         omsetBersih,
         labaKotor,
-        labaBersihOperasional,
+        labaBersih, // <-- PERBAIKAN 1: Nama variabel sudah benar
         omsetKotor,
         totalDiskon,
         totalHppTerjual,
-        totalBiayaTransaksi, // Nama disesuaikan dengan template
-        totalBiayaOperasional, // Nama disesuaikan dengan template
-        totalNilaiRetur,
+        totalBiayaTransaksi,
+        totalBiayaOperasional,
+        totalNilaiRetur: totalNilaiReturGross, // <-- PERBAIKAN 2: Mengirim nilai GROSS ke tampilan
         totalUnitStok,
         totalNilaiStokHPP,
     };
