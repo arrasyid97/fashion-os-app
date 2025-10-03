@@ -354,32 +354,40 @@ const loadDataForPage = async (pageName) => {
         const dataPromises = [];
 
         switch(pageName) {
-            case 'dashboard': { // <-- PERBAIKAN 1: Tambahkan kurung kurawal {
-                const now = new Date();
+            case 'dashboard': {
                 let startDate = new Date();
                 let endDate = new Date();
+                const now = new Date();
 
-                if (uiState.dashboardDateFilter === 'today') {
-                    startDate.setHours(0, 0, 0, 0);
-                    endDate.setHours(23, 59, 59, 999);
-                } else if (uiState.dashboardDateFilter === 'last_7_days') {
-                    startDate.setDate(now.getDate() - 7);
-                    startDate.setHours(0, 0, 0, 0);
-                } else if (uiState.dashboardDateFilter === 'last_30_days') {
-                    startDate.setDate(now.getDate() - 30);
-                    startDate.setHours(0, 0, 0, 0);
+                // Hitung rentang tanggal HANYA untuk filter jangka pendek
+                const isShortTermFilter = ['today', 'last_7_days', 'last_30_days'].includes(uiState.dashboardDateFilter);
+
+                if (isShortTermFilter) {
+                    if (uiState.dashboardDateFilter === 'today') {
+                        startDate.setHours(0, 0, 0, 0);
+                        endDate.setHours(23, 59, 59, 999);
+                    } else if (uiState.dashboardDateFilter === 'last_7_days') {
+                        startDate.setDate(now.getDate() - 7);
+                        startDate.setHours(0, 0, 0, 0);
+                    } else if (uiState.dashboardDateFilter === 'last_30_days') {
+                        startDate.setDate(now.getDate() - 30);
+                        startDate.setHours(0, 0, 0, 0);
+                    }
+                    // Panggil fetch data dengan rentang tanggal
+                    dataPromises.push(fetchTransactionAndReturnData(userId, false, startDate, endDate));
+                    dataPromises.push(fetchKeuanganData(startDate, endDate));
+                } else {
+                    // Untuk jangka panjang, cukup fetch 15 data terbaru untuk grafik
+                    dataPromises.push(fetchTransactionAndReturnData(userId));
+                    dataPromises.push(fetchKeuanganData());
                 }
 
+                // Selalu fetch summary dan produk
                 dataPromises.push(fetchSummaryData(userId));
                 dataPromises.push(fetchProductData(userId));
-                if (['today', 'last_7_days', 'last_30_days'].includes(uiState.dashboardDateFilter)) {
-                    dataPromises.push(fetchTransactionAndReturnData(userId, false, startDate, endDate));
-                } else {
-                    dataPromises.push(fetchTransactionAndReturnData(userId));
-                }
-                dataPromises.push(fetchKeuanganData());
                 break;
-            } // <-- PERBAIKAN 1: Tambahkan kurung kurawal }
+            }
+            // ... (sisa dari switch case biarkan sama seperti sebelumnya)
             case 'transaksi':
             case 'bulk_process':
                 dataPromises.push(fetchProductData(userId));
@@ -2808,7 +2816,6 @@ const investorLedger = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    // --- PERBAIKAN: Tambahkan pengecekan 'by_year_range' ---
     const isLongTermFilter = ['by_month_range', 'this_year', 'all_time', 'by_year_range'].includes(uiState.dashboardDateFilter);
 
     let kpis = {
@@ -2817,9 +2824,8 @@ const dashboardKpis = computed(() => {
         totalBiayaOperasional: 0, totalNilaiRetur: 0
     };
 
-    // --- PERBAIKAN: Pastikan state.summaryData tidak null sebelum diakses ---
     if (isLongTermFilter && state.summaryData && Object.keys(state.summaryData).length > 0) {
-        // ... (seluruh isi blok 'if' ini biarkan sama persis seperti sebelumnya) ...
+        // --- LOGIKA UNTUK FILTER JANGKA PANJANG (CEPAT & HEMAT) ---
         const processSummary = (summary) => {
             if (!summary) return;
             kpis.omsetKotor += summary.omsetKotor || 0;
@@ -2856,18 +2862,23 @@ const dashboardKpis = computed(() => {
                 }
             }
         }
+        // Saldo Kas untuk jangka panjang dihitung dari omset bersih dikurangi biaya
         kpis.saldoKas = (kpis.omsetBersih) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
+
     } else {
-        // ... (seluruh isi blok 'else' ini biarkan sama persis seperti sebelumnya) ...
+        // --- LOGIKA UNTUK FILTER JANGKA PENDEK (REAL-TIME & AKURAT) ---
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
+        
         const omsetKotorAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
         const totalDiskonAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
         const totalHppTerjualAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
         const totalBiayaTransaksiAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
+
         let totalNilaiReturGross = 0;
         let totalDiskonBatal = 0;
         let totalHppRetur = 0;
         let biayaMarketplaceBatal = 0;
+
         (retur || []).forEach(r => {
             (r.items || []).forEach(item => {
                 totalNilaiReturGross += (item.nilaiRetur || 0) + (item.nilaiDiskon || 0);
@@ -2879,8 +2890,10 @@ const dashboardKpis = computed(() => {
                 }
             });
         });
+
         kpis.totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
         const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+
         kpis.omsetKotor = omsetKotorAwal - totalNilaiReturGross;
         kpis.totalDiskon = totalDiskonAwal - totalDiskonBatal;
         kpis.totalHppTerjual = totalHppTerjualAwal - totalHppRetur;
