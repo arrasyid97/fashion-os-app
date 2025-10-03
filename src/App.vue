@@ -2794,37 +2794,33 @@ const dashboardKpis = computed(() => {
     const omsetKotor = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
     const totalDiskon = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
     const totalHppTerjual = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
-    const biayaTransaksi = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-    // --- PERBAIKAN DI SINI ---
+    const totalBiayaTransaksi = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
     const totalNilaiRetur = (retur || []).reduce((sum, r) => sum + (r.items || []).reduce((itemSum, item) => itemSum + (item.nilaiRetur || 0), 0), 0);
 
     // 2. Kalkulasi dari data Keuangan
-    const biayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-    // --- PERBAIKAN DI SINI ---
+    const totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
 
     // 3. Kalkulasi Metrik Gabungan
     const omsetBersih = omsetKotor - totalDiskon - totalNilaiRetur;
     const labaKotor = omsetBersih - totalHppTerjual;
-    const labaBersih = labaKotor - biayaTransaksi - biayaOperasional;
-    
-    // Ini adalah Arus Kas untuk PERIODE TERPILIH, bukan saldo total.
-    const saldoKasPeriodeIni = (omsetBersih + pemasukanLain) - (biayaTransaksi + biayaOperasional);
+    const labaBersihOperasional = labaKotor - totalBiayaTransaksi - totalBiayaOperasional;
+    const saldoKas = (omsetBersih + pemasukanLain) - (totalBiayaTransaksi + totalBiayaOperasional + totalHppTerjual);
 
     // 4. Kalkulasi Data Stok (selalu real-time dari data inventaris lengkap)
     const totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     const totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
     return {
-        saldoKas: saldoKasPeriodeIni,
+        saldoKas,
         omsetBersih,
         labaKotor,
-        labaBersih,
+        labaBersihOperasional,
         omsetKotor,
         totalDiskon,
         totalHppTerjual,
-        biayaTransaksi,
-        biayaOperasional,
+        totalBiayaTransaksi, // Nama disesuaikan dengan template
+        totalBiayaOperasional, // Nama disesuaikan dengan template
         totalNilaiRetur,
         totalUnitStok,
         totalNilaiStokHPP,
