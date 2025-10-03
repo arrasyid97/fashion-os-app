@@ -2775,13 +2775,11 @@ const investorLedger = computed(() => {
 const dashboardKpis = computed(() => {
     // 1. Inisialisasi Total Metrik
     const totals = {
-        omsetKotor: 0,
         totalDiskon: 0,
         hppTerjual: 0,
         biayaTransaksi: 0,
         biayaOperasional: 0,
         nilaiRetur: 0,
-        omsetLiveGross: 0 // Variabel bantu: total nilai transaksi dari field 'total'
     };
 
     const filter = uiState.dashboardDateFilter;
@@ -2800,22 +2798,22 @@ const dashboardKpis = computed(() => {
 
     // 2. LOGIKA PERHITUNGAN DARI LIVE DATA 
     
-    // KRITIS: Omset Kotor yang benar adalah nilai transaksi sebelum diskon/retur.
-    // Berdasarkan hasil uji coba, kita berasumsi 'trx.subtotal' adalah Rp 0 dan 'trx.total' adalah Omset Kotor yang benar.
-    totals.omsetKotor = transaksiSource.reduce((sum, trx) => sum + (trx.total || 0), 0); 
-    
-    // Mengamankan semua perhitungan reduce
+    // Menghitung komponen yang terpisah (semua ini terisi dengan benar)
     totals.totalDiskon = transaksiSource.reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
     totals.hppTerjual = transaksiSource.reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + ((item.hpp || 0) * (item.qty || 0)), 0), 0);
     totals.biayaTransaksi = transaksiSource.reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-    
     totals.biayaOperasional = keuanganSource.filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya').reduce((sum, i) => sum + (i.jumlah || 0), 0);
     totals.nilaiRetur = (returSource || []).reduce((sum, r) => sum + (r.items || []).reduce((iSum, i) => iSum + (i.nilaiRetur || 0), 0), 0);
     
+    // KRITIS: Kita harus mendapatkan Omset Bersih yang benar (dari penjumlahan field yang kita yakini berisi data)
+    // Asumsi: Omset Bersih yang benar berasal dari Omset Akhir (trx.total) dikurangi retur
+    const totalTransaksiAkhir = transaksiSource.reduce((sum, trx) => sum + (trx.total || 0), 0);
+    const omsetBersih = totalTransaksiAkhir - totals.nilaiRetur;
+    
     // 3. KALKULASI FINAL
     
-    // Omset Bersih: Omset Kotor dikurangi Diskon dan Retur
-    const omsetBersih = totals.omsetKotor - totals.totalDiskon - totals.nilaiRetur;
+    // KRITIS: Omset Kotor dihitung secara terbalik (dari Omset Bersih) karena field aslinya bermasalah
+    const omsetKotor = omsetBersih + totals.totalDiskon + totals.nilaiRetur;
     
     // Laba Kotor: Omset Bersih dikurangi HPP
     const labaKotor = omsetBersih - totals.hppTerjual; 
@@ -2838,7 +2836,7 @@ const dashboardKpis = computed(() => {
         omsetBersih,
         labaKotor,
         labaBersih: labaBersihOperasional,
-        omsetKotor: totals.omsetKotor, // KINI TERISI NILAI YANG BENAR (Rp 1.200.000)
+        omsetKotor: omsetKotor, // KINI MENGGUNAKAN KALKULASI TERBAIK
         totalDiskon: totals.totalDiskon,
         totalHppTerjual: totals.hppTerjual,
         totalBiayaTransaksi: totals.biayaTransaksi,
