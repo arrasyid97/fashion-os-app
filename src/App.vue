@@ -6337,8 +6337,8 @@ const panduanData = [
             <p>Dashboard adalah kokpit utama operasional Anda. Halaman ini menyajikan denyut nadi bisnis secara visual dan intuitif untuk pengambilan keputusan yang cepat dan berbasis data.</p>
             <ul class="list-disc list-inside mt-2 space-y-1">
                 <li><strong>Indikator Kinerja Utama (KPI):</strong> Pantau metrik fundamental seperti Omset Bersih, Laba Kotor, Biaya Operasional, dan Laba Bersih.</li>
-                <li><strong>Analisis Periodik:</strong> Gunakan filter waktu yang fleksibel untuk mengevaluasi kinerja dan menemukan tren. Untuk filter jangka pendek (Hari Ini, 7 & 30 Hari Terakhir, Rentang Tanggal), data dihitung langsung untuk akurasi real-time.</li>
-                <li><strong>Efiensi Jangka Panjang:</strong> Untuk filter jangka panjang (Rentang Bulan, Tahun Ini, Semua), data diambil dari ringkasan yang sudah diolah oleh Cloud Functions, membuatnya super cepat dan hemat biaya.</li>
+                <li><strong>Analisis Periodik:</strong> Gunakan filter waktu yang fleksibel (harian, bulanan, tahunan) untuk mengevaluasi kinerja dan menemukan tren bisnis Anda.</li>
+                <li><strong>Cepat & Akurat:</strong> Sistem dirancang untuk menampilkan data laporan jangka panjang secara instan tanpa membuat aplikasi menjadi lambat.</li>
             </ul>
         `
     },
@@ -6437,14 +6437,14 @@ const panduanData = [
             </ul>
         `
     },
-    { // <-- PANDUAN BARU DIMULAI DARI SINI
+    {
         icon: '🧾',
         title: 'Laporan Transaksi',
         subtitle: 'Rincian Performa Penjualan dari Bulan ke Bulan.',
         content: `
             <p>Halaman ini memberikan rincian performa penjualan Anda, dipecah per bulan untuk tahun yang dipilih. Laporan ini berfokus pada metrik yang berhubungan langsung dengan transaksi.</p>
             <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Super Cepat & Hemat:</strong> Laporan ini dimuat secara instan karena mengambil data dari <code>summaryData</code> yang sudah diolah oleh Cloud Functions, hanya memakan <strong>1 read</strong> per tahun.</li>
+                <li><strong>Super Cepat:</strong> Laporan ini dirancang untuk dapat menampilkan data tahunan secara instan tanpa membuat aplikasi lambat.</li>
                 <li><strong>Metrik Utama:</strong> Anda bisa melihat perbandingan bulanan untuk QTY Terjual, Omset Kotor, Diskon, Retur, Omset Bersih, HPP Terjual, Biaya Transaksi, dan Laba Kotor.</li>
             </ul>
         `
@@ -6457,8 +6457,8 @@ const panduanData = [
             <p>Berbeda dengan Laporan Transaksi, halaman ini memberikan gambaran laba-rugi bisnis secara menyeluruh dengan memasukkan biaya operasional.</p>
             <ul class="list-disc list-inside mt-2 space-y-1">
                 <li><strong>Performa Finansial:</strong> Ini adalah tempat untuk melihat gambaran besar kesehatan finansial bisnis Anda dari bulan ke bulan.</li>
-                <li><strong>Laba Bersih Akurat:</strong> Metrik kunci di sini adalah <strong>Laba Bersih</strong>, yang dihitung dari Laba Kotor dikurangi semua biaya, termasuk biaya operasional yang Anda catat di halaman Manajemen Keuangan.</li>
-                <li><strong>Sangat Efisien:</strong> Sama seperti Laporan Transaksi, halaman ini juga hanya membutuhkan <strong>1 read</strong> untuk menampilkan data setahun penuh.</li>
+                <li><strong>Laba Bersih Akurat:</strong> Metrik kunci di sini adalah <strong>Laba Bersih</strong>, yang dihitung dari Laba Kotor dikurangi semua biaya, termasuk biaya operasional.</li>
+                <li><strong>Sangat Efisien:</strong> Halaman ini juga dirancang agar dapat menampilkan data setahun penuh secara instan.</li>
             </ul>
         `
     },
