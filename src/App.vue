@@ -32,6 +32,8 @@ const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengatura
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
+const userProfile = reactive({ data: null });
+const currentTime = ref(new Date());
 const nomorWhatsAppAdmin = ref('6285691803476');
 const activationCodeInput = ref('');
 const activationCodeMessage = ref('');
@@ -579,18 +581,20 @@ const parsePercentageInput = (value) => {
 };
 
 const isSubscriptionActive = computed(() => {
-    if (!currentUser.value || !currentUser.value.userData) {
+    const now = currentTime.value.getTime(); // Gunakan waktu reaktif kita
+
+    if (!userProfile.data) {
         return false;
     }
-    const status = currentUser.value.userData.subscriptionStatus;
-    const trialEndDate = currentUser.value.userData.trialEndDate?.seconds * 1000;
-    const subscriptionEndDate = currentUser.value.userData.subscriptionEndDate?.seconds * 1000;
     
-    // Cek apakah status aktif DAN tanggal kedaluwarsa belum terlewati
-    if (status === 'active' && subscriptionEndDate > Date.now()) {
+    const status = userProfile.data.subscriptionStatus;
+    const trialEndDate = userProfile.data.trialEndDate?.seconds * 1000;
+    const subscriptionEndDate = userProfile.data.subscriptionEndDate?.seconds * 1000;
+    
+    if (status === 'active' && subscriptionEndDate > now) {
         return true;
     }
-    if (status === 'trial' && trialEndDate > Date.now()) {
+    if (status === 'trial' && trialEndDate > now) {
         return true;
     }
     return false;
@@ -1252,8 +1256,8 @@ const filteredVoucherNotes = computed(() => {
 
 const monthlyPrice = ref(350000);
 const yearlyPrice = ref(4200000);
-const discountedMonthlyPrice = ref(250000);
-const discountedYearlyPrice = ref(2500000);
+const discountedMonthlyPrice = ref(5000);
+const discountedYearlyPrice = ref(6000);
 
 async function submitAddProduct() {
   const form = uiState.modalData;
@@ -2566,39 +2570,49 @@ async function handleActivation() {
     }
 
     try {
-        isSaving.value = true; // Menunjukkan proses sedang berjalan
+        isSaving.value = true;
         activationCodeMessage.value = 'Memvalidasi kode...';
 
         const codeRef = doc(db, "activation_codes", activationCodeInput.value);
-        const codeDoc = await getDoc(codeRef);
+        const userRef = doc(db, "users", currentUser.value.uid);
+        
+        let subscriptionEndDate; // Variabel untuk menyimpan tanggal baru
 
-        if (codeDoc.exists() && codeDoc.data().status === 'unused') {
-            const userRef = doc(db, "users", currentUser.value.uid);
+        // Menjalankan transaksi untuk memastikan keamanan data
+        await runTransaction(db, async (transaction) => {
+            const codeDoc = await transaction.get(codeRef);
+            if (!codeDoc.exists() || codeDoc.data().status !== 'unused') {
+                throw new Error('Kode aktivasi tidak valid atau sudah digunakan.');
+            }
+
             const now = new Date();
-            const nextMonth = new Date(new Date(now).setMonth(now.getMonth() + 1));
+            subscriptionEndDate = new Date(new Date(now).setMonth(now.getMonth() + 1));
             
-            const batch = writeBatch(db);
-            // Update data pengguna
-            batch.update(userRef, {
+            transaction.update(userRef, {
                 subscriptionStatus: 'active',
-                subscriptionEndDate: nextMonth,
-                trialEndDate: null // Hapus masa trial jika ada
+                subscriptionEndDate: subscriptionEndDate,
+                trialEndDate: null
             });
-            // Update status kode aktivasi
-            batch.update(codeRef, {
+            transaction.update(codeRef, {
                 status: 'used',
                 usedBy: currentUser.value.uid,
+                usedByEmail: userProfile.data.email, // Menyimpan email pengguna
                 usedAt: new Date()
             });
-
-            await batch.commit();
-            
-            activationCodeMessage.value = '';
-            alert('Aktivasi berhasil! Langganan Anda sekarang aktif selama 1 bulan.');
-            // onAuthStateChanged akan otomatis memuat ulang data dan status langganan
-        } else {
-            throw new Error('Kode aktivasi tidak valid atau sudah digunakan.');
+        });
+        
+        // --- PERBAIKAN UTAMA DI SINI ---
+        // Perbarui state lokal secara manual agar UI langsung berubah
+        if (userProfile.data) {
+            userProfile.data.subscriptionStatus = 'active';
+            userProfile.data.subscriptionEndDate = { seconds: Math.floor(subscriptionEndDate.getTime() / 1000) }; // Simulasikan format Firestore
+            userProfile.data.trialEndDate = null;
         }
+        
+        activationCodeMessage.value = '';
+        activationCodeInput.value = '';
+        alert('Aktivasi berhasil! Langganan Anda sekarang aktif selama 1 bulan.');
+
     } catch (error) {
         activationCodeMessage.value = error.message;
     } finally {
@@ -7168,31 +7182,34 @@ const fetchNotesData = async (userId) => {
 };
 
 onMounted(() => {
-  onAuthStateChanged(auth, async (user) => {
-    isLoading.value = true;
-    hasLoadedInitialData.value = false;
+    // Memulai jam reaktif yang akan update setiap 1 menit
+    setInterval(() => {
+        currentTime.value = new Date();
+    }, 60000); 
 
-    // Reset status data yang sudah di-fetch setiap kali auth berubah
-    Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
+    onAuthStateChanged(auth, async (user) => {
+        isLoading.value = true;
+        hasLoadedInitialData.value = false;
+        Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
 
-    if (user) {
-        // --- INI BAGIAN UTAMA PERBAIKAN ---
-        const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-        const userData = userDocSnap.exists() ? userDocSnap.data() : {};
-        currentUser.value = { ...user, userData, isPartner: userData.isPartner || false, referralCode: userData.referralCode || null };
-        // --- AKHIR DARI PERBAIKAN ---
+        if (user) {
+            currentUser.value = user; // Simpan data otentikasi Firebase
+            
+            // Ambil data profil dari Firestore dan simpan di state reaktif terpisah
+            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+            userProfile.data = userDocSnap.exists() ? userDocSnap.data() : {};
 
-        await setupListeners(user.uid);
-        changePage(activePage.value);
-
-    } else {
-        currentUser.value = null;
-        activePage.value = 'login';
-        unsubscribe();
-    }
-    isLoading.value = false;
-    hasLoadedInitialData.value = true;
-});
+            await setupListeners(user.uid);
+            changePage(activePage.value);
+        } else {
+            currentUser.value = null;
+            userProfile.data = null; // Kosongkan profil saat logout
+            activePage.value = 'login';
+            if (unsubscribe) unsubscribe();
+        }
+        isLoading.value = false;
+        hasLoadedInitialData.value = true;
+    });
 });
 
 watch(activePage, (newPage) => {

@@ -69,11 +69,11 @@ console.log(`Webhook Diterima - Amount: ${amount}, Tipe Data: ${typeof amount}`)
             let subscriptionEndDate;
             const now = new Date();
 
-            if (amount === 250000 || amount === 350000 || amount === 250000) {
+            if (amount === 5000 || amount === 350000 || amount === 5000) {
                 plan = 'bulanan';
                 commissionAmount = 50000;
                 subscriptionEndDate = new Date(new Date().setMonth(now.getMonth() + 1));
-            } else if (amount === 2500000 || amount === 4200000 || amount === 2500000) { // <-- TAMBAHKAN INI
+            } else if (amount === 6000 || amount === 4200000 || amount === 6000) { // <-- TAMBAHKAN INI
                 plan = 'tahunan';
                 commissionAmount = 500000;
                 subscriptionEndDate = new Date(new Date().setFullYear(now.getFullYear() + 1));
