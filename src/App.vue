@@ -2218,20 +2218,15 @@ async function handleSubscriptionMayar(plan) {
     }
     isSubscribingPlan.value = true;
 
-    // Logika untuk memeriksa apakah ada kode rujukan yang aktif
-    const referredByCode = uiState.referralCodeApplied ? uiState.referralCodeInput : (currentUser.value?.userData?.referredBy || null);
+    // --- PERBAIKAN DI SINI ---
+    const referredByCode = uiState.referralCodeApplied ? uiState.referralCodeInput : (userProfile.data?.referredBy || null);
 
-    // --- AWAL PERBAIKAN UTAMA ---
-    // Tentukan harga yang akan dibayar berdasarkan status kode rujukan
     let priceToPay;
     if (referredByCode) {
-        // Jika ada kode rujukan, gunakan harga diskon
         priceToPay = plan === 'bulanan' ? discountedMonthlyPrice.value : discountedYearlyPrice.value;
     } else {
-        // Jika tidak ada, gunakan harga normal
         priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
     }
-    // --- AKHIR PERBAIKAN UTAMA ---
 
     try {
         if (referredByCode) {
@@ -2240,14 +2235,13 @@ async function handleSubscriptionMayar(plan) {
                 referredByCode: referredByCode,
                 timestamp: new Date(),
             }, { merge: true });
-            console.log(`INFO: Data referral untuk ${currentUser.value.email} disimpan di Firestore.`);
         }
 
         const response = await fetch('/api/create-mayar-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                amount: priceToPay, // <-- Menggunakan variabel harga yang sudah benar
+                amount: priceToPay,
                 item_name: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
                 customer_email: currentUser.value.email,
                 callback_url: 'https://appfashion.id/api/mayar-webhook',
@@ -2370,7 +2364,8 @@ async function saveModelPromotions(modelName, channelId) {
 }
 
 async function applyReferralCode() {
-    if (currentUser.value?.userData?.referredBy) {
+    // --- PERBAIKAN DI SINI ---
+    if (userProfile.data?.referredBy) {
         uiState.referralCodeMessage = "Anda sudah memiliki diskon rujukan.";
         return;
     }
@@ -6772,36 +6767,32 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 let unsubscribe = () => {}; 
 
 const setupListeners = async (userId) => {
-  unsubscribe(); // Hentikan listener lama
+    if (unsubscribe) unsubscribe();
 
-  // Listener untuk settings (real-time)
-  const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
-    if (docSnap.exists()) {
-      const settingsData = docSnap.data();
-      Object.assign(state.settings, settingsData);
+    const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
+        if (docSnap.exists()) {
+            Object.assign(state.settings, docSnap.data());
+        }
+    }, (error) => { console.error("Error fetching settings:", error); });
+
+    let commissionsListener = () => {};
+    // --- PERBAIKAN DI SINI ---
+    if (userProfile.data?.isPartner) {
+        const commissionsQuery = query(
+            collection(db, 'commissions'),
+            where('partnerId', '==', currentUser.value.uid)
+        );
+        commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+            commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        });
     }
-  }, (error) => { console.error("Error fetching settings:", error); });
 
-  // Listener untuk komisi mitra (real-time jika dia adalah mitra)
-  let commissionsListener = () => {};
-  if (currentUser.value?.isPartner) {
-    const commissionsQuery = query(
-      collection(db, 'commissions'),
-      where('partnerId', '==', currentUser.value.uid)
-    );
-    commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-      commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    });
-  }
+    await fetchCoreData(userId);
 
-  // Panggil data inti yang dibutuhkan segera
-  await fetchCoreData(userId);
-
-  // Fungsi untuk menghentikan listener saat logout
-  unsubscribe = () => {
-    settingsListener();
-    commissionsListener();
-  };
+    unsubscribe = () => {
+        settingsListener();
+        commissionsListener();
+    };
 };
 
 const fetchCoreData = async (userId) => {
@@ -7363,7 +7354,7 @@ watch(activePage, (newPage) => {
                 </svg>
                 Investasi
             </a>
-            <a v-if="currentUser.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">
+            <a v-if="userProfile.data?.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
