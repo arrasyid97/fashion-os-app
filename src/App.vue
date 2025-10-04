@@ -1400,8 +1400,8 @@ const roasResults = computed(() => {
     }
 
     // --- PERBAIKAN RUMUS DI SINI ---
-    const biayaAdminValue = hargaJual * ((biayaAdminMarketplace || 0) / 100);
-    const totalBiayaProduk = (modalProduk || 0) + (biayaPacking || 0) + biayaAdminValue;
+    // Biaya Admin sekarang ditambahkan langsung sebagai angka Rupiah
+    const totalBiayaProduk = (modalProduk || 0) + (biayaPacking || 0) + (biayaAdminMarketplace || 0);
     const profitKotor = hargaJual - totalBiayaProduk;
 
     if (profitKotor <= 0) {
@@ -9363,9 +9363,9 @@ watch(activePage, (newPage) => {
                     <input type="number" v-model.number="uiState.roasCalculator.biayaPacking" class="mt-1 w-full p-2 border rounded-md">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700">Biaya Admin Marketplace (%)</label>
-                    <input type="number" v-model.number="uiState.roasCalculator.biayaAdminMarketplace" class="mt-1 w-full p-2 border rounded-md">
-                </div>
+    <label class="block text-sm font-medium text-slate-700">Biaya Admin Marketplace (Rp)</label>
+    <input type="number" v-model.number="uiState.roasCalculator.biayaAdminMarketplace" class="mt-1 w-full p-2 border rounded-md">
+</div>
             </div>
 
             <div class="lg:col-span-2 space-y-6">
@@ -11340,9 +11340,9 @@ watch(activePage, (newPage) => {
             <p>Estimasi biaya untuk mengemas satu pesanan, seperti bubble wrap, kardus, lakban, stiker, atau kartu ucapan.</p>
         </div>
         <div>
-            <p class="font-semibold text-slate-800">Biaya Admin Marketplace (%)</p>
-            <p>Masukkan total persentase biaya yang diambil oleh marketplace (misalnya, biaya admin + biaya layanan program). Contoh: jika biaya admin 6.5% dan biaya program 4%, masukkan **10.5**.</p>
-        </div>
+    <p class="font-semibold text-slate-800">Biaya Admin Marketplace (Rp)</p>
+    <p>Masukkan total biaya tetap dalam Rupiah yang diambil oleh marketplace untuk satu pesanan. Contoh: jika ada biaya admin Rp 2.000 dan biaya layanan program Rp 1.500, masukkan **3500**.</p>
+</div>
     </div>
     <div class="flex justify-end mt-6 pt-4 border-t">
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
