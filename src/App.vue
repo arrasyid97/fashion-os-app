@@ -4055,20 +4055,25 @@ async function saveGeneralSettings() {
         const userId = currentUser.value.uid;
         const settingsRef = doc(db, "settings", userId);
         
+        // --- PERBAIKAN: Buat objek pinProtection yang bersih ---
+        const cleanPinProtection = {
+            dashboard: !!state.settings.pinProtection.dashboard,
+            incomeHistory: !!state.settings.pinProtection.incomeHistory,
+            investmentPage: !!state.settings.pinProtection.investmentPage,
+            laporanTransaksi: !!state.settings.pinProtection.laporanTransaksi,
+            laporanKeuangan: !!state.settings.pinProtection.laporanKeuangan,
+            hargaHpp: !!state.settings.pinProtection.hargaHpp,
+        };
+
         const dataToUpdate = {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
-            pinProtection: state.settings.pinProtection,
-            // Menggunakan operator kondisional untuk memastikan nilai PIN tidak undefined
-            // Jika newPinToSave ada, gunakan itu. Jika tidak, jangan masukkan field-nya.
+            pinProtection: cleanPinProtection, // <-- Gunakan objek yang bersih
             ...(newPinToSave !== undefined && { dashboardPin: newPinToSave }),
         };
 
-        // Menggunakan setDoc dengan merge: true adalah cara teraman untuk partial update.
-        // Ini akan menyimpan dataToUpdate sambil tetap mempertahankan field lain (misal: marketplaces, modelProduk)
         await setDoc(settingsRef, dataToUpdate, { merge: true });
         
-        // Perbarui state lokal setelah berhasil
         state.settings.dashboardPin = newPinToSave;
         uiState.oldPin = '';
         uiState.newPin = '';
@@ -6781,42 +6786,50 @@ const setupListeners = async (userId) => {
 };
 
 const fetchCoreData = async (userId) => {
-  try {
-    // BARIS BARU: Tambahkan 'commissionsSnap'
-    const [settingsSnap, promotionsSnap, commissionsSnap] = await Promise.all([
-      getDoc(doc(db, "settings", userId)),
-      getDoc(doc(db, "promotions", userId)),
-      getDoc(doc(db, "product_commissions", userId)), // BARIS BARU: Ambil data dari koleksi BARU
-    ]);
+    try {
+        const [settingsSnap, promotionsSnap, commissionsSnap] = await Promise.all([
+            getDoc(doc(db, "settings", userId)),
+            getDoc(doc(db, "promotions", userId)),
+            getDoc(doc(db, "product_commissions", userId)),
+        ]);
 
-    if (settingsSnap.exists()) {
-      const settingsData = settingsSnap.data();
-      Object.assign(state.settings, settingsData);
-      if (!state.settings.pinProtection) {
-        state.settings.pinProtection = { dashboard: true, incomeHistory: true, investmentPage: true };
-      }
-    }
-if (currentUser.value?.userData?.inflowCategories) {
-        state.settings.inflowCategories = currentUser.value.userData.inflowCategories;
-     }
-    if (promotionsSnap.exists()) {
-      const promoData = promotionsSnap.data();
-      state.promotions.perChannel = promoData.perChannel || {};
-      state.promotions.perModel = promoData.perModel || {};
-    }
+        if (settingsSnap.exists()) {
+            const settingsData = settingsSnap.data();
+            Object.assign(state.settings, settingsData);
 
-    // BLOK BARU: Proses data komisi yang sudah dimuat
-    if (commissionsSnap.exists()) {
-        const commsData = commissionsSnap.data();
-        state.commissions.perModel = commsData.perModel || {};
-    } else {
-        // Jika belum ada data komisi, pastikan objeknya ada
-        state.commissions.perModel = {};
-    }
+            // --- PERBAIKAN UTAMA DI SINI ---
+            // Pastikan semua kunci PIN ada dengan nilai default 'false' (tidak aktif)
+            const defaultPinSettings = {
+                dashboard: false,
+                incomeHistory: false,
+                investmentPage: false,
+                laporanTransaksi: false,
+                laporanKeuangan: false,
+                hargaHpp: false
+            };
+            // Gabungkan default dengan data yang ada.
+            // Kunci yang belum ada di database akan diberi nilai 'false'.
+            state.settings.pinProtection = { ...defaultPinSettings, ...(settingsData.pinProtection || {}) };
+        }
 
-  } catch (error) {
-    console.error("Error fetching core data:", error);
-  }
+        if (currentUser.value?.userData?.inflowCategories) {
+            state.settings.inflowCategories = currentUser.value.userData.inflowCategories;
+        }
+        if (promotionsSnap.exists()) {
+            const promoData = promotionsSnap.data();
+            state.promotions.perChannel = promoData.perChannel || {};
+            state.promotions.perModel = promoData.perModel || {};
+        }
+        if (commissionsSnap.exists()) {
+            const commsData = commissionsSnap.data();
+            state.commissions.perModel = commsData.perModel || {};
+        } else {
+            state.commissions.perModel = {};
+        }
+
+    } catch (error) {
+        console.error("Error fetching core data:", error);
+    }
 };
 
 // Fungsi khusus untuk data produk, harga, dan alokasi
@@ -13214,7 +13227,7 @@ watch(activePage, (newPage) => {
                             <strong>SKU Produk (Untuk Aktual Jadi):</strong> Gunakan dropdown ini untuk memilih SKU produk akhir yang <strong>sudah terdaftar di Manajemen Inventaris</strong>. Stok dari SKU inilah yang akan bertambah ketika Anda menekan tombol "+ Masukkan ke Inventaris". Wajib diisi untuk bahan utama.
                         </li>
                         <li>
-                            <strong>SKU Kombinasi (Tulis Manual):</strong> Gunakan kolom teks ini untuk memberi nama pada bahan komponen atau kombinasi (contoh: "Lengan Merah", "Kerah Putih"). Data ini <strong>tidak terhubung ke inventaris</strong> dan hanya berfungsi untuk pencatatan biaya bahan tambahan pada produk akhir.
+                            <strong>SKU Kombinasi (Tulis Manual):</strong> Gunakan kolom teks ini untuk memberi nama pada bahan komponen atau kombinasi (contoh untuk bagian tangan: nama model bajunya madina lalu warnanya putih lalu SIzenya M / no angka alhasil tulis dikolom SKU Kombinasi (Tulis Manual) tulisnya MDN htm M di singkat agar cepat"). Data ini <strong>tidak terhubung ke inventaris</strong> dan hanya berfungsi untuk pencatatan biaya bahan tambahan pada produk akhir.
                         </li>
                     </ul>
                 </div>
