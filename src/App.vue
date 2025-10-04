@@ -32,6 +32,8 @@ const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengatura
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
+const userProfile = reactive({ data: null }); // <-- TAMBAHKAN INI
+const currentTime = ref(new Date());        // <-- TAMBAHKAN INI
 const nomorWhatsAppAdmin = ref('6285691803476');
 const activationCodeInput = ref('');
 const activationCodeMessage = ref('');
@@ -579,20 +581,24 @@ const parsePercentageInput = (value) => {
 };
 
 const isSubscriptionActive = computed(() => {
-    if (!currentUser.value || !currentUser.value.userData) {
+    const now = currentTime.value; // Gunakan waktu reaktif kita
+
+    if (!userProfile.data) {
         return false;
     }
-    const status = currentUser.value.userData.subscriptionStatus;
-    const trialEndDate = currentUser.value.userData.trialEndDate?.seconds * 1000;
-    const subscriptionEndDate = currentUser.value.userData.subscriptionEndDate?.seconds * 1000;
     
-    // Cek apakah status aktif DAN tanggal kedaluwarsa belum terlewati
-    if (status === 'active' && subscriptionEndDate > Date.now()) {
-        return true;
+    const status = userProfile.data.subscriptionStatus;
+    
+    if (status === 'trial' && userProfile.data.trialEndDate) {
+        const trialEndDate = new Date(userProfile.data.trialEndDate.seconds * 1000);
+        if (trialEndDate > now) return true;
     }
-    if (status === 'trial' && trialEndDate > Date.now()) {
-        return true;
+    
+    if (status === 'active' && userProfile.data.subscriptionEndDate) {
+        const subscriptionEndDate = new Date(userProfile.data.subscriptionEndDate.seconds * 1000);
+        if (subscriptionEndDate > now) return true;
     }
+
     return false;
 });
 
@@ -793,6 +799,24 @@ async function updateReferralCode() {
     } finally {
         isSaving.value = false;
     }
+}
+
+let userListener = null; // Listener untuk data pengguna
+
+function setupUserListener(userId) {
+  // Hentikan listener lama jika ada
+  if (userListener) userListener();
+
+  const userDocRef = doc(db, 'users', userId);
+  userListener = onSnapshot(userDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+      console.log("Data pengguna diperbarui secara real-time.");
+      // Gabungkan data baru ke currentUser.value.userData
+      if (currentUser.value) {
+        currentUser.value.userData = { ...currentUser.value.userData, ...docSnap.data() };
+      }
+    }
+  });
 }
 
 async function deleteInvestor(investorId) {
@@ -2566,39 +2590,48 @@ async function handleActivation() {
     }
 
     try {
-        isSaving.value = true; // Menunjukkan proses sedang berjalan
+        isSaving.value = true;
         activationCodeMessage.value = 'Memvalidasi kode...';
 
         const codeRef = doc(db, "activation_codes", activationCodeInput.value);
-        const codeDoc = await getDoc(codeRef);
+        const userRef = doc(db, "users", currentUser.value.uid);
+        
+        let subscriptionEndDate;
 
-        if (codeDoc.exists() && codeDoc.data().status === 'unused') {
-            const userRef = doc(db, "users", currentUser.value.uid);
+        await runTransaction(db, async (transaction) => {
+            const codeDoc = await transaction.get(codeRef);
+            if (!codeDoc.exists() || codeDoc.data().status !== 'unused') {
+                throw new Error('Kode aktivasi tidak valid atau sudah digunakan.');
+            }
+
             const now = new Date();
-            const nextMonth = new Date(new Date(now).setMonth(now.getMonth() + 1));
+            subscriptionEndDate = new Date(new Date(now).setMonth(now.getMonth() + 1));
             
-            const batch = writeBatch(db);
-            // Update data pengguna
-            batch.update(userRef, {
+            transaction.update(userRef, {
                 subscriptionStatus: 'active',
-                subscriptionEndDate: nextMonth,
-                trialEndDate: null // Hapus masa trial jika ada
+                subscriptionEndDate: subscriptionEndDate,
+                trialEndDate: null
             });
-            // Update status kode aktivasi
-            batch.update(codeRef, {
+            transaction.update(codeRef, {
                 status: 'used',
                 usedBy: currentUser.value.uid,
+                usedByEmail: currentUser.value.userData.email,
                 usedAt: new Date()
             });
-
-            await batch.commit();
-            
-            activationCodeMessage.value = '';
-            alert('Aktivasi berhasil! Langganan Anda sekarang aktif selama 1 bulan.');
-            // onAuthStateChanged akan otomatis memuat ulang data dan status langganan
-        } else {
-            throw new Error('Kode aktivasi tidak valid atau sudah digunakan.');
+        });
+        
+        // --- PERBAIKAN UTAMA DI SINI ---
+        // Perbarui state lokal secara manual agar UI langsung berubah
+        if (currentUser.value.userData) {
+            currentUser.value.userData.subscriptionStatus = 'active';
+            currentUser.value.userData.subscriptionEndDate = subscriptionEndDate;
+            currentUser.value.userData.trialEndDate = null;
         }
+        
+        activationCodeMessage.value = '';
+        activationCodeInput.value = '';
+        alert('Aktivasi berhasil! Langganan Anda sekarang aktif selama 1 bulan.');
+
     } catch (error) {
         activationCodeMessage.value = error.message;
     } finally {
@@ -7195,9 +7228,20 @@ onMounted(() => {
 });
 });
 
-watch(activePage, (newPage) => {
+watch(activePage, (newPage, oldPage) => {
     localStorage.setItem('lastActivePage', newPage);
     loadDataForPage(newPage);
+
+    // --- LOGIKA BARU UNTUK LISTENER REAL-TIME ---
+    if (newPage === 'langganan' && currentUser.value) {
+        // Mulai mendengarkan perubahan data pengguna saat masuk ke halaman langganan
+        setupUserListener(currentUser.value.uid);
+    } else if (oldPage === 'langganan' && userListener) {
+        // Hentikan listener saat keluar dari halaman langganan untuk hemat resource
+        console.log("Keluar dari halaman langganan, listener dihentikan.");
+        userListener();
+        userListener = null;
+    }
 });
 
 </script>
