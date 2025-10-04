@@ -1440,16 +1440,21 @@ const roasSimulationResults = computed(() => {
     const results = roasResults.value;
     const { estimasiBiayaIklan, hargaJual, customRoasTarget } = uiState.roasCalculator;
 
-    if (results.error || !estimasiBiayaIklan || estimasiBiayaIklan <= 0) {
-        return [];
+    if (!hargaJual || hargaJual <= 0 || !estimasiBiayaIklan || estimasiBiayaIklan <= 0 || results.error) {
+        // Jika input belum lengkap, kembalikan array kosong
+        return [
+            { scenario: 'Skenario Impas (BEP)', targetRoas: 'N/A', estimasiOrder: 0, estimasiOmset: 0, estimasiLabaBersih: 0 },
+            { scenario: 'Skenario Target Profit 20%', targetRoas: 'N/A', estimasiOrder: 0, estimasiOmset: 0, estimasiLabaBersih: 0 },
+            { scenario: 'Skenario Kustom', targetRoas: customRoasTarget || 0, estimasiOrder: 0, estimasiOmset: 0, estimasiLabaBersih: 0 },
+        ];
     }
 
     const calculateScenario = (scenarioName, roasTarget) => {
-        if (!isFinite(roasTarget)) {
+        if (!isFinite(roasTarget) || roasTarget <= 0) {
             return { scenario: scenarioName, targetRoas: 'N/A', estimasiOrder: 0, estimasiOmset: 0, estimasiLabaBersih: 0 };
         }
         
-        // Rumus inti
+        // Rumus inti yang sudah benar
         const estimasiOmset = estimasiBiayaIklan * roasTarget;
         const estimasiOrder = hargaJual > 0 ? estimasiOmset / hargaJual : 0;
         const estimasiProfitKotor = estimasiOrder * results.profitKotor;
@@ -1464,6 +1469,7 @@ const roasSimulationResults = computed(() => {
         };
     };
 
+    // Cari target ROAS untuk 20% dari hasil perhitungan yang sudah benar
     const targetRoas20Percent = results.targets.find(t => t.margin === 20)?.roas || 0;
 
     return [
