@@ -10334,7 +10334,7 @@ watch(activePage, (newPage, oldPage) => {
                     </div>
                     <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
                         <p class="font-semibold text-slate-600">Versi Aplikasi</p>
-                        <p class="text-slate-800">1.0.0 (Build 20250903)</p>
+                        <p class="text-slate-800">1.0.0 (Build 20251004)</p>
                     </div>
                 </div>
             </div>
