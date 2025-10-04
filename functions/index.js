@@ -18,14 +18,13 @@ exports.updateSummaryOnNewTransaction = onDocumentCreated("transactions/{transac
     const biayaTransaksi = biaya?.total || 0;
     const labaKotor = omsetBersih - totalHPP;
     const labaBersihOperasional = labaKotor - biayaTransaksi;
+    const totalQty = (items || []).reduce((sum, item) => sum + (item.qty || 0), 0); // <-- LOGIKA BARU
 
     const date = tanggal.toDate();
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
-
     const summaryRef = db.doc(`user_summaries/${userId}`);
 
-    // --- STRUKTUR OBJEK BARU YANG BENAR ---
     const updateData = {
         [`summary_${year}`]: {
             months: {
@@ -37,6 +36,7 @@ exports.updateSummaryOnNewTransaction = onDocumentCreated("transactions/{transac
                     labaKotor: admin.firestore.FieldValue.increment(labaKotor),
                     omsetBersih: admin.firestore.FieldValue.increment(omsetBersih),
                     labaBersihOperasional: admin.firestore.FieldValue.increment(labaBersihOperasional),
+                    totalQty: admin.firestore.FieldValue.increment(totalQty), // <-- TAMBAHKAN INI
                 }
             },
             yearlyTotals: {
@@ -47,6 +47,7 @@ exports.updateSummaryOnNewTransaction = onDocumentCreated("transactions/{transac
                 labaKotor: admin.firestore.FieldValue.increment(labaKotor),
                 omsetBersih: admin.firestore.FieldValue.increment(omsetBersih),
                 labaBersihOperasional: admin.firestore.FieldValue.increment(labaBersihOperasional),
+                totalQty: admin.firestore.FieldValue.increment(totalQty), // <-- TAMBAHKAN INI
             }
         }
     };
@@ -91,10 +92,12 @@ exports.updateSummaryOnNewReturn = onDocumentCreated("returns/{returnId}", async
     let totalNilaiRetur = 0;
     let totalBiayaMarketplaceBatal = 0;
     let totalHppRetur = 0;
+    let totalQtyRetur = 0; // <-- LOGIKA BARU
 
     for (const item of items) {
         totalNilaiRetur += item.nilaiRetur || 0;
         totalBiayaMarketplaceBatal += item.biayaMarketplace || 0;
+        totalQtyRetur += item.qty || 0; // <-- LOGIKA BARU
         const productQuery = await db.collection("products").where("sku", "==", item.sku).limit(1).get();
         if (!productQuery.empty) {
             const productData = productQuery.docs[0].data();
@@ -105,12 +108,10 @@ exports.updateSummaryOnNewReturn = onDocumentCreated("returns/{returnId}", async
     const date = tanggal.toDate();
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
-
     const summaryRef = db.doc(`user_summaries/${userId}`);
     const labaKotorChange = totalHppRetur - totalNilaiRetur;
     const labaBersihChange = labaKotorChange + totalBiayaMarketplaceBatal;
 
-    // --- STRUKTUR OBJEK BARU YANG BENAR ---
     const updateData = {
         [`summary_${year}`]: {
             months: {
@@ -121,6 +122,7 @@ exports.updateSummaryOnNewReturn = onDocumentCreated("returns/{returnId}", async
                     biayaTransaksi: admin.firestore.FieldValue.increment(-totalBiayaMarketplaceBatal),
                     labaKotor: admin.firestore.FieldValue.increment(labaKotorChange),
                     labaBersihOperasional: admin.firestore.FieldValue.increment(labaBersihChange),
+                    totalQty: admin.firestore.FieldValue.increment(-totalQtyRetur), // <-- TAMBAHKAN INI
                 }
             },
             yearlyTotals: {
@@ -130,6 +132,7 @@ exports.updateSummaryOnNewReturn = onDocumentCreated("returns/{returnId}", async
                 biayaTransaksi: admin.firestore.FieldValue.increment(-totalBiayaMarketplaceBatal),
                 labaKotor: admin.firestore.FieldValue.increment(labaKotorChange),
                 labaBersihOperasional: admin.firestore.FieldValue.increment(labaBersihChange),
+                totalQty: admin.firestore.FieldValue.increment(-totalQtyRetur), // <-- TAMBAHKAN INI
             }
         }
     };

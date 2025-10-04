@@ -1348,7 +1348,6 @@ const laporanTransaksiData = computed(() => {
     const summaryForYear = state.summaryData?.[`summary_${year}`];
     const months = [];
 
-    // Loop 12 bulan untuk membuat baris tabel
     for (let i = 1; i <= 12; i++) {
         const monthStr = i.toString().padStart(2, '0');
         const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
@@ -1356,6 +1355,7 @@ const laporanTransaksiData = computed(() => {
 
         months.push({
             monthName: monthName,
+            totalQty: data.totalQty || 0, // <-- TAMBAHKAN INI
             omsetKotor: data.omsetKotor || 0,
             totalDiskon: data.totalDiskon || 0,
             totalNilaiRetur: data.nilaiRetur || 0,
@@ -1366,8 +1366,8 @@ const laporanTransaksiData = computed(() => {
         });
     }
     
-    // Ambil total tahunan yang sudah dihitung oleh Cloud Functions
     const yearlyTotals = {
+        totalQty: summaryForYear?.yearlyTotals?.totalQty || 0, // <-- TAMBAHKAN INI
         omsetKotor: summaryForYear?.yearlyTotals?.omsetKotor || 0,
         totalDiskon: summaryForYear?.yearlyTotals?.totalDiskon || 0,
         totalNilaiRetur: summaryForYear?.yearlyTotals?.nilaiRetur || 0,
@@ -9231,6 +9231,7 @@ watch(activePage, (newPage) => {
                     <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
                         <tr>
                             <th class="px-6 py-4 font-semibold">Bulan</th>
+                            <th class="px-6 py-4 font-semibold text-center">QTY Terjual</th>
                             <th class="px-6 py-4 font-semibold text-right">Omset Kotor</th>
                             <th class="px-6 py-4 font-semibold text-right">Diskon</th>
                             <th class="px-6 py-4 font-semibold text-right">Retur</th>
@@ -9243,6 +9244,7 @@ watch(activePage, (newPage) => {
                     <tbody class="divide-y divide-slate-200/50">
                         <tr v-for="month in laporanTransaksiData.months" :key="month.monthName" class="hover:bg-slate-50/50">
                             <td class="px-6 py-4 font-semibold text-slate-800">{{ month.monthName }}</td>
+                            <td class="px-6 py-4 text-center font-bold text-slate-800">{{ formatNumber(month.totalQty) }} pcs</td>
                             <td class="px-6 py-4 text-right">{{ formatCurrency(month.omsetKotor) }}</td>
                             <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalDiskon) }}</td>
                             <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalNilaiRetur) }}</td>
@@ -9255,6 +9257,7 @@ watch(activePage, (newPage) => {
                     <tfoot class="border-t-2 border-slate-300 bg-slate-100/80">
                         <tr class="font-bold text-slate-900">
                             <td class="px-6 py-4">TOTAL {{ uiState.laporanTransaksiTahun }}</td>
+                            <td class="px-6 py-4 text-center text-lg">{{ formatNumber(laporanTransaksiData.yearlyTotals.totalQty) }} pcs</td>
                             <td class="px-6 py-4 text-right">{{ formatCurrency(laporanTransaksiData.yearlyTotals.omsetKotor) }}</td>
                             <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalDiskon) }}</td>
                             <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalNilaiRetur) }}</td>
