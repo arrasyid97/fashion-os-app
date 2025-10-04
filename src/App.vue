@@ -6793,23 +6793,24 @@ const fetchCoreData = async (userId) => {
             getDoc(doc(db, "product_commissions", userId)),
         ]);
 
+        const defaultPinSettings = {
+            dashboard: false,
+            incomeHistory: false,
+            investmentPage: false,
+            laporanTransaksi: false,
+            laporanKeuangan: false,
+            hargaHpp: false
+        };
+
         if (settingsSnap.exists()) {
             const settingsData = settingsSnap.data();
             Object.assign(state.settings, settingsData);
-
-            // --- PERBAIKAN UTAMA DI SINI ---
-            // Pastikan semua kunci PIN ada dengan nilai default 'false' (tidak aktif)
-            const defaultPinSettings = {
-                dashboard: false,
-                incomeHistory: false,
-                investmentPage: false,
-                laporanTransaksi: false,
-                laporanKeuangan: false,
-                hargaHpp: false
-            };
-            // Gabungkan default dengan data yang ada.
-            // Kunci yang belum ada di database akan diberi nilai 'false'.
+            // Gabungkan default dengan data yang ada untuk pengguna lama
             state.settings.pinProtection = { ...defaultPinSettings, ...(settingsData.pinProtection || {}) };
+        } else {
+            // --- PERBAIKAN UTAMA DI SINI ---
+            // Jika pengguna baru dan belum punya settings, buat pinProtection default
+            state.settings.pinProtection = defaultPinSettings;
         }
 
         if (currentUser.value?.userData?.inflowCategories) {
