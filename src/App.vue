@@ -32,8 +32,6 @@ const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengatura
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
-const userProfile = reactive({ data: null });
-const currentTime = ref(new Date());
 const nomorWhatsAppAdmin = ref('6285691803476');
 const activationCodeInput = ref('');
 const activationCodeMessage = ref('');
@@ -581,20 +579,18 @@ const parsePercentageInput = (value) => {
 };
 
 const isSubscriptionActive = computed(() => {
-    const now = currentTime.value.getTime(); // Gunakan waktu reaktif kita
-
-    if (!userProfile.data) {
+    if (!currentUser.value || !currentUser.value.userData) {
         return false;
     }
+    const status = currentUser.value.userData.subscriptionStatus;
+    const trialEndDate = currentUser.value.userData.trialEndDate?.seconds * 1000;
+    const subscriptionEndDate = currentUser.value.userData.subscriptionEndDate?.seconds * 1000;
     
-    const status = userProfile.data.subscriptionStatus;
-    const trialEndDate = userProfile.data.trialEndDate?.seconds * 1000;
-    const subscriptionEndDate = userProfile.data.subscriptionEndDate?.seconds * 1000;
-    
-    if (status === 'active' && subscriptionEndDate > now) {
+    // Cek apakah status aktif DAN tanggal kedaluwarsa belum terlewati
+    if (status === 'active' && subscriptionEndDate > Date.now()) {
         return true;
     }
-    if (status === 'trial' && trialEndDate > now) {
+    if (status === 'trial' && trialEndDate > Date.now()) {
         return true;
     }
     return false;
@@ -1256,8 +1252,8 @@ const filteredVoucherNotes = computed(() => {
 
 const monthlyPrice = ref(350000);
 const yearlyPrice = ref(4200000);
-const discountedMonthlyPrice = ref(5000);
-const discountedYearlyPrice = ref(6000);
+const discountedMonthlyPrice = ref(250000);
+const discountedYearlyPrice = ref(2500000);
 
 async function submitAddProduct() {
   const form = uiState.modalData;
@@ -2218,15 +2214,20 @@ async function handleSubscriptionMayar(plan) {
     }
     isSubscribingPlan.value = true;
 
-    // --- PERBAIKAN DI SINI ---
-    const referredByCode = uiState.referralCodeApplied ? uiState.referralCodeInput : (userProfile.data?.referredBy || null);
+    // Logika untuk memeriksa apakah ada kode rujukan yang aktif
+    const referredByCode = uiState.referralCodeApplied ? uiState.referralCodeInput : (currentUser.value?.userData?.referredBy || null);
 
+    // --- AWAL PERBAIKAN UTAMA ---
+    // Tentukan harga yang akan dibayar berdasarkan status kode rujukan
     let priceToPay;
     if (referredByCode) {
+        // Jika ada kode rujukan, gunakan harga diskon
         priceToPay = plan === 'bulanan' ? discountedMonthlyPrice.value : discountedYearlyPrice.value;
     } else {
+        // Jika tidak ada, gunakan harga normal
         priceToPay = plan === 'bulanan' ? monthlyPrice.value : yearlyPrice.value;
     }
+    // --- AKHIR PERBAIKAN UTAMA ---
 
     try {
         if (referredByCode) {
@@ -2235,13 +2236,14 @@ async function handleSubscriptionMayar(plan) {
                 referredByCode: referredByCode,
                 timestamp: new Date(),
             }, { merge: true });
+            console.log(`INFO: Data referral untuk ${currentUser.value.email} disimpan di Firestore.`);
         }
 
         const response = await fetch('/api/create-mayar-invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                amount: priceToPay,
+                amount: priceToPay, // <-- Menggunakan variabel harga yang sudah benar
                 item_name: `Langganan Fashion OS - Paket ${plan === 'bulanan' ? 'Bulanan' : 'Tahunan'}`,
                 customer_email: currentUser.value.email,
                 callback_url: 'https://appfashion.id/api/mayar-webhook',
@@ -2364,8 +2366,7 @@ async function saveModelPromotions(modelName, channelId) {
 }
 
 async function applyReferralCode() {
-    // --- PERBAIKAN DI SINI ---
-    if (userProfile.data?.referredBy) {
+    if (currentUser.value?.userData?.referredBy) {
         uiState.referralCodeMessage = "Anda sudah memiliki diskon rujukan.";
         return;
     }
@@ -2565,49 +2566,39 @@ async function handleActivation() {
     }
 
     try {
-        isSaving.value = true;
+        isSaving.value = true; // Menunjukkan proses sedang berjalan
         activationCodeMessage.value = 'Memvalidasi kode...';
 
         const codeRef = doc(db, "activation_codes", activationCodeInput.value);
-        const userRef = doc(db, "users", currentUser.value.uid);
-        
-        let subscriptionEndDate; // Variabel untuk menyimpan tanggal baru
+        const codeDoc = await getDoc(codeRef);
 
-        // Menjalankan transaksi untuk memastikan keamanan data
-        await runTransaction(db, async (transaction) => {
-            const codeDoc = await transaction.get(codeRef);
-            if (!codeDoc.exists() || codeDoc.data().status !== 'unused') {
-                throw new Error('Kode aktivasi tidak valid atau sudah digunakan.');
-            }
-
+        if (codeDoc.exists() && codeDoc.data().status === 'unused') {
+            const userRef = doc(db, "users", currentUser.value.uid);
             const now = new Date();
-            subscriptionEndDate = new Date(new Date(now).setMonth(now.getMonth() + 1));
+            const nextMonth = new Date(new Date(now).setMonth(now.getMonth() + 1));
             
-            transaction.update(userRef, {
+            const batch = writeBatch(db);
+            // Update data pengguna
+            batch.update(userRef, {
                 subscriptionStatus: 'active',
-                subscriptionEndDate: subscriptionEndDate,
-                trialEndDate: null
+                subscriptionEndDate: nextMonth,
+                trialEndDate: null // Hapus masa trial jika ada
             });
-            transaction.update(codeRef, {
+            // Update status kode aktivasi
+            batch.update(codeRef, {
                 status: 'used',
                 usedBy: currentUser.value.uid,
-                usedByEmail: userProfile.data.email, // Menyimpan email pengguna
                 usedAt: new Date()
             });
-        });
-        
-        // --- PERBAIKAN UTAMA DI SINI ---
-        // Perbarui state lokal secara manual agar UI langsung berubah
-        if (userProfile.data) {
-            userProfile.data.subscriptionStatus = 'active';
-            userProfile.data.subscriptionEndDate = { seconds: Math.floor(subscriptionEndDate.getTime() / 1000) }; // Simulasikan format Firestore
-            userProfile.data.trialEndDate = null;
-        }
-        
-        activationCodeMessage.value = '';
-        activationCodeInput.value = '';
-        alert('Aktivasi berhasil! Langganan Anda sekarang aktif selama 1 bulan.');
 
+            await batch.commit();
+            
+            activationCodeMessage.value = '';
+            alert('Aktivasi berhasil! Langganan Anda sekarang aktif selama 1 bulan.');
+            // onAuthStateChanged akan otomatis memuat ulang data dan status langganan
+        } else {
+            throw new Error('Kode aktivasi tidak valid atau sudah digunakan.');
+        }
     } catch (error) {
         activationCodeMessage.value = error.message;
     } finally {
@@ -6767,32 +6758,36 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 let unsubscribe = () => {}; 
 
 const setupListeners = async (userId) => {
-    if (unsubscribe) unsubscribe();
+  unsubscribe(); // Hentikan listener lama
 
-    const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
-        if (docSnap.exists()) {
-            Object.assign(state.settings, docSnap.data());
-        }
-    }, (error) => { console.error("Error fetching settings:", error); });
-
-    let commissionsListener = () => {};
-    // --- PERBAIKAN DI SINI ---
-    if (userProfile.data?.isPartner) {
-        const commissionsQuery = query(
-            collection(db, 'commissions'),
-            where('partnerId', '==', currentUser.value.uid)
-        );
-        commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-            commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        });
+  // Listener untuk settings (real-time)
+  const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
+    if (docSnap.exists()) {
+      const settingsData = docSnap.data();
+      Object.assign(state.settings, settingsData);
     }
+  }, (error) => { console.error("Error fetching settings:", error); });
 
-    await fetchCoreData(userId);
+  // Listener untuk komisi mitra (real-time jika dia adalah mitra)
+  let commissionsListener = () => {};
+  if (currentUser.value?.isPartner) {
+    const commissionsQuery = query(
+      collection(db, 'commissions'),
+      where('partnerId', '==', currentUser.value.uid)
+    );
+    commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
+      commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    });
+  }
 
-    unsubscribe = () => {
-        settingsListener();
-        commissionsListener();
-    };
+  // Panggil data inti yang dibutuhkan segera
+  await fetchCoreData(userId);
+
+  // Fungsi untuk menghentikan listener saat logout
+  unsubscribe = () => {
+    settingsListener();
+    commissionsListener();
+  };
 };
 
 const fetchCoreData = async (userId) => {
@@ -7173,34 +7168,31 @@ const fetchNotesData = async (userId) => {
 };
 
 onMounted(() => {
-    // Memulai jam reaktif yang akan update setiap 1 menit
-    setInterval(() => {
-        currentTime.value = new Date();
-    }, 60000); 
+  onAuthStateChanged(auth, async (user) => {
+    isLoading.value = true;
+    hasLoadedInitialData.value = false;
 
-    onAuthStateChanged(auth, async (user) => {
-        isLoading.value = true;
-        hasLoadedInitialData.value = false;
-        Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
+    // Reset status data yang sudah di-fetch setiap kali auth berubah
+    Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
 
-        if (user) {
-            currentUser.value = user; // Simpan data otentikasi Firebase
-            
-            // Ambil data profil dari Firestore dan simpan di state reaktif terpisah
-            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-            userProfile.data = userDocSnap.exists() ? userDocSnap.data() : {};
+    if (user) {
+        // --- INI BAGIAN UTAMA PERBAIKAN ---
+        const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+        const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+        currentUser.value = { ...user, userData, isPartner: userData.isPartner || false, referralCode: userData.referralCode || null };
+        // --- AKHIR DARI PERBAIKAN ---
 
-            await setupListeners(user.uid);
-            changePage(activePage.value);
-        } else {
-            currentUser.value = null;
-            userProfile.data = null; // Kosongkan profil saat logout
-            activePage.value = 'login';
-            if (unsubscribe) unsubscribe();
-        }
-        isLoading.value = false;
-        hasLoadedInitialData.value = true;
-    });
+        await setupListeners(user.uid);
+        changePage(activePage.value);
+
+    } else {
+        currentUser.value = null;
+        activePage.value = 'login';
+        unsubscribe();
+    }
+    isLoading.value = false;
+    hasLoadedInitialData.value = true;
+});
 });
 
 watch(activePage, (newPage) => {
@@ -7354,7 +7346,7 @@ watch(activePage, (newPage) => {
                 </svg>
                 Investasi
             </a>
-            <a v-if="userProfile.data?.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">
+            <a v-if="currentUser.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
