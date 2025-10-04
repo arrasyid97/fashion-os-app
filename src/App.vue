@@ -582,37 +582,23 @@ const parsePercentageInput = (value) => {
 
 
 
-function getDateValue(dateSource) {
-    if (!dateSource) return null;
-    // Jika formatnya adalah Firestore Timestamp (memiliki .seconds)
-    if (typeof dateSource.seconds === 'number') {
-        return dateSource.seconds * 1000;
-    }
-    // Jika formatnya adalah objek Date JavaScript atau string tanggal
-    if (dateSource instanceof Date || typeof dateSource === 'string') {
-        return new Date(dateSource).getTime();
-    }
-    return null;
-}
-
 const isSubscriptionActive = computed(() => {
-    if (!currentUser.value?.userData) {
+    const now = currentTime.value; // Gunakan waktu reaktif kita
+
+    if (!userProfile.data) {
         return false;
     }
-
-    const now = Date.now();
-    const status = currentUser.value.userData.subscriptionStatus;
-
-    // Gunakan fungsi bantuan untuk mendapatkan tanggal akhir trial
-    const trialEndDate = getDateValue(currentUser.value.userData.trialEndDate);
-    if (status === 'trial' && trialEndDate && trialEndDate > now) {
-        return true;
+    
+    const status = userProfile.data.subscriptionStatus;
+    
+    if (status === 'trial' && userProfile.data.trialEndDate) {
+        const trialEndDate = new Date(userProfile.data.trialEndDate.seconds * 1000);
+        if (trialEndDate > now) return true;
     }
-
-    // Gunakan fungsi bantuan untuk mendapatkan tanggal akhir langganan
-    const subscriptionEndDate = getDateValue(currentUser.value.userData.subscriptionEndDate);
-    if (status === 'active' && subscriptionEndDate && subscriptionEndDate > now) {
-        return true;
+    
+    if (status === 'active' && userProfile.data.subscriptionEndDate) {
+        const subscriptionEndDate = new Date(userProfile.data.subscriptionEndDate.seconds * 1000);
+        if (subscriptionEndDate > now) return true;
     }
 
     return false;
