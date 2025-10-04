@@ -405,7 +405,7 @@ const loadDataForPage = async (pageName) => {
             case 'produksi':
                 dataPromises.push(fetchProductData(userId));
                 dataPromises.push(fetchProductionData(userId));
-                dataPromises.push(fetchSummaryData(userId));
+                
                 break;
             case 'gudang-kain':
                 dataPromises.push(fetchProductionData(userId));
@@ -1339,14 +1339,7 @@ const laporanKeuanganData = computed(() => {
     return { months, yearlyTotals };
 });
 
-const biayaOperasionalBulanIni = computed(() => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  
-  // Mengambil data dari state.summaryData dengan aman
-  return state.summaryData?.[`summary_${year}`]?.months?.[month]?.biayaOperasional || 0;
-});
+
 
 async function addSupplier() {
     if (!currentUser.value) return alert("Anda harus login.");
@@ -8118,21 +8111,7 @@ watch(activePage, (newPage) => {
                     <div class="flex items-center gap-4">
     <div>
         <h2 class="text-3xl font-bold text-slate-800">Manajemen Produksi</h2>
-        <p class="text-slate-500 mt-1">Lacak semua batch produksi, mulai dari bahan baku hingga produk jadi.</p>
-
-    <div class="my-6 bg-white/70 backdrop-blur-sm p-4 rounded-xl border border-slate-200 shadow-lg max-w-sm animate-fade-in-up">
-        <div class="flex items-start gap-4">
-            <div class="bg-orange-100 text-orange-600 p-3 rounded-lg flex-shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" />
-                </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-medium text-slate-500">Total Biaya Operasional Bulan Ini</h3>
-                <p class="text-2xl font-bold mt-1 text-orange-600">-{{ formatCurrency(biayaOperasionalBulanIni) }}</p>
-            </div>
-        </div>
-    </div>
+        
         <p class="text-slate-500 mt-1">Lacak semua batch produksi, mulai dari bahan baku hingga produk jadi.</p>
     </div>
     <button @click="showModal('produksiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2 flex-shrink-0">
