@@ -244,6 +244,13 @@ const uiState = reactive({
     investasiPinInput: '',       // Untuk input PIN di halaman investasi
     investasiPinError: '',       // Pesan error jika PIN salah
 
+    laporanKeuanganPinInput: '',
+laporanKeuanganPinError: '',
+laporanTransaksiPinInput: '',
+laporanTransaksiPinError: '',
+hargaHppPinInput: '',
+hargaHppPinError: '',
+
     referralCodeInput: '',
     referralCodeApplied: false,
     referralCodeMessage: '',
@@ -552,7 +559,9 @@ const totalRevenue = computed(() =>
 const availableForWithdrawal = computed(() => totalUnpaidCommission.value);
 const totalWithdrawn = computed(() => totalPaidCommission.value);
 
-
+const isLaporanKeuanganLocked = ref(false);
+const isLaporanTransaksiLocked = ref(false);
+const isHargaHppLocked = ref(false);
 const isDashboardLocked = ref(false);
 const dashboardPinInput = ref('');
 const dashboardPinError = ref('');
@@ -4192,9 +4201,8 @@ function generateBagiHasilReport() {
 function changePage(pageName) {
     activePage.value = pageName;
 
-    // Logika Kunci untuk Halaman Dashboard
+    // Logika Kunci Halaman Dashboard
     if (pageName === 'dashboard') {
-        // Dasbor terkunci HANYA jika PIN ada DAN toggle-nya ON
         if (state.settings.dashboardPin && state.settings.pinProtection?.dashboard) {
             isDashboardLocked.value = true;
             dashboardPinInput.value = '';
@@ -4202,14 +4210,10 @@ function changePage(pageName) {
         } else {
             isDashboardLocked.value = false;
         }
-    } else {
-        // Untuk halaman lain, pastikan lock screen dasbor tidak aktif
-        isDashboardLocked.value = false;
     }
 
-    // Logika Kunci untuk Halaman Keuangan (Riwayat Pemasukan)
+    // Logika Kunci Halaman Keuangan (Riwayat Pemasukan)
     if (pageName === 'keuangan') {
-        // Pemasukan terkunci HANYA jika PIN ada DAN toggle-nya ON
         if (state.settings.dashboardPin && state.settings.pinProtection?.incomeHistory) {
             uiState.isPemasukanLocked = true;
             uiState.pemasukanPinInput = '';
@@ -4219,9 +4223,8 @@ function changePage(pageName) {
         }
     }
 
-    // Logika Kunci untuk Halaman Investasi
+    // Logika Kunci Halaman Investasi
     if (pageName === 'investasi') {
-        // Investasi terkunci HANYA jika PIN ada DAN toggle-nya ON
         if (state.settings.dashboardPin && state.settings.pinProtection?.investmentPage) {
             uiState.isInvestasiLocked = true;
             uiState.investasiPinInput = '';
@@ -4230,7 +4233,42 @@ function changePage(pageName) {
             uiState.isInvestasiLocked = false;
         }
     }
+
+    // --- LOGIKA BARU DIMULAI DI SINI ---
+    // Logika Kunci Laporan Transaksi
+    if (pageName === 'laporan-transaksi') {
+        if (state.settings.dashboardPin && state.settings.pinProtection?.laporanTransaksi) {
+            isLaporanTransaksiLocked.value = true;
+            uiState.laporanTransaksiPinInput = '';
+            uiState.laporanTransaksiPinError = '';
+        } else {
+            isLaporanTransaksiLocked.value = false;
+        }
+    }
+
+    // Logika Kunci Laporan Keuangan
+    if (pageName === 'laporan-keuangan') {
+        if (state.settings.dashboardPin && state.settings.pinProtection?.laporanKeuangan) {
+            isLaporanKeuanganLocked.value = true;
+            uiState.laporanKeuanganPinInput = '';
+            uiState.laporanKeuanganPinError = '';
+        } else {
+            isLaporanKeuanganLocked.value = false;
+        }
+    }
+
+    // Logika Kunci Harga & HPP
+    if (pageName === 'harga-hpp') {
+        if (state.settings.dashboardPin && state.settings.pinProtection?.hargaHpp) {
+            isHargaHppLocked.value = true;
+            uiState.hargaHppPinInput = '';
+            uiState.hargaHppPinError = '';
+        } else {
+            isHargaHppLocked.value = false;
+        }
+    }
 }
+
 function unlockDashboard() {
   // Cek PIN yang dimasukkan dengan PIN yang sudah ada di state
   if (dashboardPinInput.value === state.settings.dashboardPin) {
@@ -4253,7 +4291,32 @@ function unlockInvestasi() {
     }
 }
 
+function unlockLaporanTransaksi() {
+    if (uiState.laporanTransaksiPinInput === state.settings.dashboardPin) {
+        isLaporanTransaksiLocked.value = false;
+        uiState.laporanTransaksiPinError = '';
+    } else {
+        uiState.laporanTransaksiPinError = 'PIN salah.';
+    }
+}
 
+function unlockLaporanKeuangan() {
+    if (uiState.laporanKeuanganPinInput === state.settings.dashboardPin) {
+        isLaporanKeuanganLocked.value = false;
+        uiState.laporanKeuanganPinError = '';
+    } else {
+        uiState.laporanKeuanganPinError = 'PIN salah.';
+    }
+}
+
+function unlockHargaHpp() {
+    if (uiState.hargaHppPinInput === state.settings.dashboardPin) {
+        isHargaHppLocked.value = false;
+        uiState.hargaHppPinError = '';
+    } else {
+        uiState.hargaHppPinError = 'PIN salah.';
+    }
+}
 
 function showModal(type, data = {}) {
     // Reset data modal untuk memastikan tidak ada data lama yang bocor
@@ -7937,196 +8000,200 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-    <div v-if="activePage === 'harga-hpp'">
-    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-        <div class="max-w-7xl mx-auto">
-            
-            <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
-    <div>
-        <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga, HPP & Komisi</h2>
-        <p class="text-slate-500 mt-1">Atur profitabilitas untuk setiap varian produk di semua channel penjualan.</p>
+    <div v-if="activePage === 'harga-hpp'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+    
+    <div v-if="isHargaHppLocked" class="flex items-center justify-center h-full animate-fade-in">
+        <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Halaman Terkunci</h3>
+            <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan Anda untuk membuka.</p>
+            <form @submit.prevent="unlockHargaHpp" class="w-full">
+                <input type="password" v-model="uiState.hargaHppPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2">
+                <p v-if="uiState.hargaHppPinError" class="text-red-500 text-xs mb-2">{{ uiState.hargaHppPinError }}</p>
+                <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka</button>
+            </form>
+        </div>
     </div>
-    <div class="flex gap-3">
-        <button @click="showModal('priceCalculator')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors" :disabled="!isSubscriptionActive">
-            Kalkulator Harga
-        </button>
-    </div>
-</div>
 
-            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-                
-                <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Daftar Produk</h3>
+    <div v-else class="max-w-7xl mx-auto">
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
+            <div>
+                <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga, HPP & Komisi</h2>
+                <p class="text-slate-500 mt-1">Atur profitabilitas untuk setiap varian produk di semua channel penjualan.</p>
+            </div>
+            <div class="flex gap-3">
+                <button @click="showModal('priceCalculator')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors" :disabled="!isSubscriptionActive">
+                    Kalkulator Harga
+                </button>
+            </div>
+        </div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                            <tr>
-                                <th class="px-6 py-3 font-semibold">Nama Model</th>
-                                <th class="px-6 py-3 font-semibold">SKU</th>
-                                <th class="px-6 py-3 font-semibold">Warna</th>
-                                <th class="px-6 py-3 font-semibold">Ukuran</th>
-                                <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="inventoryProductGroups.length === 0">
-                                <td colspan="5" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
-                            </tr>
-                            
-                            <template v-for="group in inventoryProductGroups" :key="group.namaModel">
-                                <tr 
-                                    class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" 
-                                    @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel"
-                                >
-                                    <td class="px-6 py-4 font-bold text-slate-800">
-                                        <div class="flex items-center">
-                                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.namaModel }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                                            <div>
-                                                {{ group.namaModel }}
-                                                <span class="block text-xs font-normal text-slate-500">{{ group.variants.length }} varian</span>
-                                            </div>
+        <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+            <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Daftar Produk</h3>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                        <tr>
+                            <th class="px-6 py-3 font-semibold">Nama Model</th>
+                            <th class="px-6 py-3 font-semibold">SKU</th>
+                            <th class="px-6 py-3 font-semibold">Warna</th>
+                            <th class="px-6 py-3 font-semibold">Ukuran</th>
+                            <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-if="inventoryProductGroups.length === 0">
+                            <td colspan="5" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
+                        </tr>
+                        
+                        <template v-for="group in inventoryProductGroups" :key="group.namaModel">
+                            <tr 
+                                class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" 
+                                @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel"
+                            >
+                                <td class="px-6 py-4 font-bold text-slate-800">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.namaModel }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                        <div>
+                                            {{ group.namaModel }}
+                                            <span class="block text-xs font-normal text-slate-500">{{ group.variants.length }} varian</span>
                                         </div>
-                                    </td>
-                                    <td colspan="3"></td>
-                                    <td class="px-6 py-3 text-center">
-                                        <button 
-                                            @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `komisi-${group.namaModel}` ? null : `komisi-${group.namaModel}`)"
-                                            class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
-                                            :class="{'bg-blue-200': uiState.activeAccordion === `komisi-${group.namaModel}`}"
-                                        >
-                                            Atur Komisi
-                                        </button>
-                                    </td>
-                                </tr>
+                                    </div>
+                                </td>
+                                <td colspan="3"></td>
+                                <td class="px-6 py-3 text-center">
+                                    <button 
+                                        @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `komisi-${group.namaModel}` ? null : `komisi-${group.namaModel}`)"
+                                        class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
+                                        :class="{'bg-blue-200': uiState.activeAccordion === `komisi-${group.namaModel}`}"
+                                    >
+                                        Atur Komisi
+                                    </button>
+                                </td>
+                            </tr>
 
-                                <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`" class="animate-fade-in">
-                                    <td colspan="5" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
-                                        <div class="space-y-3">
-                                            <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
-                                            <p class="text-xs text-slate-500">Komisi ini akan diterapkan ke **semua varian** dalam model ini dan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
-                                            <div class="space-y-2">
-                                                <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
-                                                    <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
-                                                    <div class="relative w-32">
-                                                        <input 
-    type="text" 
-    v-model="commissionModelComputed(group.namaModel, marketplace.id).value"
-    @input="markProductAsEdited(group.variants[0].docId)" 
-    class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
-    placeholder="0"
->
-                                                        <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
-                                                    </div>
+                            <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`" class="animate-fade-in">
+                                <td colspan="5" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
+                                    <div class="space-y-3">
+                                        <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
+                                        <p class="text-xs text-slate-500">Komisi ini akan diterapkan ke **semua varian** dalam model ini dan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
+                                        <div class="space-y-2">
+                                            <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
+                                                <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
+                                                <div class="relative w-32">
+                                                    <input 
+                                                        type="text" 
+                                                        v-model="commissionModelComputed(group.namaModel, marketplace.id).value"
+                                                        @input="markProductAsEdited(group.variants[0].docId)" 
+                                                        class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
+                                                        placeholder="0"
+                                                    >
+                                                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="mt-4 flex justify-end">
-                                            <button @click.stop="saveCommissionSettings()" 
-    type="button" 
-    class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
-    :disabled="isSaving || !isSubscriptionActive"
->
-    <span v-if="isSaving">Menyimpan Komisi...</span>
-    <span v-else>Simpan & Tutup</span>
-</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                
-                                <template v-if="uiState.activeAccordion === group.namaModel || group.variants.some(v => uiState.activeAccordion === `harga-${v.sku}`)">
-                                    
-                                    <template v-for="v in group.variants" :key="v.docId">
-                                        
-                                        <tr 
-                                            class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in"
-                                            :class="{ 'bg-slate-100': uiState.activeAccordion === `harga-${v.sku}` }"
+                                    </div>
+                                    <div class="mt-4 flex justify-end">
+                                        <button @click.stop="saveCommissionSettings()" 
+                                            type="button" 
+                                            class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
+                                            :disabled="isSaving || !isSubscriptionActive"
                                         >
-                                            <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
-                                            <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
-                                            <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
-                                            <td class="px-6 py-3 text-slate-600">{{ v.varian }}</td>
-                                            <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
-                                                
-                                                <button 
-                                                    @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `harga-${v.sku}` ? group.namaModel : `harga-${v.sku}`)"
-                                                    class="font-semibold text-indigo-600 hover:underline px-2 py-1 rounded-md bg-indigo-50"
-                                                >
-                                                    Atur Harga
-                                                </button>
-                                                
-                                                <button 
-                                                    @click.stop="removeProductVariant(v.docId)" 
-                                                    class="font-semibold text-red-500 hover:underline px-2 py-1 rounded-md bg-red-50" 
-                                                    :disabled="!isSubscriptionActive"
-                                                >
-                                                    Hapus
-                                                </button>
-                                                
-                                            </td>
-                                        </tr>
+                                            <span v-if="isSaving">Menyimpan Komisi...</span>
+                                            <span v-else>Simpan & Tutup</span>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            
+                            <template v-if="uiState.activeAccordion === group.namaModel || group.variants.some(v => uiState.activeAccordion === `harga-${v.sku}`)">
+                                <template v-for="v in group.variants" :key="v.docId">
+                                    <tr 
+                                        class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in"
+                                        :class="{ 'bg-slate-100': uiState.activeAccordion === `harga-${v.sku}` }"
+                                    >
+                                        <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
+                                        <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
+                                        <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
+                                        <td class="px-6 py-3 text-slate-600">{{ v.varian }}</td>
+                                        <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
+                                            <button 
+                                                @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `harga-${v.sku}` ? group.namaModel : `harga-${v.sku}`)"
+                                                class="font-semibold text-indigo-600 hover:underline px-2 py-1 rounded-md bg-indigo-50"
+                                            >
+                                                Atur Harga
+                                            </button>
+                                            <button 
+                                                @click.stop="removeProductVariant(v.docId)" 
+                                                class="font-semibold text-red-500 hover:underline px-2 py-1 rounded-md bg-red-50" 
+                                                :disabled="!isSubscriptionActive"
+                                            >
+                                                Hapus
+                                            </button>
+                                        </td>
+                                    </tr>
 
-                                        <tr v-if="uiState.activeAccordion === `harga-${v.sku}`" class="animate-fade-in">
-                                            <td colspan="5" class="p-6 bg-indigo-50/50 border-b-2 border-indigo-400/50">
-                                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                                    
-                                                    <div>
-                                                        <h4 class="text-sm font-bold text-slate-700 mb-2">HPP (Harga Pokok Produksi)</h4>
-                                                        <div class="relative mt-1">
-                                                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                                            <input 
-    type="text" 
-    :value="formatInputNumber(v.hpp)" 
-    @input="v.hpp = parseInputNumber($event.target.value); markProductAsEdited(v.docId)" 
-    class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600"
->
-                                                        </div>
+                                    <tr v-if="uiState.activeAccordion === `harga-${v.sku}`" class="animate-fade-in">
+                                        <td colspan="5" class="p-6 bg-indigo-50/50 border-b-2 border-indigo-400/50">
+                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                <div>
+                                                    <h4 class="text-sm font-bold text-slate-700 mb-2">HPP (Harga Pokok Produksi)</h4>
+                                                    <div class="relative mt-1">
+                                                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                                        <input 
+                                                            type="text" 
+                                                            :value="formatInputNumber(v.hpp)" 
+                                                            @input="v.hpp = parseInputNumber($event.target.value); markProductAsEdited(v.docId)" 
+                                                            class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-bold text-red-600"
+                                                        >
                                                     </div>
-                                                    
-                                                    <div class="md:col-span-2 space-y-3">
-                                                        <h4 class="text-sm font-bold text-slate-700 mb-2">Harga Jual per Channel</h4>
-                                                        <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
-                                                            <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
-                                                            <div class="flex items-center gap-2">
-                                                                <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
-                                                                    :class="{
-                                                                        'bg-green-100 text-green-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) >= 40,
-                                                                        'bg-yellow-100 text-yellow-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) >= 20 && ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) < 40,
-                                                                        'bg-red-100 text-red-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) < 20
-                                                                    }">
-                                                                    {{ (v.hargaJual[marketplace.id] && v.hpp && v.hargaJual[marketplace.id] > 0 ? (((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
-                                                                </span>
-                                                                <div class="relative w-36">
-                                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
-                                                                    <input 
-    type="text" 
-    :value="formatInputNumber(v.hargaJual[marketplace.id])" 
-    @input="v.hargaJual[marketplace.id] = parseInputNumber($event.target.value); markProductAsEdited(v.docId)" 
-    class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold"
->
-                                                                </div>
+                                                </div>
+                                                
+                                                <div class="md:col-span-2 space-y-3">
+                                                    <h4 class="text-sm font-bold text-slate-700 mb-2">Harga Jual per Channel</h4>
+                                                    <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex justify-between items-center">
+                                                        <label class="text-sm text-slate-600">{{ marketplace.name }}</label>
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-xs font-bold px-2 py-0.5 rounded-full w-20 text-center"
+                                                                :class="{
+                                                                    'bg-green-100 text-green-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) >= 40,
+                                                                    'bg-yellow-100 text-yellow-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) >= 20 && ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) < 40,
+                                                                    'bg-red-100 text-red-800': ((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id] * 100) < 20
+                                                                }">
+                                                                {{ (v.hargaJual[marketplace.id] && v.hpp && v.hargaJual[marketplace.id] > 0 ? (((v.hargaJual[marketplace.id] - v.hpp) / v.hargaJual[marketplace.id]) * 100) : 0).toFixed(1) }}% Margin
+                                                            </span>
+                                                            <div class="relative w-36">
+                                                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">Rp</span>
+                                                                <input 
+                                                                    type="text" 
+                                                                    :value="formatInputNumber(v.hargaJual[marketplace.id])" 
+                                                                    @input="v.hargaJual[marketplace.id] = parseInputNumber($event.target.value); markProductAsEdited(v.docId)" 
+                                                                    class="w-full p-2 pl-8 pr-3 border border-slate-300 rounded-md text-right font-semibold"
+                                                                >
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                <div class="mt-4 flex justify-end">
-                                                    <button @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" type="button" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
-                                                        <span v-if="isSaving">Menyimpan Harga...</span>
-                                                        <span v-else>Simpan & Tutup</span>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        
-                                    </template>
+                                            <div class="mt-4 flex justify-end">
+                                                <button @click.stop="saveData().then(() => uiState.activeAccordion = group.namaModel)" type="button" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400">
+                                                    <span v-if="isSaving">Menyimpan Harga...</span>
+                                                    <span v-else>Simpan & Tutup</span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 </template>
-
-                                <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`"></tr>
                             </template>
-                        </tbody>
-                    </table>
-                </div>
 
+                            <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`"></tr>
+                        </template>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -9319,7 +9386,23 @@ watch(activePage, (newPage) => {
 </div>
 
 <div v-if="activePage === 'laporan-transaksi'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto">
+    
+    <div v-if="isLaporanTransaksiLocked" class="flex items-center justify-center h-full animate-fade-in">
+        <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Halaman Terkunci</h3>
+            <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan Anda untuk membuka.</p>
+            <form @submit.prevent="unlockLaporanTransaksi" class="w-full">
+                <input type="password" v-model="uiState.laporanTransaksiPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2">
+                <p v-if="uiState.laporanTransaksiPinError" class="text-red-500 text-xs mb-2">{{ uiState.laporanTransaksiPinError }}</p>
+                <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka</button>
+            </form>
+        </div>
+    </div>
+
+    <div v-else class="max-w-7xl mx-auto">
         <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
             <div>
                 <h2 class="text-3xl font-bold text-slate-800">Laporan Transaksi Tahunan</h2>
@@ -9512,7 +9595,23 @@ watch(activePage, (newPage) => {
 </div>
 
 <div v-if="activePage === 'laporan-keuangan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto">
+    
+    <div v-if="isLaporanKeuanganLocked" class="flex items-center justify-center h-full animate-fade-in">
+        <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Halaman Terkunci</h3>
+            <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan Anda untuk membuka.</p>
+            <form @submit.prevent="unlockLaporanKeuangan" class="w-full">
+                <input type="password" v-model="uiState.laporanKeuanganPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2">
+                <p v-if="uiState.laporanKeuanganPinError" class="text-red-500 text-xs mb-2">{{ uiState.laporanKeuanganPinError }}</p>
+                <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka</button>
+            </form>
+        </div>
+    </div>
+
+    <div v-else class="max-w-7xl mx-auto">
         <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
             <div>
                 <h2 class="text-3xl font-bold text-slate-800">Laporan Keuangan Tahunan</h2>
@@ -9523,7 +9622,6 @@ watch(activePage, (newPage) => {
                 <input type="number" id="tahun-laporan" v-model.number="uiState.laporanKeuanganTahun" class="w-32 p-2 border border-slate-300 rounded-md shadow-sm">
             </div>
         </div>
-
         <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
@@ -9649,6 +9747,26 @@ watch(activePage, (newPage) => {
                                         <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.investmentPage }"></span>
                                     </button>
                                 </div>
+                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+    <span class="font-medium text-sm text-slate-800">Kunci Laporan Transaksi</span>
+    <button @click="requestPinForToggle('laporanTransaksi')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.laporanTransaksi ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.laporanTransaksi }"></span>
+    </button>
+</div>
+
+<div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+    <span class="font-medium text-sm text-slate-800">Kunci Laporan Keuangan</span>
+    <button @click="requestPinForToggle('laporanKeuangan')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.laporanKeuangan ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.laporanKeuangan }"></span>
+    </button>
+</div>
+
+<div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+    <span class="font-medium text-sm text-slate-800">Kunci Harga & HPP</span>
+    <button @click="requestPinForToggle('hargaHpp')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.hargaHpp ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.hargaHpp }"></span>
+    </button>
+</div>
                             </div>
                         </div>
                         <div class="border-t pt-4 mt-6">
