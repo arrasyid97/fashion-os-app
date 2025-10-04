@@ -11324,6 +11324,53 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
+<div v-if="uiState.modalType === 'roasInputInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full">
+    <h3 class="text-xl font-bold text-slate-800 mb-4">Panduan Pengisian Data</h3>
+    <div class="space-y-4 text-sm text-slate-600">
+        <div>
+            <p class="font-semibold text-slate-800">Harga Jual / AOV</p>
+            <p>Masukkan harga jual akhir produk Anda ke pelanggan (setelah diskon jika ada). AOV (Average Order Value) adalah nilai rata-rata pesanan.</p>
+        </div>
+        <div>
+            <p class="font-semibold text-slate-800">Modal Produk (HPP)</p>
+            <p>Biaya modal murni untuk membuat atau membeli satu unit produk.</p>
+        </div>
+        <div>
+            <p class="font-semibold text-slate-800">Biaya Packing & Lainnya</p>
+            <p>Estimasi biaya untuk mengemas satu pesanan, seperti bubble wrap, kardus, lakban, stiker, atau kartu ucapan.</p>
+        </div>
+        <div>
+            <p class="font-semibold text-slate-800">Biaya Admin Marketplace (%)</p>
+            <p>Masukkan total persentase biaya yang diambil oleh marketplace (misalnya, biaya admin + biaya layanan program). Contoh: jika biaya admin 6.5% dan biaya program 4%, masukkan **10.5**.</p>
+        </div>
+    </div>
+    <div class="flex justify-end mt-6 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+    </div>
+</div>
+
+<div v-if="uiState.modalType === 'roasResultInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full">
+    <h3 class="text-xl font-bold text-slate-800 mb-4">Memahami Hasil Perhitungan</h3>
+    <div class="space-y-4 text-sm text-slate-600">
+        <div>
+            <p class="font-semibold text-slate-800">Profit Kotor / Penjualan</p>
+            <p>Ini adalah keuntungan bersih yang Anda dapatkan dari **satu penjualan**, sebelum dikurangi biaya iklan. Rumusnya: `Harga Jual - (Semua Biaya)`.</p>
+        </div>
+        <div>
+            <p class="font-semibold text-slate-800">ROAS Impas (BEP - Break Even Point)</p>
+            <p>Ini adalah angka ROAS **paling minimum** yang harus Anda capai agar tidak rugi (modal kembali, tapi belum untung). Jika ROAS iklan Anda di bawah angka ini, berarti Anda rugi.</p>
+        </div>
+        <div>
+            <p class="font-semibold text-slate-800">Target ROAS (untuk Profit)</p>
+            <p>Ini adalah angka ROAS yang harus Anda targetkan di platform iklan (Shopee Ads, TikTok Ads) untuk mendapatkan margin keuntungan bersih sesuai yang Anda inginkan setelah dikurangi biaya iklan.</p>
+            <p class="mt-2 p-2 bg-yellow-50 rounded-md border-l-4 border-yellow-400"><strong>Kapan "Tidak Mungkin"?</strong> Muncul jika target profit Anda lebih besar dari profit kotor yang tersedia. Artinya, tidak ada sisa profit untuk membayar biaya iklan.</p>
+        </div>
+    </div>
+    <div class="flex justify-end mt-6 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+    </div>
+</div>
+
 <div v-if="uiState.modalType === 'biayaOperasionalHelp'" class="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full">
     <div class="flex justify-between items-center pb-3 border-b mb-4">
         <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -13616,52 +13663,7 @@ watch(activePage, (newPage) => {
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'roasInputInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full">
-    <h3 class="text-xl font-bold text-slate-800 mb-4">Panduan Pengisian Data</h3>
-    <div class="space-y-4 text-sm text-slate-600">
-        <div>
-            <p class="font-semibold text-slate-800">Harga Jual / AOV</p>
-            <p>Masukkan harga jual akhir produk Anda ke pelanggan (setelah diskon jika ada). AOV (Average Order Value) adalah nilai rata-rata pesanan.</p>
-        </div>
-        <div>
-            <p class="font-semibold text-slate-800">Modal Produk (HPP)</p>
-            <p>Biaya modal murni untuk membuat atau membeli satu unit produk.</p>
-        </div>
-        <div>
-            <p class="font-semibold text-slate-800">Biaya Packing & Lainnya</p>
-            <p>Estimasi biaya untuk mengemas satu pesanan, seperti bubble wrap, kardus, lakban, stiker, atau kartu ucapan.</p>
-        </div>
-        <div>
-            <p class="font-semibold text-slate-800">Biaya Admin Marketplace (%)</p>
-            <p>Masukkan total persentase biaya yang diambil oleh marketplace (misalnya, biaya admin + biaya layanan program). Contoh: jika biaya admin 6.5% dan biaya program 4%, masukkan **10.5**.</p>
-        </div>
-    </div>
-    <div class="flex justify-end mt-6 pt-4 border-t">
-        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
-    </div>
-</div>
 
-<div v-if="uiState.modalType === 'roasResultInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full">
-    <h3 class="text-xl font-bold text-slate-800 mb-4">Memahami Hasil Perhitungan</h3>
-    <div class="space-y-4 text-sm text-slate-600">
-        <div>
-            <p class="font-semibold text-slate-800">Profit Kotor / Penjualan</p>
-            <p>Ini adalah keuntungan bersih yang Anda dapatkan dari **satu penjualan**, sebelum dikurangi biaya iklan. Rumusnya: `Harga Jual - (Semua Biaya)`.</p>
-        </div>
-        <div>
-            <p class="font-semibold text-slate-800">ROAS Impas (BEP - Break Even Point)</p>
-            <p>Ini adalah angka ROAS **paling minimum** yang harus Anda capai agar tidak rugi (modal kembali, tapi belum untung). Jika ROAS iklan Anda di bawah angka ini, berarti Anda rugi.</p>
-        </div>
-        <div>
-            <p class="font-semibold text-slate-800">Target ROAS (untuk Profit)</p>
-            <p>Ini adalah angka ROAS yang harus Anda targetkan di platform iklan (Shopee Ads, TikTok Ads) untuk mendapatkan margin keuntungan bersih sesuai yang Anda inginkan setelah dikurangi biaya iklan.</p>
-            <p class="mt-2 p-2 bg-yellow-50 rounded-md border-l-4 border-yellow-400"><strong>Kapan "Tidak Mungkin"?</strong> Muncul jika target profit Anda lebih besar dari profit kotor yang tersedia. Artinya, tidak ada sisa profit untuk membayar biaya iklan.</p>
-        </div>
-    </div>
-    <div class="flex justify-end mt-6 pt-4 border-t">
-        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
-    </div>
-</div>
 
 
 </div>
