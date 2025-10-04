@@ -6794,14 +6794,17 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 let unsubscribe = () => {}; 
 
 const setupListeners = async (userId, isUserPartner) => { // <-- PERUBAHAN DI SINI
-    if (unsubscribe) unsubscribe();
+    unsubscribe(); // Hentikan listener lama
 
+    // Listener untuk settings (real-time)
     const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
         if (docSnap.exists()) {
-            Object.assign(state.settings, docSnap.data());
+            const settingsData = docSnap.data();
+            Object.assign(state.settings, settingsData);
         }
     }, (error) => { console.error("Error fetching settings:", error); });
 
+    // Listener untuk komisi mitra (real-time jika dia adalah mitra)
     let commissionsListener = () => {};
     if (isUserPartner) { // <-- PERUBAHAN DI SINI
         const commissionsQuery = query(
@@ -6813,8 +6816,10 @@ const setupListeners = async (userId, isUserPartner) => { // <-- PERUBAHAN DI SI
         });
     }
 
+    // Panggil data inti yang dibutuhkan segera
     await fetchCoreData(userId);
 
+    // Fungsi untuk menghentikan listener saat logout
     unsubscribe = () => {
         settingsListener();
         commissionsListener();
@@ -9318,7 +9323,7 @@ watch(activePage, (newPage, oldPage) => {
             </div>
         </div>
         
-        <div v-else-if="currentUser && currentUser.isPartner" class="max-w-7xl mx-auto">
+        <div v-else-if="userProfile.data?.isPartner" class="max-w-7xl mx-auto">
             <div class="flex justify-between items-center mb-8 animate-fade-in-up">
     <div>
         <h2 class="text-3xl font-bold text-slate-800">Dashboard Mitra</h2>
