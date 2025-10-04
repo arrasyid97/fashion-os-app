@@ -273,6 +273,15 @@ laporanKeuanganTahun: new Date().getFullYear(),
 laporanTransaksiTahun: new Date().getFullYear(),
 hargaHppSelectedModelName: '',
 
+roasCalculator: {
+        hargaJual: 150000,
+        modalProduk: 65000,
+        biayaPacking: 3000,
+        biayaAdminMarketplace: 10000,
+        targetMargin: 20, // dalam persen
+        estimasiBiayaIklan: 500000, // dalam Rupiah
+    },
+
 purchaseOrderSearch: '',
 purchaseOrdersLastVisible: null, // Untuk menyimpan dokumen terakhir yang terlihat
 purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data untuk dimuat
@@ -427,6 +436,9 @@ const loadDataForPage = async (pageName) => {
                 dataPromises.push(fetchProductData(userId));
                 dataPromises.push(fetchSupplierData(userId));
                 break;
+                case 'roas-calculator':
+    // Tidak perlu fetch data apa pun, halaman ini murni kalkulator
+    break;
             case 'retur':
                 dataPromises.push(fetchTransactionAndReturnData(userId));
                 dataPromises.push(fetchProductData(userId));
@@ -1378,6 +1390,48 @@ const laporanTransaksiData = computed(() => {
     };
 
     return { months, yearlyTotals };
+});
+
+const roasResults = computed(() => {
+    const { hargaJual, modalProduk, biayaPacking, biayaAdminMarketplace } = uiState.roasCalculator;
+
+    if (!hargaJual || hargaJual <= 0) {
+        return { error: "Harga Jual harus diisi." };
+    }
+
+    const totalBiayaProduk = (modalProduk || 0) + (biayaPacking || 0) + (biayaAdminMarketplace || 0);
+    const profitKotor = hargaJual - totalBiayaProduk;
+
+    if (profitKotor <= 0) {
+        return {
+            totalBiayaProduk,
+            profitKotor,
+            error: "Harga Jual lebih rendah dari total biaya, tidak mungkin profit."
+        };
+    }
+
+    const breakEvenROAS = hargaJual / profitKotor;
+
+    // Menghitung target ROAS untuk berbagai margin
+    const targets = [10, 15, 20, 25, 30].map(marginPercent => {
+        const targetProfit = hargaJual * (marginPercent / 100);
+        const maxBiayaIklanPerOrder = profitKotor - targetProfit;
+        if (maxBiayaIklanPerOrder <= 0) {
+            return { margin: marginPercent, roas: Infinity };
+        }
+        return {
+            margin: marginPercent,
+            roas: hargaJual / maxBiayaIklanPerOrder
+        };
+    });
+
+    return {
+        totalBiayaProduk,
+        profitKotor,
+        profitMargin: (profitKotor / hargaJual) * 100,
+        breakEvenROAS,
+        targets,
+    };
 });
 
 async function addSupplier() {
@@ -7132,6 +7186,10 @@ watch(activePage, (newPage) => {
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121M12 12l2.879 2.879M12 12L9.121 14.879M12 12L14.879 9.121M12 12L19 5"/></svg>
                 Stok Kain
             </a>
+            <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2"/></svg>
+                Manajemen Retur
+            </a>
             <a href="#" @click.prevent="changePage('laporan-transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-transaksi' }">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -7148,10 +7206,13 @@ watch(activePage, (newPage) => {
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                 Keuangan
             </a>
-            <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2"/></svg>
-                Manajemen Retur
-            </a>
+            <a href="#" @click.prevent="changePage('roas-calculator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-calculator' }">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 21.945A9.001 9.001 0 0013 3.055V13h8.945c-.53 4.437-4.213 8.12-8.65 8.655z" />
+    </svg>
+    Kalkulator ROAS
+</a>
             <a href="#" @click.prevent="changePage('investasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'investasi' }">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M17 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM17 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM5 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM5 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM11 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM11 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2z"/>
@@ -9268,6 +9329,87 @@ watch(activePage, (newPage) => {
                         </tr>
                     </tfoot>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div v-if="activePage === 'roas-calculator'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto animate-fade-in-up">
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-slate-800">Kalkulator Target ROAS Iklan</h2>
+            <p class="text-slate-500 mt-1">Tentukan target ROAS Anda agar iklan tidak merugi dan mencapai target profit.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            
+            <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 space-y-4">
+                <h3 class="text-xl font-bold text-slate-800 border-b pb-3">1. Masukkan Data Produk</h3>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Harga Jual / AOV</label>
+                    <input type="number" v-model.number="uiState.roasCalculator.hargaJual" class="mt-1 w-full p-2 border rounded-md font-semibold">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Modal Produk (HPP)</label>
+                    <input type="number" v-model.number="uiState.roasCalculator.modalProduk" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Biaya Packing & Lainnya</label>
+                    <input type="number" v-model.number="uiState.roasCalculator.biayaPacking" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Biaya Admin Marketplace (%)</label>
+                    <input type="number" v-model.number="uiState.roasCalculator.biayaAdminMarketplace" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
+                    <h3 class="text-xl font-bold text-slate-800 border-b pb-3 mb-4">2. Hasil Perhitungan</h3>
+                    <div v-if="roasResults.error" class="p-4 bg-red-100 text-red-700 border border-red-200 rounded-lg">
+                        {{ roasResults.error }}
+                    </div>
+                    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="p-4 bg-slate-50 rounded-lg border">
+                            <p class="text-sm font-medium text-slate-500">Profit Kotor / Penjualan</p>
+                            <p class="text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(roasResults.profitKotor) }}</p>
+                        </div>
+                        <div class="p-4 bg-yellow-100 rounded-lg border border-yellow-300">
+                            <p class="text-sm font-medium text-yellow-800">ROAS Impas (BEP)</p>
+                            <p class="text-2xl font-bold mt-1 text-yellow-900">{{ roasResults.breakEvenROAS.toFixed(2) }}</p>
+                            <p class="text-xs text-yellow-700">ROAS minimum agar tidak rugi</p>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-lg border">
+                            <p class="text-sm font-medium text-slate-500">Margin Profit Kotor</p>
+                            <p class="text-2xl font-bold mt-1 text-indigo-600">{{ roasResults.profitMargin.toFixed(1) }}%</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
+                    <h3 class="text-xl font-bold text-slate-800 border-b pb-3 mb-4">3. Target ROAS (untuk Profit)</h3>
+                    <p class="text-sm text-slate-600 mb-4">Untuk mendapatkan margin profit bersih dari penjualan, Anda harus mencapai target ROAS berikut:</p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-left bg-slate-100">
+                                <tr>
+                                    <th class="p-3 font-semibold text-slate-600">Target Profit Margin</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-center">Target ROAS yang Dibutuhkan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="target in roasResults.targets" :key="target.margin" class="border-b">
+                                    <td class="p-3">Target profit **{{ target.margin }}%** dari Harga Jual</td>
+                                    <td class="p-3 text-center font-bold text-lg" :class="target.roas > roasResults.breakEvenROAS ? 'text-green-600' : 'text-slate-500'">
+                                        <span v-if="isFinite(target.roas)">{{ target.roas.toFixed(2) }}</span>
+                                        <span v-else>Tidak Mungkin</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
