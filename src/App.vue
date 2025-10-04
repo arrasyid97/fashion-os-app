@@ -7203,31 +7203,34 @@ const fetchNotesData = async (userId) => {
 };
 
 onMounted(() => {
-  onAuthStateChanged(auth, async (user) => {
-    isLoading.value = true;
-    hasLoadedInitialData.value = false;
+    // Memulai jam reaktif yang akan update setiap 1 menit
+    setInterval(() => {
+        currentTime.value = new Date();
+    }, 60000); 
 
-    // Reset status data yang sudah di-fetch setiap kali auth berubah
-    Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
+    onAuthStateChanged(auth, async (user) => {
+        isLoading.value = true;
+        hasLoadedInitialData.value = false;
+        Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
 
-    if (user) {
-        // --- INI BAGIAN UTAMA PERBAIKAN ---
-        const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-        const userData = userDocSnap.exists() ? userDocSnap.data() : {};
-        currentUser.value = { ...user, userData, isPartner: userData.isPartner || false, referralCode: userData.referralCode || null };
-        // --- AKHIR DARI PERBAIKAN ---
+        if (user) {
+            currentUser.value = user; // Simpan data otentikasi Firebase
 
-        await setupListeners(user.uid);
-        changePage(activePage.value);
+            // Ambil data profil dari Firestore dan simpan di state reaktif terpisah
+            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+            userProfile.data = userDocSnap.exists() ? userDocSnap.data() : {};
 
-    } else {
-        currentUser.value = null;
-        activePage.value = 'login';
-        unsubscribe();
-    }
-    isLoading.value = false;
-    hasLoadedInitialData.value = true;
-});
+            await setupListeners(user.uid);
+            changePage(activePage.value);
+        } else {
+            currentUser.value = null;
+            userProfile.data = null; // Kosongkan profil saat logout
+            activePage.value = 'login';
+            if (unsubscribe) unsubscribe();
+        }
+        isLoading.value = false;
+        hasLoadedInitialData.value = true;
+    });
 });
 
 watch(activePage, (newPage, oldPage) => {
@@ -10720,12 +10723,10 @@ watch(activePage, (newPage, oldPage) => {
 <div v-if="activePage === 'langganan'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8 flex items-center justify-center">
 
-        <div v-if="currentUser?.userData?.subscriptionStatus === 'active' && new Date(currentUser.userData.subscriptionEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
+        <div v-if="isSubscriptionActive && userProfile.data?.subscriptionStatus === 'active'" class="w-full max-w-4xl animate-fade-in">
             <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-green-200 flex flex-col items-center">
                 <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
                 <h2 class="text-3xl font-bold text-slate-800 mb-2">Langganan Anda Aktif! 🎉</h2>
                 <p class="text-slate-600 mb-6 max-w-xl text-center">
@@ -10733,19 +10734,17 @@ watch(activePage, (newPage, oldPage) => {
                 </p>
                 <div class="bg-green-50 text-green-800 px-6 py-4 rounded-lg w-full text-center border border-green-200">
                     <p class="text-lg font-semibold">Status Langganan: Aktif</p>
-                    <p v-if="currentUser?.userData?.subscriptionEndDate" class="text-sm mt-1">
-                        Berakhir pada: {{ new Date(currentUser.userData.subscriptionEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                    <p v-if="userProfile.data?.subscriptionEndDate" class="text-sm mt-1">
+                        Berakhir pada: {{ new Date(userProfile.data.subscriptionEndDate.seconds ? userProfile.data.subscriptionEndDate.seconds * 1000 : userProfile.data.subscriptionEndDate).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
                     </p>
                 </div>
             </div>
         </div>
         
-        <div v-else-if="currentUser?.userData?.subscriptionStatus === 'trial' && new Date(currentUser.userData.trialEndDate?.seconds * 1000) > Date.now()" class="w-full max-w-4xl animate-fade-in">
+        <div v-else-if="isSubscriptionActive && userProfile.data?.subscriptionStatus === 'trial'" class="w-full max-w-4xl animate-fade-in">
             <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-blue-200 flex flex-col items-center">
                 <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
                 <h2 class="text-3xl font-bold text-slate-800 mb-2">Masa Uji Coba Gratis Anda Aktif!</h2>
                 <p class="text-slate-600 mb-6 max-w-xl text-center">
@@ -10753,8 +10752,8 @@ watch(activePage, (newPage, oldPage) => {
                 </p>
                 <div class="bg-blue-50 text-blue-800 px-6 py-4 rounded-lg w-full text-center border border-blue-200">
                     <p class="text-lg font-semibold">Status: Uji Coba (Trial)</p>
-                    <p v-if="currentUser?.userData?.trialEndDate" class="text-sm mt-1">
-                        Berakhir pada: {{ new Date(currentUser.userData.trialEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+                    <p v-if="userProfile.data?.trialEndDate" class="text-sm mt-1">
+                        Berakhir pada: {{ new Date(userProfile.data.trialEndDate.seconds * 1000).toLocaleString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
                     </p>
                 </div>
             </div>
@@ -10787,17 +10786,17 @@ watch(activePage, (newPage, oldPage) => {
             
             <div class="max-w-xl mx-auto mb-12 p-6 rounded-xl border border-dashed border-indigo-300 bg-white/70 backdrop-blur-sm text-left animate-fade-in-up" style="animation-delay: 300ms;">
                 <h3 class="text-lg font-semibold text-indigo-700">Punya Kode Rujukan? (Untuk Diskon)</h3>
-                <p v-if="!currentUser?.userData?.referredBy" class="text-sm text-slate-600 mb-2">
+                <p v-if="!userProfile.data?.referredBy" class="text-sm text-slate-600 mb-2">
                     Silahkan masukan kodenya.
                 </p>
-                <div v-if="!currentUser?.userData?.referredBy" class="flex gap-2">
-    <input type="text" v-model="uiState.referralCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400">
-    <button @click.prevent="applyReferralCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">Terapkan</button>
-</div>
+                <div v-if="!userProfile.data?.referredBy" class="flex gap-2">
+                    <input type="text" v-model="uiState.referralCodeInput" class="w-full p-2 border bg-white/50 border-slate-300 rounded-md text-slate-800 placeholder-slate-400">
+                    <button @click.prevent="applyReferralCode" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors">Terapkan</button>
+                </div>
                 <p v-if="uiState.referralCodeMessage" class="mt-2 text-xs font-medium" :class="uiState.referralCodeApplied ? 'text-green-600' : 'text-red-500'">
                     {{ uiState.referralCodeMessage }}
                 </p>
-                <p v-if="currentUser?.userData?.referredBy" class="text-sm text-green-600 font-medium">
+                <p v-if="userProfile.data?.referredBy" class="text-sm text-green-600 font-medium">
                     Selamat! Diskon rujukan sudah berlaku selamanya untuk akun Anda.
                 </p>
             </div>
@@ -10805,7 +10804,7 @@ watch(activePage, (newPage, oldPage) => {
             <div class="flex flex-col md:flex-row items-center justify-center gap-8">
                 <div class="bg-white p-8 rounded-2xl shadow-lg border w-full md:w-96 transform hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 animate-fade-in-up" style="animation-delay: 400ms;">
                     <h3 class="text-xl font-semibold text-slate-800">Paket Bulanan</h3>
-                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                    <div v-if="uiState.referralCodeApplied || userProfile.data?.referredBy" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(monthlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedMonthlyPrice) }} <span class="text-base font-normal text-slate-500">/bulan</span></p>
                     </div>
@@ -10826,7 +10825,7 @@ watch(activePage, (newPage, oldPage) => {
                 <div class="relative bg-white p-8 rounded-2xl shadow-2xl border-2 border-indigo-500 w-full md:w-96 transform hover:-translate-y-2 hover:shadow-indigo-200 transition-all duration-300 animate-fade-in-up" style="animation-delay: 500ms;">
                     <div class="absolute top-0 right-6 -mt-3 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Paling Hemat</div>
                     <h3 class="text-xl font-semibold text-slate-800">Paket Tahunan</h3>
-                    <div v-if="uiState.referralCodeApplied || currentUser?.userData?.referredBy" class="my-4">
+                    <div v-if="uiState.referralCodeApplied || userProfile.data?.referredBy" class="my-4">
                         <p class="text-2xl font-bold line-through text-slate-400">{{ formatCurrency(yearlyPrice) }}</p>
                         <p class="text-4xl font-bold text-green-600">{{ formatCurrency(discountedYearlyPrice) }} <span class="text-base font-normal text-slate-500">/tahun</span></p>
                     </div>
@@ -10840,7 +10839,7 @@ watch(activePage, (newPage, oldPage) => {
                         <li class="flex items-center gap-3 font-semibold text-green-600"><svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Diskon setara 2 bulan!</li>
                     </ul>
                     <button @click="handleSubscriptionMayar('tahunan')" :disabled="isSubscribingYearly" class="mt-8 w-full bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30 disabled:bg-slate-400 disabled:shadow-none">
-                         <span v-if="isSubscribingYearly">Memproses...</span>
+                        <span v-if="isSubscribingYearly">Memproses...</span>
                         <span v-else>Pilih Paket Tahunan</span>
                     </button>
                 </div>
