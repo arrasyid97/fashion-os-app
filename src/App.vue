@@ -9484,7 +9484,7 @@ watch(activePage, (newPage) => {
                                         <div v-if="sim.scenario.includes('Kustom')" class="w-24 mx-auto">
                                             <input type="number" step="0.1" v-model.number="uiState.roasCalculator.customRoasTarget" class="w-full p-1 text-center border rounded-md">
                                         </div>
-                                        <span v-else>{{ sim.targetRoas.toFixed(2) }}</span>
+                                        <span v-else>{{ typeof sim.targetRoas === 'number' ? sim.targetRoas.toFixed(2) : sim.targetRoas }}</span>
                                     </td>
                                     <td class="p-3 text-center">{{ sim.estimasiOrder.toFixed(0) }} order</td>
                                     <td class="p-3 text-right">{{ formatCurrency(sim.estimasiOmset) }}</td>
