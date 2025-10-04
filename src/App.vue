@@ -280,6 +280,7 @@ roasCalculator: {
         biayaAdminMarketplace: 10000,
         targetMargin: 20, // dalam persen
         estimasiBiayaIklan: 500000, // dalam Rupiah
+        customRoasTarget: 5,
     },
 
 purchaseOrderSearch: '',
@@ -1433,6 +1434,43 @@ const roasResults = computed(() => {
         breakEvenROAS,
         targets,
     };
+});
+
+const roasSimulationResults = computed(() => {
+    const results = roasResults.value;
+    const { estimasiBiayaIklan, hargaJual, customRoasTarget } = uiState.roasCalculator;
+
+    if (results.error || !estimasiBiayaIklan || estimasiBiayaIklan <= 0) {
+        return [];
+    }
+
+    const calculateScenario = (scenarioName, roasTarget) => {
+        if (!isFinite(roasTarget)) {
+            return { scenario: scenarioName, targetRoas: 'N/A', estimasiOrder: 0, estimasiOmset: 0, estimasiLabaBersih: 0 };
+        }
+        
+        // Rumus inti
+        const estimasiOmset = estimasiBiayaIklan * roasTarget;
+        const estimasiOrder = hargaJual > 0 ? estimasiOmset / hargaJual : 0;
+        const estimasiProfitKotor = estimasiOrder * results.profitKotor;
+        const estimasiLabaBersih = estimasiProfitKotor - estimasiBiayaIklan;
+
+        return {
+            scenario: scenarioName,
+            targetRoas: roasTarget,
+            estimasiOrder,
+            estimasiOmset,
+            estimasiLabaBersih,
+        };
+    };
+
+    const targetRoas20Percent = results.targets.find(t => t.margin === 20)?.roas || 0;
+
+    return [
+        calculateScenario('Skenario Impas (BEP)', results.breakEvenROAS),
+        calculateScenario('Skenario Target Profit 20%', targetRoas20Percent),
+        calculateScenario('Skenario Kustom', customRoasTarget || 0),
+    ];
 });
 
 async function addSupplier() {
@@ -9344,11 +9382,11 @@ watch(activePage, (newPage) => {
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             
-            <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 space-y-4">
+            <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 space-y-4 lg:sticky lg:top-8">
                 <div class="flex items-center justify-between border-b pb-3">
-    <h3 class="text-xl font-bold text-slate-800">1. Masukkan Data Produk</h3>
-    <button @click="showModal('roasInputInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
-</div>
+                    <h3 class="text-xl font-bold text-slate-800">1. Masukkan Data</h3>
+                    <button @click="showModal('roasInputInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
+                </div>
                 
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Harga Jual / AOV</label>
@@ -9363,17 +9401,17 @@ watch(activePage, (newPage) => {
                     <input type="number" v-model.number="uiState.roasCalculator.biayaPacking" class="mt-1 w-full p-2 border rounded-md">
                 </div>
                 <div>
-    <label class="block text-sm font-medium text-slate-700">Biaya Admin Marketplace (Rp)</label>
-    <input type="number" v-model.number="uiState.roasCalculator.biayaAdminMarketplace" class="mt-1 w-full p-2 border rounded-md">
-</div>
+                    <label class="block text-sm font-medium text-slate-700">Biaya Admin Marketplace (Rp)</label>
+                    <input type="number" v-model.number="uiState.roasCalculator.biayaAdminMarketplace" class="mt-1 w-full p-2 border rounded-md">
+                </div>
             </div>
 
             <div class="lg:col-span-2 space-y-6">
                 <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
                     <div class="flex items-center justify-between border-b pb-3 mb-4">
-    <h3 class="text-xl font-bold text-slate-800">2. Hasil Perhitungan</h3>
-    <button @click="showModal('roasResultInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
-</div>
+                        <h3 class="text-xl font-bold text-slate-800">2. Hasil Perhitungan</h3>
+                        <button @click="showModal('roasResultInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
+                    </div>
                     <div v-if="roasResults.error" class="p-4 bg-red-100 text-red-700 border border-red-200 rounded-lg">
                         {{ roasResults.error }}
                     </div>
@@ -9417,6 +9455,48 @@ watch(activePage, (newPage) => {
                         </table>
                     </div>
                 </div>
+                
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
+                    <h3 class="text-xl font-bold text-slate-800 border-b pb-3 mb-4">4. Simulasi Iklan dengan Budget</h3>
+                    <div class="max-w-md mb-6">
+                        <label class="block text-sm font-medium text-slate-700">Masukkan Estimasi Budget Iklan (per bulan)</label>
+                        <input type="number" v-model.number="uiState.roasCalculator.estimasiBiayaIklan" class="mt-1 w-full p-2 border rounded-md font-semibold">
+                    </div>
+
+                    <div v-if="roasResults.error">
+                        <p class="text-slate-500 text-center py-4">Silakan lengkapi data produk di atas terlebih dahulu.</p>
+                    </div>
+                    <div v-else class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-left bg-slate-100">
+                                <tr>
+                                    <th class="p-3 font-semibold text-slate-600">Skenario</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-center">Target ROAS</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-center">Estimasi Order</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-right">Estimasi Omset</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-right bg-indigo-100 text-indigo-800">Estimasi Laba Bersih<br><span class="font-normal text-xs">(Setelah Biaya Iklan)</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="sim in roasSimulationResults" :key="sim.scenario" class="border-b">
+                                    <td class="p-3 font-semibold">{{ sim.scenario }}</td>
+                                    <td class="p-3 text-center text-lg font-bold" :class="{'text-yellow-700': sim.scenario.includes('Impas'), 'text-green-700': sim.scenario.includes('Target')}">
+                                        <div v-if="sim.scenario.includes('Kustom')" class="w-24 mx-auto">
+                                            <input type="number" step="0.1" v-model.number="uiState.roasCalculator.customRoasTarget" class="w-full p-1 text-center border rounded-md">
+                                        </div>
+                                        <span v-else>{{ sim.targetRoas.toFixed(2) }}</span>
+                                    </td>
+                                    <td class="p-3 text-center">{{ sim.estimasiOrder.toFixed(0) }} order</td>
+                                    <td class="p-3 text-right">{{ formatCurrency(sim.estimasiOmset) }}</td>
+                                    <td class="p-3 text-right text-lg font-bold" :class="sim.estimasiLabaBersih >= 0 ? 'text-green-600' : 'text-red-600'">
+                                        {{ formatCurrency(sim.estimasiLabaBersih) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
