@@ -812,19 +812,17 @@ async function updateReferralCode() {
 let userListener = null; // Listener untuk data pengguna
 
 function setupUserListener(userId) {
-  // Hentikan listener lama jika ada
-  if (userListener) userListener();
+    // Hentikan listener lama jika ada
+    if (userListener) userListener();
 
-  const userDocRef = doc(db, 'users', userId);
-  userListener = onSnapshot(userDocRef, (docSnap) => {
-    if (docSnap.exists()) {
-      console.log("Data pengguna diperbarui secara real-time.");
-      // Gabungkan data baru ke currentUser.value.userData
-      if (currentUser.value) {
-        currentUser.value.userData = { ...currentUser.value.userData, ...docSnap.data() };
-      }
-    }
-  });
+    const userDocRef = doc(db, 'users', userId);
+    userListener = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            console.log("Data profil pengguna diperbarui secara real-time.");
+            // Perbarui state reaktif `userProfile` dengan data terbaru
+            userProfile.data = { ...userProfile.data, ...docSnap.data() };
+        }
+    });
 }
 
 async function deleteInvestor(investorId) {
@@ -2626,7 +2624,7 @@ async function handleActivation() {
             });
         });
 
-        // Perbarui state lokal agar UI langsung berubah
+        // Perbarui state lokal agar UI langsung berubah tanpa refresh
         if (userProfile.data) {
             userProfile.data.subscriptionStatus = 'active';
             userProfile.data.subscriptionEndDate = subscriptionEndDate;
@@ -2636,6 +2634,7 @@ async function handleActivation() {
         activationCodeMessage.value = '';
         activationCodeInput.value = '';
         alert('Aktivasi berhasil! Langganan Anda sekarang aktif selama 1 bulan.');
+
     } catch (error) {
         activationCodeMessage.value = error.message;
     } finally {
@@ -9310,7 +9309,7 @@ watch(activePage, (newPage, oldPage) => {
 <div v-if="activePage === 'mitra'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         
-        <div v-if="currentUser && !currentUser.isPartner" class="flex items-center justify-center h-full animate-fade-in">
+        <div v-if="currentUser && !userProfile.data?.isPartner" class="flex items-center justify-center h-full animate-fade-in">
             <div class="bg-white p-8 rounded-2xl shadow-xl border text-center max-w-md">
                 <h3 class="text-2xl font-bold text-slate-800 mb-4">Jadilah Mitra & Dapatkan Penghasilan</h3>
                 <p class="text-slate-600 mb-6">Dapatkan komisi dari setiap pelanggan yang Anda ajak. Jadilah bagian dari tim kami untuk mengembangkan Fashion OS bersama.</p>
@@ -10727,7 +10726,9 @@ watch(activePage, (newPage, oldPage) => {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
                 <h2 class="text-3xl font-bold text-slate-800 mb-2">Langganan Anda Aktif! 🎉</h2>
-                <p class="text-slate-600 mb-6 max-w-xl text-center">Selamat, Anda memiliki akses penuh ke semua fitur premium kami.</p>
+                <p class="text-slate-600 mb-6 max-w-xl text-center">
+                    Selamat, Anda memiliki akses penuh ke semua fitur premium kami.
+                </p>
                 <div class="bg-green-50 text-green-800 px-6 py-4 rounded-lg w-full text-center border border-green-200">
                     <p class="text-lg font-semibold">Status Langganan: Aktif</p>
                     <p v-if="userProfile.data?.subscriptionEndDate" class="text-sm mt-1">
@@ -10740,10 +10741,14 @@ watch(activePage, (newPage, oldPage) => {
         <div v-else-if="isSubscriptionActive && userProfile.data?.subscriptionStatus === 'trial'" class="w-full max-w-4xl animate-fade-in">
             <div class="bg-white p-8 sm:p-12 rounded-2xl shadow-2xl border border-blue-200 flex flex-col items-center">
                 <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                 </div>
                 <h2 class="text-3xl font-bold text-slate-800 mb-2">Masa Uji Coba Gratis Anda Aktif!</h2>
-                <p class="text-slate-600 mb-6 max-w-xl text-center">Nikmati semua fitur premium selama masa uji coba. Untuk melanjutkan setelahnya, silakan pilih paket langganan.</p>
+                <p class="text-slate-600 mb-6 max-w-xl text-center">
+                    Nikmati semua fitur premium selama masa uji coba. Untuk melanjutkan setelahnya, silakan pilih paket langganan.
+                </p>
                 <div class="bg-blue-50 text-blue-800 px-6 py-4 rounded-lg w-full text-center border border-blue-200">
                     <p class="text-lg font-semibold">Status: Uji Coba (Trial)</p>
                     <p v-if="userProfile.data?.trialEndDate" class="text-sm mt-1">
@@ -10838,6 +10843,7 @@ watch(activePage, (newPage, oldPage) => {
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 
