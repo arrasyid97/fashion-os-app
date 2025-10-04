@@ -6794,17 +6794,14 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 let unsubscribe = () => {}; 
 
 const setupListeners = async (userId, isUserPartner) => { // <-- PERUBAHAN DI SINI
-    unsubscribe(); // Hentikan listener lama
+    if (unsubscribe) unsubscribe();
 
-    // Listener untuk settings (real-time)
     const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
         if (docSnap.exists()) {
-            const settingsData = docSnap.data();
-            Object.assign(state.settings, settingsData);
+            Object.assign(state.settings, docSnap.data());
         }
     }, (error) => { console.error("Error fetching settings:", error); });
 
-    // Listener untuk komisi mitra (real-time jika dia adalah mitra)
     let commissionsListener = () => {};
     if (isUserPartner) { // <-- PERUBAHAN DI SINI
         const commissionsQuery = query(
@@ -6816,10 +6813,8 @@ const setupListeners = async (userId, isUserPartner) => { // <-- PERUBAHAN DI SI
         });
     }
 
-    // Panggil data inti yang dibutuhkan segera
     await fetchCoreData(userId);
 
-    // Fungsi untuk menghentikan listener saat logout
     unsubscribe = () => {
         settingsListener();
         commissionsListener();
