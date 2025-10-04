@@ -270,6 +270,7 @@ productsHasMore: true,     // Flag untuk menandakan apakah masih ada data produk
 
 summaryData: {},
 laporanKeuanganTahun: new Date().getFullYear(),
+laporanTransaksiTahun: new Date().getFullYear(),
 hargaHppSelectedModelName: '',
 
 purchaseOrderSearch: '',
@@ -409,6 +410,9 @@ const loadDataForPage = async (pageName) => {
                 break;
             case 'gudang-kain':
                 dataPromises.push(fetchProductionData(userId));
+                break;
+                case 'laporan-transaksi': // <-- TAMBAHKAN CASE BARU INI
+                dataPromises.push(fetchSummaryData(userId));
                 break;
             case 'laporan-keuangan':
                 dataPromises.push(fetchSummaryData(userId));
@@ -1339,7 +1343,42 @@ const laporanKeuanganData = computed(() => {
     return { months, yearlyTotals };
 });
 
+const laporanTransaksiData = computed(() => {
+    const year = uiState.laporanTransaksiTahun;
+    const summaryForYear = state.summaryData?.[`summary_${year}`];
+    const months = [];
 
+    // Loop 12 bulan untuk membuat baris tabel
+    for (let i = 1; i <= 12; i++) {
+        const monthStr = i.toString().padStart(2, '0');
+        const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
+        const data = summaryForYear?.months?.[monthStr] || {};
+
+        months.push({
+            monthName: monthName,
+            omsetKotor: data.omsetKotor || 0,
+            totalDiskon: data.totalDiskon || 0,
+            totalNilaiRetur: data.nilaiRetur || 0,
+            omsetBersih: data.omsetBersih || 0,
+            totalHppTerjual: data.hppTerjual || 0,
+            totalBiayaTransaksi: data.biayaTransaksi || 0,
+            labaKotor: data.labaKotor || 0,
+        });
+    }
+    
+    // Ambil total tahunan yang sudah dihitung oleh Cloud Functions
+    const yearlyTotals = {
+        omsetKotor: summaryForYear?.yearlyTotals?.omsetKotor || 0,
+        totalDiskon: summaryForYear?.yearlyTotals?.totalDiskon || 0,
+        totalNilaiRetur: summaryForYear?.yearlyTotals?.nilaiRetur || 0,
+        omsetBersih: summaryForYear?.yearlyTotals?.omsetBersih || 0,
+        totalHppTerjual: summaryForYear?.yearlyTotals?.hppTerjual || 0,
+        totalBiayaTransaksi: summaryForYear?.yearlyTotals?.biayaTransaksi || 0,
+        labaKotor: summaryForYear?.yearlyTotals?.labaKotor || 0,
+    };
+
+    return { months, yearlyTotals };
+});
 
 async function addSupplier() {
     if (!currentUser.value) return alert("Anda harus login.");
@@ -7093,6 +7132,12 @@ watch(activePage, (newPage) => {
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121M12 12l2.879 2.879M12 12L9.121 14.879M12 12L14.879 9.121M12 12L19 5"/></svg>
                 Stok Kain
             </a>
+            <a href="#" @click.prevent="changePage('laporan-transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-transaksi' }">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+    Laporan Transaksi
+</a>
             <a href="#" @click.prevent="changePage('laporan-keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-keuangan' }">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2a4 4 0 00-4-4H5a2 2 0 00-2 2v2a2 2 0 002 2h2a4 4 0 004-4zm0 0v-2a4 4 0 014-4h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a4 4 0 01-4-4z" />
@@ -9162,6 +9207,64 @@ watch(activePage, (newPage) => {
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div v-if="activePage === 'laporan-transaksi'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto">
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
+            <div>
+                <h2 class="text-3xl font-bold text-slate-800">Laporan Transaksi Tahunan</h2>
+                <p class="text-slate-500 mt-1">Analisis performa penjualan bulanan Anda secara mendetail.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <label for="tahun-laporan-trx" class="text-sm font-medium">Pilih Tahun:</label>
+                <input type="number" id="tahun-laporan-trx" v-model.number="uiState.laporanTransaksiTahun" class="w-32 p-2 border border-slate-300 rounded-md shadow-sm">
+            </div>
+        </div>
+
+        <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                        <tr>
+                            <th class="px-6 py-4 font-semibold">Bulan</th>
+                            <th class="px-6 py-4 font-semibold text-right">Omset Kotor</th>
+                            <th class="px-6 py-4 font-semibold text-right">Diskon</th>
+                            <th class="px-6 py-4 font-semibold text-right">Retur</th>
+                            <th class="px-6 py-4 font-semibold text-right bg-blue-100 text-blue-800">Omset Bersih</th>
+                            <th class="px-6 py-4 font-semibold text-right">HPP Terjual</th>
+                            <th class="px-6 py-4 font-semibold text-right">Biaya Transaksi</th>
+                            <th class="px-6 py-4 font-semibold text-right bg-green-100 text-green-800">Laba Kotor</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200/50">
+                        <tr v-for="month in laporanTransaksiData.months" :key="month.monthName" class="hover:bg-slate-50/50">
+                            <td class="px-6 py-4 font-semibold text-slate-800">{{ month.monthName }}</td>
+                            <td class="px-6 py-4 text-right">{{ formatCurrency(month.omsetKotor) }}</td>
+                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalDiskon) }}</td>
+                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalNilaiRetur) }}</td>
+                            <td class="px-6 py-4 text-right font-semibold text-blue-800">{{ formatCurrency(month.omsetBersih) }}</td>
+                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalHppTerjual) }}</td>
+                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaTransaksi) }}</td>
+                            <td class="px-6 py-4 text-right font-bold" :class="month.labaKotor >= 0 ? 'text-green-600' : 'text-red-600'">{{ formatCurrency(month.labaKotor) }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="border-t-2 border-slate-300 bg-slate-100/80">
+                        <tr class="font-bold text-slate-900">
+                            <td class="px-6 py-4">TOTAL {{ uiState.laporanTransaksiTahun }}</td>
+                            <td class="px-6 py-4 text-right">{{ formatCurrency(laporanTransaksiData.yearlyTotals.omsetKotor) }}</td>
+                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalDiskon) }}</td>
+                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalNilaiRetur) }}</td>
+                            <td class="px-6 py-4 text-right font-semibold text-blue-800">{{ formatCurrency(laporanTransaksiData.yearlyTotals.omsetBersih) }}</td>
+                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalHppTerjual) }}</td>
+                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalBiayaTransaksi) }}</td>
+                            <td class="px-6 py-4 text-right text-lg" :class="laporanTransaksiData.yearlyTotals.labaKotor >= 0 ? 'text-green-700' : 'text-red-700'">{{ formatCurrency(laporanTransaksiData.yearlyTotals.labaKotor) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
         </div>
     </div>
