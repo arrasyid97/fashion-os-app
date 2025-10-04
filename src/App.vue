@@ -9463,7 +9463,10 @@ watch(activePage, (newPage) => {
                 </div>
                 
                 <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
-                    <h3 class="text-xl font-bold text-slate-800 border-b pb-3 mb-4">4. Simulasi Iklan dengan Budget</h3>
+                    <div class="flex items-center justify-between border-b pb-3 mb-4">
+    <h3 class="text-xl font-bold text-slate-800">4. Simulasi Iklan dengan Budget</h3>
+    <button @click="showModal('roasSimulationInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
+</div>
                     <div class="max-w-md mb-6">
                         <label class="block text-sm font-medium text-slate-700">Masukkan Estimasi Budget Iklan (per bulan)</label>
                         <input type="number" v-model.number="uiState.roasCalculator.estimasiBiayaIklan" class="mt-1 w-full p-2 border rounded-md font-semibold">
@@ -11450,6 +11453,34 @@ watch(activePage, (newPage) => {
             <p class="font-semibold text-slate-800">Target ROAS (untuk Profit)</p>
             <p>Ini adalah angka ROAS yang harus Anda targetkan di platform iklan (Shopee Ads, TikTok Ads) untuk mendapatkan margin keuntungan bersih sesuai yang Anda inginkan setelah dikurangi biaya iklan.</p>
             <p class="mt-2 p-2 bg-yellow-50 rounded-md border-l-4 border-yellow-400"><strong>Kapan "Tidak Mungkin"?</strong> Muncul jika target profit Anda lebih besar dari profit kotor yang tersedia. Artinya, tidak ada sisa profit untuk membayar biaya iklan.</p>
+        </div>
+    </div>
+    <div class="flex justify-end mt-6 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Mengerti</button>
+    </div>
+</div>
+
+<div v-if="uiState.modalType === 'roasSimulationInfo'" class="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full">
+    <h3 class="text-xl font-bold text-slate-800 mb-4">Panduan Membaca Tabel Simulasi</h3>
+    <div class="space-y-4 text-sm text-slate-600">
+        <p>Tabel ini membantu Anda memproyeksikan hasil akhir dari kampanye iklan Anda berdasarkan budget dan target ROAS yang berbeda.</p>
+        
+        <div>
+            <p class="font-semibold text-slate-800">Penjelasan Kolom:</p>
+            <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
+                <li><strong>Estimasi Order:</strong> Perkiraan jumlah penjualan yang akan Anda dapatkan. Dihitung dari `(Budget Iklan * Target ROAS) / Harga Jual`.</li>
+                <li><strong>Estimasi Omset:</strong> Perkiraan total pendapatan kotor dari iklan. Dihitung dari `Budget Iklan * Target ROAS`.</li>
+                <li><strong>Estimasi Laba Bersih:</strong> Ini adalah metrik paling penting. Ini adalah perkiraan **keuntungan bersih** Anda setelah **dikurangi budget iklan**. Dihitung dari `(Total Profit Kotor dari semua order) - Budget Iklan`.</li>
+            </ul>
+        </div>
+
+        <div>
+            <p class="font-semibold text-slate-800">Penjelasan Skenario:</p>
+             <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
+                <li><strong>Skenario Impas (BEP):</strong> Menunjukkan hasil jika ROAS iklan Anda sama persis dengan angka ROAS Impas. Laba Bersih di skenario ini akan selalu **Rp 0**.</li>
+                <li><strong>Skenario Target Profit 20%:</strong> Menunjukkan hasil jika Anda berhasil mencapai target ROAS untuk mendapatkan profit 20% dari harga jual.</li>
+                <li><strong>Skenario Kustom:</strong> Baris interaktif di mana Anda bisa memasukkan angka ROAS apa pun untuk melihat langsung potensi profit atau kerugiannya.</li>
+            </ul>
         </div>
     </div>
     <div class="flex justify-end mt-6 pt-4 border-t">
