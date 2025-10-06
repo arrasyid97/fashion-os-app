@@ -6330,9 +6330,12 @@ async function deleteGroup(variants) {
     try {
         await batch.commit();
 
-        // Perbarui state lokal secara langsung
         const deletedDocIds = variants.map(v => v.docId);
+        // Hapus dari state utama
         state.produk = state.produk.filter(p => !deletedDocIds.includes(p.docId));
+        // --- BARIS PENTING DITAMBAHKAN ---
+        // Hapus juga dari state tampilan inventaris agar UI langsung update
+        state.inventoryPaginated = state.inventoryPaginated.filter(p => !deletedDocIds.includes(p.docId));
         
         alert(`Berhasil menghapus ${successCount} varian.`);
     } catch (error) {
@@ -6371,8 +6374,11 @@ async function removeProductVariant(productId) {
 
         await batch.commit();
         
-        // Perbarui state lokal secara langsung
+        // Hapus dari state utama
         state.produk = state.produk.filter(p => p.docId !== productId);
+        // --- BARIS PENTING DITAMBAHKAN ---
+        // Hapus juga dari state tampilan inventaris agar UI langsung update
+        state.inventoryPaginated = state.inventoryPaginated.filter(p => p.docId !== productId);
 
         alert(`Varian produk berhasil dihapus.`);
     } catch (error) {
