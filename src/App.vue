@@ -357,6 +357,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
 
 const dataFetched = reactive({
   products: false,
+  allProductsLoaded: false,
   transactions: false,
   production: false,
   finance: false,
@@ -6888,38 +6889,31 @@ const fetchCoreData = async (userId) => {
 const fetchProductData = async (userId, loadMore = false) => {
     const PRODUCTS_PER_PAGE = 20;
 
-    // Bagian ini hanya dijalankan SEKALI untuk mengambil semua data harga & alokasi
+    // Bagian harga & alokasi ini tetap sama, hanya dijalankan sekali
     if (!dataFetched.pricesAndAllocations) {
-        console.log("Fetching all prices and allocations (one time)...");
-        try {
-            const [pricesSnap, allocationsSnap] = await Promise.all([
-                getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-                getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
-            ]);
-            // Simpan ke dalam state agar tidak perlu fetch ulang
-            state.productPrices = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            state.stockAllocations = allocationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            dataFetched.pricesAndAllocations = true;
-        } catch (error) {
-            console.error("Error fetching prices/allocations:", error);
-        }
+        // ... (isi bagian ini biarkan seperti kode Anda yang sudah ada)
     }
 
-    // Paginasi untuk data produk
     if (loadMore && !uiState.productsHasMore) return;
 
     try {
         let q = query(
             collection(db, "products"),
             where("userId", "==", userId),
-            orderBy("product_name", "asc"), // Mengurutkan berdasarkan nama produk
+            orderBy("product_name", "asc"),
             limit(PRODUCTS_PER_PAGE)
         );
 
         if (loadMore && uiState.productsLastVisible) {
             q = query(q, startAfter(uiState.productsLastVisible));
         } else {
-            state.produk = []; // Reset hanya jika ini pemuatan awal
+            // --- INI PERUBAHAN KRITIS ---
+            // HANYA reset daftar produk jika data LENGKAP belum pernah dimuat sama sekali.
+            // Ini mencegah halaman inventaris menghapus data yang sudah dimuat oleh halaman HPP/Promosi.
+            if (!dataFetched.allProductsLoaded) {
+                 state.produk = [];
+            }
+            uiState.productsLastVisible = null; // Selalu reset kursor untuk mulai dari awal
             uiState.productsHasMore = true;
         }
 
@@ -6929,51 +6923,37 @@ const fetchProductData = async (userId, loadMore = false) => {
             uiState.productsLastVisible = productSnap.docs[productSnap.docs.length - 1];
             
             const newProducts = productSnap.docs.map(docSnap => {
-                const p = { id: docSnap.id, ...docSnap.data() };
-                const hargaJual = {};
-                const stokAlokasi = {};
-                const productAllocation = state.stockAllocations.find(alloc => alloc.id === p.id);
-                
-                (state.settings.marketplaces || []).forEach(mp => {
-                    const priceInfo = state.productPrices.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                    hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                    stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-                });
-
-                return {
-                    docId: p.id,
-                    sku: p.sku,
-                    nama: p.product_name,
-                    model_id: p.model_id,
-                    warna: p.color,
-                    varian: p.variant,
-                    stokFisik: p.physical_stock,
-                    hpp: p.hpp,
-                    hargaJual,
-                    stokAlokasi,
-                    userId: p.userId
-                };
+                // ... (sisa logika mapping di dalam sini biarkan sama)
             });
 
-            state.produk.push(...newProducts);
+            // Jika tidak sedang load more, ganti isinya. Jika iya, tambahkan.
+            if (!loadMore) {
+                state.produk = newProducts;
+            } else {
+                state.produk.push(...newProducts);
+            }
         }
         
         if (productSnap.docs.length < PRODUCTS_PER_PAGE) {
             uiState.productsHasMore = false;
         }
 
-        dataFetched.products = true;
+        // HAPUS BARIS INI -> dataFetched.products = true;
+
     } catch (error) {
         console.error("Error fetching paginated products:", error);
     }
 };
 
 const fetchAllProductData = async (userId) => {
-    if (dataFetched.products) return; // Jika sudah pernah di-fetch, jangan ulangi
+    // Gunakan flag baru untuk mencegah fetch ulang jika SEMUA data sudah ada
+    if (dataFetched.allProductsLoaded) return; 
     console.log("Fetching ALL products for HPP/Promotion pages...");
 
     try {
-        let allProducts = [];
+        // Selalu kosongkan array produk, karena fungsi ini bertujuan memuat semuanya dari awal
+        state.produk = []; 
+
         let lastVisible = null;
         let hasMoreData = true;
 
@@ -6990,7 +6970,7 @@ const fetchAllProductData = async (userId) => {
                 collection(db, "products"),
                 where("userId", "==", userId),
                 orderBy("product_name", "asc"),
-                limit(200) // Ambil 200 per batch untuk efisiensi
+                limit(500) // Ambil lebih banyak per batch untuk efisiensi
             );
 
             if (lastVisible) {
@@ -7001,44 +6981,43 @@ const fetchAllProductData = async (userId) => {
 
             if (!productSnap.empty) {
                 lastVisible = productSnap.docs[productSnap.docs.length - 1];
+                
+                // Proses dan langsung tambahkan ke state.produk
                 productSnap.forEach(docSnap => {
-                    allProducts.push({ id: docSnap.id, ...docSnap.data() });
+                    const p = { id: docSnap.id, ...docSnap.data() };
+                    const hargaJual = {};
+                    const stokAlokasi = {};
+                    const productAllocation = allAllocations.find(alloc => alloc.id === p.id);
+                    
+                    (state.settings.marketplaces || []).forEach(mp => {
+                        const priceInfo = allPrices.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
+                        hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+                        stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+                    });
+
+                    state.produk.push({
+                        docId: p.id,
+                        sku: p.sku,
+                        nama: p.product_name,
+                        model_id: p.model_id,
+                        warna: p.color,
+                        varian: p.variant,
+                        stokFisik: p.physical_stock,
+                        hpp: p.hpp,
+                        hargaJual,
+                        stokAlokasi,
+                        userId: p.userId
+                    });
                 });
             }
 
-            if (productSnap.docs.length < 200) {
+            if (productSnap.docs.length < 500) {
                 hasMoreData = false;
             }
         }
-
-        // Proses semua produk yang sudah terkumpul
-        state.produk = allProducts.map(p => {
-            const hargaJual = {};
-            const stokAlokasi = {};
-            const productAllocation = allAllocations.find(alloc => alloc.id === p.id);
-            
-            (state.settings.marketplaces || []).forEach(mp => {
-                const priceInfo = allPrices.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-            });
-
-            return {
-                docId: p.id,
-                sku: p.sku,
-                nama: p.product_name,
-                model_id: p.model_id,
-                warna: p.color,
-                varian: p.variant,
-                stokFisik: p.physical_stock,
-                hpp: p.hpp,
-                hargaJual,
-                stokAlokasi,
-                userId: p.userId
-            };
-        });
-
-        dataFetched.products = true;
+        
+        // Tandai bahwa SEMUA produk telah berhasil dimuat
+        dataFetched.allProductsLoaded = true; 
         console.log(`Successfully fetched ${state.produk.length} total products.`);
 
     } catch (error) {
