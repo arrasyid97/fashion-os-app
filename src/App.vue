@@ -9447,7 +9447,7 @@ watch(activePage, (newPage, oldPage) => {
                 <!-- Kolom Kode Rujukan -->
                 <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 animate-fade-in-up flex flex-col justify-center" style="animation-delay: 100ms;">
                     <h4 class="text-sm font-medium text-slate-500">Kode Rujukan Anda</h4>
-                    <p class="font-mono font-bold text-indigo-600 mt-2 break-all" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ currentUser.referralCode }}</p>
+                    <p class="font-mono font-bold text-indigo-600 mt-2 break-all" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ userProfile.data.referralCode }}</p>
                 </div>
 
                 <!-- Kolom Total Pendapatan -->
