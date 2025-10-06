@@ -58,6 +58,7 @@ const state = reactive({
         ],
     },
     produk: [],
+    inventoryPaginated: [],
     transaksi: [],
     keuangan: [],
     retur: [
@@ -3211,8 +3212,9 @@ const filteredGudangKain = computed(() => {
     return kainData;
 });
 const inventoryProductGroups = computed(() => {
-    const grouped = state.produk.reduce((acc, product) => {
-        // Ambil nama model konseptual (misal: "SALWA")
+    // --- HANYA BARIS INI YANG BERUBAH ---
+    const grouped = state.inventoryPaginated.reduce((acc, product) => {
+    // ------------------------------------
         const model = state.settings.modelProduk.find(m => m.id === product.model_id);
         const modelName = model ? model.namaModel.split(' ')[0] : 'N/A';
 
@@ -3238,7 +3240,7 @@ const inventoryProductGroups = computed(() => {
 
     productGroups = productGroups.filter(group => {
         const matchesSearch = (group.namaModel || '').toLowerCase().includes(searchTerm) || 
-                              group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm) || (v.nama || '').toLowerCase().includes(searchTerm));
+                                group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm) || (v.nama || '').toLowerCase().includes(searchTerm));
         if (!matchesSearch) return false;
         
         const totalStock = group.variants.reduce((sum, v) => sum + (v.stokFisik || 0), 0);
@@ -3254,11 +3256,10 @@ const inventoryProductGroups = computed(() => {
             case 'nama-desc': return b.namaModel.localeCompare(a.namaModel);
             case 'stok-desc': return b.totalStock - a.totalStock;
             case 'stok-asc': return a.totalStock - b.totalStock;
-            case 'nama-asc': default: return a.namaModel.localeCompare(b.namaModel);
+            case 'nama-asc': default: return a.namaModel.localeCompare(a.namaModel);
         }
     });
     
-    // --- PERBAIKAN: SORTING VARIAN DI DALAM KELOMPOK ---
     const sizeOrder = {
         'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
         '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, 
@@ -3277,6 +3278,33 @@ const inventoryProductGroups = computed(() => {
         });
     });
 
+    return productGroups;
+});
+
+const allProductGroups = computed(() => {
+    // Fungsi ini sama persis seperti inventoryProductGroups, TAPI menggunakan state.produk
+    const grouped = state.produk.reduce((acc, product) => { 
+        const model = state.settings.modelProduk.find(m => m.id === product.model_id);
+        const modelName = model ? model.namaModel.split(' ')[0] : 'N/A';
+
+        if (!acc[modelName]) {
+            acc[modelName] = {
+                namaModel: modelName,
+                variants: [],
+                totalStock: 0,
+                totalNilaiStok: 0,
+            };
+        }
+        acc[modelName].variants.push(product);
+        acc[modelName].totalStock += (product.stokFisik || 0);
+        acc[modelName].totalNilaiStok += (product.stokFisik || 0) * (parseInputNumber(product.hpp) || 0);
+        return acc;
+    }, {});
+
+    // ... (Salin semua sisa kode dari inventoryProductGroups ke sini, mulai dari 'let productGroups = ...' sampai selesai)
+    // Ini bagian untuk filtering dan sorting
+    let productGroups = Object.values(grouped);
+    // ... dan seterusnya ...
     return productGroups;
 });
 
@@ -6890,7 +6918,6 @@ const fetchProductData = async (userId, loadMore = false) => {
     const PRODUCTS_PER_PAGE = 20;
 
     if (!dataFetched.pricesAndAllocations) {
-        console.log("Fetching all prices and allocations (one time)...");
         try {
             const [pricesSnap, allocationsSnap] = await Promise.all([
                 getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
@@ -6917,11 +6944,8 @@ const fetchProductData = async (userId, loadMore = false) => {
         if (loadMore && uiState.productsLastVisible) {
             q = query(q, startAfter(uiState.productsLastVisible));
         } else {
-            // HANYA reset daftar produk jika data LENGKAP belum pernah dimuat.
-            if (!dataFetched.allProductsLoaded) {
-                 state.produk = [];
-            }
-            uiState.productsLastVisible = null; 
+            state.inventoryPaginated = []; // Selalu reset data TAMPILAN inventaris
+            uiState.productsLastVisible = null;
             uiState.productsHasMore = true;
         }
 
@@ -6930,7 +6954,7 @@ const fetchProductData = async (userId, loadMore = false) => {
         if (!productSnap.empty) {
             uiState.productsLastVisible = productSnap.docs[productSnap.docs.length - 1];
             
-            const newProducts = productSnap.docs.map(docSnap => { // <-- docSnap SEKARANG DIGUNAKAN
+            const newProducts = productSnap.docs.map(docSnap => {
                 const p = { id: docSnap.id, ...docSnap.data() };
                 const hargaJual = {};
                 const stokAlokasi = {};
@@ -6943,31 +6967,19 @@ const fetchProductData = async (userId, loadMore = false) => {
                 });
 
                 return {
-                    docId: p.id,
-                    sku: p.sku,
-                    nama: p.product_name,
-                    model_id: p.model_id,
-                    warna: p.color,
-                    varian: p.variant,
-                    stokFisik: p.physical_stock,
-                    hpp: p.hpp,
-                    hargaJual,
-                    stokAlokasi,
-                    userId: p.userId
+                    docId: p.id, sku: p.sku, nama: p.product_name, model_id: p.model_id,
+                    warna: p.color, varian: p.variant, stokFisik: p.physical_stock, hpp: p.hpp,
+                    hargaJual, stokAlokasi, userId: p.userId
                 };
             });
 
-            // Ganti isi array jika ini pemuatan awal, atau tambahkan jika "load more"
-            if (!loadMore) {
-                state.produk = newProducts;
-            } else {
-                state.produk.push(...newProducts);
-            }
+            state.inventoryPaginated.push(...newProducts);
         }
         
         if (productSnap.docs.length < PRODUCTS_PER_PAGE) {
             uiState.productsHasMore = false;
         }
+        dataFetched.products = true;
 
     } catch (error) {
         console.error("Error fetching paginated products:", error);
@@ -8214,7 +8226,7 @@ watch(activePage, (newPage, oldPage) => {
                             <td colspan="5" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
                         </tr>
                         
-                        <template v-for="group in inventoryProductGroups" :key="group.namaModel">
+                        <template v-for="group in allProductGroups" :key="group.namaModel">
                             <tr 
                                 class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" 
                                 @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel"
@@ -8404,7 +8416,7 @@ watch(activePage, (newPage, oldPage) => {
                             <tr v-if="inventoryProductGroups.length === 0">
                                 <td colspan="3" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
                             </tr>
-                            <template v-for="group in inventoryProductGroups" :key="group.namaModel">
+                            <template v-for="group in allProductGroups" :key="group.namaModel">
                                 <tr class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel">
                                     <td class="px-6 py-4 font-bold text-slate-800">
                                         <div class="flex items-center">
