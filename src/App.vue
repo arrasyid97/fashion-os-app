@@ -3300,12 +3300,23 @@ const filteredVoucherTypes = computed(() => {
 });
 
 const modalStockSummary = computed(() => {
-    if (uiState.modalType !== 'kelolaStok' || !uiState.modalData.original) {
+    // Tambahkan pengecekan keamanan yang ketat
+    if (uiState.modalType !== 'kelolaStok' || !uiState.modalData || !uiState.modalData.product) {
         return { teralokasi: 0, belumTeralokasi: 0 };
     }
+    
     const { product } = uiState.modalData;
-    const teralokasi = Object.values(product.stokAlokasi).reduce((sum, val) => sum + (val || 0), 0);
-    const belumTeralokasi = (product.stokFisik || 0) - teralokasi;
+    
+    // Pastikan stokAlokasi ada dan merupakan objek/array yang dapat diiterasi
+    const stokAlokasiData = product.stokAlokasi && typeof product.stokAlokasi === 'object' 
+        ? Object.values(product.stokAlokasi) 
+        : [];
+        
+    const teralokasi = stokAlokasiData.reduce((sum, val) => sum + (val || 0), 0);
+    const stokFisikValid = product.stokFisik || 0;
+
+    const belumTeralokasi = stokFisikValid - teralokasi;
+    
     return { teralokasi, belumTeralokasi };
 });
 
