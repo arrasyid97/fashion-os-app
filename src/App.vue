@@ -6889,9 +6889,19 @@ const fetchCoreData = async (userId) => {
 const fetchProductData = async (userId, loadMore = false) => {
     const PRODUCTS_PER_PAGE = 20;
 
-    // Bagian harga & alokasi ini tetap sama, hanya dijalankan sekali
     if (!dataFetched.pricesAndAllocations) {
-        // ... (isi bagian ini biarkan seperti kode Anda yang sudah ada)
+        console.log("Fetching all prices and allocations (one time)...");
+        try {
+            const [pricesSnap, allocationsSnap] = await Promise.all([
+                getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
+                getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
+            ]);
+            state.productPrices = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            state.stockAllocations = allocationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            dataFetched.pricesAndAllocations = true;
+        } catch (error) {
+            console.error("Error fetching prices/allocations:", error);
+        }
     }
 
     if (loadMore && !uiState.productsHasMore) return;
@@ -6907,13 +6917,11 @@ const fetchProductData = async (userId, loadMore = false) => {
         if (loadMore && uiState.productsLastVisible) {
             q = query(q, startAfter(uiState.productsLastVisible));
         } else {
-            // --- INI PERUBAHAN KRITIS ---
-            // HANYA reset daftar produk jika data LENGKAP belum pernah dimuat sama sekali.
-            // Ini mencegah halaman inventaris menghapus data yang sudah dimuat oleh halaman HPP/Promosi.
+            // HANYA reset daftar produk jika data LENGKAP belum pernah dimuat.
             if (!dataFetched.allProductsLoaded) {
                  state.produk = [];
             }
-            uiState.productsLastVisible = null; // Selalu reset kursor untuk mulai dari awal
+            uiState.productsLastVisible = null; 
             uiState.productsHasMore = true;
         }
 
@@ -6922,11 +6930,34 @@ const fetchProductData = async (userId, loadMore = false) => {
         if (!productSnap.empty) {
             uiState.productsLastVisible = productSnap.docs[productSnap.docs.length - 1];
             
-            const newProducts = productSnap.docs.map(docSnap => {
-                // ... (sisa logika mapping di dalam sini biarkan sama)
+            const newProducts = productSnap.docs.map(docSnap => { // <-- docSnap SEKARANG DIGUNAKAN
+                const p = { id: docSnap.id, ...docSnap.data() };
+                const hargaJual = {};
+                const stokAlokasi = {};
+                const productAllocation = state.stockAllocations.find(alloc => alloc.id === p.id);
+                
+                (state.settings.marketplaces || []).forEach(mp => {
+                    const priceInfo = state.productPrices.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
+                    hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+                    stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+                });
+
+                return {
+                    docId: p.id,
+                    sku: p.sku,
+                    nama: p.product_name,
+                    model_id: p.model_id,
+                    warna: p.color,
+                    varian: p.variant,
+                    stokFisik: p.physical_stock,
+                    hpp: p.hpp,
+                    hargaJual,
+                    stokAlokasi,
+                    userId: p.userId
+                };
             });
 
-            // Jika tidak sedang load more, ganti isinya. Jika iya, tambahkan.
+            // Ganti isi array jika ini pemuatan awal, atau tambahkan jika "load more"
             if (!loadMore) {
                 state.produk = newProducts;
             } else {
@@ -6937,8 +6968,6 @@ const fetchProductData = async (userId, loadMore = false) => {
         if (productSnap.docs.length < PRODUCTS_PER_PAGE) {
             uiState.productsHasMore = false;
         }
-
-        // HAPUS BARIS INI -> dataFetched.products = true;
 
     } catch (error) {
         console.error("Error fetching paginated products:", error);
