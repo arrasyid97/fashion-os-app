@@ -8255,8 +8255,8 @@ watch(activePage, (newPage, oldPage) => {
                             <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`" class="animate-fade-in">
                                 <td colspan="5" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
                                     <div class="space-y-3">
-                                        <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Mitra untuk Model: {{ group.namaModel }}</h4>
-                                        <p class="text-xs text-slate-500">Komisi ini akan diterapkan ke **semua varian** dalam model ini dan dibayarkan kepada mitra yang mereferensikan pengguna yang membeli produk ini.</p>
+                                        <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Produk untuk Model: {{ group.namaModel }}</h4>
+    <p class="text-xs text-slate-500">Komisi ini adalah biaya internal yang akan dihitung sebagai **Biaya Transaksi** pada setiap penjualan produk dalam model ini.</p>
                                         <div class="space-y-2">
                                             <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
                                                 <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
