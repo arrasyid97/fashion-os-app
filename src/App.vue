@@ -378,8 +378,6 @@ const loadDataForPage = async (pageName) => {
                 let startDate = new Date();
                 let endDate = new Date();
                 const now = new Date();
-
-                // Hitung rentang tanggal HANYA untuk filter jangka pendek
                 const isShortTermFilter = ['today', 'last_7_days', 'last_30_days'].includes(uiState.dashboardDateFilter);
 
                 if (isShortTermFilter) {
@@ -393,44 +391,55 @@ const loadDataForPage = async (pageName) => {
                         startDate.setDate(now.getDate() - 30);
                         startDate.setHours(0, 0, 0, 0);
                     }
-                    // Panggil fetch data dengan rentang tanggal
                     dataPromises.push(fetchTransactionAndReturnData(userId, false, startDate, endDate));
                     dataPromises.push(fetchKeuanganData(startDate, endDate));
                 } else {
-                    // Untuk jangka panjang, cukup fetch 15 data terbaru untuk grafik
                     dataPromises.push(fetchTransactionAndReturnData(userId));
                     dataPromises.push(fetchKeuanganData());
                 }
 
-                // Selalu fetch summary dan produk
                 dataPromises.push(fetchSummaryData(userId));
+                // Dashboard mungkin hanya butuh data produk bertahap, jadi ini tetap
                 dataPromises.push(fetchProductData(userId));
                 break;
             }
-            // ... (sisa dari switch case biarkan sama seperti sebelumnya)
+            
             case 'transaksi':
             case 'bulk_process':
+                // Halaman ini butuh produk untuk pencarian, jadi bertahap sudah cukup
                 dataPromises.push(fetchProductData(userId));
                 dataPromises.push(fetchTransactionAndReturnData(userId));
                 dataPromises.push(fetchNotesData(userId));
                 break;
+
+            // --- PERUBAHAN DIMULAI DI SINI ---
+
             case 'inventaris':
+                // Halaman inventaris TETAP menggunakan fetchProductData agar tombol "Muat Lebih Banyak" berfungsi
+                dataPromises.push(fetchProductData(userId));
+                break;
+
             case 'harga-hpp':
-                dataPromises.push(fetchProductData(userId));
-                break;
             case 'promosi':
-                dataPromises.push(fetchProductData(userId));
-                dataPromises.push(fetchNotesData(userId));
-                break;
             case 'produksi':
-                dataPromises.push(fetchProductData(userId));
-                dataPromises.push(fetchProductionData(userId));
+            case 'supplier':
+            case 'retur':
+                 // Halaman-halaman ini WAJIB memuat SEMUA produk agar data lengkap
+                dataPromises.push(fetchAllProductData(userId));
                 
+                // Tambahkan data lain yang diperlukan oleh halaman-halaman ini
+                if (pageName === 'promosi') dataPromises.push(fetchNotesData(userId));
+                if (pageName === 'produksi') dataPromises.push(fetchProductionData(userId));
+                if (pageName === 'supplier') dataPromises.push(fetchSupplierData(userId));
+                if (pageName === 'retur') dataPromises.push(fetchTransactionAndReturnData(userId));
                 break;
+            
+            // --- AKHIR PERUBAHAN ---
+
             case 'gudang-kain':
                 dataPromises.push(fetchProductionData(userId));
                 break;
-                case 'laporan-transaksi': // <-- TAMBAHKAN CASE BARU INI
+            case 'laporan-transaksi':
                 dataPromises.push(fetchSummaryData(userId));
                 break;
             case 'laporan-keuangan':
@@ -442,16 +451,8 @@ const loadDataForPage = async (pageName) => {
             case 'investasi':
                 dataPromises.push(fetchInvestorsAndBanksData(userId));
                 break;
-            case 'supplier':
-                dataPromises.push(fetchProductData(userId));
-                dataPromises.push(fetchSupplierData(userId));
-                break;
-                case 'roas-calculator':
-    // Tidak perlu fetch data apa pun, halaman ini murni kalkulator
-    break;
-            case 'retur':
-                dataPromises.push(fetchTransactionAndReturnData(userId));
-                dataPromises.push(fetchProductData(userId));
+            case 'roas-calculator':
+                // Tidak perlu fetch data apa pun, halaman ini murni kalkulator
                 break;
         }
 
@@ -6964,6 +6965,84 @@ const fetchProductData = async (userId, loadMore = false) => {
         dataFetched.products = true;
     } catch (error) {
         console.error("Error fetching paginated products:", error);
+    }
+};
+
+const fetchAllProductData = async (userId) => {
+    if (dataFetched.products) return; // Jika sudah pernah di-fetch, jangan ulangi
+    console.log("Fetching ALL products for HPP/Promotion pages...");
+
+    try {
+        let allProducts = [];
+        let lastVisible = null;
+        let hasMoreData = true;
+
+        // Ambil juga data harga dan alokasi sekali jalan
+        const [pricesSnap, allocationsSnap] = await Promise.all([
+            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
+            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
+        ]);
+        const allPrices = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const allAllocations = allocationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        while (hasMoreData) {
+            let q = query(
+                collection(db, "products"),
+                where("userId", "==", userId),
+                orderBy("product_name", "asc"),
+                limit(200) // Ambil 200 per batch untuk efisiensi
+            );
+
+            if (lastVisible) {
+                q = query(q, startAfter(lastVisible));
+            }
+
+            const productSnap = await getDocs(q);
+
+            if (!productSnap.empty) {
+                lastVisible = productSnap.docs[productSnap.docs.length - 1];
+                productSnap.forEach(docSnap => {
+                    allProducts.push({ id: docSnap.id, ...docSnap.data() });
+                });
+            }
+
+            if (productSnap.docs.length < 200) {
+                hasMoreData = false;
+            }
+        }
+
+        // Proses semua produk yang sudah terkumpul
+        state.produk = allProducts.map(p => {
+            const hargaJual = {};
+            const stokAlokasi = {};
+            const productAllocation = allAllocations.find(alloc => alloc.id === p.id);
+            
+            (state.settings.marketplaces || []).forEach(mp => {
+                const priceInfo = allPrices.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
+                hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
+                stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
+            });
+
+            return {
+                docId: p.id,
+                sku: p.sku,
+                nama: p.product_name,
+                model_id: p.model_id,
+                warna: p.color,
+                varian: p.variant,
+                stokFisik: p.physical_stock,
+                hpp: p.hpp,
+                hargaJual,
+                stokAlokasi,
+                userId: p.userId
+            };
+        });
+
+        dataFetched.products = true;
+        console.log(`Successfully fetched ${state.produk.length} total products.`);
+
+    } catch (error) {
+        console.error("Error fetching all products:", error);
     }
 };
 
