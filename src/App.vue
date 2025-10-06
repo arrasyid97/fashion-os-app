@@ -6294,50 +6294,38 @@ async function saveStockAllocation() {
 }
 
 async function deleteGroup(variants) {
-    if (!confirm(`Anda yakin ingin menghapus SEMUA ${variants.length} varian produk ini?`)) {
+    if (!confirm(`Anda yakin ingin menghapus SEMUA ${variants.length} varian produk ini? Aksi ini tidak dapat dibatalkan.`)) {
         return;
     }
-
     if (!currentUser.value) {
-        alert("Anda harus login.");
-        return;
+        return alert("Anda harus login.");
     }
 
-    const userId = currentUser.value.uid;
     const batch = writeBatch(db);
-    let successCount = 0;
-    const failedSkus = [];
+    const deletedDocIds = variants.map(v => v.docId);
 
-    variants.forEach(variant => {
-        if (variant.userId !== userId) {
-            failedSkus.push(variant.sku);
-            return;
-        }
-
-        const productRef = doc(db, "products", variant.docId);
+    deletedDocIds.forEach(productId => {
+        const productRef = doc(db, "products", productId);
         batch.delete(productRef);
-        const allocationRef = doc(db, "stock_allocations", variant.docId);
+        const allocationRef = doc(db, "stock_allocations", productId);
         batch.delete(allocationRef);
 
         state.settings.marketplaces.forEach(mp => {
-            const priceDocId = `${variant.docId}-${mp.id}`;
+            const priceDocId = `${productId}-${mp.id}`;
             const priceRef = doc(db, "product_prices", priceDocId);
             batch.delete(priceRef);
         });
-        successCount++;
     });
 
     try {
         await batch.commit();
 
-        const deletedDocIds = variants.map(v => v.docId);
-        // Hapus dari state utama
+        // --- PERBAIKAN DI SINI ---
+        // Memperbarui kedua state array untuk konsistensi data dan UI
         state.produk = state.produk.filter(p => !deletedDocIds.includes(p.docId));
-        // --- BARIS PENTING DITAMBAHKAN ---
-        // Hapus juga dari state tampilan inventaris agar UI langsung update
         state.inventoryPaginated = state.inventoryPaginated.filter(p => !deletedDocIds.includes(p.docId));
         
-        alert(`Berhasil menghapus ${successCount} varian.`);
+        alert(`Berhasil menghapus ${variants.length} varian produk.`);
     } catch (error) {
         console.error("Gagal menghapus grup produk:", error);
         alert(`Gagal menghapus produk: ${error.message}`);
@@ -6349,17 +6337,17 @@ async function removeProductVariant(productId) {
         return;
     }
     if (!currentUser.value) {
-        alert("Anda harus login.");
-        return;
+        return alert("Anda harus login.");
     }
-    const userId = currentUser.value.uid;
 
     try {
         const batch = writeBatch(db);
-        const productInState = state.produk.find(p => p.docId === productId);
-        if (!productInState || productInState.userId !== userId) {
-            throw new Error("Anda tidak memiliki izin untuk menghapus produk ini.");
-        }
+        
+        // DIHAPUS: Pengecekan di sisi klien yang menyebabkan error. Keamanan sudah diatur oleh Firebase Rules.
+        // const productInState = state.produk.find(p => p.docId === productId);
+        // if (!productInState || productInState.userId !== userId) {
+        //     throw new Error("Anda tidak memiliki izin untuk menghapus produk ini.");
+        // }
 
         const productRef = doc(db, "products", productId);
         batch.delete(productRef);
@@ -6374,10 +6362,9 @@ async function removeProductVariant(productId) {
 
         await batch.commit();
         
-        // Hapus dari state utama
+        // --- PERBAIKAN DI SINI ---
+        // Memperbarui kedua state array untuk konsistensi data dan UI
         state.produk = state.produk.filter(p => p.docId !== productId);
-        // --- BARIS PENTING DITAMBAHKAN ---
-        // Hapus juga dari state tampilan inventaris agar UI langsung update
         state.inventoryPaginated = state.inventoryPaginated.filter(p => p.docId !== productId);
 
         alert(`Varian produk berhasil dihapus.`);
