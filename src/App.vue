@@ -6209,48 +6209,57 @@ async function saveModelProdukEdit() {
 
 async function saveStockAllocation() {
     if (!currentUser.value) return alert("Anda harus login untuk menyimpan perubahan.");
-    const { product, original } = uiState.modalData;
-    const userId = currentUser.value.uid;
+    const modalData = uiState.modalData;
 
+    // Tambahkan validasi mendasar untuk memastikan objek penting tidak undefined
+    if (!modalData || !modalData.product || !modalData.original) {
+        console.error("Data modal tidak lengkap atau undefined.");
+        alert("Gagal menyimpan: Data produk hilang.");
+        return;
+    }
+    
+    const { product, original } = modalData;
+    const userId = currentUser.value.uid;
     const cleanAllocationData = JSON.parse(JSON.stringify(product.stokAlokasi));
     
     try {
+        isSaving.value = true;
         const batch = writeBatch(db);
 
         // Operasi 1: Update stok fisik di koleksi 'products'
         const productRef = doc(db, "products", original.docId);
-        batch.update(productRef, { physical_stock: product.stokFisik });
+        // Penting: Pastikan stokFisik dikirim sebagai Number.
+        batch.update(productRef, { physical_stock: product.stokFisik || 0 });
         
         // Operasi 2: Simpan/Update data alokasi di koleksi 'stock_allocations'
         const allocationRef = doc(db, "stock_allocations", original.docId);
-        batch.set(allocationRef, { ...cleanAllocationData, userId: userId });
+        batch.set(allocationRef, { ...cleanAllocationData, userId: userId }, { merge: true });
 
         await batch.commit();
 
-        // --- PERBAIKAN UTAMA: CARA UPDATE STATE LOKAL YANG LEBIH AMAN ---
+        // --- REVISI: UPDATE STATE LOKAL DENGAN PENCARIAN YANG AMAN ---
         const index = state.produk.findIndex(p => p.docId === original.docId);
+        
         if (index !== -1) {
-    // Buat objek baru dengan data yang diperbarui
-    const updatedProduct = {
-        ...state.produk[index], // Ambil semua data lama
-        stokFisik: product.stokFisik, // Perbarui stok fisik
-        stokAlokasi: { ...product.stokAlokasi } // Perbarui alokasi stok
-    };
-    // Ganti objek lama dengan yang baru di dalam array
-    state.produk[index] = updatedProduct;
-
-    // "Mengingat" model mana yang baru diedit untuk keperluan scroll
-    const targetModel = state.settings.modelProduk.find(m => m.id === updatedProduct.model_id);
-    if (targetModel) {
-        lastEditedModel.value = targetModel.namaModel.split(' ')[0];
-    }
-}
+            // Perbarui properti secara langsung pada objek proxy reaktif
+            state.produk[index].stokFisik = product.stokFisik || 0;
+            state.produk[index].stokAlokasi = { ...product.stokAlokasi };
+            
+            // Atur scroll ke elemen yang baru diedit (jika perlu)
+            const targetModel = state.settings.modelProduk.find(m => m.id === state.produk[index].model_id);
+            if (targetModel) {
+                lastEditedModel.value = targetModel.namaModel.split(' ')[0];
+            }
+        }
+        
         hideModal();
         alert("Perubahan stok fisik dan alokasi berhasil disimpan!");
 
     } catch (error) {
         console.error("Error menyimpan alokasi stok:", error);
-        alert("Gagal menyimpan perubahan stok.");
+        alert(`Gagal menyimpan perubahan stok: ${error.message}`);
+    } finally {
+        isSaving.value = false;
     }
 }
 
