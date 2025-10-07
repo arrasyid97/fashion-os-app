@@ -402,20 +402,19 @@ const loadDataForPage = async (pageName) => {
                 }
 
                 dataPromises.push(fetchSummaryData(userId));
-                // Dashboard mungkin hanya butuh data produk bertahap, jadi ini tetap
-                dataPromises.push(fetchProductData(userId));
+                dataPromises.push(fetchProductData(userId)); // Untuk dashboard, cukup data bertahap
                 break;
             }
             
+            // --- PERBAIKAN DI SINI ---
             case 'transaksi':
             case 'bulk_process':
-                // Halaman ini butuh produk untuk pencarian, jadi bertahap sudah cukup
-                dataPromises.push(fetchProductData(userId));
+                // Halaman ini butuh SEMUA produk agar fitur pencarian berfungsi
+                dataPromises.push(fetchAllProductData(userId));
                 dataPromises.push(fetchTransactionAndReturnData(userId));
                 dataPromises.push(fetchNotesData(userId));
                 break;
-
-            // --- PERUBAHAN DIMULAI DI SINI ---
+            // --- AKHIR PERBAIKAN ---
 
             case 'inventaris':
                 // Halaman inventaris TETAP menggunakan fetchProductData agar tombol "Muat Lebih Banyak" berfungsi
@@ -437,8 +436,6 @@ const loadDataForPage = async (pageName) => {
                 if (pageName === 'retur') dataPromises.push(fetchTransactionAndReturnData(userId));
                 break;
             
-            // --- AKHIR PERUBAHAN ---
-
             case 'gudang-kain':
                 dataPromises.push(fetchProductionData(userId));
                 break;

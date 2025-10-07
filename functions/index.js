@@ -197,3 +197,135 @@ exports.onProductUpdate = onDocumentUpdated("products/{productId}", async (event
     },
   }, {merge: true});
 });
+
+exports.updateSummaryOnDeleteTransaction = onDocumentDeleted("transactions/{transactionId}", async (event) => {
+    const deletedData = event.data.data();
+    const { userId, tanggal, subtotal, total, items, biaya, diskon } = deletedData;
+    if (!userId) return null;
+
+    const omsetKotor = subtotal || 0;
+    const totalDiskon = diskon?.totalDiscount || 0;
+    const omsetBersih = total || 0;
+    const totalHPP = (items || []).reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
+    const biayaTransaksi = biaya?.total || 0;
+    const labaKotor = omsetBersih - totalHPP;
+    const labaBersihOperasional = labaKotor - biayaTransaksi;
+    const totalQty = (items || []).reduce((sum, item) => sum + (item.qty || 0), 0);
+
+    const date = tanggal.toDate();
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const summaryRef = db.doc(`user_summaries/${userId}`);
+
+    // Mengurangi nilai (decrement) karena data dihapus
+    const updateData = {
+        [`summary_${year}`]: {
+            months: {
+                [month]: {
+                    omsetKotor: admin.firestore.FieldValue.increment(-omsetKotor),
+                    totalDiskon: admin.firestore.FieldValue.increment(-totalDiskon),
+                    hppTerjual: admin.firestore.FieldValue.increment(-totalHPP),
+                    biayaTransaksi: admin.firestore.FieldValue.increment(-biayaTransaksi),
+                    labaKotor: admin.firestore.FieldValue.increment(-labaKotor),
+                    omsetBersih: admin.firestore.FieldValue.increment(-omsetBersih),
+                    labaBersihOperasional: admin.firestore.FieldValue.increment(-labaBersihOperasional),
+                    totalQty: admin.firestore.FieldValue.increment(-totalQty),
+                }
+            },
+            yearlyTotals: {
+                omsetKotor: admin.firestore.FieldValue.increment(-omsetKotor),
+                totalDiskon: admin.firestore.FieldValue.increment(-totalDiskon),
+                hppTerjual: admin.firestore.FieldValue.increment(-totalHPP),
+                biayaTransaksi: admin.firestore.FieldValue.increment(-biayaTransaksi),
+                labaKotor: admin.firestore.FieldValue.increment(-labaKotor),
+                omsetBersih: admin.firestore.FieldValue.increment(-omsetBersih),
+                labaBersihOperasional: admin.firestore.FieldValue.increment(-labaBersihOperasional),
+                totalQty: admin.firestore.FieldValue.increment(-totalQty),
+            }
+        }
+    };
+    return summaryRef.set(updateData, { merge: true });
+});
+
+exports.updateSummaryOnDeleteExpense = onDocumentDeleted("keuangan/{financeId}", async (event) => {
+    const deletedData = event.data.data();
+    const { userId, tanggal, jenis, jumlah } = deletedData;
+    if (jenis !== "pengeluaran" || !userId) return null;
+
+    const biayaOperasional = jumlah || 0;
+    const date = tanggal.toDate();
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const summaryRef = db.doc(`user_summaries/${userId}`);
+
+    const updateData = {
+        [`summary_${year}`]: {
+            months: {
+                [month]: {
+                    biayaOperasional: admin.firestore.FieldValue.increment(-biayaOperasional),
+                    labaBersihOperasional: admin.firestore.FieldValue.increment(biayaOperasional), // Ditambah karena pengeluaran berkurang
+                }
+            },
+            yearlyTotals: {
+                biayaOperasional: admin.firestore.FieldValue.increment(-biayaOperasional),
+                labaBersihOperasional: admin.firestore.FieldValue.increment(biayaOperasional),
+            }
+        }
+    };
+    return summaryRef.set(updateData, { merge: true });
+});
+
+exports.updateSummaryOnDeleteReturn = onDocumentDeleted("returns/{returnId}", async (event) => {
+    const deletedData = event.data.data();
+    const { userId, tanggal, items } = deletedData;
+    if (!userId || !items || items.length === 0) return null;
+
+    let totalNilaiRetur = 0;
+    let totalBiayaMarketplaceBatal = 0;
+    let totalHppRetur = 0;
+    let totalQtyRetur = 0;
+
+    for (const item of items) {
+        totalNilaiRetur += item.nilaiRetur || 0;
+        totalBiayaMarketplaceBatal += item.biayaMarketplace || 0;
+        totalQtyRetur += item.qty || 0;
+        const productQuery = await db.collection("products").where("sku", "==", item.sku).limit(1).get();
+        if (!productQuery.empty) {
+            const productData = productQuery.docs[0].data();
+            totalHppRetur += (productData.hpp || 0) * (item.qty || 0);
+        }
+    }
+
+    const date = tanggal.toDate();
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const summaryRef = db.doc(`user_summaries/${userId}`);
+    const labaKotorChange = totalHppRetur - totalNilaiRetur;
+    const labaBersihChange = labaKotorChange + totalBiayaMarketplaceBatal;
+
+    const updateData = {
+        [`summary_${year}`]: {
+            months: {
+                [month]: {
+                    nilaiRetur: admin.firestore.FieldValue.increment(-totalNilaiRetur),
+                    omsetBersih: admin.firestore.FieldValue.increment(totalNilaiRetur),
+                    hppTerjual: admin.firestore.FieldValue.increment(totalHppRetur),
+                    biayaTransaksi: admin.firestore.FieldValue.increment(totalBiayaMarketplaceBatal),
+                    labaKotor: admin.firestore.FieldValue.increment(-labaKotorChange),
+                    labaBersihOperasional: admin.firestore.FieldValue.increment(-labaBersihChange),
+                    totalQty: admin.firestore.FieldValue.increment(totalQtyRetur),
+                }
+            },
+            yearlyTotals: {
+                nilaiRetur: admin.firestore.FieldValue.increment(-totalNilaiRetur),
+                omsetBersih: admin.firestore.FieldValue.increment(totalNilaiRetur),
+                hppTerjual: admin.firestore.FieldValue.increment(totalHppRetur),
+                biayaTransaksi: admin.firestore.FieldValue.increment(totalBiayaMarketplaceBatal),
+                labaKotor: admin.firestore.FieldValue.increment(-labaKotorChange),
+                labaBersihOperasional: admin.firestore.FieldValue.increment(-labaBersihChange),
+                totalQty: admin.firestore.FieldValue.increment(totalQtyRetur),
+            }
+        }
+    };
+    return summaryRef.set(updateData, { merge: true });
+});
