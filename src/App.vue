@@ -402,11 +402,13 @@ const loadDataForPage = async (pageName) => {
                 }
 
                 dataPromises.push(fetchSummaryData(userId));
-                dataPromises.push(fetchProductData(userId)); // Untuk dashboard, cukup data bertahap
+                
+                // --- PERBAIKAN DI SINI: Baris di bawah ini dihapus ---
+                // dataPromises.push(fetchProductData(userId)); 
+                
                 break;
             }
             
-            // --- PERBAIKAN DI SINI ---
             case 'transaksi':
             case 'bulk_process':
                 // Halaman ini butuh SEMUA produk agar fitur pencarian berfungsi
@@ -414,7 +416,6 @@ const loadDataForPage = async (pageName) => {
                 dataPromises.push(fetchTransactionAndReturnData(userId));
                 dataPromises.push(fetchNotesData(userId));
                 break;
-            // --- AKHIR PERBAIKAN ---
 
             case 'inventaris':
                 // Halaman inventaris TETAP menggunakan fetchProductData agar tombol "Muat Lebih Banyak" berfungsi
