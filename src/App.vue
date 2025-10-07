@@ -6931,17 +6931,17 @@ const fetchCoreData = async (userId) => {
         if (settingsSnap.exists()) {
             const settingsData = settingsSnap.data();
             Object.assign(state.settings, settingsData);
-            // Gabungkan default dengan data yang ada untuk pengguna lama
             state.settings.pinProtection = { ...defaultPinSettings, ...(settingsData.pinProtection || {}) };
         } else {
-            // --- PERBAIKAN UTAMA DI SINI ---
-            // Jika pengguna baru dan belum punya settings, buat pinProtection default
             state.settings.pinProtection = defaultPinSettings;
         }
 
-        if (currentUser.value?.userData?.inflowCategories) {
-            state.settings.inflowCategories = currentUser.value.userData.inflowCategories;
+        // --- PERBAIKAN DI SINI ---
+        // Mengambil data dari userProfile.data, bukan currentUser.value.userData
+        if (userProfile.data?.inflowCategories) {
+            state.settings.inflowCategories = userProfile.data.inflowCategories;
         }
+        
         if (promotionsSnap.exists()) {
             const promoData = promotionsSnap.data();
             state.promotions.perChannel = promoData.perChannel || {};
