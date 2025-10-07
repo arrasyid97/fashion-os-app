@@ -12108,29 +12108,28 @@ watch(activePage, (newPage, oldPage) => {
         </div>
 
         <div class="relative">
-            <label for="stock-in-sku" class="block text-sm font-medium text-slate-700">Cari SKU Produk</label>
-            <input 
-                type="text" 
-                v-model="uiState.modalData.sku" 
-                @input="handleStockInSearch"
-                id="stock-in-sku" 
-                class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" 
-                placeholder="Ketik SKU atau Nama Produk..." 
-                required 
-                autocomplete="off"
-            >
-            <div v-if="uiState.stockInSearchRecommendations.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                <div 
-                    v-for="p in uiState.stockInSearchRecommendations" 
-                    :key="p.sku" 
-                    @click="selectStockInRecommendation(p)" 
-                    class="p-3 hover:bg-slate-100 cursor-pointer border-b last:border-b-0"
-                >
-                    <p class="font-semibold text-slate-800">{{ p.nama }}</p>
-                    <p class="text-sm text-slate-500">{{ p.sku }} - {{ p.warna }} - {{ p.varian }} | <span class="font-medium">Stok: {{ p.stokFisik }}</span></p>
-                </div>
-            </div>
+    <label for="stock-in-sku" class="block text-sm font-medium text-slate-700">Cari SKU Produk</label>
+    <input 
+        type="text" 
+        v-model="uiState.modalData.sku" 
+        @input="handleStockInSearch"  id="stock-in-sku" 
+        class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" 
+        placeholder="Ketik SKU atau Nama Produk..." 
+        required 
+        autocomplete="off"
+    >
+    <div v-if="uiState.stockInSearchRecommendations.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <div 
+            v-for="p in uiState.stockInSearchRecommendations" 
+            :key="p.sku" 
+            @click="selectStockInRecommendation(p)" 
+            class="p-3 hover:bg-slate-100 cursor-pointer border-b last:border-b-0"
+        >
+            <p class="font-semibold text-slate-800">{{ p.nama }}</p>
+            <p class="text-sm text-slate-500">{{ p.sku }} - {{ p.warna }} - {{ p.varian }} | <span class="font-medium">Stok: {{ p.stokFisik }}</span></p>
         </div>
+    </div>
+</div>
 
         <div>
             <label for="stock-in-qty" class="block text-sm font-medium text-slate-700">Jumlah (Pcs)</label>
