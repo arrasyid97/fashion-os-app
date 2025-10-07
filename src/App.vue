@@ -403,22 +403,20 @@ const loadDataForPage = async (pageName) => {
 
                 dataPromises.push(fetchSummaryData(userId));
                 
-                // --- PERBAIKAN DI SINI: Baris di bawah ini dihapus ---
-                // dataPromises.push(fetchProductData(userId)); 
+                // --- PERBAIKAN DI SINI: Memanggil SEMUA data produk agar kalkulasi KPI akurat ---
+                dataPromises.push(fetchAllProductData(userId)); 
                 
                 break;
             }
             
             case 'transaksi':
             case 'bulk_process':
-                // Halaman ini butuh SEMUA produk agar fitur pencarian berfungsi
                 dataPromises.push(fetchAllProductData(userId));
                 dataPromises.push(fetchTransactionAndReturnData(userId));
                 dataPromises.push(fetchNotesData(userId));
                 break;
 
             case 'inventaris':
-                // Halaman inventaris TETAP menggunakan fetchProductData agar tombol "Muat Lebih Banyak" berfungsi
                 dataPromises.push(fetchProductData(userId));
                 break;
 
@@ -427,10 +425,8 @@ const loadDataForPage = async (pageName) => {
             case 'produksi':
             case 'supplier':
             case 'retur':
-                 // Halaman-halaman ini WAJIB memuat SEMUA produk agar data lengkap
                 dataPromises.push(fetchAllProductData(userId));
                 
-                // Tambahkan data lain yang diperlukan oleh halaman-halaman ini
                 if (pageName === 'promosi') dataPromises.push(fetchNotesData(userId));
                 if (pageName === 'produksi') dataPromises.push(fetchProductionData(userId));
                 if (pageName === 'supplier') dataPromises.push(fetchSupplierData(userId));
@@ -453,7 +449,6 @@ const loadDataForPage = async (pageName) => {
                 dataPromises.push(fetchInvestorsAndBanksData(userId));
                 break;
             case 'roas-calculator':
-                // Tidak perlu fetch data apa pun, halaman ini murni kalkulator
                 break;
         }
 
