@@ -10448,13 +10448,23 @@ watch(activePage, (newPage, oldPage) => {
 
 <div v-if="activePage === 'panduan-baru'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
     <div class="max-w-4xl mx-auto">
+        
         <div class="text-center mb-12 animate-fade-in-up">
-            <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800">
-                <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Selamat Datang di Fashion OS!</span>
-            </h2>
-            <p class="text-lg text-slate-600 mt-4 max-w-2xl mx-auto">
-                Ikuti 4 langkah sederhana ini untuk memulai dan membuat aplikasi siap digunakan untuk bisnis Anda.
-            </p>
+            <div class="flex flex-wrap justify-between items-center gap-4">
+                <div class="text-left">
+                    <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800">
+                        <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Selamat Datang di Fashion OS!</span>
+                    </h2>
+                    <p class="text-lg text-slate-600 mt-4 max-w-2xl">
+                        Ikuti 4 langkah sederhana ini untuk memulai dan membuat aplikasi siap digunakan untuk bisnis Anda.
+                    </p>
+                </div>
+
+                <a href="https://wa.me/6285691803476" target="_blank" class="bg-green-500 text-white font-bold py-3 px-5 rounded-lg hover:bg-green-600 transition-colors shadow-lg flex items-center gap-2 flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.487 5.235 3.487 8.413 0 6.557-5.338 11.892-11.894 11.892-1.99 0-3.903-.52-5.687-1.475L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.886-.001 2.267.655 4.398 1.905 6.344l-1.332 4.869 4.869-1.332z"/></svg>
+                    Hubungi Admin
+                </a>
+            </div>
         </div>
 
         <div class="space-y-8">
@@ -10466,7 +10476,7 @@ watch(activePage, (newPage, oldPage) => {
                         <p class="text-slate-700 mb-4">Ini adalah fondasi dari seluruh aplikasi. Pastikan Anda mengisinya terlebih dahulu sebelum melanjutkan ke langkah lain.</p>
                         <div class="space-y-3">
                             <p><strong>A. Atur Marketplace:</strong> Daftarkan semua toko online Anda (Shopee, Tokopedia, dll) beserta biaya adminnya.</p>
-                            <p><strong>B. Atur Model Produk:</strong> Buat "cetakan" untuk setiap model produk Anda (misal: Madina Hitam M), lengkap dengan kebutuhan kain dan harga jasa maklun/jahit.</p>
+                            <p><strong>B. Atur Model Produk:</strong> Buat "cetakan" untuk setiap model produk Anda (misal: Gamis Salwa Hitam M), lengkap dengan kebutuhan kain dan harga jasa maklun/jahit.</p>
                         </div>
                         <button @click="changePage('pengaturan')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
                             Buka Halaman Pengaturan &raquo;
@@ -10484,7 +10494,7 @@ watch(activePage, (newPage, oldPage) => {
                         <ul class="list-disc list-inside space-y-2 text-slate-700">
                             <li>Klik tombol <strong>"+ Tambah Produk Baru"</strong>.</li>
                             <li>Pilih **Model Produk** yang sudah Anda buat di Langkah 1, maka beberapa kolom akan terisi otomatis.</li>
-                            <li>Setelah produk ditambahkan, gunakan tombol **"Penyesuaian Stok"** untuk memasukkan jumlah stok awal setiap produk.</li>
+                            <li>Setelah produk ditambahkan, gunakan tombol <strong>"Penyesuaian Stok"** untuk memasukkan jumlah stok awal setiap produk.</li>
                         </ul>
                         <button @click="changePage('inventaris')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
                             Buka Halaman Inventaris &raquo;
