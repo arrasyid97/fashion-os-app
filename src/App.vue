@@ -9252,7 +9252,7 @@ watch(activePage, (newPage, oldPage) => {
                         <div>
                             <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 5: Meninjau dan Mencetak</h4>
                             <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                                <li>Klik **"Print"**, lalu atur **"Print direction"** (0 atau 180) dan **"Print density"** (misalnya, 5).</li>
+                                <li>Klik **"Print"**, lalu atur **"Print direction"** (0 atau 180) dan **"Print density"** (misalnya, 5)jika kurang jelas barcodenya naikan angka densitynya dan atur sesuai keinginan.</li>
                                 <li>Atur **"Number of prints"** sesuai jumlah salinan yang Anda inginkan, lalu klik **"OK"**.</li>
                             </ol>
                         </div>
