@@ -3095,18 +3095,17 @@ const dashboardKpis = computed(() => {
         };
 
         if (uiState.dashboardDateFilter === 'by_month_range') {
-            const year = uiState.dashboardStartYear;
-            // Pastikan bulan dan tahun kedua juga dipertimbangkan jika rentangnya lebih dari 1 bulan
-            for (let y = uiState.dashboardStartYear; y <= uiState.dashboardEndYear; y++) {
-                const startMonth = (y === uiState.dashboardStartYear) ? uiState.dashboardStartMonth : 1;
-                const endMonth = (y === uiState.dashboardEndYear) ? uiState.dashboardEndMonth : 12;
-                for (let m = startMonth; m <= endMonth; m++) {
-                    const monthStr = m.toString().padStart(2, '0');
-                    const summary = state.summaryData?.[`summary_${y}`]?.months?.[monthStr];
-                    processSummary(summary);
-                }
-            }
-        } else if (uiState.dashboardDateFilter === 'this_year') {
+    // const year = uiState.dashboardStartYear; // BARIS INI DIHAPUS KARENA TIDAK DIGUNAKAN
+    for (let y = uiState.dashboardStartYear; y <= uiState.dashboardEndYear; y++) {
+        const startMonth = (y === uiState.dashboardStartYear) ? uiState.dashboardStartMonth : 1;
+        const endMonth = (y === uiState.dashboardEndYear) ? uiState.dashboardEndMonth : 12;
+        for (let m = startMonth; m <= endMonth; m++) {
+            const monthStr = m.toString().padStart(2, '0');
+            const summary = state.summaryData?.[`summary_${y}`]?.months?.[monthStr];
+            processSummary(summary);
+        }
+    }
+} else if (uiState.dashboardDateFilter === 'this_year') {
             const year = new Date().getFullYear();
             const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
             processSummary(summary);
