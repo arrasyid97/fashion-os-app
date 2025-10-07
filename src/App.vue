@@ -10466,7 +10466,7 @@ watch(activePage, (newPage, oldPage) => {
                         <p class="text-slate-700 mb-4">Ini adalah fondasi dari seluruh aplikasi. Pastikan Anda mengisinya terlebih dahulu sebelum melanjutkan ke langkah lain.</p>
                         <div class="space-y-3">
                             <p><strong>A. Atur Marketplace:</strong> Daftarkan semua toko online Anda (Shopee, Tokopedia, dll) beserta biaya adminnya.</p>
-                            <p><strong>B. Atur Model Produk:</strong> Buat "cetakan" untuk setiap model produk Anda (misal: Gamis Salwa Hitam M), lengkap dengan kebutuhan kain dan harga jasa maklun/jahit.</p>
+                            <p><strong>B. Atur Model Produk:</strong> Buat "cetakan" untuk setiap model produk Anda (misal: Madina Hitam M), lengkap dengan kebutuhan kain dan harga jasa maklun/jahit.</p>
                         </div>
                         <button @click="changePage('pengaturan')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
                             Buka Halaman Pengaturan &raquo;
