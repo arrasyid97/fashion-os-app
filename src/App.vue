@@ -1839,7 +1839,9 @@ async function handleCashoutRequest() {
             body: JSON.stringify({
                 amountToWithdraw: amountToWithdraw,
                 withdrawalId: withdrawalId,
-                referralCode: currentUser.value.referralCode
+                // --- PERBAIKAN DI SINI ---
+                // Mengambil kode rujukan dari userProfile.data, bukan currentUser
+                referralCode: userProfile.data.referralCode 
             })
         });
         const data = await response.json();
