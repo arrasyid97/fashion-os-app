@@ -300,6 +300,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     purchaseOrderStatusProsesFilter: 'all', // 'all', 'Dalam Proses', 'Selesai'
     purchaseOrderStatusBayarFilter: 'all', // 'all', 'Belum Dibayar', 'Proses Pembayaran', 'Sudah Dibayar'
     purchaseOrderSort: 'tanggal-desc', // 'total-desc', 'total-asc'
+    purchaseOrderItemStatusFilter: 'all',
     purchaseOrderDateFilter: 'all_time',
     purchaseOrderStartDate: '',
     purchaseOrderEndDate: '',
@@ -3601,19 +3602,34 @@ const filteredPurchaseOrders = computed(() => {
 });
 
 const itemizedPurchaseHistory = computed(() => {
-  // flatMap akan mengubah array pesanan menjadi array item produk yang rata
-  return filteredPurchaseOrders.value.flatMap(order => 
-    // Jika tidak ada produk di dalam pesanan, kembalikan array kosong
-    (order.produk || []).map(item => ({
-      ...item, // Ambil semua data dari item (nama, harga, qty, dll)
-      orderId: order.id,
-      tanggal: order.tanggal,
-      supplierName: order.supplierName,
-      // Kita simpan juga status dari pesanan induknya
-      orderStatusProses: order.statusProses,
-      orderStatusPembayaran: order.statusPembayaran
-    }))
-  );
+    // Langkah 1: Dapatkan semua item produk seperti sebelumnya
+    let allItems = filteredPurchaseOrders.value.flatMap(order => 
+        (order.produk || []).map(item => ({
+            ...item,
+            orderId: order.id,
+            tanggal: order.tanggal,
+            supplierName: order.supplierName,
+            orderStatusProses: order.statusProses,
+            orderStatusPembayaran: order.statusPembayaran
+        }))
+    );
+
+    // --- PERBAIKAN DI SINI ---
+    // Langkah 2: Tambahkan logika filter berdasarkan status inventaris
+    const filterStatus = uiState.purchaseOrderItemStatusFilter;
+    if (filterStatus !== 'all') {
+        allItems = allItems.filter(item => {
+            if (filterStatus === 'sudahMasuk') {
+                return item.isInventoried === true;
+            }
+            if (filterStatus === 'belumMasuk') {
+                return !item.isInventoried;
+            }
+            return true;
+        });
+    }
+
+    return allItems;
 });
 
 const ringkasanJadiData = computed(() => {
@@ -10700,53 +10716,61 @@ watch(activePage, (newPage, oldPage) => {
     </button>
 </div>
                 <div v-show="uiState.activeSupplierView === 'produkList'" class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
-                    <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Produk dari Supplier</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left text-slate-500">
-                            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                                <tr>
-                                    <th class="px-4 py-3">Tanggal</th>
-                                    <th class="px-4 py-3">Supplier</th>
-                                    <th class="px-4 py-3">Produk</th>
-                                    <th class="px-4 py-3 text-right">Harga Beli</th>
-                                    <th class="px-4 py-3 text-center">Qty</th>
-                                    <th class="px-4 py-3 text-center">Status Inventaris</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-200/50">
-                                <tr v-if="itemizedPurchaseHistory.length === 0">
-                                    <td colspan="6" class="p-10 text-center text-slate-500">Belum ada riwayat penerimaan barang.</td>
-                                </tr>
-                                <tr v-for="(item, index) in itemizedPurchaseHistory" :key="`${item.orderId}-${index}`" class="hover:bg-slate-50/50">
-                                    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
-                                    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
-                                    <td class="px-4 py-3">
-                                        <p class="font-semibold">{{ item.modelName }}</p>
-                                        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
-                                    </td>
-                                    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
-                                    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
-                                    <td class="px-4 py-3 text-center">
-                                        <span v-if="item.isInventoried" class="text-green-600 font-bold flex items-center justify-center text-xs">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-                                            Sudah Masuk
-                                        </span>
-                                        <button 
-                                            v-else 
-                                            @click="addPurchaseOrderItemToInventory(item)" 
-                                            class="bg-blue-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-blue-700" 
-                                            :disabled="!isSubscriptionActive"
-                                        >
-                                            Masukkan ke Inventaris
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
+    <h3 class="text-xl font-bold text-slate-800 mb-4 pb-4 border-b">Riwayat Produk dari Supplier</h3>
+    
+    <div class="mb-4">
+        <label for="inventory-status-filter" class="block text-sm font-medium text-slate-700 mb-1">Filter Status Inventaris</label>
+        <select v-model="uiState.purchaseOrderItemStatusFilter" id="inventory-status-filter" class="w-full md:w-1/3 p-2 border border-slate-300 rounded-md bg-white shadow-sm">
+            <option value="all">Semua Status</option>
+            <option value="belumMasuk">Belum Masuk Inventaris</option>
+            <option value="sudahMasuk">Sudah Masuk</option>
+        </select>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left text-slate-500">
+            <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                <tr>
+                    <th class="px-4 py-3">Tanggal</th>
+                    <th class="px-4 py-3">Supplier</th>
+                    <th class="px-4 py-3">Produk</th>
+                    <th class="px-4 py-3 text-right">Harga Beli</th>
+                    <th class="px-4 py-3 text-center">Qty</th>
+                    <th class="px-4 py-3 text-center">Status Inventaris</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200/50">
+                <tr v-if="itemizedPurchaseHistory.length === 0">
+                    <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada produk yang cocok dengan filter.</td>
+                </tr>
+                <tr v-for="(item, index) in itemizedPurchaseHistory" :key="`${item.orderId}-${index}`" class="hover:bg-slate-50/50">
+                    <td class="px-4 py-3">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
+                    <td class="px-4 py-3 font-semibold text-slate-800">{{ item.supplierName }}</td>
+                    <td class="px-4 py-3">
+                        <p class="font-semibold">{{ item.modelName }}</p>
+                        <p class="text-xs">{{ item.sku }} ({{ item.color }} / {{ item.size }})</p>
+                    </td>
+                    <td class="px-4 py-3 text-right">{{ formatCurrency(item.hargaJual) }}</td>
+                    <td class="px-4 py-3 text-center font-medium">{{ item.qty }}</td>
+                    <td class="px-4 py-3 text-center">
+                        <span v-if="item.isInventoried" class="text-green-600 font-bold flex items-center justify-center text-xs">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                            Sudah Masuk
+                        </span>
+                        <button 
+                            v-else 
+                            @click="addPurchaseOrderItemToInventory(item)" 
+                            class="bg-blue-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-blue-700" 
+                            :disabled="!isSubscriptionActive"
+                        >
+                            Masukkan ke Inventaris
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+</div>
             <div v-if="uiState.activeSupplierView === 'form'" class="animate-fade-in-up">
                 <div class="flex justify-between items-center mb-8">
                     <div>
