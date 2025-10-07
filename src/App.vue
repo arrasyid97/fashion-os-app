@@ -10494,7 +10494,7 @@ watch(activePage, (newPage, oldPage) => {
                         <ul class="list-disc list-inside space-y-2 text-slate-700">
                             <li>Klik tombol <strong>"+ Tambah Produk Baru"</strong>.</li>
                             <li>Pilih **Model Produk** yang sudah Anda buat di Langkah 1, maka beberapa kolom akan terisi otomatis.</li>
-                            <li>Setelah produk ditambahkan, gunakan tombol <strong>"Penyesuaian Stok"** untuk memasukkan jumlah stok awal setiap produk.</li>
+                            <li>Setelah produk ditambahkan, gunakan tombol <strong>"Penyesuaian Stok"</strong> untuk memasukkan jumlah stok awal setiap produk.</li>
                         </ul>
                         <button @click="changePage('inventaris')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
                             Buka Halaman Inventaris &raquo;
