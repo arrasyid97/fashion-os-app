@@ -329,3 +329,56 @@ exports.updateSummaryOnDeleteReturn = onDocumentDeleted("returns/{returnId}", as
     };
     return summaryRef.set(updateData, { merge: true });
 });
+
+exports.updateSummaryOnNewIncome = onDocumentCreated("keuangan/{financeId}", async (event) => {
+    const financeData = event.data.data();
+    const { userId, tanggal, jenis, jumlah } = financeData;
+    if (jenis !== "pemasukan_lain" || !userId) return null;
+
+    const pemasukanLain = jumlah || 0;
+    const date = tanggal.toDate();
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const summaryRef = db.doc(`user_summaries/${userId}`);
+
+    const updateData = {
+        [`summary_${year}`]: {
+            months: {
+                [month]: {
+                    pemasukanLain: admin.firestore.FieldValue.increment(pemasukanLain),
+                }
+            },
+            yearlyTotals: {
+                pemasukanLain: admin.firestore.FieldValue.increment(pemasukanLain),
+            }
+        }
+    };
+    return summaryRef.set(updateData, { merge: true });
+});
+
+// Fungsi ini akan MENGURANGI pemasukan_lain dari summary saat dihapus
+exports.updateSummaryOnDeleteIncome = onDocumentDeleted("keuangan/{financeId}", async (event) => {
+    const deletedData = event.data.data();
+    const { userId, tanggal, jenis, jumlah } = deletedData;
+    if (jenis !== "pemasukan_lain" || !userId) return null;
+
+    const pemasukanLain = jumlah || 0;
+    const date = tanggal.toDate();
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const summaryRef = db.doc(`user_summaries/${userId}`);
+
+    const updateData = {
+        [`summary_${year}`]: {
+            months: {
+                [month]: {
+                    pemasukanLain: admin.firestore.FieldValue.increment(-pemasukanLain),
+                }
+            },
+            yearlyTotals: {
+                pemasukanLain: admin.firestore.FieldValue.increment(-pemasukanLain),
+            }
+        }
+    };
+    return summaryRef.set(updateData, { merge: true });
+});

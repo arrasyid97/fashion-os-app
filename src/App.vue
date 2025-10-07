@@ -3074,11 +3074,12 @@ const dashboardKpis = computed(() => {
     let kpis = {
         saldoKas: 0, omsetBersih: 0, labaKotor: 0, labaBersih: 0, omsetKotor: 0,
         totalDiskon: 0, totalHppTerjual: 0, totalBiayaTransaksi: 0,
-        totalBiayaOperasional: 0, totalNilaiRetur: 0
+        totalBiayaOperasional: 0, totalNilaiRetur: 0,
+        pemasukanLain: 0 // Properti baru untuk menampung pemasukan lain
     };
 
     if (isLongTermFilter && state.summaryData && Object.keys(state.summaryData).length > 0) {
-        // --- LOGIKA UNTUK FILTER JANGKA PANJANG (CEPAT & HEMAT) ---
+        // --- LOGIKA UNTUK FILTER JANGKA PANJANG ---
         const processSummary = (summary) => {
             if (!summary) return;
             kpis.omsetKotor += summary.omsetKotor || 0;
@@ -3090,43 +3091,49 @@ const dashboardKpis = computed(() => {
             kpis.totalBiayaOperasional += summary.biayaOperasional || 0;
             kpis.labaBersih += summary.labaBersihOperasional || 0;
             kpis.totalNilaiRetur += summary.nilaiRetur || 0;
+            kpis.pemasukanLain += summary.pemasukanLain || 0; // <-- PERBAIKAN: Ambil data pemasukanLain
         };
 
         if (uiState.dashboardDateFilter === 'by_month_range') {
             const year = uiState.dashboardStartYear;
-            const month = uiState.dashboardStartMonth.toString().padStart(2, "0");
-            const summary = state.summaryData?.[`summary_${year}`]?.months?.[month];
-            processSummary(summary);
+            // Pastikan bulan dan tahun kedua juga dipertimbangkan jika rentangnya lebih dari 1 bulan
+            for (let y = uiState.dashboardStartYear; y <= uiState.dashboardEndYear; y++) {
+                const startMonth = (y === uiState.dashboardStartYear) ? uiState.dashboardStartMonth : 1;
+                const endMonth = (y === uiState.dashboardEndYear) ? uiState.dashboardEndMonth : 12;
+                for (let m = startMonth; m <= endMonth; m++) {
+                    const monthStr = m.toString().padStart(2, '0');
+                    const summary = state.summaryData?.[`summary_${y}`]?.months?.[monthStr];
+                    processSummary(summary);
+                }
+            }
         } else if (uiState.dashboardDateFilter === 'this_year') {
             const year = new Date().getFullYear();
             const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
             processSummary(summary);
-        } 
-        else if (uiState.dashboardDateFilter === 'by_year_range') {
+        } else if (uiState.dashboardDateFilter === 'by_year_range') {
             for (let year = uiState.dashboardStartYear; year <= uiState.dashboardEndYear; year++) {
                 const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
                 processSummary(summary);
             }
-        } 
-        else if (uiState.dashboardDateFilter === 'all_time') {
+        } else if (uiState.dashboardDateFilter === 'all_time') {
             for (const key in state.summaryData) {
-                if (key.startsWith('summary_')) {
+                if (key.startsWith('summary_') && state.summaryData[key]?.yearlyTotals) {
                     processSummary(state.summaryData[key].yearlyTotals);
                 }
             }
         }
-        // Saldo Kas untuk jangka panjang dihitung dari omset bersih dikurangi biaya
-        kpis.saldoKas = (kpis.omsetBersih) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
+        
+        // --- PERBAIKAN PERHITUNGAN SALDO KAS ---
+        kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
 
     } else {
-        // --- LOGIKA UNTUK FILTER JANGKA PENDEK (REAL-TIME & AKURAT) ---
+        // --- LOGIKA UNTUK FILTER JANGKA PENDEK (SUDAH BENAR) ---
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
         
         const omsetKotorAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
         const totalDiskonAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
         const totalHppTerjualAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
         const totalBiayaTransaksiAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
-
         let totalNilaiReturGross = 0;
         let totalDiskonBatal = 0;
         let totalHppRetur = 0;
@@ -3158,6 +3165,7 @@ const dashboardKpis = computed(() => {
         kpis.saldoKas = (kpis.omsetBersih + pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
     }
     
+    // Ini dihitung terpisah dan sudah benar
     kpis.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     kpis.totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
