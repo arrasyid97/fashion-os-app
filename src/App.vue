@@ -2713,79 +2713,97 @@ function removeProgram(programId) {
 }
 
 async function submitStockAdjustment() {
-  const form = uiState.modalData;
-  if (!form.sku || !form.qty || form.qty <= 0 || !form.alasan || !form.tipe) {
-    alert('Semua kolom wajib diisi dan jumlah harus lebih dari 0.');
-    return;
-  }
-
-  const skuToUpdate = form.sku.toUpperCase();
-  const quantity = form.qty;
-  const adjustmentType = form.tipe;
-  let hppLoss = 0;
-
-  try {
-    const productsCollection = collection(db, "products");
-    const q = query(productsCollection, where("sku", "==", skuToUpdate), where("userId", "==", currentUser.value.uid));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-      throw new Error(`Produk dengan SKU "${skuToUpdate}" tidak ditemukan.`);
+    const form = uiState.modalData;
+    if (!form.sku || !form.qty || form.qty <= 0 || !form.alasan || !form.tipe) {
+        alert('Semua kolom wajib diisi dan jumlah harus lebih dari 0.');
+        return;
     }
 
-    const productDocSnapshot = querySnapshot.docs[0];
-    const productId = productDocSnapshot.id;
-    const productRef = doc(db, "products", productId);
-    const productInState = state.produk.find(p => p.docId === productId);
+    const skuToUpdate = form.sku.toUpperCase();
+    const quantity = form.qty;
+    const adjustmentType = form.tipe;
+    let hppLoss = 0;
 
-    await runTransaction(db, async (transaction) => {
-      const productDoc = await transaction.get(productRef);
-      const currentStock = productDoc.data().physical_stock || 0;
-      let newStock;
+    try {
+        const productsCollection = collection(db, "products");
+        const q = query(productsCollection, where("sku", "==", skuToUpdate), where("userId", "==", currentUser.value.uid));
+        const querySnapshot = await getDocs(q);
 
-      if (adjustmentType === 'penambahan') {
-        newStock = currentStock + quantity;
-      } else { // 'pengurangan'
-        newStock = currentStock - quantity;
-        if (newStock < 0) {
-          throw new Error(`Stok tidak cukup. Stok saat ini: ${currentStock}, akan dikurangi: ${quantity}.`);
+        if (querySnapshot.empty) {
+            throw new Error(`Produk dengan SKU "${skuToUpdate}" tidak ditemukan.`);
         }
-        hppLoss = (productDoc.data().hpp || 0) * quantity;
-      }
 
-      transaction.update(productRef, { physical_stock: newStock });
+        const productDocSnapshot = querySnapshot.docs[0];
+        const productId = productDocSnapshot.id;
+        const productRef = doc(db, "products", productId);
+        
+        // --- PERBAIKAN UTAMA DIMULAI DI SINI ---
 
-      if (adjustmentType === 'pengurangan' && hppLoss > 0) {
-        const expenseData = {
-          kategori: 'Kerugian Stok',
-          jumlah: hppLoss,
-          catatan: `${form.alasan}: ${quantity} pcs x ${skuToUpdate}`,
-          jenis: 'pengeluaran',
-          userId: currentUser.value.uid,
-          tanggal: new Date()
-        };
-        const expenseRef = doc(collection(db, "keuangan"));
-        transaction.set(expenseRef, expenseData);
-        state.keuangan.push({ id: expenseRef.id, ...expenseData });
-      }
-    });
+        // Cari produk di kedua state untuk nanti diperbarui setelah transaksi berhasil
+        const productInState = state.produk.find(p => p.docId === productId);
+        const inventoryProductInState = state.inventoryPaginated.find(p => p.docId === productId);
 
-    // Perbarui state lokal setelah transaksi selesai
-    if (productInState) {
-      if (adjustmentType === 'penambahan') {
-        productInState.stokFisik += quantity;
-      } else {
-        productInState.stokFisik -= quantity;
-      }
+        await runTransaction(db, async (transaction) => {
+            const productDoc = await transaction.get(productRef);
+            const currentStock = productDoc.data().physical_stock || 0;
+            let newStock;
+
+            if (adjustmentType === 'penambahan') {
+                newStock = currentStock + quantity;
+            } else { // 'pengurangan'
+                newStock = currentStock - quantity;
+                if (newStock < 0) {
+                    throw new Error(`Stok tidak cukup. Stok saat ini: ${currentStock}, akan dikurangi: ${quantity}.`);
+                }
+                hppLoss = (productDoc.data().hpp || 0) * quantity;
+            }
+
+            transaction.update(productRef, { physical_stock: newStock });
+
+            if (adjustmentType === 'pengurangan' && hppLoss > 0) {
+                const expenseData = {
+                    kategori: 'Kerugian Stok',
+                    jumlah: hppLoss,
+                    catatan: `${form.alasan}: ${quantity} pcs x ${skuToUpdate}`,
+                    jenis: 'pengeluaran',
+                    userId: currentUser.value.uid,
+                    tanggal: new Date()
+                };
+                const expenseRef = doc(collection(db, "keuangan"));
+                transaction.set(expenseRef, expenseData);
+                state.keuangan.push({ id: expenseRef.id, ...expenseData });
+            }
+        });
+
+        // Perbarui state lokal setelah transaksi selesai
+        
+        // 1. Perbarui state.produk (untuk konsistensi di halaman lain)
+        if (productInState) {
+            if (adjustmentType === 'penambahan') {
+                productInState.stokFisik += quantity;
+            } else {
+                productInState.stokFisik -= quantity;
+            }
+        }
+        
+        // 2. Perbarui state.inventoryPaginated (agar UI di halaman Inventaris langsung berubah)
+        if (inventoryProductInState) {
+             if (adjustmentType === 'penambahan') {
+                inventoryProductInState.stokFisik += quantity;
+            } else {
+                inventoryProductInState.stokFisik -= quantity;
+            }
+        }
+
+        // --- AKHIR PERBAIKAN ---
+
+        alert(`Stok untuk SKU ${skuToUpdate} berhasil disesuaikan.`);
+        hideModal();
+
+    } catch (error) {
+        console.error("Error dalam transaksi penyesuaian stok:", error);
+        alert(`Gagal memperbarui stok: ${error.message}`);
     }
-
-    alert(`Stok untuk SKU ${skuToUpdate} berhasil disesuaikan.`);
-    hideModal();
-
-  } catch (error) {
-    console.error("Error dalam transaksi penyesuaian stok:", error);
-    alert(`Gagal memperbarui stok: ${error.message}`);
-  }
 }
 
 let profitExpenseChart = null;
