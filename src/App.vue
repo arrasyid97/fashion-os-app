@@ -4390,25 +4390,27 @@ function unlockHargaHpp() {
 }
 
 function showModal(type, data = {}) {
-    // Reset data modal untuk memastikan tidak ada data lama yang bocor
+    // --- PERBAIKAN DIMULAI DI SINI ---
+    // Pastikan semua data produk sudah dimuat sebelum membuka modal yang memerlukannya
+    if (type === 'addStockIn' || type === 'priceCalculator' || type === 'addProduksi') {
+        fetchAllProductData(currentUser.value.uid);
+    }
+    // --- AKHIR PERBAIKAN ---
+
     uiState.modalData = {};
     uiState.modalType = type;
-    uiState.isModalVisible = true; // Selalu set ke true untuk menampilkan container modal
+    uiState.isModalVisible = true;
 
-    // Menggunakan nextTick untuk memastikan UI merespons reset sebelum data baru diisi
     nextTick(() => {
-        // Salin data dengan aman untuk menghindari referensi langsung
         if (data) {
             uiState.modalData = JSON.parse(JSON.stringify(data));
         }
 
-        // Logika khusus untuk modal tertentu
         if (type === 'editMarketplace' && data) {
             if (!uiState.modalData.programs) {
                 uiState.modalData.programs = [];
             }
         } else if (type === 'supplierPayment') {
-            // Reset form untuk pembayaran baru setiap kali modal dibuka
             uiState.newPaymentData = {
                 amount: null,
                 date: new Date().toISOString().split('T')[0],
@@ -4418,14 +4420,13 @@ function showModal(type, data = {}) {
         } else if (type === 'addProduksi') {
             if (!state.settings.modelProduk || state.settings.modelProduk.length === 0) {
                 alert("Data 'Model Produk' belum dibuat. silahkan kehalaman pengaturan untuk menambahkan model produk.");
-                hideModal(); // Langsung tutup lagi jika syarat tidak terpenuhi
+                hideModal();
                 return;
             }
             setupNewProduksiBatch();
         } else if (type === 'editProduksi' && data) {
             setupEditProduksiBatch(data);
         } else if (type === 'editRetur' && data) {
-            // Pastikan tanggal diformat dengan benar untuk input type="date"
             uiState.modalData.tanggal = new Date(data.tanggal).toISOString().split('T')[0];
         }
     });
