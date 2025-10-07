@@ -402,22 +402,19 @@ const loadDataForPage = async (pageName) => {
                 }
 
                 dataPromises.push(fetchSummaryData(userId));
-                dataPromises.push(fetchProductData(userId)); // Untuk dashboard, cukup data bertahap
+                // Memuat SEMUA data produk agar kalkulasi KPI di dashboard akurat saat refresh
+                dataPromises.push(fetchAllProductData(userId)); 
                 break;
             }
             
-            // --- PERBAIKAN DI SINI ---
             case 'transaksi':
             case 'bulk_process':
-                // Halaman ini butuh SEMUA produk agar fitur pencarian berfungsi
                 dataPromises.push(fetchAllProductData(userId));
                 dataPromises.push(fetchTransactionAndReturnData(userId));
                 dataPromises.push(fetchNotesData(userId));
                 break;
-            // --- AKHIR PERBAIKAN ---
 
             case 'inventaris':
-                // Halaman inventaris TETAP menggunakan fetchProductData agar tombol "Muat Lebih Banyak" berfungsi
                 dataPromises.push(fetchProductData(userId));
                 break;
 
@@ -426,10 +423,8 @@ const loadDataForPage = async (pageName) => {
             case 'produksi':
             case 'supplier':
             case 'retur':
-                 // Halaman-halaman ini WAJIB memuat SEMUA produk agar data lengkap
                 dataPromises.push(fetchAllProductData(userId));
                 
-                // Tambahkan data lain yang diperlukan oleh halaman-halaman ini
                 if (pageName === 'promosi') dataPromises.push(fetchNotesData(userId));
                 if (pageName === 'produksi') dataPromises.push(fetchProductionData(userId));
                 if (pageName === 'supplier') dataPromises.push(fetchSupplierData(userId));
@@ -451,8 +446,11 @@ const loadDataForPage = async (pageName) => {
             case 'investasi':
                 dataPromises.push(fetchInvestorsAndBanksData(userId));
                 break;
+            
+            // --- PENAMBAHAN CASE BARU DI SINI ---
+            case 'panduan-baru':
             case 'roas-calculator':
-                // Tidak perlu fetch data apa pun, halaman ini murni kalkulator
+                // Halaman-halaman ini tidak perlu memuat data apa pun
                 break;
         }
 
@@ -7568,6 +7566,12 @@ watch(activePage, (newPage, oldPage) => {
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v1h-14v-1zM14 11h-4a1 1 0 00-1 1v2a1 1 0 001 1h4a1 1 0 001-1v-2a1 1 0 00-1-1zM5 19h14a2 2 0 002-2v-5H3v5a2 2 0 002 2z"/></svg>
                 Langganan
             </a>
+            <a href="#" @click.prevent="changePage('panduan-baru')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'panduan-baru' }">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+    Panduan Pengguna Baru
+</a>
             <a href="#" @click.prevent="changePage('barcode-generator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'barcode-generator' }">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m-4-12h8M7 16h10" />
@@ -10441,6 +10445,83 @@ watch(activePage, (newPage, oldPage) => {
         </div>
     </div>
 </div>
+
+<div v-if="activePage === 'panduan-baru'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="text-center mb-12 animate-fade-in-up">
+            <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800">
+                <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Selamat Datang di Fashion OS!</span>
+            </h2>
+            <p class="text-lg text-slate-600 mt-4 max-w-2xl mx-auto">
+                Ikuti 4 langkah sederhana ini untuk memulai dan membuat aplikasi siap digunakan untuk bisnis Anda.
+            </p>
+        </div>
+
+        <div class="space-y-8">
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+                <div class="flex items-start gap-6">
+                    <div class="text-4xl font-black text-indigo-200">01</div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-indigo-700 mb-2">Lakukan Pengaturan Awal</h3>
+                        <p class="text-slate-700 mb-4">Ini adalah fondasi dari seluruh aplikasi. Pastikan Anda mengisinya terlebih dahulu sebelum melanjutkan ke langkah lain.</p>
+                        <div class="space-y-3">
+                            <p><strong>A. Atur Marketplace:</strong> Daftarkan semua toko online Anda (Shopee, Tokopedia, dll) beserta biaya adminnya.</p>
+                            <p><strong>B. Atur Model Produk:</strong> Buat "cetakan" untuk setiap model produk Anda (misal: Gamis Salwa Hitam M), lengkap dengan kebutuhan kain dan harga jasa maklun/jahit.</p>
+                        </div>
+                        <button @click="changePage('pengaturan')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
+                            Buka Halaman Pengaturan &raquo;
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                <div class="flex items-start gap-6">
+                    <div class="text-4xl font-black text-indigo-200">02</div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-indigo-700 mb-2">Tambahkan Semua Produk Anda</h3>
+                        <p class="text-slate-700 mb-4">Setelah pengaturan selesai, daftarkan semua varian produk Anda yang ada di gudang ke dalam sistem.</p>
+                        <ul class="list-disc list-inside space-y-2 text-slate-700">
+                            <li>Klik tombol <strong>"+ Tambah Produk Baru"</strong>.</li>
+                            <li>Pilih **Model Produk** yang sudah Anda buat di Langkah 1, maka beberapa kolom akan terisi otomatis.</li>
+                            <li>Setelah produk ditambahkan, gunakan tombol **"Penyesuaian Stok"** untuk memasukkan jumlah stok awal setiap produk.</li>
+                        </ul>
+                        <button @click="changePage('inventaris')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
+                            Buka Halaman Inventaris &raquo;
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 300ms;">
+                <div class="flex items-start gap-6">
+                    <div class="text-4xl font-black text-indigo-200">03</div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-indigo-700 mb-2">Atur Harga Jual & HPP</h3>
+                        <p class="text-slate-700 mb-4">Produk Anda perlu harga. Di halaman ini, Anda bisa mengatur HPP (modal) dan harga jual yang berbeda untuk setiap marketplace.</p>
+                        <button @click="changePage('harga-hpp')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
+                            Buka Halaman Harga & HPP &raquo;
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 400ms;">
+                <div class="flex items-start gap-6">
+                    <div class="text-4xl font-black text-green-300">04</div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-green-700 mb-2">Aplikasi Siap Digunakan!</h3>
+                        <p class="text-slate-700 mb-4">Selamat! Anda sekarang siap untuk mencatat setiap transaksi penjualan menggunakan halaman **Kasir (POS)** atau **Proses Massal**.</p>
+                        <button @click="changePage('transaksi')" class="mt-6 bg-green-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-green-700 transition-colors">
+                            Mulai Gunakan Kasir &raquo;
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div v-if="activePage === 'tentang'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-4xl mx-auto">
