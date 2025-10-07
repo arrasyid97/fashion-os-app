@@ -1290,77 +1290,87 @@ const discountedMonthlyPrice = ref(250000);
 const discountedYearlyPrice = ref(2500000);
 
 async function submitAddProduct() {
-  const form = uiState.modalData;
-  if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian) {
-    alert('SKU, Nama, Model produk, Warna, dan Varian wajib diisi.');
-    return;
-  }
-
-  const skuFormatted = form.sku.toUpperCase().replace(/\s+/g, '-');
-  const userId = currentUser.value.uid;
-
-  try {
-    const productsCollection = collection(db, "products");
-    const q = query(productsCollection, where("sku", "==", skuFormatted), where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      throw new Error(`Produk dengan SKU "${skuFormatted}" sudah terdaftar untuk akun Anda.`);
+    const form = uiState.modalData;
+    if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian) {
+        alert('SKU, Nama, Model produk, Warna, dan Varian wajib diisi.');
+        return;
     }
 
-    const newProductRef = doc(collection(db, "products"));
+    const skuFormatted = form.sku.toUpperCase().replace(/\s+/g, '-');
+    const userId = currentUser.value.uid;
 
-    const productData = {
-      id: newProductRef.id,
-      product_name: form.nama,
-      model_id: form.modelId,
-      color: form.warna || '',
-      variant: form.varian || '',
-      physical_stock: 0,
-      hpp: 0,
-      userId: userId,
-      sku: skuFormatted
-    };
+    try {
+        const productsCollection = collection(db, "products");
+        const q = query(productsCollection, where("sku", "==", skuFormatted), where("userId", "==", userId));
+        const querySnapshot = await getDocs(q);
 
-    const batch = writeBatch(db);
-    batch.set(newProductRef, productData);
+        if (!querySnapshot.empty) {
+            throw new Error(`Produk dengan SKU "${skuFormatted}" sudah terdaftar untuk akun Anda.`);
+        }
 
-    state.settings.marketplaces.forEach(channel => {
-      const priceDocId = `${newProductRef.id}-${channel.id}`;
-      const priceRef = doc(db, "product_prices", priceDocId);
-      batch.set(priceRef, {
-        product_id: newProductRef.id,
-        product_sku: skuFormatted,
-        marketplace_id: channel.id,
-        price: 0,
-        userId: userId
-      });
-    });
+        const newProductRef = doc(collection(db, "products"));
 
-    await batch.commit();
+        const productData = {
+            id: newProductRef.id,
+            product_name: form.nama,
+            model_id: form.modelId,
+            color: form.warna || '',
+            variant: form.varian || '',
+            physical_stock: 0,
+            hpp: 0,
+            userId: userId,
+            sku: skuFormatted
+        };
 
-    // Perbarui state lokal secara langsung
-    state.produk.push({
-      docId: newProductRef.id,
-      sku: productData.sku,
-      nama: productData.product_name,
-      model_id: productData.model_id,
-      warna: productData.color,
-      varian: productData.variant,
-      stokFisik: productData.physical_stock,
-      hpp: productData.hpp,
-      hargaJual: {},
-      stokAlokasi: {},
-      userId: productData.userId
-    });
+        const batch = writeBatch(db);
+        batch.set(newProductRef, productData);
 
-    alert(`Produk "${form.nama}" berhasil ditambahkan!`);
-    hideModal();
+        state.settings.marketplaces.forEach(channel => {
+            const priceDocId = `${newProductRef.id}-${channel.id}`;
+            const priceRef = doc(db, "product_prices", priceDocId);
+            batch.set(priceRef, {
+                product_id: newProductRef.id,
+                product_sku: skuFormatted,
+                marketplace_id: channel.id,
+                price: 0,
+                userId: userId
+            });
+        });
 
-  } catch (error) {
-    console.error('Error menyimpan produk:', error);
-    alert(`Gagal menyimpan produk: ${error.message}`);
-  }
+        await batch.commit();
+
+        // --- PERBAIKAN DIMULAI DI SINI ---
+
+        // Buat objek produk baru untuk ditambahkan ke state lokal
+        const newProductObject = {
+            docId: newProductRef.id,
+            sku: productData.sku,
+            nama: productData.product_name,
+            model_id: productData.model_id,
+            warna: productData.color,
+            varian: productData.variant,
+            stokFisik: productData.physical_stock,
+            hpp: productData.hpp,
+            hargaJual: {},
+            stokAlokasi: {},
+            userId: productData.userId
+        };
+
+        // 1. Tambahkan ke state utama (untuk halaman HPP, Promosi, dll)
+        state.produk.push(newProductObject);
+        
+        // 2. Tambahkan juga ke state tampilan inventaris agar UI langsung update
+        state.inventoryPaginated.push(newProductObject);
+
+        // --- AKHIR PERBAIKAN ---
+
+        alert(`Produk "${form.nama}" berhasil ditambahkan!`);
+        hideModal();
+
+    } catch (error) {
+        console.error('Error menyimpan produk:', error);
+        alert(`Gagal menyimpan produk: ${error.message}`);
+    }
 }
 
 
