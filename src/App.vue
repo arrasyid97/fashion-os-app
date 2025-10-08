@@ -5937,6 +5937,7 @@ async function submitReturForm() {
     try {
         const batch = writeBatch(db);
         const trxAsli = form.foundTransaction;
+        const newKeuanganEntries = [];
 
         const dataToSave = {
             tanggal: new Date(),
@@ -5946,14 +5947,16 @@ async function submitReturForm() {
                 const porsiItem = (item.hargaJual * item.returnQty) / (trxAsli.subtotal || 1);
                 const nilaiDiskon = (trxAsli.diskon?.totalDiscount || 0) * porsiItem;
                 const biayaMarketplace = (trxAsli.biaya?.total || 0) * porsiItem;
+                const nilaiReturBersih = item.hargaJual * item.returnQty - nilaiDiskon;
+
                 return {
                     sku: item.sku,
                     qty: item.returnQty,
-                    nilaiRetur: item.hargaJual * item.returnQty - nilaiDiskon,
+                    nilaiRetur: nilaiReturBersih,
                     nilaiDiskon: nilaiDiskon,
                     biayaMarketplace: biayaMarketplace,
                     alasan: item.alasan || '',
-                    tindakLanjut: item.tindakLanjut || 'Ganti Baru'
+                    // BARIS tindakLanjut DIHAPUS DARI SINI
                 };
             }),
             userId: currentUser.value.uid
@@ -5978,17 +5981,24 @@ async function submitReturForm() {
         
         await batch.commit();
 
-        // Perbarui state lokal secara langsung
         state.retur.unshift({ id: returnRef.id, ...dataToSave });
+        if (newKeuanganEntries.length > 0) {
+            state.keuangan.push(...newKeuanganEntries);
+        }
+
         for (const item of selectedItems) {
             const productInState = state.produk.find(p => p.sku === item.sku);
             if (productInState) {
                 productInState.stokFisik += item.returnQty;
+                const invProduct = state.inventoryPaginated.find(p => p.sku === item.sku);
+                if (invProduct) {
+                    invProduct.stokFisik += item.returnQty;
+                }
                 productInState.stokAlokasi[trxAsli.channelId] += item.returnQty;
             }
         }
 
-        alert(`Data retur untuk pesanan ${trxAsli.marketplaceOrderId} berhasil disimpan! Stok telah dikembalikan.`);
+        alert(`Data retur untuk pesanan ${trxAsli.marketplaceOrderId} berhasil disimpan!`);
         hideModal();
 
     } catch (error) {
@@ -9476,13 +9486,12 @@ watch(activePage, (newPage, oldPage) => {
                                 <th class="px-6 py-3">Produk</th>
                                 <th class="px-6 py-3 text-center">Qty</th>
                                 <th class="px-6 py-3">Alasan</th>
-                                <th class="px-6 py-3">Tindak Lanjut</th>
                                 <th class="px-6 py-3 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
                             <tr v-if="filteredRetur.length === 0">
-                                <td colspan="7" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
+                                <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
                             </tr>
                             <tr v-for="(item, index) in filteredRetur" :key="`${item.returnDocId}-${item.sku}-${index}`" class="hover:bg-slate-50/50">
                                 <td class="px-6 py-4 whitespace-nowrap">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
@@ -9493,18 +9502,6 @@ watch(activePage, (newPage, oldPage) => {
                                 </td>
                                 <td class="px-6 py-4 font-medium text-center">{{ item.qty }}</td>
                                 <td class="px-6 py-4">{{ item.alasan }}</td>
-                                <td class="px-6 py-4">
-                                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                                            :class="{
-                                            'bg-yellow-100 text-yellow-800': item.tindakLanjut === 'Refund',
-                                            'bg-green-100 text-green-800': item.tindakLanjut === 'Ganti Baru',
-                                            'bg-blue-100 text-blue-800': item.tindakLanjut === 'Tukar Ukuran',
-                                            'bg-cyan-100 text-cyan-800': item.tindakLanjut === 'Tukar Warna',
-                                            'bg-purple-100 text-purple-800': item.tindakLanjut === 'Perbaiki',
-                                            }">
-                                        {{ item.tindakLanjut }}
-                                    </span>
-                                </td>
                                 <td class="px-6 py-4 text-center space-x-2">
                                     <button @click="deleteReturnItem(item)" class="text-xs text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
                                 </td>
@@ -13059,22 +13056,16 @@ watch(activePage, (newPage, oldPage) => {
                         <p class="font-semibold">{{ getProductBySku(item.sku)?.nama || item.sku }}</p>
                         <p class="text-xs text-slate-500">SKU: {{ item.sku }} | Harga Jual Asli: {{ formatCurrency(item.hargaJual) }}</p>
                         
-                        <div v-if="item.selected" class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2 animate-fade-in">
-                            <div>
-                                <label class="block text-xs font-medium">Qty Retur</label>
-                                <input type="number" v-model.number="item.returnQty" class="mt-1 w-full p-1.5 text-xs border rounded-md" :max="item.qty" min="1">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium">Alasan</label>
-                                <input type="text" v-model="item.alasan" class="mt-1 w-full p-1.5 text-xs border rounded-md">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium">Tindak Lanjut</label>
-                                <select v-model="item.tindakLanjut" class="mt-1 w-full p-1.5 text-xs border rounded-md">
-                                    <option>Ganti Baru</option><option>Tukar Ukuran</option><option>Tukar Warna</option><option>Refund</option><option>Perbaiki</option>
-                                </select>
-                            </div>
-                        </div>
+                        <div v-if="item.selected" class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 animate-fade-in">
+    <div>
+        <label class="block text-xs font-medium">Qty Retur</label>
+        <input type="number" v-model.number="item.returnQty" class="mt-1 w-full p-1.5 text-xs border rounded-md" :max="item.qty" min="1">
+    </div>
+    <div>
+        <label class="block text-xs font-medium">Alasan / Tindak Lanjut</label>
+        <input type="text" v-model="item.alasan" placeholder="Contoh: Refund, Ganti Baru, dll." class="mt-1 w-full p-1.5 text-xs border rounded-md">
+    </div>
+</div>
                     </div>
                 </div>
             </div>
