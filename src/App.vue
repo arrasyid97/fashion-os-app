@@ -1054,7 +1054,7 @@ async function toggleInvestorStatus(investor) {
 }
 
 // Fungsi untuk mengekspor semua data milik satu pengguna
-async function exportAllDataForUser(userId, userEmail, filterType, startDateStr, endDateStr, startMonth, endMonth, startYear, endYear) {
+async function exportAllDataForUser(userId, userEmail) {
     if (!isAdmin.value || !userId) {
         return alert("Aksi tidak diizinkan atau pelanggan belum dipilih.");
     }
@@ -1066,7 +1066,6 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
     try {
         const workbook = XLSX.utils.book_new();
 
-        // --- PERBAIKAN 1: Ambil data settings & summary milik PENGGUNA terlebih dahulu ---
         const [userSettingsSnap, userSummarySnap] = await Promise.all([
             getDoc(doc(db, "settings", userId)),
             getDoc(doc(db, "user_summaries", userId))
@@ -1084,7 +1083,6 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
         for (const collName of collectionsToExport) {
             let data = [];
             
-            // Logika pengambilan data dari Firestore (biarkan sama)
             const collectionsWithUserIdField = [
                 'products', 'product_prices', 'stock_allocations', 'transactions', 'keuangan',
                 'production_batches', 'returns', 'categories', 'fabric_stock',
@@ -1105,7 +1103,6 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
             }
             
             if (data.length > 0) {
-                // --- PERBAIKAN 2: Konversi semua tanggal menjadi JS Date Object ---
                 let worksheetData = data.map(item => {
                     const newItem = { ...item };
                     for (const key in newItem) {
@@ -1116,7 +1113,6 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
                     return newItem;
                 });
 
-                // Kustomisasi tampilan data agar lebih rapi
                 if (collName === 'transactions') {
                     worksheetData = worksheetData.map(trx => ({
                         'ID Transaksi': trx.id,
@@ -1127,13 +1123,13 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
                         'Total Akhir': trx.total
                     }));
                 } else if (collName === 'returns') {
-                    worksheetData = worksheetData.flatMap(returDoc => (returDoc.items || []).map(item => {
+                     worksheetData = worksheetData.flatMap(returDoc => (returDoc.items || []).map(item => {
                         const marketplace = userSettings.marketplaces.find(mp => mp.id === returDoc.channelId) || {};
                         return {
                             'ID Retur Dokumen': returDoc.id,
                             'Tanggal Retur': returDoc.tanggal,
                             'ID Transaksi Asli': returDoc.originalTransactionId,
-                            'Asal Marketplace': marketplace.name || 'N/A', // <-- INI SEKARANG AKAN BENAR
+                            'Asal Marketplace': marketplace.name || 'N/A',
                             'SKU Produk': item.sku,
                             'Jumlah Retur': item.qty,
                             'Alasan': item.alasan,
@@ -1142,20 +1138,17 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
                 }
 
                 const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-                // Menambahkan auto-width untuk kolom
                 const cols = Object.keys(worksheetData[0] || {}).map(key => ({ wch: Math.max(20, key.length) }));
                 worksheet['!cols'] = cols;
                 XLSX.utils.book_append_sheet(workbook, worksheet, collName.substring(0, 31));
             }
         }
         
-        // --- FITUR BARU: TAMBAHKAN LAPORAN RINGKASAN ---
         for (const yearKey in userSummary) {
             if (yearKey.startsWith('summary_')) {
                 const year = yearKey.split('_')[1];
                 const summaryForYear = userSummary[yearKey];
 
-                // 1. Buat Laporan Transaksi
                 const trxReportData = [];
                 for (let i = 1; i <= 12; i++) {
                     const monthStr = i.toString().padStart(2, '0');
@@ -1174,10 +1167,9 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
                     'Total HPP Terjual': trxYearly.hppTerjual || 0, 'Total Biaya Transaksi': trxYearly.biayaTransaksi || 0, 'Laba Kotor': trxYearly.labaKotor || 0,
                 });
                 const trxSheet = XLSX.utils.json_to_sheet(trxReportData);
-                trxSheet['!cols'] = Array(9).fill({ wch: 20 }); // Auto-width
+                trxSheet['!cols'] = Array(9).fill({ wch: 20 });
                 XLSX.utils.book_append_sheet(workbook, trxSheet, `Lap Transaksi ${year}`);
 
-                // 2. Buat Laporan Keuangan
                 const finReportData = [];
                  for (let i = 1; i <= 12; i++) {
                     const monthStr = i.toString().padStart(2, '0');
@@ -1194,11 +1186,10 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
                     'Biaya Transaksi': finYearly.biayaTransaksi || 0, 'Biaya Operasional': finYearly.biayaOperasional || 0, 'Laba Bersih': finYearly.labaBersihOperasional || 0,
                 });
                 const finSheet = XLSX.utils.json_to_sheet(finReportData);
-                finSheet['!cols'] = Array(6).fill({ wch: 20 }); // Auto-width
+                finSheet['!cols'] = Array(6).fill({ wch: 20 });
                 XLSX.utils.book_append_sheet(workbook, finSheet, `Lap Keuangan ${year}`);
             }
         }
-        // --- AKHIR FITUR BARU ---
 
         const fileName = `Export_Data_${userEmail}_${new Date().toISOString().split('T')[0]}.xlsx`;
         XLSX.writeFile(workbook, fileName);
