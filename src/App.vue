@@ -1919,14 +1919,14 @@ function handlePosSubmit() {
 
 // PASTIKAN FUNGSI INI ADA (dari panduan sebelumnya)
 function handlePosSearch() {
-    const query = uiState.pos_scan_input.trim().toLowerCase();
-    if (query.length < 2) {
-        uiState.posSearchRecommendations = [];
-        return;
-    }
-    uiState.posSearchRecommendations = state.produk
-        .filter(p => `${p.sku} ${p.nama}`.toLowerCase().includes(query))
-        .slice(0, 5);
+  const query = uiState.pos_scan_input.trim().toLowerCase();
+  if (query.length < 2) {
+    uiState.posSearchRecommendations = [];
+    return;
+  }
+  // Menghapus .slice(0, 5) agar menampilkan semua hasil
+  uiState.posSearchRecommendations = state.produk
+    .filter(p => `${p.sku} ${p.nama}`.toLowerCase().includes(query));
 }
 
 // PASTIKAN FUNGSI INI ADA (dari panduan sebelumnya)
@@ -1941,28 +1941,27 @@ function selectPosRecommendation(product) {
 }
 
 function handleBulkManualSearch() {
-    clearTimeout(bulkSearchDebounceTimer);
-    const query = uiState.bulk_manual_input.trim().toLowerCase();
-    if (query.length < 2) {
-        uiState.bulk_recommendations = [];
-        return;
-    }
-    bulkSearchDebounceTimer = setTimeout(() => {
-        // Filter produk seperti biasa
-        const filteredProducts = state.produk
-            .filter(p => `${p.sku} ${p.nama}`.toLowerCase().includes(query));
-        
-        // Tambahkan informasi nama model ke setiap produk hasil filter
-        const recommendationsWithModel = filteredProducts.map(p => {
-            const model = state.settings.modelProduk.find(m => m.id === p.model_id);
-            return {
-                ...p,
-                modelNama: model ? model.namaModel : 'N/A'
-            };
-        });
+  clearTimeout(bulkSearchDebounceTimer);
+  const query = uiState.bulk_manual_input.trim().toLowerCase();
+  if (query.length < 2) {
+    uiState.bulk_recommendations = [];
+    return;
+  }
+  bulkSearchDebounceTimer = setTimeout(() => {
+    const filteredProducts = state.produk
+      .filter(p => `${p.sku} ${p.nama}`.toLowerCase().includes(query));
+    
+    const recommendationsWithModel = filteredProducts.map(p => {
+      const model = state.settings.modelProduk.find(m => m.id === p.model_id);
+      return {
+        ...p,
+        modelNama: model ? model.namaModel : 'N/A'
+      };
+    });
 
-        uiState.bulk_recommendations = recommendationsWithModel.slice(0, 5);
-    }, 200);
+    // Menghapus .slice(0, 5) agar menampilkan semua hasil
+    uiState.bulk_recommendations = recommendationsWithModel;
+  }, 200);
 }
 
 // FUNGSI INTI UNTUK MENAMBAHKAN PRODUK KE ANTRIAN SEMENTARA
