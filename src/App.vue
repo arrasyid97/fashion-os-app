@@ -7132,48 +7132,43 @@ const fetchAllProductData = async (userId) => {
 };
 
 const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate = null, endDate = null) => {
-    const TRANSACTIONS_PER_PAGE = 15;
-    
+    const ITEMS_PER_PAGE = 15;
 
     // --- Logika untuk Transaksi ---
+    if (loadMore && !uiState.transaksiHasMore && !startDate) return;
     try {
-        let q;
+        let q_trx;
         if (startDate && endDate) {
-            // --- LOGIKA BARU UNTUK DASHBOARD ---
-            // Jika ada rentang tanggal, ambil semua data dalam rentang itu tanpa limit.
-            q = query(
+            q_trx = query(
                 collection(db, "transactions"),
                 where("userId", "==", userId),
                 where("tanggal", ">=", startDate),
                 where("tanggal", "<=", endDate),
                 orderBy("tanggal", "desc")
             );
-            // Saat menggunakan filter tanggal, kita reset data transaksi agar hanya berisi data dari rentang tersebut
             state.transaksi = []; 
         } else {
-            // --- LOGIKA LAMA UNTUK PAGINASI (di halaman riwayat transaksi) ---
-            q = query(
+            q_trx = query(
                 collection(db, "transactions"),
                 where("userId", "==", userId),
                 orderBy("tanggal", "desc"),
-                limit(TRANSACTIONS_PER_PAGE)
+                limit(ITEMS_PER_PAGE)
             );
             if (loadMore && uiState.transaksiLastVisible) {
-                q = query(q, startAfter(uiState.transaksiLastVisible));
+                q_trx = query(q_trx, startAfter(uiState.transaksiLastVisible));
             } else if (!loadMore) {
                 state.transaksi = [];
                 uiState.transaksiHasMore = true;
             }
         }
-
-        const transactionSnap = await getDocs(q);
+        const transactionSnap = await getDocs(q_trx);
         if (!transactionSnap.empty) {
             uiState.transaksiLastVisible = transactionSnap.docs[transactionSnap.docs.length - 1];
             transactionSnap.forEach(doc => {
                 state.transaksi.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
             });
         }
-        if (!startDate || transactionSnap.docs.length < TRANSACTIONS_PER_PAGE) {
+        if (!startDate && transactionSnap.docs.length < ITEMS_PER_PAGE) {
             uiState.transaksiHasMore = false;
         }
         dataFetched.transactions = true;
@@ -7181,9 +7176,38 @@ const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate
         console.error("Error fetching transaction data:", error);
     }
 
-    // --- Logika untuk Retur (bisa dibiarkan sama karena jumlahnya biasanya tidak sebanyak transaksi) ---
-    // (Tidak perlu diubah)
-    // ...
+    // --- PERBAIKAN: LOGIKA UNTUK MENGAMBIL DATA RETUR ---
+    if (loadMore && !uiState.returHasMore) return;
+    try {
+        let q_retur = query(
+            collection(db, "returns"),
+            where("userId", "==", userId),
+            orderBy("tanggal", "desc"),
+            limit(ITEMS_PER_PAGE)
+        );
+
+        if (loadMore && uiState.returLastVisible) {
+            q_retur = query(q_retur, startAfter(uiState.returLastVisible));
+        } else if (!loadMore) {
+            state.retur = []; // Selalu reset saat load awal
+            uiState.returHasMore = true;
+        }
+
+        const returnSnap = await getDocs(q_retur);
+        if (!returnSnap.empty) {
+            uiState.returLastVisible = returnSnap.docs[returnSnap.docs.length - 1];
+            returnSnap.forEach(doc => {
+                state.retur.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
+            });
+        }
+        if (returnSnap.docs.length < ITEMS_PER_PAGE) {
+            uiState.returHasMore = false;
+        }
+        dataFetched.returns = true;
+
+    } catch (error) {
+        console.error("Error fetching return data:", error);
+    }
 };
 
 // Fungsi khusus untuk data produksi
