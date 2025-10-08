@@ -2156,6 +2156,26 @@ function showNotesModal() {
     });
 }
 
+function handleReturSearch() {
+    const query = uiState.modalData.transactionIdSearch.trim().toLowerCase();
+    if (query.length < 2) {
+        uiState.returSearchRecommendations = [];
+        return;
+    }
+    // Cari berdasarkan ID Pesanan Marketplace atau ID internal
+    uiState.returSearchRecommendations = state.transaksi.filter(t =>
+        (t.marketplaceOrderId && t.marketplaceOrderId.toLowerCase().includes(query)) ||
+        (t.id && t.id.toLowerCase().includes(query))
+    );
+}
+
+function selectReturRecommendation(trx) {
+    uiState.modalData.transactionIdSearch = trx.marketplaceOrderId || trx.id;
+    uiState.returSearchRecommendations = [];
+    // Langsung jalankan fungsi pencarian transaksi setelah memilih
+    findTransactionForReturn();
+}
+
 async function submitVoucherNote() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.notesData;
@@ -12971,16 +12991,35 @@ watch(activePage, (newPage, oldPage) => {
 <div v-if="uiState.modalType === 'addRetur'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
     <h3 class="text-xl font-bold mb-4">Tambah Data Retur dari Transaksi</h3>
     
-    <div class="p-4 bg-slate-50 rounded-lg border flex flex-col md:flex-row gap-2 items-end">
-        <div class="flex-grow w-full">
+    <div class="p-4 bg-slate-50 rounded-lg border flex flex-col md:flex-row gap-2 items-start">
+        <div class="flex-grow w-full relative">
             <label class="block text-sm font-medium">1. Scan Resi atau Masukkan ID Pesanan Marketplace</label>
-            <input type="text" v-model="uiState.modalData.transactionIdSearch" placeholder="Cari ID dari riwayat transaksi atau resi..." class="mt-1 w-full p-2 border rounded-md">
+            <input 
+                type="text" 
+                v-model="uiState.modalData.transactionIdSearch" 
+                @input="handleReturSearch"
+                placeholder="Ketik ID Pesanan Marketplace atau ID internal..." 
+                class="mt-1 w-full p-2 border rounded-md"
+                autocomplete="off"
+            >
+            <div v-if="uiState.returSearchRecommendations.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                <div 
+                    v-for="trx in uiState.returSearchRecommendations" 
+                    :key="trx.id" 
+                    @click="selectReturRecommendation(trx)" 
+                    class="p-3 hover:bg-slate-100 cursor-pointer border-b last:border-b-0"
+                >
+                    <p class="font-semibold text-slate-800">{{ trx.marketplaceOrderId || trx.id }}</p>
+                    <p class="text-xs text-slate-500">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }} - {{ trx.channel }} - {{ formatCurrency(trx.total) }}</p>
+                </div>
+            </div>
         </div>
-        <button @click="findTransactionForReturn" type="button" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 w-full md:w-auto">
-            Cari Transaksi
-        </button>
+        <div class="flex-shrink-0 w-full md:w-auto">
+            <label class="block text-sm font-medium opacity-0 hidden md:block">Aksi</label> <button @click="findTransactionForReturn" type="button" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 w-full mt-1">
+                Cari Transaksi
+            </button>
+        </div>
     </div>
-
     <div v-if="uiState.modalData.foundTransaction" class="flex-1 overflow-y-auto mt-4 pt-4 border-t">
         <div class="mb-4 p-3 bg-green-50 text-green-800 rounded-md border border-green-200">
             <p><strong>Transaksi Ditemukan:</strong> {{ uiState.modalData.foundTransaction.marketplaceOrderId }}</p>
