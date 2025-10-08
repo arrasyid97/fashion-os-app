@@ -1055,23 +1055,25 @@ async function toggleInvestorStatus(investor) {
 
 // Fungsi untuk mengekspor semua data milik satu pengguna
 async function exportAllDataForUser(userId, userEmail, filterType, startDateStr, endDateStr, startMonth, endMonth, startYear, endYear) {
-    if (!isAdmin.value) return;
-    if (!userId) {
-        alert("Silakan pilih pelanggan terlebih dahulu.");
-        return;
+    if (!isAdmin.value || !userId) {
+        return alert("Aksi tidak diizinkan atau pelanggan belum dipilih.");
     }
-    
-    let filterDescription = '';
-    if (filterType !== 'all_time') {
-        filterDescription = ` (${filterType})`;
-    }
-    
-    if (!confirm(`Anda akan mengunduh data untuk ${userEmail} dengan filter ${filterDescription}. Lanjutkan?`)) {
+    if (!confirm(`Anda akan mengunduh semua data untuk ${userEmail}. Lanjutkan?`)) {
         return;
     }
 
     uiState.isExportingUserData = true;
     try {
+        const workbook = XLSX.utils.book_new();
+
+        // --- PERBAIKAN 1: Ambil data settings & summary milik PENGGUNA terlebih dahulu ---
+        const [userSettingsSnap, userSummarySnap] = await Promise.all([
+            getDoc(doc(db, "settings", userId)),
+            getDoc(doc(db, "user_summaries", userId))
+        ]);
+        const userSettings = userSettingsSnap.exists() ? userSettingsSnap.data() : { marketplaces: [] };
+        const userSummary = userSummarySnap.exists() ? userSummarySnap.data() : {};
+        
         const collectionsToExport = [
             'users', 'settings', 'promotions', 'products', 'product_prices',
             'stock_allocations', 'transactions', 'keuangan', 'production_batches',
@@ -1079,18 +1081,15 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
             'bank_accounts'
         ];
 
-        const workbook = XLSX.utils.book_new();
-
         for (const collName of collectionsToExport) {
             let data = [];
-            const hasTanggal = ['transactions', 'keuangan', 'production_batches', 'returns', 'investor_payments', 'fabric_stock'].includes(collName);
-
+            
+            // Logika pengambilan data dari Firestore (biarkan sama)
             const collectionsWithUserIdField = [
                 'products', 'product_prices', 'stock_allocations', 'transactions', 'keuangan',
                 'production_batches', 'returns', 'categories', 'fabric_stock',
                 'investors', 'investor_payments', 'bank_accounts'
             ];
-
             const collectionsWithDocIdAsUserId = ['users', 'settings', 'promotions'];
 
             if (collectionsWithUserIdField.includes(collName)) {
@@ -1103,125 +1102,105 @@ async function exportAllDataForUser(userId, userEmail, filterType, startDateStr,
                 if (docSnap.exists()) {
                     data.push({ id: docSnap.id, ...docSnap.data() });
                 }
-            } else {
-                const q = collection(db, collName);
-                const snapshot = await getDocs(q);
-                data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             }
-
-            // Menerapkan filter tanggal hanya untuk koleksi yang relevan
-            if (hasTanggal) {
-                data = filterDataByDate(data, filterType, startDateStr, endDateStr, startMonth, endMonth, startYear, endYear);
-            }
-
+            
             if (data.length > 0) {
-                let worksheetData = [];
+                // --- PERBAIKAN 2: Konversi semua tanggal menjadi JS Date Object ---
+                let worksheetData = data.map(item => {
+                    const newItem = { ...item };
+                    for (const key in newItem) {
+                        if (newItem[key] && typeof newItem[key].toDate === 'function') {
+                            newItem[key] = newItem[key].toDate();
+                        }
+                    }
+                    return newItem;
+                });
 
+                // Kustomisasi tampilan data agar lebih rapi
                 if (collName === 'transactions') {
-                    // ... (logika kustom untuk transaksi) ...
-                    worksheetData = data.map(trx => {
-                        const totalHPP = (trx.items || []).reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
-                        const totalBiayaMarketplace = trx.biaya?.total || 0;
-                        const labaBersih = trx.total - totalHPP - totalBiayaMarketplace;
-
-                        const rincianBiaya = (trx.biaya?.rincian || [])
-                            .map(item => `${item.name}: ${formatCurrency(item.value)}`)
-                            .join('; ');
-                        
-                        const itemTerjual = (trx.items || [])
-                            .map(item => `${item.qty}x ${item.sku}`)
-                            .join('; ');
-
-                        return {
-                            ID_Transaksi: trx.id,
-                            Tanggal: trx.tanggal?.toDate ? trx.tanggal.toDate().toLocaleString('id-ID') : trx.tanggal,
-                            Channel: trx.channel,
-                            Item_Terjual: itemTerjual,
-                            Subtotal: trx.subtotal,
-                            Total_Akhir: trx.total,
-                            Total_HPP: totalHPP,
-                            Total_Biaya_Marketplace: totalBiayaMarketplace,
-                            Estimasi_Laba_Bersih: labaBersih,
-                            Rincian_Biaya: rincianBiaya,
-                            Deskripsi_Diskon: trx.diskon?.description || '-',
-                            Total_Diskon: trx.diskon?.totalDiscount || 0,
-                            UserId: trx.userId
-                        };
-                    });
-                } else if (collName === 'production_batches') {
-                    // ... (logika kustom untuk production_batches) ...
-                    worksheetData = data.flatMap(batch => (batch.kainBahan || []).map(item => {
-                        const modelInfo = state.settings.modelProduk.find(m => m.id === item.modelProdukId) || {};
-                        const totalBiayaKain = (item.totalYard || 0) * (item.hargaKainPerYard || 0);
-                        const hargaJasaPerPcs = batch.produksiType === 'penjahit' ? (item.hargaJahitPerPcs || 0) : (item.hargaMaklunPerPcs || 0);
-                        const totalBiayaJasa = (item.aktualJadi || 0) * hargaJasaPerPcs;
-                        const totalBiayaAlat = (item.aktualJadi || 0) > 0 ? (item.biayaAlat || 0) : 0;
-                        const totalBiayaProduksi = totalBiayaKain + totalBiayaJasa + totalBiayaAlat;
-                        const totalKuantitas = (item.aktualJadi || 0) + (item.aktualJadiKombinasi || 0);
-                        const hpp = totalKuantitas > 0 ? totalBiayaProduksi / totalKuantitas : 0;
-
-                        return {
-                            ID_Batch: batch.id,
-                            Tanggal_Produksi: batch.tanggal?.toDate ? batch.tanggal.toDate() : batch.tanggal,
-                            Jenis_Pekerja: batch.produksiType,
-                            Nama_Pekerja: batch.namaStatus,
-                            Status_Proses: batch.statusProses,
-                            Model_Produk: modelInfo.namaModel || 'N/A',
-                            Nama_Kain: item.namaKain,
-                            Warna: item.warnaKain,
-                            Ukuran: item.ukuran,
-                            Qty_Jadi: item.aktualJadi,
-                            Qty_Kombinasi: item.aktualJadiKombinasi,
-                            Total_Yard: item.totalYard,
-                            Harga_per_Yard: item.hargaKainPerYard,
-                            Total_Biaya_Kain: totalBiayaKain,
-                            Total_Biaya_Jasa: totalBiayaJasa,
-                            Total_Biaya_Alat: totalBiayaAlat,
-                            Total_Biaya_Produksi: totalBiayaProduksi,
-                            HPP_per_Pcs: hpp,
-                            Sudah_Masuk_Inventaris: item.isInventoried,
-                            UserId: batch.userId
-                        };
+                    worksheetData = worksheetData.map(trx => ({
+                        'ID Transaksi': trx.id,
+                        'Tanggal': trx.tanggal,
+                        'Channel': trx.channel,
+                        'Item Terjual': (trx.items || []).map(item => `${item.qty}x ${item.sku}`).join('; '),
+                        'Subtotal': trx.subtotal,
+                        'Total Akhir': trx.total
                     }));
                 } else if (collName === 'returns') {
-                    // ... (logika kustom untuk retur) ...
-                    worksheetData = data.flatMap(returDoc => (returDoc.items || []).map(item => {
-                        const product = getProductBySku(item.sku) || {};
-                        const marketplace = getMarketplaceById(returDoc.channelId) || {};
+                    worksheetData = worksheetData.flatMap(returDoc => (returDoc.items || []).map(item => {
+                        const marketplace = userSettings.marketplaces.find(mp => mp.id === returDoc.channelId) || {};
                         return {
-                            ID_Retur_Dokumen: returDoc.id,
-                            Tanggal_Retur: returDoc.tanggal?.toDate ? returDoc.tanggal.toDate() : returDoc.tanggal,
-                            ID_Transaksi_Asli: returDoc.originalTransactionId,
-                            Asal_Marketplace: marketplace.name || 'N/A',
-                            SKU_Produk: item.sku,
-                            Nama_Produk: product.nama || 'N/A',
-                            Jumlah_Retur: item.qty,
-                            Alasan: item.alasan,
-                            Tindak_Lanjut: item.tindakLanjut,
-                            UserId: returDoc.userId
+                            'ID Retur Dokumen': returDoc.id,
+                            'Tanggal Retur': returDoc.tanggal,
+                            'ID Transaksi Asli': returDoc.originalTransactionId,
+                            'Asal Marketplace': marketplace.name || 'N/A', // <-- INI SEKARANG AKAN BENAR
+                            'SKU Produk': item.sku,
+                            'Jumlah Retur': item.qty,
+                            'Alasan': item.alasan,
                         };
                     }));
-                } else if (collName === 'keuangan') {
-                    // ... (logika kustom untuk keuangan) ...
-                    worksheetData = data.map(item => ({
-                        ID: item.id,
-                        Tanggal: item.tanggal?.toDate ? item.tanggal.toDate() : item.tanggal,
-                        Jenis: item.jenis,
-                        Kategori: item.kategori,
-                        Jumlah: item.jumlah,
-                        Catatan: item.catatan,
-                        UserId: item.userId
-                    }));
-                } else {
-                    worksheetData = JSON.parse(JSON.stringify(data));
                 }
 
                 const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+                // Menambahkan auto-width untuk kolom
+                const cols = Object.keys(worksheetData[0] || {}).map(key => ({ wch: Math.max(20, key.length) }));
+                worksheet['!cols'] = cols;
                 XLSX.utils.book_append_sheet(workbook, worksheet, collName.substring(0, 31));
             }
         }
+        
+        // --- FITUR BARU: TAMBAHKAN LAPORAN RINGKASAN ---
+        for (const yearKey in userSummary) {
+            if (yearKey.startsWith('summary_')) {
+                const year = yearKey.split('_')[1];
+                const summaryForYear = userSummary[yearKey];
 
-        const fileName = `Export_Data_${userEmail}${filterDescription}_${new Date().toISOString().split('T')[0]}.xlsx`;
+                // 1. Buat Laporan Transaksi
+                const trxReportData = [];
+                for (let i = 1; i <= 12; i++) {
+                    const monthStr = i.toString().padStart(2, '0');
+                    const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
+                    const data = summaryForYear?.months?.[monthStr] || {};
+                    trxReportData.push({
+                        'Bulan': monthName, 'QTY Terjual': data.totalQty || 0, 'Omset Kotor': data.omsetKotor || 0,
+                        'Total Diskon': data.totalDiskon || 0, 'Total Nilai Retur': data.nilaiRetur || 0, 'Omset Bersih': data.omsetBersih || 0,
+                        'Total HPP Terjual': data.hppTerjual || 0, 'Total Biaya Transaksi': data.biayaTransaksi || 0, 'Laba Kotor': data.labaKotor || 0,
+                    });
+                }
+                const trxYearly = summaryForYear?.yearlyTotals || {};
+                trxReportData.push({ 
+                    'Bulan': `TOTAL ${year}`, 'QTY Terjual': trxYearly.totalQty || 0, 'Omset Kotor': trxYearly.omsetKotor || 0,
+                    'Total Diskon': trxYearly.totalDiskon || 0, 'Total Nilai Retur': trxYearly.nilaiRetur || 0, 'Omset Bersih': trxYearly.omsetBersih || 0,
+                    'Total HPP Terjual': trxYearly.hppTerjual || 0, 'Total Biaya Transaksi': trxYearly.biayaTransaksi || 0, 'Laba Kotor': trxYearly.labaKotor || 0,
+                });
+                const trxSheet = XLSX.utils.json_to_sheet(trxReportData);
+                trxSheet['!cols'] = Array(9).fill({ wch: 20 }); // Auto-width
+                XLSX.utils.book_append_sheet(workbook, trxSheet, `Lap Transaksi ${year}`);
+
+                // 2. Buat Laporan Keuangan
+                const finReportData = [];
+                 for (let i = 1; i <= 12; i++) {
+                    const monthStr = i.toString().padStart(2, '0');
+                    const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
+                    const data = summaryForYear?.months?.[monthStr] || {};
+                    finReportData.push({
+                        'Bulan': monthName, 'Omset Bersih': data.omsetBersih || 0, 'Laba Kotor': data.labaKotor || 0,
+                        'Biaya Transaksi': data.biayaTransaksi || 0, 'Biaya Operasional': data.biayaOperasional || 0, 'Laba Bersih': data.labaBersihOperasional || 0,
+                    });
+                }
+                const finYearly = summaryForYear?.yearlyTotals || {};
+                finReportData.push({ 
+                    'Bulan': `TOTAL ${year}`, 'Omset Bersih': finYearly.omsetBersih || 0, 'Laba Kotor': finYearly.labaKotor || 0,
+                    'Biaya Transaksi': finYearly.biayaTransaksi || 0, 'Biaya Operasional': finYearly.biayaOperasional || 0, 'Laba Bersih': finYearly.labaBersihOperasional || 0,
+                });
+                const finSheet = XLSX.utils.json_to_sheet(finReportData);
+                finSheet['!cols'] = Array(6).fill({ wch: 20 }); // Auto-width
+                XLSX.utils.book_append_sheet(workbook, finSheet, `Lap Keuangan ${year}`);
+            }
+        }
+        // --- AKHIR FITUR BARU ---
+
+        const fileName = `Export_Data_${userEmail}_${new Date().toISOString().split('T')[0]}.xlsx`;
         XLSX.writeFile(workbook, fileName);
         alert('Data berhasil diekspor!');
 
