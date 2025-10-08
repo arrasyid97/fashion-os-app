@@ -1281,8 +1281,8 @@ const filteredVoucherNotes = computed(() => {
 
 const monthlyPrice = ref(350000);
 const yearlyPrice = ref(4200000);
-const discountedMonthlyPrice = ref(5000);
-const discountedYearlyPrice = ref(6000);
+const discountedMonthlyPrice = ref(250000);
+const discountedYearlyPrice = ref(2500000);
 
 async function submitAddProduct() {
     const form = uiState.modalData;
