@@ -3952,7 +3952,14 @@ const analisisModelData = computed(() => {
 });
 
 const kpiExplanations = {
-    'saldo-kas': { title: 'Saldo Kas Saat Ini', description: 'Estimasi total uang tunai yang tersedia dari hasil seluruh operasi bisnis, setelah dikurangi pengeluaran dan penarikan pribadi, dan ditambah modal masuk.' },
+    'saldo-kas': { 
+    title: 'Saldo Kas Saat Ini', 
+    description: `Ini adalah **estimasi** posisi kas bersih Anda dari semua aktivitas yang tercatat di aplikasi, dihitung dengan rumus: 
+    
+    (Omset Bersih + Pemasukan Lain) - (Biaya Transaksi + Biaya Operasional).
+    
+    **Penting:** Angka ini mengasumsikan uang dari penjualan marketplace sudah masuk ke kas Anda. Pada praktiknya, ada jeda waktu pencairan. Anggaplah ini sebagai **indikator potensi kas** Anda.` 
+},
     'omset-kotor': { title: 'Omset Kotor', description: 'Total pendapatan dari penjualan produk sebelum dikurangi diskon, biaya transaksi, atau retur. Ini adalah total harga jual semua produk yang laku.' },
     'omset-bersih': { title: 'Omset Bersih', description: 'Total pendapatan dari penjualan setelah dikurangi diskon, voucher, dan nilai produk yang diretur. Ini adalah nilai bersih uang yang masuk dari penjualan.' },
     'diskon': { title: 'Diskon', description: 'Total nilai semua diskon dan voucher yang diberikan kepada pelanggan pada periode ini. Angka ini mengurangi omset kotor.' },
