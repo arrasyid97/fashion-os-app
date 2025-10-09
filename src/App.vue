@@ -1072,7 +1072,7 @@ async function exportAllDataForUser(userId, userEmail) {
         ]);
         const userSettings = userSettingsSnap.exists() ? userSettingsSnap.data() : { marketplaces: [], modelProduk: [] };
         const userSummary = userSummarySnap.exists() ? userSummarySnap.data() : {};
-
+        
         const marketplaceData = (userSettings.marketplaces || []).map(mp => ({
             "Nama Marketplace": mp.name, "Biaya Admin (%)": mp.adm || 0, "Biaya Layanan (%)": mp.layanan || 0,
             "Biaya Per Pesanan (Rp)": mp.perPesanan || 0, "Program Tambahan": (mp.programs || []).map(p => `${p.name} (${p.rate}%)`).join('; ')
@@ -1104,29 +1104,25 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, bankAccountSheet, "Rekening Bank");
         }
         
+        // --- PERBAIKAN: Menggabungkan kembali data keuangan ke satu sheet untuk menghilangkan error ---
         const keuanganSnap = await getDocs(query(collection(db, "keuangan"), where("userId", "==", userId)));
-        const allKeuangan = keuanganSnap.docs.map(doc => {
-            const data = doc.data();
-            return {
-                ID: doc.id, Tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : new Date(data.tanggal),
-                Jenis: data.jenis, Kategori: data.kategori, Jumlah: data.jumlah, Catatan: data.catatan
-            };
-        });
-        
-        // --- PERBAIKAN AKHIR UNTUK ERROR 'Jenis' ---
-        const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis: _Jenis, ...rest }) => rest);
-        const pengeluaranData = allKeuangan.filter(item => item.Jenis === 'pengeluaran').map(({ Jenis: _Jenis, ...rest }) => rest);
-
-        if (pemasukanData.length > 0) {
-            const pemasukanSheet = XLSX.utils.json_to_sheet(pemasukanData);
-            pemasukanSheet['!cols'] = Array(5).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, pemasukanSheet, "Pemasukan Lain");
+        if (!keuanganSnap.empty) {
+            const allKeuangan = keuanganSnap.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    ID: doc.id,
+                    Tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : new Date(data.tanggal),
+                    Jenis: data.jenis,
+                    Kategori: data.kategori,
+                    Jumlah: data.jumlah,
+                    Catatan: data.catatan
+                };
+            });
+            const keuanganSheet = XLSX.utils.json_to_sheet(allKeuangan);
+            keuanganSheet['!cols'] = Array(6).fill({ wch: 25 });
+            XLSX.utils.book_append_sheet(workbook, keuanganSheet, "Keuangan");
         }
-        if (pengeluaranData.length > 0) {
-            const pengeluaranSheet = XLSX.utils.json_to_sheet(pengeluaranData);
-            pengeluaranSheet['!cols'] = Array(5).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, pengeluaranSheet, "Pengeluaran");
-        }
+        // --- AKHIR PERBAIKAN ---
 
         const transactionsSnap = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
         if (!transactionsSnap.empty) {
@@ -1197,6 +1193,7 @@ async function exportAllDataForUser(userId, userEmail) {
                     const trxSheet = XLSX.utils.json_to_sheet(trxReportData);
                     trxSheet['!cols'] = Array(9).fill({ wch: 20 });
                     XLSX.utils.book_append_sheet(workbook, trxSheet, `Lap Transaksi ${year}`);
+
                     const finReportData = [];
                     for (let i = 1; i <= 12; i++) {
                         const monthStr = i.toString().padStart(2, '0');
