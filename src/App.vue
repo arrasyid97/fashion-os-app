@@ -1115,7 +1115,7 @@ async function exportAllDataForUser(userId, userEmail) {
                 Jenis: data.jenis, Kategori: data.kategori, Jumlah: data.jumlah, Catatan: data.catatan
             };
         });
-        // PERBAIKAN: Menghapus properti 'Jenis' yang tidak terpakai agar tidak error
+        // PERBAIKAN: Menghapus properti 'Jenis' yang tidak terpakai menggunakan sintaks yang benar
         const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis, ...rest }) => rest);
         const pengeluaranData = allKeuangan.filter(item => item.Jenis === 'pengeluaran').map(({ Jenis, ...rest }) => rest);
 
@@ -1185,13 +1185,12 @@ async function exportAllDataForUser(userId, userEmail) {
         }
 
         // --- Menambahkan Laporan Ringkasan Tahunan ---
-        // PERBAIKAN: Menghapus variabel yang tidak terpakai
         for (const yearKey in userSummary) {
             if (yearKey.startsWith('summary_')) {
                 const year = yearKey.split('_')[1];
                 const summaryForYear = userSummary[yearKey];
-                
                 if (summaryForYear) {
+                    // Membuat Laporan Transaksi Tahunan
                     const trxReportData = [];
                     for (let i = 1; i <= 12; i++) {
                         const monthStr = i.toString().padStart(2, '0');
@@ -1205,6 +1204,7 @@ async function exportAllDataForUser(userId, userEmail) {
                     trxSheet['!cols'] = Array(9).fill({ wch: 20 });
                     XLSX.utils.book_append_sheet(workbook, trxSheet, `Lap Transaksi ${year}`);
 
+                    // Membuat Laporan Keuangan Tahunan
                     const finReportData = [];
                     for (let i = 1; i <= 12; i++) {
                         const monthStr = i.toString().padStart(2, '0');
@@ -1229,16 +1229,18 @@ async function exportAllDataForUser(userId, userEmail) {
             if (!snapshot.empty) {
                  let data = snapshot.docs.map(doc => {
                     const item = {id: doc.id, ...doc.data()};
-                    for (const key in item) {
-                        if (item[key] && typeof item[key].toDate === 'function') {
-                            item[key] = item[key].toDate();
+                    // PERBAIKAN: Menggunakan _key untuk menghindari error 'no-unused-vars'
+                    for (const _key in item) {
+                        if (item[_key] && typeof item[_key].toDate === 'function') {
+                            item[_key] = item[_key].toDate();
                         }
                     }
                     delete item.userId;
                     return item;
                 });
                 const worksheet = XLSX.utils.json_to_sheet(data);
-                worksheet['!cols'] = Object.keys(data[0] || {}).map(key => ({ wch: 20 }));
+                // PERBAIKAN: 'key' juga tidak terpakai di sini
+                worksheet['!cols'] = Object.keys(data[0] || {}).map(() => ({ wch: 20 }));
                 XLSX.utils.book_append_sheet(workbook, worksheet, collName);
             }
         }
