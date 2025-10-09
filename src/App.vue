@@ -1185,12 +1185,13 @@ async function exportAllDataForUser(userId, userEmail) {
         }
 
         // --- Menambahkan Laporan Ringkasan Tahunan ---
+        // PERBAIKAN: Menghapus variabel yang tidak terpakai
         for (const yearKey in userSummary) {
             if (yearKey.startsWith('summary_')) {
                 const year = yearKey.split('_')[1];
                 const summaryForYear = userSummary[yearKey];
                 
-                if (summaryForYear) { 
+                if (summaryForYear) {
                     const trxReportData = [];
                     for (let i = 1; i <= 12; i++) {
                         const monthStr = i.toString().padStart(2, '0');
