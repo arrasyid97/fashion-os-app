@@ -1066,15 +1066,13 @@ async function exportAllDataForUser(userId, userEmail) {
     try {
         const workbook = XLSX.utils.book_new();
 
-        // 1. Ambil data settings & summary milik PENGGUNA terlebih dahulu
         const [userSettingsSnap, userSummarySnap] = await Promise.all([
             getDoc(doc(db, "settings", userId)),
             getDoc(doc(db, "user_summaries", userId))
         ]);
         const userSettings = userSettingsSnap.exists() ? userSettingsSnap.data() : { marketplaces: [], modelProduk: [] };
         const userSummary = userSummarySnap.exists() ? userSummarySnap.data() : {};
-        
-        // --- MEMBUAT SHEET PENGATURAN YANG RAPI ---
+
         const marketplaceData = (userSettings.marketplaces || []).map(mp => ({
             "Nama Marketplace": mp.name, "Biaya Admin (%)": mp.adm || 0, "Biaya Layanan (%)": mp.layanan || 0,
             "Biaya Per Pesanan (Rp)": mp.perPesanan || 0, "Program Tambahan": (mp.programs || []).map(p => `${p.name} (${p.rate}%)`).join('; ')
@@ -1106,7 +1104,6 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, bankAccountSheet, "Rekening Bank");
         }
         
-        // --- MEMBUAT SHEET KEUANGAN TERPISAH ---
         const keuanganSnap = await getDocs(query(collection(db, "keuangan"), where("userId", "==", userId)));
         const allKeuangan = keuanganSnap.docs.map(doc => {
             const data = doc.data();
@@ -1115,9 +1112,10 @@ async function exportAllDataForUser(userId, userEmail) {
                 Jenis: data.jenis, Kategori: data.kategori, Jumlah: data.jumlah, Catatan: data.catatan
             };
         });
-        // PERBAIKAN: Menghapus properti 'Jenis' yang tidak terpakai agar tidak error
-        const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis, ...rest }) => rest);
-        const pengeluaranData = allKeuangan.filter(item => item.Jenis === 'pengeluaran').map(({ Jenis, ...rest }) => rest);
+        
+        // --- PERBAIKAN AKHIR UNTUK ERROR 'Jenis' ---
+        const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis: _Jenis, ...rest }) => rest);
+        const pengeluaranData = allKeuangan.filter(item => item.Jenis === 'pengeluaran').map(({ Jenis: _Jenis, ...rest }) => rest);
 
         if (pemasukanData.length > 0) {
             const pemasukanSheet = XLSX.utils.json_to_sheet(pemasukanData);
@@ -1130,7 +1128,6 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, pengeluaranSheet, "Pengeluaran");
         }
 
-        // --- MEMBUAT SHEET TRANSAKSI LENGKAP ---
         const transactionsSnap = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
         if (!transactionsSnap.empty) {
             const transactionsData = transactionsSnap.docs.map(doc => {
@@ -1152,7 +1149,6 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, transactionsSheet, "Transactions");
         }
         
-        // --- MEMBUAT SHEET PRODUKSI LENGKAP ---
         const productionSnap = await getDocs(query(collection(db, "production_batches"), where("userId", "==", userId)));
         if (!productionSnap.empty) {
             const productionData = productionSnap.docs.flatMap(doc => {
@@ -1184,13 +1180,10 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, productionSheet, "Production Batches");
         }
 
-        // --- Menambahkan Laporan Ringkasan Tahunan ---
-        // PERBAIKAN: Menghapus variabel yang tidak terpakai
         for (const yearKey in userSummary) {
             if (yearKey.startsWith('summary_')) {
                 const year = yearKey.split('_')[1];
                 const summaryForYear = userSummary[yearKey];
-                
                 if (summaryForYear) {
                     const trxReportData = [];
                     for (let i = 1; i <= 12; i++) {
@@ -1204,7 +1197,6 @@ async function exportAllDataForUser(userId, userEmail) {
                     const trxSheet = XLSX.utils.json_to_sheet(trxReportData);
                     trxSheet['!cols'] = Array(9).fill({ wch: 20 });
                     XLSX.utils.book_append_sheet(workbook, trxSheet, `Lap Transaksi ${year}`);
-
                     const finReportData = [];
                     for (let i = 1; i <= 12; i++) {
                         const monthStr = i.toString().padStart(2, '0');
@@ -1221,7 +1213,6 @@ async function exportAllDataForUser(userId, userEmail) {
             }
         }
         
-        // Ekspor koleksi sederhana lainnya
         const otherCollections = ['products', 'categories', 'investors', 'investor_payments'];
         for (const collName of otherCollections) {
             const q = query(collection(db, collName), where("userId", "==", userId));
@@ -1238,7 +1229,6 @@ async function exportAllDataForUser(userId, userEmail) {
                     return item;
                 });
                 const worksheet = XLSX.utils.json_to_sheet(data);
-                // PERBAIKAN: Variabel 'key' dihapus karena tidak digunakan
                 worksheet['!cols'] = Object.keys(data[0] || {}).map(() => ({ wch: 20 }));
                 XLSX.utils.book_append_sheet(workbook, worksheet, collName);
             }
