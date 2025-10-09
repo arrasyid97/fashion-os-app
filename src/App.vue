@@ -3953,7 +3953,7 @@ const analisisModelData = computed(() => {
 
 const kpiExplanations = {
     'saldo-kas': { 
-    title: 'Saldo Kas Saat Ini', 
+    title: 'Saldo Kas', 
     description: `Ini adalah **estimasi** posisi kas bersih Anda dari semua aktivitas yang tercatat di aplikasi, dihitung dengan rumus: 
     
     (Omset Bersih + Pemasukan Lain) - (Biaya Transaksi + Biaya Operasional).
@@ -7705,7 +7705,7 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Saldo Kas Saat Ini</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Saldo Kas</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
                         </div>
                     </div>
