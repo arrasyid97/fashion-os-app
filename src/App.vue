@@ -6626,46 +6626,45 @@ const panduanAccordion = ref(null);
 
 
 async function deleteTransaction(transactionId) {
-  if (!confirm(`Anda yakin ingin menghapus transaksi ID: ${transactionId}? Stok produk akan dikembalikan.`)) {
-    return;
-  }
-
-  const trxToDelete = state.transaksi.find(trx => trx.id === transactionId);
-  if (!trxToDelete) {
-    alert("Transaksi tidak ditemukan.");
-    return;
-  }
-
-  try {
-    const batch = writeBatch(db);
-    const transactionRef = doc(db, "transactions", transactionId);
-    batch.delete(transactionRef);
-
-    for (const item of trxToDelete.items) {
-      const productInState = state.produk.find(p => p.sku === item.sku);
-      if (productInState) {
-        const newStock = (productInState.stokFisik || 0) + item.qty;
-        const productRef = doc(db, "products", productInState.docId);
-        batch.update(productRef, { physical_stock: newStock });
-        
-        // Perbarui state lokal
-        productInState.stokFisik += item.qty;
-      }
+    if (!confirm(`Anda yakin ingin menghapus transaksi ID: ${transactionId}? Stok produk akan dikembalikan.`)) {
+        return;
     }
 
-    await batch.commit();
+    const trxToDelete = state.transaksi.find(trx => trx.id === transactionId);
+    if (!trxToDelete) {
+        alert("Transaksi tidak ditemukan.");
+        return;
+    }
 
-    // Hapus transaksi dari state lokal setelah berhasil
-    state.transaksi = state.transaksi.filter(trx => trx.id !== transactionId);
+    try {
+        const batch = writeBatch(db);
+        const transactionRef = doc(db, "transactions", transactionId);
+        batch.delete(transactionRef);
 
-    alert("Transaksi berhasil dihapus dan stok telah dikembalikan.");
+        for (const item of trxToDelete.items) {
+            const productInState = state.produk.find(p => p.sku === item.sku);
+            if (productInState) {
+                const newStock = (productInState.stokFisik || 0) + item.qty;
+                const productRef = doc(db, "products", productInState.docId);
+                batch.update(productRef, { physical_stock: newStock });
+            }
+        }
 
-  } catch (error) {
-    console.error("Error saat menghapus transaksi:", error);
-    alert("Gagal menghapus transaksi dari database.");
-  }
+        await batch.commit();
+
+        // --- PERBAIKAN DI SINI ---
+        // Alih-alih hanya memfilter state lokal, kita panggil ulang data dari server
+        // untuk memastikan konsistensi data 100% dan memperbaiki bug filter.
+        await fetchTransactionAndReturnData(currentUser.value.uid, false);
+        // Baris `state.transaksi = state.transaksi.filter(...)` sudah tidak diperlukan lagi.
+        
+        alert("Transaksi berhasil dihapus dan stok telah dikembalikan.");
+
+    } catch (error) {
+        console.error("Error saat menghapus transaksi:", error);
+        alert("Gagal menghapus transaksi dari database.");
+    }
 }
-
 
 function handleModelProdukChange() {
     const selectedModel = state.settings.modelProduk.find(
