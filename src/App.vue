@@ -1115,7 +1115,7 @@ async function exportAllDataForUser(userId, userEmail) {
                 Jenis: data.jenis, Kategori: data.kategori, Jumlah: data.jumlah, Catatan: data.catatan
             };
         });
-        // PERBAIKAN: Menghapus properti 'Jenis' yang tidak terpakai
+        // PERBAIKAN: Menghapus properti 'Jenis' yang tidak terpakai agar tidak error
         const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis, ...rest }) => rest);
         const pengeluaranData = allKeuangan.filter(item => item.Jenis === 'pengeluaran').map(({ Jenis, ...rest }) => rest);
 
@@ -1185,13 +1185,12 @@ async function exportAllDataForUser(userId, userEmail) {
         }
 
         // --- Menambahkan Laporan Ringkasan Tahunan ---
-        // PERBAIKAN: Menghapus variabel yang tidak terpakai
         for (const yearKey in userSummary) {
             if (yearKey.startsWith('summary_')) {
                 const year = yearKey.split('_')[1];
                 const summaryForYear = userSummary[yearKey];
                 
-                if (summaryForYear) {
+                if (summaryForYear) { 
                     const trxReportData = [];
                     for (let i = 1; i <= 12; i++) {
                         const monthStr = i.toString().padStart(2, '0');
@@ -1204,6 +1203,19 @@ async function exportAllDataForUser(userId, userEmail) {
                     const trxSheet = XLSX.utils.json_to_sheet(trxReportData);
                     trxSheet['!cols'] = Array(9).fill({ wch: 20 });
                     XLSX.utils.book_append_sheet(workbook, trxSheet, `Lap Transaksi ${year}`);
+
+                    const finReportData = [];
+                    for (let i = 1; i <= 12; i++) {
+                        const monthStr = i.toString().padStart(2, '0');
+                        const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
+                        const data = summaryForYear.months?.[monthStr] || {};
+                        finReportData.push({'Bulan': monthName, 'Omset Bersih': data.omsetBersih || 0, 'Laba Kotor': data.labaKotor || 0, 'Biaya Transaksi': data.biayaTransaksi || 0, 'Biaya Operasional': data.biayaOperasional || 0, 'Laba Bersih': data.labaBersihOperasional || 0});
+                    }
+                    const finYearly = summaryForYear.yearlyTotals || {};
+                    finReportData.push({'Bulan': `TOTAL ${year}`, 'Omset Bersih': finYearly.omsetBersih || 0, 'Laba Kotor': finYearly.labaKotor || 0, 'Biaya Transaksi': finYearly.biayaTransaksi || 0, 'Biaya Operasional': finYearly.biayaOperasional || 0, 'Laba Bersih': finYearly.labaBersihOperasional || 0});
+                    const finSheet = XLSX.utils.json_to_sheet(finReportData);
+                    finSheet['!cols'] = Array(6).fill({ wch: 20 });
+                    XLSX.utils.book_append_sheet(workbook, finSheet, `Lap Keuangan ${year}`);
                 }
             }
         }
