@@ -3953,10 +3953,10 @@ const analisisModelData = computed(() => {
 
 const kpiExplanations = {
     'saldo-kas': { 
-    title: 'Saldo Kas', 
+    title: 'Saldo Kas Saat Ini', 
     description: `Ini adalah **estimasi** posisi kas bersih Anda dari semua aktivitas yang tercatat di aplikasi, dihitung dengan rumus: 
     
-    (Omset Bersih + Pemasukan Lain) - (Biaya Transaksi + Biaya Operasional).
+    (Omset Bersih + Pemasukan Lain) - Biaya Transaksi - Biaya Operasional.
     
     **Penting:** Angka ini mengasumsikan uang dari penjualan marketplace sudah masuk ke kas Anda. Pada praktiknya, ada jeda waktu pencairan. Anggaplah ini sebagai **indikator potensi kas** Anda.` 
 },
