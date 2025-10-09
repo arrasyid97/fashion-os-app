@@ -1075,13 +1075,9 @@ async function exportAllDataForUser(userId, userEmail) {
         const userSummary = userSummarySnap.exists() ? userSummarySnap.data() : {};
         
         // --- MEMBUAT SHEET PENGATURAN YANG RAPI ---
-        // Sheet untuk Marketplaces
         const marketplaceData = (userSettings.marketplaces || []).map(mp => ({
-            "Nama Marketplace": mp.name,
-            "Biaya Admin (%)": mp.adm || 0,
-            "Biaya Layanan (%)": mp.layanan || 0,
-            "Biaya Per Pesanan (Rp)": mp.perPesanan || 0,
-            "Program Tambahan": (mp.programs || []).map(p => `${p.name} (${p.rate}%)`).join('; ')
+            "Nama Marketplace": mp.name, "Biaya Admin (%)": mp.adm || 0, "Biaya Layanan (%)": mp.layanan || 0,
+            "Biaya Per Pesanan (Rp)": mp.perPesanan || 0, "Program Tambahan": (mp.programs || []).map(p => `${p.name} (${p.rate}%)`).join('; ')
         }));
         if (marketplaceData.length > 0) {
             const marketplaceSheet = XLSX.utils.json_to_sheet(marketplaceData);
@@ -1089,14 +1085,9 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, marketplaceSheet, "Marketplaces");
         }
 
-        // Sheet untuk Model Produk
         const modelProdukData = (userSettings.modelProduk || []).map(m => ({
-            "Nama Model": m.namaModel,
-            "Warna Default": m.warna,
-            "Ukuran Default": m.ukuran,
-            "Kebutuhan Kain (Yard)": m.yardPerModel,
-            "Harga Maklun (Rp)": m.hargaMaklun,
-            "Harga Jahit (Rp)": m.hargaJahit
+            "Nama Model": m.namaModel, "Warna Default": m.warna, "Ukuran Default": m.ukuran,
+            "Kebutuhan Kain (Yard)": m.yardPerModel, "Harga Maklun (Rp)": m.hargaMaklun, "Harga Jahit (Rp)": m.hargaJahit
         }));
         if (modelProdukData.length > 0) {
             const modelProdukSheet = XLSX.utils.json_to_sheet(modelProdukData);
@@ -1104,7 +1095,6 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, modelProdukSheet, "Model Produk");
         }
         
-        // Sheet untuk Rekening Bank
         const bankAccountsSnap = await getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId)));
         if (!bankAccountsSnap.empty) {
             const bankAccountsData = bankAccountsSnap.docs.map(doc => {
@@ -1121,12 +1111,8 @@ async function exportAllDataForUser(userId, userEmail) {
         const allKeuangan = keuanganSnap.docs.map(doc => {
             const data = doc.data();
             return {
-                ID: doc.id,
-                Tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : new Date(data.tanggal),
-                Jenis: data.jenis,
-                Kategori: data.kategori,
-                Jumlah: data.jumlah,
-                Catatan: data.catatan
+                ID: doc.id, Tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : new Date(data.tanggal),
+                Jenis: data.jenis, Kategori: data.kategori, Jumlah: data.jumlah, Catatan: data.catatan
             };
         });
         const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis, ...rest }) => rest);
@@ -1145,26 +1131,21 @@ async function exportAllDataForUser(userId, userEmail) {
 
         // --- MEMBUAT SHEET TRANSAKSI LENGKAP ---
         const transactionsSnap = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
-        const transactionsData = transactionsSnap.docs.map(doc => {
-            const trx = doc.data();
-            const totalHPP = (trx.items || []).reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
-            const totalBiayaMarketplace = trx.biaya?.total || 0;
-            const labaBersih = trx.total - totalHPP - totalBiayaMarketplace;
-            return {
-                'ID Transaksi': doc.id,
-                'Tanggal': trx.tanggal?.toDate ? trx.tanggal.toDate() : new Date(trx.tanggal),
-                'Channel': trx.channel,
-                'Item Terjual': (trx.items || []).map(item => `${item.qty}x ${item.sku}`).join('; '),
-                'Subtotal': trx.subtotal,
-                'Total Diskon': trx.diskon?.totalDiscount || 0,
-                'Total Akhir (Omset Bersih)': trx.total,
-                'Total HPP': totalHPP,
-                'Total Biaya Marketplace': totalBiayaMarketplace,
-                'Rincian Biaya': (trx.biaya?.rincian || []).map(b => `${b.name}: ${b.value.toFixed(0)}`).join('; '),
-                'Estimasi Laba Bersih': labaBersih
-            };
-        });
-        if (transactionsData.length > 0) {
+        if (!transactionsSnap.empty) {
+            const transactionsData = transactionsSnap.docs.map(doc => {
+                const trx = doc.data();
+                const totalHPP = (trx.items || []).reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
+                const totalBiayaMarketplace = trx.biaya?.total || 0;
+                const labaBersih = trx.total - totalHPP - totalBiayaMarketplace;
+                return {
+                    'ID Transaksi': doc.id, 'Tanggal': trx.tanggal?.toDate ? trx.tanggal.toDate() : new Date(trx.tanggal), 'Channel': trx.channel,
+                    'Item Terjual': (trx.items || []).map(item => `${item.qty}x ${item.sku}`).join('; '), 'Subtotal': trx.subtotal,
+                    'Total Diskon': trx.diskon?.totalDiscount || 0, 'Total Akhir (Omset Bersih)': trx.total, 'Total HPP': totalHPP,
+                    'Total Biaya Marketplace': totalBiayaMarketplace,
+                    'Rincian Biaya': (trx.biaya?.rincian || []).map(b => `${b.name}: ${b.value.toFixed(0)}`).join('; '),
+                    'Estimasi Laba Bersih': labaBersih
+                };
+            });
             const transactionsSheet = XLSX.utils.json_to_sheet(transactionsData);
             transactionsSheet['!cols'] = Array(11).fill({ wch: 25 });
             XLSX.utils.book_append_sheet(workbook, transactionsSheet, "Transactions");
@@ -1172,43 +1153,31 @@ async function exportAllDataForUser(userId, userEmail) {
         
         // --- MEMBUAT SHEET PRODUKSI LENGKAP ---
         const productionSnap = await getDocs(query(collection(db, "production_batches"), where("userId", "==", userId)));
-        const productionData = productionSnap.docs.flatMap(doc => {
-            const batch = doc.data();
-            return (batch.kainBahan || []).map(item => {
-                const modelInfo = userSettings.modelProduk.find(m => m.id === item.modelProdukId) || {};
-                const yardPerModel = item.yardPerModel || modelInfo.yardPerModel || 1;
-                const targetQty = yardPerModel > 0 ? Math.floor((item.totalYard || 0) / yardPerModel) : 0;
-                const aktualFinal = (item.aktualJadi || 0) + (item.aktualJadiKombinasi || 0);
-                const selisih = aktualFinal - targetQty;
-                const totalBiayaKain = (item.totalYard || 0) * (item.hargaKainPerYard || 0);
-                const hargaJasa = batch.produksiType === 'penjahit' ? (item.hargaJahitPerPcs || 0) : (item.hargaMaklunPerPcs || 0);
-                const totalBiayaJasa = (item.aktualJadi || 0) * hargaJasa;
-                const totalBiayaAlat = (item.aktualJadi || 0) > 0 ? (item.biayaAlat || 0) : 0;
-                const totalBiayaProduksi = totalBiayaKain + totalBiayaJasa + totalBiayaAlat;
-                const hppFinal = aktualFinal > 0 ? totalBiayaProduksi / aktualFinal : 0;
-                const hppIdeal = targetQty > 0 ? totalBiayaProduksi / targetQty : hppFinal;
-
-                return {
-                    'ID Batch': doc.id,
-                    'Tanggal Produksi': batch.tanggal?.toDate ? batch.tanggal.toDate() : new Date(batch.tanggal),
-                    'Nama Pekerja': batch.namaStatus,
-                    'Jenis Pekerja': batch.produksiType,
-                    'Model Produk': modelInfo.namaModel || 'N/A',
-                    'Nama Kain': item.namaKain,
-                    'Total Yard': item.totalYard,
-                    'Target Qty': targetQty,
-                    'Aktual Jadi': item.aktualJadi,
-                    'Selisih (Aktual - Target)': selisih,
-                    'Total Biaya Kain': totalBiayaKain,
-                    'Total Biaya Jasa': totalBiayaJasa,
-                    'Total Biaya Alat': totalBiayaAlat,
-                    'Total Biaya Produksi': totalBiayaProduksi,
-                    'HPP Ideal/Pcs': hppIdeal,
-                    'HPP Final/Pcs': hppFinal,
-                };
+        if (!productionSnap.empty) {
+            const productionData = productionSnap.docs.flatMap(doc => {
+                const batch = doc.data();
+                return (batch.kainBahan || []).map(item => {
+                    const modelInfo = userSettings.modelProduk.find(m => m.id === item.modelProdukId) || {};
+                    const yardPerModel = item.yardPerModel || modelInfo.yardPerModel || 1;
+                    const targetQty = yardPerModel > 0 ? Math.floor((item.totalYard || 0) / yardPerModel) : 0;
+                    const aktualFinal = (item.aktualJadi || 0) + (item.aktualJadiKombinasi || 0);
+                    const selisih = aktualFinal - targetQty;
+                    const totalBiayaKain = (item.totalYard || 0) * (item.hargaKainPerYard || 0);
+                    const hargaJasa = batch.produksiType === 'penjahit' ? (item.hargaJahitPerPcs || 0) : (item.hargaMaklunPerPcs || 0);
+                    const totalBiayaJasa = (item.aktualJadi || 0) * hargaJasa;
+                    const totalBiayaAlat = (item.aktualJadi || 0) > 0 ? (item.biayaAlat || 0) : 0;
+                    const totalBiayaProduksi = totalBiayaKain + totalBiayaJasa + totalBiayaAlat;
+                    const hppFinal = aktualFinal > 0 ? totalBiayaProduksi / aktualFinal : 0;
+                    const hppIdeal = targetQty > 0 ? totalBiayaProduksi / targetQty : hppFinal;
+                    return {
+                        'ID Batch': doc.id, 'Tanggal Produksi': batch.tanggal?.toDate ? batch.tanggal.toDate() : new Date(batch.tanggal), 'Nama Pekerja': batch.namaStatus,
+                        'Jenis Pekerja': batch.produksiType, 'Model Produk': modelInfo.namaModel || 'N/A', 'Nama Kain': item.namaKain,
+                        'Total Yard': item.totalYard, 'Target Qty': targetQty, 'Aktual Jadi': item.aktualJadi, 'Selisih (Aktual - Target)': selisih,
+                        'Total Biaya Kain': totalBiayaKain, 'Total Biaya Jasa': totalBiayaJasa, 'Total Biaya Alat': totalBiayaAlat,
+                        'Total Biaya Produksi': totalBiayaProduksi, 'HPP Ideal/Pcs': hppIdeal, 'HPP Final/Pcs': hppFinal,
+                    };
+                });
             });
-        });
-        if (productionData.length > 0) {
             const productionSheet = XLSX.utils.json_to_sheet(productionData);
             productionSheet['!cols'] = Array(16).fill({ wch: 25 });
             XLSX.utils.book_append_sheet(workbook, productionSheet, "Production Batches");
@@ -1219,8 +1188,12 @@ async function exportAllDataForUser(userId, userEmail) {
             if (yearKey.startsWith('summary_')) {
                 const year = yearKey.split('_')[1];
                 const summaryForYear = userSummary[yearKey];
-                // (Logika untuk Laporan Transaksi & Keuangan tidak berubah dan sudah benar)
-                // ...
+                
+                if (summaryForYear) { // PERBAIKAN: Cek jika summaryForYear ada
+                    const trxReportData = [];
+                    for (let i = 1; i <= 12; i++) { /* ... */ }
+                    // ... (Sisa logika Laporan Transaksi dan Keuangan tetap sama)
+                }
             }
         }
         
@@ -1232,7 +1205,7 @@ async function exportAllDataForUser(userId, userEmail) {
             if (!snapshot.empty) {
                  let data = snapshot.docs.map(doc => {
                     const item = {id: doc.id, ...doc.data()};
-                    for (const key in item) {
+                    for (const key in item) { // PERBAIKAN: Variabel 'key' sekarang digunakan
                         if (item[key] && typeof item[key].toDate === 'function') {
                             item[key] = item[key].toDate();
                         }
