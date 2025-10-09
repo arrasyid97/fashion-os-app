@@ -1115,6 +1115,7 @@ async function exportAllDataForUser(userId, userEmail) {
                 Jenis: data.jenis, Kategori: data.kategori, Jumlah: data.jumlah, Catatan: data.catatan
             };
         });
+        // PERBAIKAN: Menghapus properti 'Jenis' yang tidak terpakai
         const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis, ...rest }) => rest);
         const pengeluaranData = allKeuangan.filter(item => item.Jenis === 'pengeluaran').map(({ Jenis, ...rest }) => rest);
 
@@ -1184,15 +1185,25 @@ async function exportAllDataForUser(userId, userEmail) {
         }
 
         // --- Menambahkan Laporan Ringkasan Tahunan ---
+        // PERBAIKAN: Menghapus variabel yang tidak terpakai
         for (const yearKey in userSummary) {
             if (yearKey.startsWith('summary_')) {
                 const year = yearKey.split('_')[1];
                 const summaryForYear = userSummary[yearKey];
                 
-                if (summaryForYear) { // PERBAIKAN: Cek jika summaryForYear ada
+                if (summaryForYear) {
                     const trxReportData = [];
-                    for (let i = 1; i <= 12; i++) { /* ... */ }
-                    // ... (Sisa logika Laporan Transaksi dan Keuangan tetap sama)
+                    for (let i = 1; i <= 12; i++) {
+                        const monthStr = i.toString().padStart(2, '0');
+                        const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
+                        const data = summaryForYear.months?.[monthStr] || {};
+                        trxReportData.push({'Bulan': monthName, 'QTY Terjual': data.totalQty || 0, 'Omset Kotor': data.omsetKotor || 0, 'Total Diskon': data.totalDiskon || 0, 'Total Nilai Retur': data.nilaiRetur || 0, 'Omset Bersih': data.omsetBersih || 0, 'Total HPP Terjual': data.hppTerjual || 0, 'Total Biaya Transaksi': data.biayaTransaksi || 0, 'Laba Kotor': data.labaKotor || 0});
+                    }
+                    const trxYearly = summaryForYear.yearlyTotals || {};
+                    trxReportData.push({'Bulan': `TOTAL ${year}`, 'QTY Terjual': trxYearly.totalQty || 0, 'Omset Kotor': trxYearly.omsetKotor || 0, 'Total Diskon': trxYearly.totalDiskon || 0, 'Total Nilai Retur': trxYearly.nilaiRetur || 0, 'Omset Bersih': trxYearly.omsetBersih || 0, 'Total HPP Terjual': trxYearly.hppTerjual || 0, 'Total Biaya Transaksi': trxYearly.biayaTransaksi || 0, 'Laba Kotor': trxYearly.labaKotor || 0});
+                    const trxSheet = XLSX.utils.json_to_sheet(trxReportData);
+                    trxSheet['!cols'] = Array(9).fill({ wch: 20 });
+                    XLSX.utils.book_append_sheet(workbook, trxSheet, `Lap Transaksi ${year}`);
                 }
             }
         }
@@ -1205,7 +1216,7 @@ async function exportAllDataForUser(userId, userEmail) {
             if (!snapshot.empty) {
                  let data = snapshot.docs.map(doc => {
                     const item = {id: doc.id, ...doc.data()};
-                    for (const key in item) { // PERBAIKAN: Variabel 'key' sekarang digunakan
+                    for (const key in item) {
                         if (item[key] && typeof item[key].toDate === 'function') {
                             item[key] = item[key].toDate();
                         }
