@@ -1066,6 +1066,7 @@ async function exportAllDataForUser(userId, userEmail) {
     try {
         const workbook = XLSX.utils.book_new();
 
+        // 1. Ambil data settings & summary milik PENGGUNA terlebih dahulu
         const [userSettingsSnap, userSummarySnap] = await Promise.all([
             getDoc(doc(db, "settings", userId)),
             getDoc(doc(db, "user_summaries", userId))
@@ -1073,6 +1074,7 @@ async function exportAllDataForUser(userId, userEmail) {
         const userSettings = userSettingsSnap.exists() ? userSettingsSnap.data() : { marketplaces: [], modelProduk: [] };
         const userSummary = userSummarySnap.exists() ? userSummarySnap.data() : {};
         
+        // --- MEMBUAT SHEET PENGATURAN YANG RAPI ---
         const marketplaceData = (userSettings.marketplaces || []).map(mp => ({
             "Nama Marketplace": mp.name, "Biaya Admin (%)": mp.adm || 0, "Biaya Layanan (%)": mp.layanan || 0,
             "Biaya Per Pesanan (Rp)": mp.perPesanan || 0, "Program Tambahan": (mp.programs || []).map(p => `${p.name} (${p.rate}%)`).join('; ')
@@ -1104,26 +1106,30 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, bankAccountSheet, "Rekening Bank");
         }
         
-        // --- PERBAIKAN: Menggabungkan kembali data keuangan ke satu sheet untuk menghilangkan error ---
+        // --- MEMBUAT SHEET KEUANGAN TERPISAH ---
         const keuanganSnap = await getDocs(query(collection(db, "keuangan"), where("userId", "==", userId)));
-        if (!keuanganSnap.empty) {
-            const allKeuangan = keuanganSnap.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    ID: doc.id,
-                    Tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : new Date(data.tanggal),
-                    Jenis: data.jenis,
-                    Kategori: data.kategori,
-                    Jumlah: data.jumlah,
-                    Catatan: data.catatan
-                };
-            });
-            const keuanganSheet = XLSX.utils.json_to_sheet(allKeuangan);
-            keuanganSheet['!cols'] = Array(6).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, keuanganSheet, "Keuangan");
-        }
-        // --- AKHIR PERBAIKAN ---
+        const allKeuangan = keuanganSnap.docs.map(doc => {
+            const data = doc.data();
+            return {
+                ID: doc.id, Tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : new Date(data.tanggal),
+                Jenis: data.jenis, Kategori: data.kategori, Jumlah: data.jumlah, Catatan: data.catatan
+            };
+        });
+        const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis, ...rest }) => rest);
+        const pengeluaranData = allKeuangan.filter(item => item.Jenis === 'pengeluaran').map(({ Jenis, ...rest }) => rest);
 
+        if (pemasukanData.length > 0) {
+            const pemasukanSheet = XLSX.utils.json_to_sheet(pemasukanData);
+            pemasukanSheet['!cols'] = Array(5).fill({ wch: 25 });
+            XLSX.utils.book_append_sheet(workbook, pemasukanSheet, "Pemasukan Lain");
+        }
+        if (pengeluaranData.length > 0) {
+            const pengeluaranSheet = XLSX.utils.json_to_sheet(pengeluaranData);
+            pengeluaranSheet['!cols'] = Array(5).fill({ wch: 25 });
+            XLSX.utils.book_append_sheet(workbook, pengeluaranSheet, "Pengeluaran");
+        }
+
+        // --- MEMBUAT SHEET TRANSAKSI LENGKAP ---
         const transactionsSnap = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
         if (!transactionsSnap.empty) {
             const transactionsData = transactionsSnap.docs.map(doc => {
@@ -1145,6 +1151,7 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, transactionsSheet, "Transactions");
         }
         
+        // --- MEMBUAT SHEET PRODUKSI LENGKAP ---
         const productionSnap = await getDocs(query(collection(db, "production_batches"), where("userId", "==", userId)));
         if (!productionSnap.empty) {
             const productionData = productionSnap.docs.flatMap(doc => {
@@ -1176,11 +1183,14 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, productionSheet, "Production Batches");
         }
 
+        // --- Menambahkan Laporan Ringkasan Tahunan ---
         for (const yearKey in userSummary) {
             if (yearKey.startsWith('summary_')) {
                 const year = yearKey.split('_')[1];
                 const summaryForYear = userSummary[yearKey];
+                
                 if (summaryForYear) {
+                    // Laporan Transaksi (Sudah Benar)
                     const trxReportData = [];
                     for (let i = 1; i <= 12; i++) {
                         const monthStr = i.toString().padStart(2, '0');
@@ -1194,17 +1204,34 @@ async function exportAllDataForUser(userId, userEmail) {
                     trxSheet['!cols'] = Array(9).fill({ wch: 20 });
                     XLSX.utils.book_append_sheet(workbook, trxSheet, `Lap Transaksi ${year}`);
 
+                    // --- PERBAIKAN DI SINI: Laporan Keuangan ---
                     const finReportData = [];
                     for (let i = 1; i <= 12; i++) {
                         const monthStr = i.toString().padStart(2, '0');
                         const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
                         const data = summaryForYear.months?.[monthStr] || {};
-                        finReportData.push({'Bulan': monthName, 'Omset Bersih': data.omsetBersih || 0, 'Laba Kotor': data.labaKotor || 0, 'Biaya Transaksi': data.biayaTransaksi || 0, 'Biaya Operasional': data.biayaOperasional || 0, 'Laba Bersih': data.labaBersihOperasional || 0});
+                        finReportData.push({
+                            'Bulan': monthName,
+                            'Omset Kotor': data.omsetKotor || 0, // <-- Kolom Ditambahkan
+                            'Omset Bersih': data.omsetBersih || 0,
+                            'Laba Kotor': data.labaKotor || 0,
+                            'Biaya Transaksi': data.biayaTransaksi || 0,
+                            'Biaya Operasional': data.biayaOperasional || 0,
+                            'Laba Bersih': data.labaBersihOperasional || 0
+                        });
                     }
                     const finYearly = summaryForYear.yearlyTotals || {};
-                    finReportData.push({'Bulan': `TOTAL ${year}`, 'Omset Bersih': finYearly.omsetBersih || 0, 'Laba Kotor': finYearly.labaKotor || 0, 'Biaya Transaksi': finYearly.biayaTransaksi || 0, 'Biaya Operasional': finYearly.biayaOperasional || 0, 'Laba Bersih': finYearly.labaBersihOperasional || 0});
+                    finReportData.push({
+                        'Bulan': `TOTAL ${year}`,
+                        'Omset Kotor': finYearly.omsetKotor || 0, // <-- Kolom Ditambahkan
+                        'Omset Bersih': finYearly.omsetBersih || 0,
+                        'Laba Kotor': finYearly.labaKotor || 0,
+                        'Biaya Transaksi': finYearly.biayaTransaksi || 0,
+                        'Biaya Operasional': finYearly.biayaOperasional || 0,
+                        'Laba Bersih': finYearly.labaBersihOperasional || 0
+                    });
                     const finSheet = XLSX.utils.json_to_sheet(finReportData);
-                    finSheet['!cols'] = Array(6).fill({ wch: 20 });
+                    finSheet['!cols'] = Array(7).fill({ wch: 20 }); // <-- Jumlah Kolom Diperbarui
                     XLSX.utils.book_append_sheet(workbook, finSheet, `Lap Keuangan ${year}`);
                 }
             }
