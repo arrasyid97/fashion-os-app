@@ -69,7 +69,7 @@ console.log(`Webhook Diterima - Amount: ${amount}, Tipe Data: ${typeof amount}`)
             let subscriptionEndDate;
             const now = new Date();
 
-            if (amount === 250000 || amount === 350000 || amount === 250000) {
+            if (amount === 5000 || amount === 350000 || amount === 5000) {
                 plan = 'bulanan';
                 commissionAmount = 50000;
                 subscriptionEndDate = new Date(new Date().setMonth(now.getMonth() + 1));
