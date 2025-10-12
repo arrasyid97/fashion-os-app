@@ -1106,7 +1106,7 @@ async function exportAllDataForUser(userId, userEmail) {
             XLSX.utils.book_append_sheet(workbook, bankAccountSheet, "Rekening Bank");
         }
         
-        // --- MEMBUAT SHEET KEUANGAN TERPISAH ---
+        // --- MEMBUAT SHEET KEUANGAN TERPISAH (VERSI AMAN DARI ERROR) ---
         const keuanganSnap = await getDocs(query(collection(db, "keuangan"), where("userId", "==", userId)));
         const allKeuangan = keuanganSnap.docs.map(doc => {
             const data = doc.data();
@@ -1115,7 +1115,10 @@ async function exportAllDataForUser(userId, userEmail) {
                 Jenis: data.jenis, Kategori: data.kategori, Jumlah: data.jumlah, Catatan: data.catatan
             };
         });
+        
+        // eslint-disable-next-line no-unused-vars
         const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis, ...rest }) => rest);
+        // eslint-disable-next-line no-unused-vars
         const pengeluaranData = allKeuangan.filter(item => item.Jenis === 'pengeluaran').map(({ Jenis, ...rest }) => rest);
 
         if (pemasukanData.length > 0) {
@@ -1188,9 +1191,8 @@ async function exportAllDataForUser(userId, userEmail) {
             if (yearKey.startsWith('summary_')) {
                 const year = yearKey.split('_')[1];
                 const summaryForYear = userSummary[yearKey];
-                
                 if (summaryForYear) {
-                    // Laporan Transaksi (Sudah Benar)
+                    // Laporan Transaksi (Sudah Lengkap)
                     const trxReportData = [];
                     for (let i = 1; i <= 12; i++) {
                         const monthStr = i.toString().padStart(2, '0');
@@ -1212,7 +1214,7 @@ async function exportAllDataForUser(userId, userEmail) {
                         const data = summaryForYear.months?.[monthStr] || {};
                         finReportData.push({
                             'Bulan': monthName,
-                            'Omset Kotor': data.omsetKotor || 0, // <-- Kolom Ditambahkan
+                            'Omset Kotor': data.omsetKotor || 0, // <-- Kolom yang hilang
                             'Omset Bersih': data.omsetBersih || 0,
                             'Laba Kotor': data.labaKotor || 0,
                             'Biaya Transaksi': data.biayaTransaksi || 0,
@@ -1223,7 +1225,7 @@ async function exportAllDataForUser(userId, userEmail) {
                     const finYearly = summaryForYear.yearlyTotals || {};
                     finReportData.push({
                         'Bulan': `TOTAL ${year}`,
-                        'Omset Kotor': finYearly.omsetKotor || 0, // <-- Kolom Ditambahkan
+                        'Omset Kotor': finYearly.omsetKotor || 0, // <-- Kolom yang hilang
                         'Omset Bersih': finYearly.omsetBersih || 0,
                         'Laba Kotor': finYearly.labaKotor || 0,
                         'Biaya Transaksi': finYearly.biayaTransaksi || 0,
@@ -1231,7 +1233,7 @@ async function exportAllDataForUser(userId, userEmail) {
                         'Laba Bersih': finYearly.labaBersihOperasional || 0
                     });
                     const finSheet = XLSX.utils.json_to_sheet(finReportData);
-                    finSheet['!cols'] = Array(7).fill({ wch: 20 }); // <-- Jumlah Kolom Diperbarui
+                    finSheet['!cols'] = Array(7).fill({ wch: 20 }); // <-- Jumlah kolom disesuaikan
                     XLSX.utils.book_append_sheet(workbook, finSheet, `Lap Keuangan ${year}`);
                 }
             }
@@ -1244,6 +1246,7 @@ async function exportAllDataForUser(userId, userEmail) {
             if (!snapshot.empty) {
                  let data = snapshot.docs.map(doc => {
                     const item = {id: doc.id, ...doc.data()};
+                    // eslint-disable-next-line no-unused-vars
                     for (const key in item) {
                         if (item[key] && typeof item[key].toDate === 'function') {
                             item[key] = item[key].toDate();
@@ -1253,7 +1256,8 @@ async function exportAllDataForUser(userId, userEmail) {
                     return item;
                 });
                 const worksheet = XLSX.utils.json_to_sheet(data);
-                worksheet['!cols'] = Object.keys(data[0] || {}).map(() => ({ wch: 20 }));
+                // eslint-disable-next-line no-unused-vars
+                worksheet['!cols'] = Object.keys(data[0] || {}).map(key => ({ wch: 20 }));
                 XLSX.utils.book_append_sheet(workbook, worksheet, collName);
             }
         }
