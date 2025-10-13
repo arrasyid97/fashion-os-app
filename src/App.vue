@@ -2046,6 +2046,32 @@ function selectBulkRecommendation(product) {
     uiState.bulk_recommendations = [];
 }
 
+function updateBulkQueueItemQty(sku, delta) {
+    const tempOrder = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
+    if (!tempOrder) return;
+
+    const item = tempOrder.items.find(i => i.sku === sku);
+    if (!item) return;
+
+    item.qty += delta;
+
+    if (item.qty <= 0) {
+        // Jika kuantitas menjadi 0, hapus item dari antrian
+        removeBulkQueueItem(sku);
+    }
+}
+
+function removeBulkQueueItem(sku) {
+    const tempOrder = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
+    if (!tempOrder) return;
+
+    const itemIndex = tempOrder.items.findIndex(i => i.sku === sku);
+    if (itemIndex > -1) {
+        tempOrder.items.splice(itemIndex, 1);
+    }
+}
+
+
 // FUNGSI UNTUK TOMBOL MANUAL "JADIKAN ID PESANAN"
 function finalizeManualOrder() {
     const marketplaceOrderId = uiState.bulk_manual_input.trim();
@@ -8145,8 +8171,8 @@ watch(activePage, (newPage, oldPage) => {
                                 </div>
                             </div>
                             <button @click="finalizeManualOrder" :disabled="!uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-')) || !uiState.bulk_manual_input || !isSubscriptionActive" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
-    Jadikan ID Pesanan
-</button>
+                                Jadikan ID Pesanan
+                            </button>
                         </div>
 
                         <div class="border-t pt-6">
@@ -8160,8 +8186,8 @@ watch(activePage, (newPage, oldPage) => {
                     <div class="flex justify-between items-center mb-4 pb-4 border-b border-slate-200/80">
                         <h3 class="text-xl font-semibold text-slate-800">Antrian Pesanan untuk Diproses ({{ uiState.bulk_order_queue.length }})</h3>
                         <button @click="processBatchOrders" :disabled="uiState.bulk_order_queue.length === 0 || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-green-700 disabled:bg-slate-400 disabled:shadow-none shadow">
-    Proses Semua Antrian
-</button>
+                            Proses Semua Antrian
+                        </button>
                     </div>
                     <div class="space-y-3 max-h-[70vh] overflow-y-auto p-2 -mr-2">
                         <p v-if="uiState.bulk_order_queue.length === 0" class="text-center py-16 text-slate-400">
@@ -8178,18 +8204,31 @@ watch(activePage, (newPage, oldPage) => {
                                     <button @click="deleteQueuedOrder(index)" class="text-xs font-semibold text-red-600 hover:underline">Hapus</button>
                                 </div>
                             </div>
-                            <div class="mt-2 border-t border-slate-200/80 pt-2">
-                                <ul class="text-xs space-y-1 text-slate-600">
-                                    <li v-for="item in order.items" :key="item.sku">
-                                        <strong>{{ item.qty }}x</strong> {{ getProductBySku(item.sku)?.nama }} ({{item.sku}})
-                                        <div class="pl-4 text-slate-500">Model: {{ state.settings.modelProduk.find(m => m.id === getProductBySku(item.sku)?.model_id)?.namaModel || 'N/A' }}, Warna: {{ getProductBySku(item.sku)?.warna }}, Ukuran: {{ getProductBySku(item.sku)?.varian }}</div>
-                                    </li>
-                                </ul>
+                            
+                            <div class="mt-2 border-t border-slate-200/80 pt-2 space-y-2">
+                                <div v-for="item in order.items" :key="item.sku" class="flex justify-between items-center py-2 border-b border-slate-200/50 last:border-b-0">
+                                    <div>
+                                        <p class="font-semibold text-sm">{{ item.nama }} ({{ item.varian }})</p>
+                                        <p class="text-xs text-slate-500">{{ item.sku }}</p>
+                                        <p class="text-xs text-slate-500 mt-1">Model: {{ state.settings.modelProduk.find(m => m.id === item.model_id)?.namaModel || 'N/A' }}</p>
+                                    </div>
+                                    
+                                    <div v-if="order.status === 'Sedang Diisi'" class="flex items-center gap-2">
+                                        <button @click="updateBulkQueueItemQty(item.sku, -1)" class="w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">-</button>
+                                        <span class="font-bold w-6 text-center">{{ item.qty }}</span>
+                                        <button @click="updateBulkQueueItemQty(item.sku, 1)" class="w-6 h-6 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center">+</button>
+                                        <button @click="removeBulkQueueItem(item.sku)" class="ml-2 text-slate-400 hover:text-red-600 font-bold text-xl">&times;</button>
+                                    </div>
+                                    
+                                    <div v-else class="font-bold text-slate-700">
+                                        {{ item.qty }}x
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+                </div>
         </div>
     </div>
 </div>
