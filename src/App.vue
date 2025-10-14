@@ -358,7 +358,8 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     // --- TAMBAHKAN 3 BARIS BARU DI SINI ---
     massPriceFilterUkuran: '',
     massPriceFilterWarna: '',
-    massPriceInputs: {}
+    massPriceInputs: {},
+    massPriceHppInput: null
 
 });
 
@@ -843,10 +844,17 @@ function setupUserListener(userId) {
 }
 
 async function applyAndSaveChanges() {
+    const newHpp = uiState.massPriceHppInput;
+    const newPrices = Object.values(uiState.massPriceInputs).filter(p => p !== null && p !== undefined && p !== '');
+
     if (filteredMassPriceVariants.value.length === 0) {
         return alert("Tidak ada produk yang cocok dengan filter untuk diubah harganya.");
     }
-    if (!confirm(`Anda akan mengubah harga untuk ${filteredMassPriceVariants.value.length} varian produk. Lanjutkan?`)) {
+    // Validasi apakah ada nilai baru yang dimasukkan
+    if (newHpp === null && newPrices.length === 0) {
+        return alert("Masukkan HPP atau setidaknya satu Harga Jual baru untuk diterapkan.");
+    }
+    if (!confirm(`Anda akan mengubah data untuk ${filteredMassPriceVariants.value.length} varian produk. Lanjutkan?`)) {
         return;
     }
 
@@ -854,6 +862,12 @@ async function applyAndSaveChanges() {
     filteredMassPriceVariants.value.forEach(variant => {
         const productInState = state.produk.find(p => p.docId === variant.docId);
         if (productInState) {
+            // PERBAIKAN 1: Update HPP jika diisi
+            if (newHpp !== null && newHpp !== undefined && newHpp >= 0) {
+                productInState.hpp = parseFloat(newHpp);
+            }
+
+            // Update Harga Jual
             for (const marketplaceId in uiState.massPriceInputs) {
                 const newPrice = uiState.massPriceInputs[marketplaceId];
                 if (newPrice !== null && newPrice !== undefined && newPrice !== '') {
@@ -4723,6 +4737,12 @@ function hideModal() {
     uiState.modalType = '';
     uiState.modalData = {};
     lastEditedModel.value = null; // Reset setelah digunakan
+
+    // --- PERBAIKAN DI SINI: Tambahkan reset untuk state harga massal ---
+    uiState.massPriceFilterUkuran = '';
+    uiState.massPriceFilterWarna = '';
+    uiState.massPriceInputs = {};
+    uiState.massPriceHppInput = null;
 
     if (modelToScrollTo && groupRefs.value[modelToScrollTo]) {
         nextTick(() => {
@@ -11322,20 +11342,28 @@ watch(activePage, (newPage, oldPage) => {
                     </div>
                 </div>
             </div>
+
             <div>
-                <h4 class="font-semibold text-slate-700 mb-2">2. Masukkan Harga Jual Baru</h4>
+                <h4 class="font-semibold text-slate-700 mb-2">2. Masukkan HPP Baru (Opsional)</h4>
+                <div class="p-4 bg-slate-50 rounded-lg border">
+                    <label class="block text-sm font-medium">Harga Pokok Produksi (HPP)</label>
+                    <input type="number" v-model.number="uiState.massPriceHppInput" placeholder="Kosongkan jika tidak ingin diubah" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+            </div>
+            <div>
+                <h4 class="font-semibold text-slate-700 mb-2">3. Masukkan Harga Jual Baru (Opsional)</h4>
                 <div class="p-4 bg-slate-50 rounded-lg border space-y-3">
                     <div v-for="mp in state.settings.marketplaces" :key="mp.id">
                         <label class="block text-sm font-medium">Harga {{ mp.name }}</label>
-                        <input type="number" v-model.number="uiState.massPriceInputs[mp.id]" :placeholder="`Harga untuk ${mp.name}`" class="mt-1 w-full p-2 border rounded-md">
+                        <input type="number" v-model.number="uiState.massPriceInputs[mp.id]" :placeholder="`Kosongkan jika tidak diubah`" class="mt-1 w-full p-2 border rounded-md">
                     </div>
                 </div>
             </div>
         </div>
         
         <div>
-            <h4 class="font-semibold text-slate-700 mb-2">3. Pratinjau ({{ filteredMassPriceVariants.length }} Varian Terpilih)</h4>
-            <div class="max-h-[45vh] overflow-y-auto border rounded-lg bg-white p-2">
+            <h4 class="font-semibold text-slate-700 mb-2">Pratinjau ({{ filteredMassPriceVariants.length }} Varian Terpilih)</h4>
+            <div class="max-h-[55vh] overflow-y-auto border rounded-lg bg-white p-2">
                 <p v-if="filteredMassPriceVariants.length === 0" class="text-center text-slate-500 p-4">Tidak ada produk yang cocok dengan filter.</p>
                 <ul v-else class="divide-y divide-slate-200">
                     <li v-for="variant in filteredMassPriceVariants" :key="variant.docId" class="py-2 px-3 text-sm">
