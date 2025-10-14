@@ -341,6 +341,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     investorPaymentEndYear: new Date().getFullYear(),
     investorPaymentSearch: '',
 
+
     isPinConfirmModalVisible: false,
     pinConfirmInput: '',
     pinConfirmError: '',
@@ -348,12 +349,16 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     posChannelFilter: 'all',
 
      laporanBagiHasil: {
-        
-        selectedInvestorId: null,
-        month: new Date().getMonth() + 1, // Default bulan ini
-        year: new Date().getFullYear(),   // Default tahun ini
-        result: null // Untuk menyimpan hasil kalkulasi
-    }
+        selectedInvestorId: null,
+        month: new Date().getMonth() + 1, // Default bulan ini
+        year: new Date().getFullYear(),   // Default tahun ini
+        result: null // Untuk menyimpan hasil kalkulasi
+    }, // <-- PENTING: Tambahkan koma di sini
+
+    // --- TAMBAHKAN 3 BARIS BARU DI SINI ---
+    massPriceFilterUkuran: '',
+    massPriceFilterWarna: '',
+    massPriceInputs: {}
 
 });
 
@@ -579,7 +584,20 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
-
+const filteredMassPriceVariants = computed(() => {
+    if (uiState.modalType !== 'aturHargaMassal' || !uiState.modalData.variants) {
+        return [];
+    }
+    
+    const filterUkuran = uiState.massPriceFilterUkuran.trim().toLowerCase();
+    const filterWarna = uiState.massPriceFilterWarna.trim().toLowerCase();
+    
+    return uiState.modalData.variants.filter(variant => {
+        const matchUkuran = !filterUkuran || (variant.varian && variant.varian.toLowerCase().includes(filterUkuran));
+        const matchWarna = !filterWarna || (variant.warna && variant.warna.toLowerCase().includes(filterWarna));
+        return matchUkuran && matchWarna;
+    });
+});
 
 const isSubscriptionActive = computed(() => {
     const now = currentTime.value; // Gunakan waktu reaktif kita
@@ -822,6 +840,35 @@ function setupUserListener(userId) {
             userProfile.data = { ...userProfile.data, ...docSnap.data() };
         }
     });
+}
+
+async function applyAndSaveChanges() {
+    if (filteredMassPriceVariants.value.length === 0) {
+        return alert("Tidak ada produk yang cocok dengan filter untuk diubah harganya.");
+    }
+    if (!confirm(`Anda akan mengubah harga untuk ${filteredMassPriceVariants.value.length} varian produk. Lanjutkan?`)) {
+        return;
+    }
+
+    // Terapkan perubahan ke state lokal
+    filteredMassPriceVariants.value.forEach(variant => {
+        const productInState = state.produk.find(p => p.docId === variant.docId);
+        if (productInState) {
+            for (const marketplaceId in uiState.massPriceInputs) {
+                const newPrice = uiState.massPriceInputs[marketplaceId];
+                if (newPrice !== null && newPrice !== undefined && newPrice !== '') {
+                    productInState.hargaJual[marketplaceId] = parseFloat(newPrice);
+                }
+            }
+            markProductAsEdited(productInState.docId); // Tandai produk ini untuk disimpan
+        }
+    });
+
+    // Panggil fungsi simpan utama
+    await saveData();
+
+    // Reset dan tutup modal
+    hideModal();
 }
 
 async function deleteInvestor(investorId) {
@@ -8432,15 +8479,18 @@ watch(activePage, (newPage, oldPage) => {
                                     </div>
                                 </td>
                                 <td colspan="3"></td>
-                                <td class="px-6 py-3 text-center">
-                                    <button 
-                                        @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `komisi-${group.namaModel}` ? null : `komisi-${group.namaModel}`)"
-                                        class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
-                                        :class="{'bg-blue-200': uiState.activeAccordion === `komisi-${group.namaModel}`}"
-                                    >
-                                        Atur Komisi
-                                    </button>
-                                </td>
+                                <td class="px-6 py-3 text-center space-x-4">
+    <button @click.stop="showModal('aturHargaMassal', { variants: group.variants, groupName: group.namaModel })" 
+        class="font-semibold text-green-600 hover:underline px-2 py-1 rounded-md bg-green-50">
+        Atur Harga Massal
+    </button>
+    <button @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `komisi-${group.namaModel}` ? null : `komisi-${group.namaModel}`)"
+        class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
+        :class="{'bg-blue-200': uiState.activeAccordion === `komisi-${group.namaModel}`}"
+    >
+        Atur Komisi
+    </button>
+</td>
                             </tr>
 
                             <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`" class="animate-fade-in">
@@ -11249,7 +11299,63 @@ watch(activePage, (newPage, oldPage) => {
 
     <!-- Modal System -->
      
-    <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">        
+    <div v-if="uiState.isModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-start justify-center p-20">
+        
+        <div v-if="uiState.modalType === 'aturHargaMassal'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] flex flex-col animate-fade-in-up">
+    <div class="flex-shrink-0 pb-4 border-b">
+        <h3 class="text-2xl font-bold text-slate-800">Atur Harga Massal</h3>
+        <p class="text-slate-500 mt-1">Untuk Model: <span class="font-semibold">{{ uiState.modalData.groupName }}</span></p>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto py-4 pr-2 grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="space-y-6">
+            <div>
+                <h4 class="font-semibold text-slate-700 mb-2">1. Filter Varian (Opsional)</h4>
+                <div class="p-4 bg-slate-50 rounded-lg border space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium">Filter berdasarkan Ukuran</label>
+                        <input type="text" v-model="uiState.massPriceFilterUkuran" placeholder="Contoh: M atau 9" class="mt-1 w-full p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium">Filter berdasarkan Warna</label>
+                        <input type="text" v-model="uiState.massPriceFilterWarna" placeholder="Contoh: Hitam" class="mt-1 w-full p-2 border rounded-md">
+                    </div>
+                </div>
+            </div>
+            <div>
+                <h4 class="font-semibold text-slate-700 mb-2">2. Masukkan Harga Jual Baru</h4>
+                <div class="p-4 bg-slate-50 rounded-lg border space-y-3">
+                    <div v-for="mp in state.settings.marketplaces" :key="mp.id">
+                        <label class="block text-sm font-medium">Harga {{ mp.name }}</label>
+                        <input type="number" v-model.number="uiState.massPriceInputs[mp.id]" :placeholder="`Harga untuk ${mp.name}`" class="mt-1 w-full p-2 border rounded-md">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div>
+            <h4 class="font-semibold text-slate-700 mb-2">3. Pratinjau ({{ filteredMassPriceVariants.length }} Varian Terpilih)</h4>
+            <div class="max-h-[45vh] overflow-y-auto border rounded-lg bg-white p-2">
+                <p v-if="filteredMassPriceVariants.length === 0" class="text-center text-slate-500 p-4">Tidak ada produk yang cocok dengan filter.</p>
+                <ul v-else class="divide-y divide-slate-200">
+                    <li v-for="variant in filteredMassPriceVariants" :key="variant.docId" class="py-2 px-3 text-sm">
+                        <p class="font-semibold text-slate-800">{{ variant.nama }}</p>
+                        <p class="text-xs text-slate-500">{{ variant.sku }} | Warna: {{ variant.warna }} | Ukuran: {{ variant.varian }}</p>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
+        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Batal</button>
+        <button @click="applyAndSaveChanges" :disabled="isSaving || filteredMassPriceVariants.length === 0" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-green-300">
+             <span v-if="isSaving">Menyimpan...</span>
+             <span v-else>Terapkan & Simpan Harga</span>
+        </button>
+    </div>
+</div>
+
 <div v-if="uiState.modalType === 'supplierPayment'" class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto transform scale-100 opacity-100 animate-fade-in-up" @click.stop>
     <h3 class="text-2xl font-bold mb-4 text-slate-800">Pembayaran Pesanan #{{ uiState.modalData.id.slice(-6) }}</h3>
     <form @submit.prevent="addSupplierPayment" class="space-y-4">
@@ -11359,6 +11465,9 @@ watch(activePage, (newPage, oldPage) => {
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
     </div>
 </div>
+
+
+
 <div v-if="uiState.modalType === 'voucherUmum'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col animate-fade-in-up">
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Pengaturan Voucher Umum (Per Channel)</h3>
