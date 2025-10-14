@@ -11334,11 +11334,11 @@ watch(activePage, (newPage, oldPage) => {
                 <div class="p-4 bg-slate-50 rounded-lg border space-y-3">
                     <div>
                         <label class="block text-sm font-medium">Filter berdasarkan Ukuran</label>
-                        <input type="text" v-model="uiState.massPriceFilterUkuran" placeholder="Contoh: M atau 9" class="mt-1 w-full p-2 border rounded-md">
+                        <input type="text" v-model="uiState.massPriceFilterUkuran" placeholder="masukan ukuran" class="mt-1 w-full p-2 border rounded-md">
                     </div>
                     <div>
                         <label class="block text-sm font-medium">Filter berdasarkan Warna</label>
-                        <input type="text" v-model="uiState.massPriceFilterWarna" placeholder="Contoh: Hitam" class="mt-1 w-full p-2 border rounded-md">
+                        <input type="text" v-model="uiState.massPriceFilterWarna" placeholder="masukan warna" class="mt-1 w-full p-2 border rounded-md">
                     </div>
                 </div>
             </div>
