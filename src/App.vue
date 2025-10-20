@@ -843,6 +843,49 @@ function setupUserListener(userId) {
     });
 }
 
+async function exportFilteredTransactions() {
+    const dataToExport = filteredTransactions.value;
+
+    if (dataToExport.length === 0) {
+        alert("Tidak ada data transaksi untuk diekspor pada periode yang dipilih.");
+        return;
+    }
+
+    try {
+        const worksheetData = dataToExport.flatMap(trx => 
+            (trx.items || []).map(item => {
+                const productInfo = getProductBySku(item.sku) || {};
+                return {
+                    // --- PERBAIKAN UTAMA ADA DI SINI ---
+                    "ID Pesanan": trx.marketplaceOrderId || trx.id, // Mengutamakan ID Marketplace
+                    "Tanggal": new Date(trx.tanggal),
+                    "Channel": trx.channel,
+                    "SKU": item.sku,
+                    "Nama Produk": productInfo.nama || 'N/A',
+                    "Qty": item.qty,
+                    "Harga Satuan": item.hargaJual
+                };
+            })
+        );
+        
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        // Atur lebar kolom agar lebih rapi
+        worksheet['!cols'] = [
+            { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, 
+            { wch: 30 }, { wch: 10 }, { wch: 15 }
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Transaksi");
+
+        const fileName = `Export_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+    } catch (error) {
+        console.error("Gagal mengekspor data transaksi:", error);
+        alert("Terjadi kesalahan saat mengekspor data.");
+    }
+}
+
 async function applyAndSaveChanges() {
     const newHpp = uiState.massPriceHppInput;
     const newPrices = Object.values(uiState.massPriceInputs).filter(p => p !== null && p !== undefined && p !== '');
