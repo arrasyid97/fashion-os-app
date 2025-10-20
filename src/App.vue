@@ -5288,8 +5288,15 @@ function exportTransactionsToExcel() {
     const dataToExport = filteredTransaksi.value.flatMap(trx => trx.items.map(item => {
         const product = getProductBySku(item.sku) || {};
         return {
-            "ID Pesanan": trx.id, "Tanggal": new Date(trx.tanggal), "Channel": trx.channel, "SKU": item.sku,
-            "Nama Produk": product.nama || 'N/A', "Qty": item.qty, "Harga Satuan": item.hargaJual,
+            // --- PERBAIKAN DI SINI ---
+            "ID Pesanan": trx.marketplaceOrderId || trx.id, // Mengutamakan ID Marketplace
+            
+            "Tanggal": new Date(trx.tanggal),
+            "Channel": trx.channel,
+            "SKU": item.sku,
+            "Nama Produk": product.nama || 'N/A',
+            "Qty": item.qty,
+            "Harga Satuan": item.hargaJual,
         };
     }));
     if (dataToExport.length === 0) { alert("Tidak ada data untuk diekspor."); return; }
