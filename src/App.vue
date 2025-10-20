@@ -476,6 +476,34 @@ const loadDataForPage = async (pageName) => {
 const lastEditedModel = ref(null);
 const groupRefs = ref({});
 
+const filteredTransactions = computed(() => {
+    let transactions = [...state.transaksi];
+
+    // Filter berdasarkan channel
+    if (uiState.posChannelFilter && uiState.posChannelFilter !== 'all') {
+        transactions = transactions.filter(trx => trx.channel === uiState.posChannelFilter);
+    }
+
+    // Filter berdasarkan tanggal
+    const now = new Date();
+    let startDate = new Date();
+
+    if (uiState.posDateFilter === 'today') {
+        startDate.setHours(0, 0, 0, 0);
+        transactions = transactions.filter(trx => new Date(trx.tanggal) >= startDate);
+    } else if (uiState.posDateFilter === 'last_7_days') {
+        startDate.setDate(now.getDate() - 7);
+        startDate.setHours(0, 0, 0, 0);
+        transactions = transactions.filter(trx => new Date(trx.tanggal) >= startDate);
+    } else if (uiState.posDateFilter === 'last_30_days') {
+        startDate.setDate(now.getDate() - 30);
+        startDate.setHours(0, 0, 0, 0);
+        transactions = transactions.filter(trx => new Date(trx.tanggal) >= startDate);
+    }
+    
+    return transactions;
+});
+
 const riwayatPengeluaran = computed(() => {
     // 1. Filter Awal: Hanya Pengeluaran (pengeluaran atau biaya)
     const pengeluaranData = state.keuangan.filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya');
@@ -843,7 +871,7 @@ function setupUserListener(userId) {
     });
 }
 
-async function exportFilteredTransactions() {
+async function exportTransactionsToExcel() {
     const dataToExport = filteredTransactions.value;
 
     if (dataToExport.length === 0) {
@@ -856,8 +884,7 @@ async function exportFilteredTransactions() {
             (trx.items || []).map(item => {
                 const productInfo = getProductBySku(item.sku) || {};
                 return {
-                    // --- PERBAIKAN UTAMA ADA DI SINI ---
-                    "ID Pesanan": trx.marketplaceOrderId || trx.id, // Mengutamakan ID Marketplace
+                    "ID Pesanan": trx.marketplaceOrderId || trx.id,
                     "Tanggal": new Date(trx.tanggal),
                     "Channel": trx.channel,
                     "SKU": item.sku,
@@ -869,7 +896,6 @@ async function exportFilteredTransactions() {
         );
         
         const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-        // Atur lebar kolom agar lebih rapi
         worksheet['!cols'] = [
             { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, 
             { wch: 30 }, { wch: 10 }, { wch: 15 }
