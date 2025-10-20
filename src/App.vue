@@ -476,34 +476,6 @@ const loadDataForPage = async (pageName) => {
 const lastEditedModel = ref(null);
 const groupRefs = ref({});
 
-const filteredTransactions = computed(() => {
-    let transactions = [...state.transaksi];
-
-    // Filter berdasarkan channel
-    if (uiState.posChannelFilter && uiState.posChannelFilter !== 'all') {
-        transactions = transactions.filter(trx => trx.channel === uiState.posChannelFilter);
-    }
-
-    // Filter berdasarkan tanggal
-    const now = new Date();
-    let startDate = new Date();
-
-    if (uiState.posDateFilter === 'today') {
-        startDate.setHours(0, 0, 0, 0);
-        transactions = transactions.filter(trx => new Date(trx.tanggal) >= startDate);
-    } else if (uiState.posDateFilter === 'last_7_days') {
-        startDate.setDate(now.getDate() - 7);
-        startDate.setHours(0, 0, 0, 0);
-        transactions = transactions.filter(trx => new Date(trx.tanggal) >= startDate);
-    } else if (uiState.posDateFilter === 'last_30_days') {
-        startDate.setDate(now.getDate() - 30);
-        startDate.setHours(0, 0, 0, 0);
-        transactions = transactions.filter(trx => new Date(trx.tanggal) >= startDate);
-    }
-    
-    return transactions;
-});
-
 const riwayatPengeluaran = computed(() => {
     // 1. Filter Awal: Hanya Pengeluaran (pengeluaran atau biaya)
     const pengeluaranData = state.keuangan.filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya');
@@ -869,47 +841,6 @@ function setupUserListener(userId) {
             userProfile.data = { ...userProfile.data, ...docSnap.data() };
         }
     });
-}
-
-async function exportTransactionsToExcel() {
-    const dataToExport = filteredTransactions.value;
-
-    if (dataToExport.length === 0) {
-        alert("Tidak ada data transaksi untuk diekspor pada periode yang dipilih.");
-        return;
-    }
-
-    try {
-        const worksheetData = dataToExport.flatMap(trx => 
-            (trx.items || []).map(item => {
-                const productInfo = getProductBySku(item.sku) || {};
-                return {
-                    "ID Pesanan": trx.marketplaceOrderId || trx.id,
-                    "Tanggal": new Date(trx.tanggal),
-                    "Channel": trx.channel,
-                    "SKU": item.sku,
-                    "Nama Produk": productInfo.nama || 'N/A',
-                    "Qty": item.qty,
-                    "Harga Satuan": item.hargaJual
-                };
-            })
-        );
-        
-        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-        worksheet['!cols'] = [
-            { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, 
-            { wch: 30 }, { wch: 10 }, { wch: 15 }
-        ];
-
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Transaksi");
-
-        const fileName = `Export_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`;
-        XLSX.writeFile(workbook, fileName);
-    } catch (error) {
-        console.error("Gagal mengekspor data transaksi:", error);
-        alert("Terjadi kesalahan saat mengekspor data.");
-    }
 }
 
 async function applyAndSaveChanges() {
