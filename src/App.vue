@@ -5284,27 +5284,88 @@ function renderCharts() {
     });
 }
 
-function exportTransactionsToExcel() {
-    const dataToExport = filteredTransaksi.value.flatMap(trx => trx.items.map(item => {
-        const product = getProductBySku(item.sku) || {};
-        return {
-            // --- PERBAIKAN DI SINI ---
-            "ID Pesanan": trx.marketplaceOrderId || trx.id, // Mengutamakan ID Marketplace
+async function exportTransactionsToExcel() {
+    // 1. Ambil data yang sudah difilter dari tabel (filteredTransaksi sudah ada di kode Anda)
+    const dataToExport = filteredTransaksi.value;
+
+    if (dataToExport.length === 0) {
+        alert("Tidak ada data transaksi untuk diekspor pada periode yang dipilih.");
+        return;
+    }
+
+    try {
+        // 2. Proses data (map, BUKAN flatMap) untuk membuat 1 baris per transaksi
+        const worksheetData = dataToExport.map(trx => {
             
-            "Tanggal": new Date(trx.tanggal),
-            "Channel": trx.channel,
-            "SKU": item.sku,
-            "Nama Produk": product.nama || 'N/A',
-            "Qty": item.qty,
-            "Harga Satuan": item.hargaJual,
-        };
-    }));
-    if (dataToExport.length === 0) { alert("Tidak ada data untuk diekspor."); return; }
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Transaksi");
-    worksheet["!cols"] = [ { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 8 }, { wch: 15 }];
-    XLSX.writeFile(workbook, `Laporan_Transaksi_${new Date().toISOString().split('T')[0]}.xlsx`);
+            // 3. Lakukan semua kalkulasi yang sama seperti di modal "Detail Transaksi"
+            const totalHPP = (trx.items || []).reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
+            const totalBiayaMarketplace = trx.biaya?.total || 0;
+            const labaKotor = trx.total - totalHPP; // (Omset Bersih - Total HPP)
+            const labaBersih = trx.total - totalHPP - totalBiayaMarketplace;
+
+            // 4. Ambil rincian biaya
+            const rincianBiaya = trx.biaya?.rincian || [];
+            const komisiProduk = rincianBiaya.find(b => b.name === 'Komisi Produk')?.value || 0;
+            const administrasi = rincianBiaya.find(b => b.name === 'Administrasi')?.value || 0;
+            const perPesanan = rincianBiaya.find(b => b.name === 'Per Pesanan')?.value || 0;
+            const layananGxtra = rincianBiaya.find(b => b.name.includes('Layanan'))?.value || 0;
+            const biayaIklan = rincianBiaya.find(b => b.name === 'BIAYA IKLAN')?.value || 0;
+            const asuransi = rincianBiaya.find(b => b.name.includes('Asuransi'))?.value || 0;
+
+            // 5. Buat objek data untuk baris Excel
+            return {
+                "ID Pesanan": trx.marketplaceOrderId || trx.id,
+                "Tanggal": new Date(trx.tanggal),
+                "Channel": trx.channel,
+                "Item Terjual": (trx.items || []).map(item => `${item.qty}x ${item.sku}`).join('; '),
+                "Omset Kotor": trx.subtotal,
+                "Diskon": trx.diskon?.totalDiscount || 0,
+                "Omset Bersih": trx.total,
+                "Total HPP Terjual": totalHPP,
+                "Laba Kotor": labaKotor,
+                "Total Biaya Marketplace": totalBiayaMarketplace,
+                "Estimasi Laba Bersih": labaBersih,
+                "Biaya Komisi Produk": komisiProduk,
+                "Biaya Administrasi": administrasi,
+                "Biaya Per Pesanan": perPesanan,
+                "Biaya Layanan": layananGxtra,
+                "Biaya Iklan": biayaIklan,
+                "Biaya Asuransi": asuransi
+            };
+        });
+        
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        
+        // 6. Atur lebar kolom agar rapi
+        worksheet['!cols'] = [
+            { wch: 25 }, // ID Pesanan
+            { wch: 20 }, // Tanggal
+            { wch: 20 }, // Channel
+            { wch: 30 }, // Item Terjual
+            { wch: 15 }, // Omset Kotor
+            { wch: 15 }, // Diskon
+            { wch: 15 }, // Omset Bersih
+            { wch: 15 }, // Total HPP
+            { wch: 15 }, // Laba Kotor
+            { wch: 20 }, // Total Biaya MP
+            { wch: 20 }, // Laba Bersih
+            { wch: 20 }, // Komisi Produk
+            { wch: 20 }, // Administrasi
+            { wch: 20 }, // Per Pesanan
+            { wch: 20 }, // Layanan
+            { wch: 20 }, // Iklan
+            { wch: 20 }  // Asuransi
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Transaksi");
+
+        const fileName = `Export_Transaksi_Lengkap_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+    } catch (error) {
+        console.error("Gagal mengekspor data transaksi:", error);
+        alert("Terjadi kesalahan saat mengekspor data.");
+    }
 }
 
 function addPromotionTier(modelName, channelId) {
