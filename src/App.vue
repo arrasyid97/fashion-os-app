@@ -90,6 +90,10 @@ const state = reactive({
 const uiState = reactive({
     activeAccordion: null,
     activeCartChannel: null,
+
+    massUpdateVariants: [],
+    isMassUpdateLoading: false,
+
     analisisModelLimit: 10,
     dashboardDateFilter: 'today',
     dashboardStartDate: '',
@@ -476,6 +480,44 @@ const loadDataForPage = async (pageName) => {
 const lastEditedModel = ref(null);
 const groupRefs = ref({});
 
+const fetchAllVariantsForModel = async (modelId) => {
+    if (!modelId || !currentUser.value) return;
+    
+    uiState.isMassUpdateLoading = true;
+    uiState.massUpdateVariants = []; // Kosongkan dulu
+
+    try {
+        // 1. Ambil semua produk yang memiliki model_id tersebut (TANPA LIMIT)
+        const q = query(
+            collection(db, "products"),
+            where("userId", "==", currentUser.value.uid),
+            where("model_id", "==", modelId)
+        );
+        
+        const snapshot = await getDocs(q);
+        
+        // 2. Petakan data produk
+        const variants = snapshot.docs.map(doc => ({
+            docId: doc.id,
+            ...doc.data()
+        }));
+
+        // 3. Kita juga perlu mengambil harga jual (product_prices) untuk varian ini
+        // agar bisa ditampilkan di pratinjau (opsional, tapi disarankan)
+        // Untuk efisiensi di modal massal, kita bisa skip detail harga per channel dulu
+        // atau lakukan fetch terpisah jika perlu. 
+        // Untuk sekarang kita fokus agar "Barangnya Muncul Dulu".
+        
+        uiState.massUpdateVariants = variants;
+
+    } catch (error) {
+        console.error("Gagal mengambil varian lengkap:", error);
+        alert("Gagal memuat varian lengkap.");
+    } finally {
+        uiState.isMassUpdateLoading = false;
+    }
+};
+
 const riwayatPengeluaran = computed(() => {
     // 1. Filter Awal: Hanya Pengeluaran (pengeluaran atau biaya)
     const pengeluaranData = state.keuangan.filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya');
@@ -690,6 +732,26 @@ function generatePartnerCode() {
         result += characters.charAt(Math.floor(Math.random() * characters.length));
     }
     return result;
+}
+
+async function openMassUpdateModal(group) {
+    // 1. Ambil ID Model
+    const modelId = group.variants[0]?.model_id;
+    
+    if (!modelId) {
+        alert("Data model tidak ditemukan.");
+        return;
+    }
+
+    // 2. BUKA MODAL DULU (Supaya user langsung lihat layar loading)
+    // Perhatikan: Nama modal diganti jadi 'aturHargaMassal' agar sesuai dengan HTML Anda
+    showModal('aturHargaMassal', { 
+        groupName: group.namaModel 
+    });
+
+    // 3. BARU AMBIL DATA LENGKAP
+    // Fungsi ini akan mengisi uiState.massUpdateVariants
+    await fetchAllVariantsForModel(modelId);
 }
 
 // Fungsi baru untuk menjadikan pengguna sebagai mitra
@@ -8568,10 +8630,11 @@ watch(activePage, (newPage, oldPage) => {
                                 </td>
                                 <td colspan="3"></td>
                                 <td class="px-6 py-3 text-center space-x-4">
-    <button @click.stop="showModal('aturHargaMassal', { variants: group.variants, groupName: group.namaModel })" 
+    <button @click.stop="openMassUpdateModal(group)" 
         class="font-semibold text-green-600 hover:underline px-2 py-1 rounded-md bg-green-50">
         Atur Harga Massal
     </button>
+
     <button @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `komisi-${group.namaModel}` ? null : `komisi-${group.namaModel}`)"
         class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
         :class="{'bg-blue-200': uiState.activeAccordion === `komisi-${group.namaModel}`}"
