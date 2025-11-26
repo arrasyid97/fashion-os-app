@@ -7260,7 +7260,7 @@ const fetchCoreData = async (userId) => {
 
 // Fungsi khusus untuk data produk, harga, dan alokasi
 const fetchProductData = async (userId, loadMore = false) => {
-    const PRODUCTS_PER_PAGE = 20;
+    const PRODUCTS_PER_PAGE = 100;
 
     if (!dataFetched.pricesAndAllocations) {
         try {
