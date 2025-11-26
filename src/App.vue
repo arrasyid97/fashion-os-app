@@ -2429,24 +2429,63 @@ async function deleteVoucherNote(noteId) {
 
 async function findTransactionForReturn() {
     const orderId = uiState.modalData.transactionIdSearch.trim();
+    
     if (!orderId) {
         return alert("Silakan scan resi atau masukkan ID Pesanan Marketplace.");
     }
-    
-    // Carii transaksii berdasarkan marketplaceOrderId
-    const foundTrx = state.transaksi.find(t => t.marketplaceOrderId && t.marketplaceOrderId.toLowerCase() === orderId.toLowerCase());
 
+    // 1. CARI DI DATA LOKAL (State) DULU
+    let foundTrx = state.transaksi.find(t => 
+        t.marketplaceOrderId && t.marketplaceOrderId.toLowerCase() === orderId.toLowerCase()
+    );
+
+    // 2. JIKA TIDAK KETEMU DI LOKAL, CARI LANGSUNG KE FIREBASE
+    if (!foundTrx) {
+        try {
+            // Tampilkan indikator loading (opsional, tapi bagus untuk UX)
+            // uiState.isLoading = true; 
+
+            const q = query(
+                collection(db, "transactions"),
+                where("userId", "==", currentUser.value.uid),
+                where("marketplaceOrderId", "==", orderId) // Pencarian persis (Case sensitive biasanya)
+            );
+
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                const docSnap = querySnapshot.docs[0];
+                // Format datanya agar sama dengan format di state
+                foundTrx = { 
+                    id: docSnap.id, 
+                    ...docSnap.data(), 
+                    tanggal: docSnap.data().tanggal?.toDate ? docSnap.data().tanggal.toDate() : new Date(docSnap.data().tanggal)
+                };
+            }
+        } catch (error) {
+            console.error("Error mencari transaksi di database:", error);
+        } finally {
+            // uiState.isLoading = false;
+        }
+    }
+
+    // 3. PROSES HASIL PENCARIAN
     if (foundTrx) {
         uiState.modalData.foundTransaction = foundTrx;
+        
+        // Reset items agar bersih
         uiState.modalData.items = foundTrx.items.map(item => ({
             ...item,
-            returnQty: item.qty,
-            selected: true,
+            returnQty: item.qty, // Default retur qty sama dengan qty beli
+            selected: true,      // Default tercentang
             alasan: '',
             tindakLanjut: 'Ganti Baru'
         }));
+        
+        // Opsional: Beri notifikasi kecil bahwa data ditemukan
+        // alert("Transaksi ditemukan!"); 
     } else {
-        alert("Transaksi dengan ID Pesanan tersebut tidak ditemukan.");
+        alert("Transaksi dengan ID Pesanan tersebut tidak ditemukan (baik di riwayat lokal maupun database).");
         uiState.modalData.foundTransaction = null;
         uiState.modalData.items = [];
     }
