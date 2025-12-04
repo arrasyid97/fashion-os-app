@@ -454,8 +454,13 @@ const loadDataForPage = async (pageName) => {
                 dataPromises.push(fetchKeuanganData());
                 break;
             case 'investasi':
-                dataPromises.push(fetchInvestorsAndBanksData(userId));
-                break;
+      await fetchInvestorsAndBanksData(userId);
+      break;
+    // --- TAMBAHKAN KODE DI BAWAH INI ---
+    case 'pengaturan':
+      // Kita panggil fungsi ini karena data Bank ada di dalamnya
+      await fetchInvestorsAndBanksData(userId); 
+      break;
             
             // --- PENAMBAHAN CASE BARU DI SINI ---
             case 'panduan-baru':
@@ -7200,15 +7205,19 @@ watch(() => uiState.notesData.type, () => {
 });
 
 watch(() => uiState.pengaturanTab, (newTab) => {
+    // 1. Logika Lama (Untuk Tab Admin)
     if (newTab === 'admin' && isAdmin.value) {
-        // Efisien: Hanya panggil data pengguna jika belum ada.
         if (uiState.allUsers.length === 0) {
             fetchAllUsers();
         }
-
-        // Selalu Update: Panggil data komisi setiap kali tab dibuka agar data selalu baru.
         fetchCommissionPayouts();
         fetchActivationCodes();
+    }
+
+    // 2. TAMBAHAN BARU (Untuk Tab Rekening Bank)
+    // Ini akan memastikan data bank diambil saat Anda klik tab "Rekening Bank"
+    if (newTab === 'rekening' && currentUser.value) {
+        fetchInvestorsAndBanksData(currentUser.value.uid);
     }
 });
 
