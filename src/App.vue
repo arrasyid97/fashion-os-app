@@ -7260,12 +7260,19 @@ const setupListeners = async (userId, isUserPartner) => { // <-- PERUBAHAN DI SI
 
 const fetchCoreData = async (userId) => {
     try {
+        // 1. Ambil data Dokumen (Settings, Promotions, Commissions)
         const [settingsSnap, promotionsSnap, commissionsSnap] = await Promise.all([
             getDoc(doc(db, "settings", userId)),
             getDoc(doc(db, "promotions", userId)),
             getDoc(doc(db, "product_commissions", userId)),
         ]);
 
+        // 2. (BARU) Ambil data Koleksi 'categories' (Agar tidak hilang saat refresh)
+        const categoriesQuery = query(collection(db, "categories"), where("userId", "==", userId));
+        const categoriesSnap = await getDocs(categoriesQuery);
+        const loadedCategories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // 3. Atur Default PIN jika belum ada
         const defaultPinSettings = {
             dashboard: false,
             incomeHistory: false,
@@ -7275,6 +7282,7 @@ const fetchCoreData = async (userId) => {
             hargaHpp: false
         };
 
+        // 4. Masukkan data Settings ke State
         if (settingsSnap.exists()) {
             const settingsData = settingsSnap.data();
             Object.assign(state.settings, settingsData);
@@ -7283,17 +7291,25 @@ const fetchCoreData = async (userId) => {
             state.settings.pinProtection = defaultPinSettings;
         }
 
-        // --- PERBAIKAN DI SINI ---
-        // Mengambil data dari userProfile.data, bukan currentUser.value.userData
-        if (userProfile.data?.inflowCategories) {
-            state.settings.inflowCategories = userProfile.data.inflowCategories;
+        // 5. (PENTING) Masukkan data kategori yang baru diambil ke State
+        state.settings.categories = loadedCategories;
+
+        // 6. Logika Inflow Categories (Pemasukan) - Biarkan seperti kode Anda
+        if (userProfile.value?.data?.inflowCategories) { 
+             // Note: Saya ubah sedikit jadi userProfile.value?.data untuk keamanan jika ref
+            state.settings.inflowCategories = userProfile.value.data.inflowCategories;
+        } else if (state.settings.inflowCategories) {
+            // Fallback jika ada di settings
         }
         
+        // 7. Masukkan data Promotions
         if (promotionsSnap.exists()) {
             const promoData = promotionsSnap.data();
             state.promotions.perChannel = promoData.perChannel || {};
             state.promotions.perModel = promoData.perModel || {};
         }
+
+        // 8. Masukkan data Commissions
         if (commissionsSnap.exists()) {
             const commsData = commissionsSnap.data();
             state.commissions.perModel = commsData.perModel || {};
