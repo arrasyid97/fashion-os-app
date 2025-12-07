@@ -636,19 +636,30 @@ const parsePercentageInput = (value) => {
 
 // --- LOGIKA FILTER YANG SUDAH DIPERBAIKI ---
 const filteredMassPriceVariants = computed(() => {
-    // Ambil data yang sudah diterjemahkan di atas
+    // 1. Ambil data source
     let variants = uiState.massUpdateVariants || [];
 
-    // Filter berdasarkan Ukuran
+    // 2. Filter berdasarkan Ukuran (Lebih Aman)
     if (uiState.massPriceFilterUkuran) {
-        const keyword = uiState.massPriceFilterUkuran.toLowerCase();
-        variants = variants.filter(v => (v.varian || '').toLowerCase().includes(keyword));
+        // .toString() untuk jaga-jaga, .trim() untuk buang spasi tidak sengaja
+        const keyword = uiState.massPriceFilterUkuran.toString().toLowerCase().trim();
+        
+        variants = variants.filter(v => {
+            // Konversi nilai database ke String dulu sebelum toLowerCase()
+            // Ini mencegah error jika v.varian isinya angka (misal: 30)
+            const val = String(v.varian || '').toLowerCase();
+            return val.includes(keyword);
+        });
     }
 
-    // Filter berdasarkan Warna
+    // 3. Filter berdasarkan Warna (Lebih Aman)
     if (uiState.massPriceFilterWarna) {
-        const keyword = uiState.massPriceFilterWarna.toLowerCase();
-        variants = variants.filter(v => (v.warna || '').toLowerCase().includes(keyword));
+        const keyword = uiState.massPriceFilterWarna.toString().toLowerCase().trim();
+        
+        variants = variants.filter(v => {
+            const val = String(v.warna || '').toLowerCase();
+            return val.includes(keyword);
+        });
     }
 
     return variants;
