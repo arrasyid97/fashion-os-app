@@ -93,6 +93,8 @@ const uiState = reactive({
 
     massUpdateVariants: [],
     isMassUpdateLoading: false,
+massUpdateFilterSize: '', // <-- BARU: Untuk menyimpan input ukuran
+    massUpdateFilterColor: '',
 
     analisisModelLimit: 10,
     dashboardDateFilter: 'today',
@@ -365,6 +367,26 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     massPriceInputs: {},
     massPriceHppInput: null
 
+});
+
+// --- LOGIKA FILTER UNTUK ATUR HARGA MASSAL ---
+const filteredMassUpdateVariants = computed(() => {
+    // Ambil semua varian
+    let variants = uiState.massUpdateVariants || [];
+
+    // Filter berdasarkan Ukuran (jika ada input)
+    if (uiState.massUpdateFilterSize) {
+        const keyword = uiState.massUpdateFilterSize.toLowerCase();
+        variants = variants.filter(v => (v.variant || '').toLowerCase().includes(keyword));
+    }
+
+    // Filter berdasarkan Warna (jika ada input)
+    if (uiState.massUpdateFilterColor) {
+        const keyword = uiState.massUpdateFilterColor.toLowerCase();
+        variants = variants.filter(v => (v.warna || '').toLowerCase().includes(keyword));
+    }
+
+    return variants;
 });
 
 const dataFetched = reactive({
@@ -910,46 +932,90 @@ function setupUserListener(userId) {
     });
 }
 
+// --- FUNGSI MENYIMPAN PERUBAHAN MASSAL (VERSI LANGSUNG KE DB) ---
 async function applyAndSaveChanges() {
+    // 1. Ambil inputan user
     const newHpp = uiState.massPriceHppInput;
-    const newPrices = Object.values(uiState.massPriceInputs).filter(p => p !== null && p !== undefined && p !== '');
+    // Cek apakah ada harga jual yang diisi
+    const hasPriceUpdate = Object.values(uiState.massPriceInputs).some(val => val !== null && val !== '' && val !== undefined);
 
+    // 2. Validasi
     if (filteredMassPriceVariants.value.length === 0) {
-        return alert("Tidak ada produk yang cocok dengan filter untuk diubah harganya.");
+        return alert("Tidak ada produk yang cocok dengan filter.");
     }
-    // Validasi apakah ada nilai baru yang dimasukkan
-    if (newHpp === null && newPrices.length === 0) {
-        return alert("Masukkan HPP atau setidaknya satu Harga Jual baru untuk diterapkan.");
+    
+    if ((newHpp === null || newHpp === '') && !hasPriceUpdate) {
+        return alert("Masukkan HPP atau setidaknya satu Harga Jual baru.");
     }
-    if (!confirm(`Anda akan mengubah data untuk ${filteredMassPriceVariants.value.length} varian produk. Lanjutkan?`)) {
+
+    if (!confirm(`Anda akan mengubah data untuk ${filteredMassPriceVariants.value.length} varian produk secara PERMANEN. Lanjutkan?`)) {
         return;
     }
 
-    // Terapkan perubahan ke state lokal
-    filteredMassPriceVariants.value.forEach(variant => {
-        const productInState = state.produk.find(p => p.docId === variant.docId);
-        if (productInState) {
-            // PERBAIKAN 1: Update HPP jika diisi
-            if (newHpp !== null && newHpp !== undefined && newHpp >= 0) {
-                productInState.hpp = parseFloat(newHpp);
+    isSaving.value = true;
+    const batch = writeBatch(db); // Kita pakai Batch agar semua tersimpan sekaligus
+    const userId = currentUser.value.uid;
+
+    try {
+        // 3. Loop semua varian hasil filter (Data Lengkap dari Database)
+        for (const variant of filteredMassPriceVariants.value) {
+            
+            // --- A. UPDATE HPP (ke koleksi products) ---
+            if (newHpp !== null && newHpp !== '' && newHpp >= 0) {
+                const productRef = doc(db, "products", variant.docId);
+                batch.update(productRef, { hpp: parseFloat(newHpp) });
+                
+                // Update tampilan lokal (hanya jika produknya sedang terlihat di layar)
+                // Agar user melihat perubahannya tanpa refresh
+                const localProd = state.produk.find(p => p.docId === variant.docId);
+                if(localProd) localProd.hpp = parseFloat(newHpp);
             }
 
-            // Update Harga Jual
+            // --- B. UPDATE HARGA JUAL (ke koleksi product_prices) ---
             for (const marketplaceId in uiState.massPriceInputs) {
                 const newPrice = uiState.massPriceInputs[marketplaceId];
-                if (newPrice !== null && newPrice !== undefined && newPrice !== '') {
-                    productInState.hargaJual[marketplaceId] = parseFloat(newPrice);
+                
+                if (newPrice !== null && newPrice !== '' && newPrice !== undefined) {
+                    // ID dokumen harga formatnya: IDPRODUK-IDMARKETPLACE
+                    const priceDocId = `${variant.docId}-${marketplaceId}`;
+                    const priceRef = doc(db, "product_prices", priceDocId);
+                    
+                    // Gunakan set dengan merge:true agar membuat baru jika belum ada
+                    batch.set(priceRef, {
+                        product_id: variant.docId,
+                        product_sku: variant.sku,
+                        marketplace_id: marketplaceId,
+                        price: parseFloat(newPrice),
+                        userId: userId
+                    }, { merge: true });
+
+                    // Update tampilan lokal (hanya jika terlihat)
+                    const localProd = state.produk.find(p => p.docId === variant.docId);
+                    if(localProd) {
+                        if(!localProd.hargaJual) localProd.hargaJual = {};
+                        localProd.hargaJual[marketplaceId] = parseFloat(newPrice);
+                    }
                 }
             }
-            markProductAsEdited(productInState.docId); // Tandai produk ini untuk disimpan
         }
-    });
 
-    // Panggil fungsi simpan utama
-    await saveData();
+        // 4. Eksekusi ke Database
+        await batch.commit();
+        
+        alert("Berhasil memperbarui harga massal!");
+        
+        // Reset form
+        uiState.massPriceHppInput = null;
+        uiState.massPriceInputs = {};
+        
+        hideModal();
 
-    // Reset dan tutup modal
-    hideModal();
+    } catch (error) {
+        console.error("Gagal update massal:", error);
+        alert(`Terjadi kesalahan: ${error.message}`);
+    } finally {
+        isSaving.value = false;
+    }
 }
 
 async function deleteInvestor(investorId) {
