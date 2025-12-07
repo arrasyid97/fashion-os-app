@@ -757,24 +757,29 @@ function generatePartnerCode() {
     return result;
 }
 
-async function openMassUpdateModal(group) {
-    // 1. Ambil ID Model
-    const modelId = group.variants[0]?.model_id;
-    
-    if (!modelId) {
-        alert("Data model tidak ditemukan.");
-        return;
-    }
+function openMassUpdateModal(group) {
+    // 1. Reset Input Filter & Data
+    uiState.massPriceFilterUkuran = '';
+    uiState.massPriceFilterWarna = '';
+    uiState.massUpdateVariants = []; // Kosongkan dulu
 
-    // 2. BUKA MODAL DULU (Supaya user langsung lihat layar loading)
-    // Perhatikan: Nama modal diganti jadi 'aturHargaMassal' agar sesuai dengan HTML Anda
+    // 2. Tampilkan Modal
     showModal('aturHargaMassal', { 
         groupName: group.namaModel 
     });
 
-    // 3. BARU AMBIL DATA LENGKAP
-    // Fungsi ini akan mengisi uiState.massUpdateVariants
-    await fetchAllVariantsForModel(modelId);
+    // 3. MASUKKAN DATA LANGSUNG DARI GRUP (Solusi Masalah Anda)
+    // Alih-alih request ke database berdasarkan ID, kita pakai data yang sudah ada di grup
+    // Ini menjamin jumlah varian SAMA PERSIS dengan yang terlihat di halaman inventaris
+    uiState.massUpdateVariants = group.variants.map(v => ({
+        ...v,
+        // Pastikan properti warna dan varian aman
+        warna: v.warna || '', 
+        varian: v.varian || ''
+    }));
+
+    // (Opsional) Kita tidak perlu memanggil fetchAllVariantsForModel lagi
+    // karena datanya sudah kita ambil dari tampilan inventaris
 }
 
 // Fungsi baru untuk menjadikan pengguna sebagai mitra
