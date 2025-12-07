@@ -369,25 +369,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
 
 });
 
-// --- LOGIKA FILTER UNTUK ATUR HARGA MASSAL ---
-const filteredMassUpdateVariants = computed(() => {
-    // Ambil semua varian
-    let variants = uiState.massUpdateVariants || [];
 
-    // Filter berdasarkan Ukuran (jika ada input)
-    if (uiState.massUpdateFilterSize) {
-        const keyword = uiState.massUpdateFilterSize.toLowerCase();
-        variants = variants.filter(v => (v.variant || '').toLowerCase().includes(keyword));
-    }
-
-    // Filter berdasarkan Warna (jika ada input)
-    if (uiState.massUpdateFilterColor) {
-        const keyword = uiState.massUpdateFilterColor.toLowerCase();
-        variants = variants.filter(v => (v.warna || '').toLowerCase().includes(keyword));
-    }
-
-    return variants;
-});
 
 const dataFetched = reactive({
   products: false,
