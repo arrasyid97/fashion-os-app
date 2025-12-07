@@ -605,25 +605,26 @@ const filteredMassPriceVariants = computed(() => {
     // 1. Ambil data source
     let variants = uiState.massUpdateVariants || [];
 
-    // 2. Filter berdasarkan Ukuran (Lebih Aman)
+    // 2. Filter berdasarkan Ukuran (DIGANTI JADI EXACT MATCH)
     if (uiState.massPriceFilterUkuran) {
-        // .toString() untuk jaga-jaga, .trim() untuk buang spasi tidak sengaja
         const keyword = uiState.massPriceFilterUkuran.toString().toLowerCase().trim();
         
         variants = variants.filter(v => {
-            // Konversi nilai database ke String dulu sebelum toLowerCase()
-            // Ini mencegah error jika v.varian isinya angka (misal: 30)
             const val = String(v.varian || '').toLowerCase();
-            return val.includes(keyword);
+            // PERUBAHAN PENTING DI SINI:
+            // Gunakan '===' (Sama Persis). 
+            // Jadi kalau ketik "l", hanya "l" yang muncul. "xl" tidak akan muncul.
+            return val === keyword; 
         });
     }
 
-    // 3. Filter berdasarkan Warna (Lebih Aman)
+    // 3. Filter berdasarkan Warna (TETAP PAKAI INCLUDES AGAR FLEKSIBEL)
     if (uiState.massPriceFilterWarna) {
         const keyword = uiState.massPriceFilterWarna.toString().toLowerCase().trim();
         
         variants = variants.filter(v => {
             const val = String(v.warna || '').toLowerCase();
+            // Warna tetap pakai 'includes' supaya ketik "merah" bisa ketemu "merah maroon"
             return val.includes(keyword);
         });
     }
