@@ -493,10 +493,9 @@ const fetchAllVariantsForModel = async (modelId) => {
     if (!modelId || !currentUser.value) return;
     
     uiState.isMassUpdateLoading = true;
-    uiState.massUpdateVariants = []; // Kosongkan dulu
+    uiState.massUpdateVariants = []; 
 
     try {
-        // 1. Ambil semua produk yang memiliki model_id tersebut (TANPA LIMIT)
         const q = query(
             collection(db, "products"),
             where("userId", "==", currentUser.value.uid),
@@ -505,23 +504,22 @@ const fetchAllVariantsForModel = async (modelId) => {
         
         const snapshot = await getDocs(q);
         
-        // 2. Petakan data produk
-        const variants = snapshot.docs.map(doc => ({
-            docId: doc.id,
-            ...doc.data()
-        }));
+        // --- PERBAIKAN: Menerjemahkan data Database ke HTML Anda ---
+        const variants = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                docId: doc.id,
+                ...data,
+                // INI KUNCINYA: Terjemahkan agar HTML Anda bisa membacanya
+                warna: data.color || '',    // Agar {{ variant.warna }} muncul
+                varian: data.variant || ''  // Agar {{ variant.varian }} muncul
+            };
+        });
 
-        // 3. Kita juga perlu mengambil harga jual (product_prices) untuk varian ini
-        // agar bisa ditampilkan di pratinjau (opsional, tapi disarankan)
-        // Untuk efisiensi di modal massal, kita bisa skip detail harga per channel dulu
-        // atau lakukan fetch terpisah jika perlu. 
-        // Untuk sekarang kita fokus agar "Barangnya Muncul Dulu".
-        
         uiState.massUpdateVariants = variants;
 
     } catch (error) {
-        console.error("Gagal mengambil varian lengkap:", error);
-        alert("Gagal memuat varian lengkap.");
+        console.error("Gagal ambil varian:", error);
     } finally {
         uiState.isMassUpdateLoading = false;
     }
@@ -636,22 +634,24 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
+// --- LOGIKA FILTER YANG SUDAH DIPERBAIKI ---
 const filteredMassPriceVariants = computed(() => {
-    // 1. Ubah sumber data ke 'massUpdateVariants' (Data lengkap dari database)
-    const variants = uiState.massUpdateVariants || [];
+    // Ambil data yang sudah diterjemahkan di atas
+    let variants = uiState.massUpdateVariants || [];
 
-    // Jika sedang loading atau tidak ada data, kembalikan kosong
-    if (variants.length === 0) return [];
-    
-    const filterUkuran = uiState.massPriceFilterUkuran.trim().toLowerCase();
-    const filterWarna = uiState.massPriceFilterWarna.trim().toLowerCase();
-    
-    // 2. Lakukan filter pada data lengkap tersebut
-    return variants.filter(variant => {
-        const matchUkuran = !filterUkuran || (variant.varian && variant.varian.toLowerCase().includes(filterUkuran));
-        const matchWarna = !filterWarna || (variant.warna && variant.warna.toLowerCase().includes(filterWarna));
-        return matchUkuran && matchWarna;
-    });
+    // Filter berdasarkan Ukuran
+    if (uiState.massPriceFilterUkuran) {
+        const keyword = uiState.massPriceFilterUkuran.toLowerCase();
+        variants = variants.filter(v => (v.varian || '').toLowerCase().includes(keyword));
+    }
+
+    // Filter berdasarkan Warna
+    if (uiState.massPriceFilterWarna) {
+        const keyword = uiState.massPriceFilterWarna.toLowerCase();
+        variants = variants.filter(v => (v.warna || '').toLowerCase().includes(keyword));
+    }
+
+    return variants;
 });
 
 const isSubscriptionActive = computed(() => {
