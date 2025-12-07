@@ -489,41 +489,7 @@ const loadDataForPage = async (pageName) => {
 const lastEditedModel = ref(null);
 const groupRefs = ref({});
 
-const fetchAllVariantsForModel = async (modelId) => {
-    if (!modelId || !currentUser.value) return;
-    
-    uiState.isMassUpdateLoading = true;
-    uiState.massUpdateVariants = []; 
 
-    try {
-        const q = query(
-            collection(db, "products"),
-            where("userId", "==", currentUser.value.uid),
-            where("model_id", "==", modelId)
-        );
-        
-        const snapshot = await getDocs(q);
-        
-        // --- PERBAIKAN: Menerjemahkan data Database ke HTML Anda ---
-        const variants = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                docId: doc.id,
-                ...data,
-                // INI KUNCINYA: Terjemahkan agar HTML Anda bisa membacanya
-                warna: data.color || '',    // Agar {{ variant.warna }} muncul
-                varian: data.variant || ''  // Agar {{ variant.varian }} muncul
-            };
-        });
-
-        uiState.massUpdateVariants = variants;
-
-    } catch (error) {
-        console.error("Gagal ambil varian:", error);
-    } finally {
-        uiState.isMassUpdateLoading = false;
-    }
-};
 
 const riwayatPengeluaran = computed(() => {
     // 1. Filter Awal: Hanya Pengeluaran (pengeluaran atau biaya)
