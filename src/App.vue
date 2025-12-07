@@ -637,14 +637,17 @@ const parsePercentageInput = (value) => {
 };
 
 const filteredMassPriceVariants = computed(() => {
-    if (uiState.modalType !== 'aturHargaMassal' || !uiState.modalData.variants) {
-        return [];
-    }
+    // 1. Ubah sumber data ke 'massUpdateVariants' (Data lengkap dari database)
+    const variants = uiState.massUpdateVariants || [];
+
+    // Jika sedang loading atau tidak ada data, kembalikan kosong
+    if (variants.length === 0) return [];
     
     const filterUkuran = uiState.massPriceFilterUkuran.trim().toLowerCase();
     const filterWarna = uiState.massPriceFilterWarna.trim().toLowerCase();
     
-    return uiState.modalData.variants.filter(variant => {
+    // 2. Lakukan filter pada data lengkap tersebut
+    return variants.filter(variant => {
         const matchUkuran = !filterUkuran || (variant.varian && variant.varian.toLowerCase().includes(filterUkuran));
         const matchWarna = !filterWarna || (variant.warna && variant.warna.toLowerCase().includes(filterWarna));
         return matchUkuran && matchWarna;
