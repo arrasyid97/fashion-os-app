@@ -3164,6 +3164,14 @@ const getProductBySku = (sku) => {
 };
 const getMarketplaceById = (id) => state.settings.marketplaces.find(mp => mp.id === id);
 
+const getTransactionDisplayId = (trxId) => {
+    if (!trxId) return '-';
+    // Cari transaksi di state berdasarkan ID
+    const trx = state.transaksi.find(t => t.id === trxId);
+    // Jika ketemu, tampilkan marketplaceOrderId (Resi), jika tidak tampilkan ID internal
+    return trx ? (trx.marketplaceOrderId || trx.id) : trxId;
+};
+
 function filterDataByDate(data, filterType, startDateStr, endDateStr, startMonth, startYear, endMonth, endYear) {
     if (!data) return [];
     
@@ -3688,10 +3696,11 @@ const filteredRetur = computed(() => {
     // 1. "Bongkar" data retur menjadi daftar item yang rata (flattened list)
     const flatReturItems = state.retur.flatMap(doc => 
         (doc.items || []).map(itemDetail => ({
-            ...itemDetail, // sku, qty, alasan, tindakLanjut
-            returnDocId: doc.id, // Simpan ID dokumen induknya
+            ...itemDetail, 
+            returnDocId: doc.id, 
             tanggal: doc.tanggal,
-            channelId: doc.channelId
+            channelId: doc.channelId,
+            originalTransactionId: doc.originalTransactionId // <--- PENTING: Tambahkan baris ini
         }))
     );
 
@@ -9865,22 +9874,30 @@ watch(activePage, (newPage, oldPage) => {
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left text-slate-500">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                            <tr>
-                                <th class="px-6 py-3">Tanggal</th>
-                                <th class="px-6 py-3">Asal Toko</th>
-                                <th class="px-6 py-3">Produk</th>
-                                <th class="px-6 py-3 text-center">Qty</th>
-                                <th class="px-6 py-3">Alasan</th>
-                                <th class="px-6 py-3 text-center">Aksi</th>
-                            </tr>
-                        </thead>
+    <tr>
+        <th class="px-6 py-3">Tanggal</th>
+        
+        <th class="px-6 py-3">ID Pesanan</th> 
+        
+        <th class="px-6 py-3">Asal Toko</th>
+        <th class="px-6 py-3">Produk</th>
+        <th class="px-6 py-3 text-center">Qty</th>
+        <th class="px-6 py-3">Alasan</th>
+        <th class="px-6 py-3 text-center">Aksi</th>
+    </tr>
+</thead>
                         <tbody class="divide-y divide-slate-200/50">
                             <tr v-if="filteredRetur.length === 0">
                                 <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
                             </tr>
                             <tr v-for="(item, index) in filteredRetur" :key="`${item.returnDocId}-${item.sku}-${index}`" class="hover:bg-slate-50/50">
-                                <td class="px-6 py-4 whitespace-nowrap">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
-                                <td class="px-6 py-4">{{ getMarketplaceById(item.channelId)?.name || 'N/A' }}</td>
+    <td class="px-6 py-4 whitespace-nowrap">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
+    
+    <td class="px-6 py-4 font-mono text-xs font-bold text-indigo-600">
+        {{ getTransactionDisplayId(item.originalTransactionId) }}
+    </td>
+
+    <td class="px-6 py-4">{{ getMarketplaceById(item.channelId)?.name || 'N/A' }}</td>
                                 <td class="px-6 py-4">
                                     <p class="font-semibold text-slate-800">{{ getProductBySku(item.sku)?.nama || 'Produk tidak ditemukan' }}</p>
                                     <p class="font-mono text-xs text-slate-500">{{ item.sku }}</p>
