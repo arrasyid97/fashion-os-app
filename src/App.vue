@@ -11,6 +11,8 @@ import { db, auth } from './firebase.js'; 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, orderBy, limit, startAfter, documentId } from 'firebase/firestore'; 
 let bulkSearchDebounceTimer = null;
+let bulkScanTimer = null;
+let posScanTimer = null;
 // Impor fungsi-fungsi BARU untuk Autentikasii
 import { 
     onAuthStateChanged, 
@@ -7212,35 +7214,64 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
   }
 });
 
-watch(() => uiState.bulk_scan_input, async (newValue) => {
-    const scannedValue = newValue.trim();
-    if (!scannedValue || !uiState.activeCartChannel) {
-        // Jika input kosong atau channel belum dipilih, abaikan.
-        return;
-    }
+watch(() => uiState.bulk_scan_input, (newValue) => {
+    // Reset timer setiap kali ada huruf masuk
+    if (bulkScanTimer) clearTimeout(bulkScanTimer);
 
-    // Tunda eksekusi utama untuk memastikan nilai baru sudah dirender di input
-    await nextTick();
-    const product = getProductBySku(scannedValue);
+    // Jangan proses jika kosong
+    if (!newValue || newValue.trim() === '') return;
 
-    if (product) {
-        // Jika yang di-scan adalah produk, tambahkan ke pesanan yang sedang aktif
-        addProductToBulkQueue(product);
-    } else {
-        // Jika bukan produk, ini pasti resi. Cari pesanan yang sedang diisi dan finalisasi.
-        let orderToFinalize = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
-        if (orderToFinalize) {
-            orderToFinalize.id = scannedValue;
-            orderToFinalize.marketplaceOrderId = scannedValue;
-            orderToFinalize.status = 'Mengantri';
+    // Tunggu 400ms (0.4 detik) agar scanner selesai mengetik SLW-HTM-M
+    bulkScanTimer = setTimeout(async () => {
+        const scannedValue = newValue.trim();
+        
+        if (!uiState.activeCartChannel) {
+            alert("Harap pilih channel penjualan dulu!");
+            uiState.bulk_scan_input = '';
+            return;
         }
-    }
-    
-    // --- PERUBAHAN UTAMA DI SINI ---
-    // Gunakan setTimeout untuk memberi jeda sebelum mengosongkan kolom input
-    setTimeout(() => {
+
+        const product = getProductBySku(scannedValue);
+
+        if (product) {
+            // Jika Produk
+            addProductToBulkQueue(product);
+        } else {
+            // Jika Resi
+            let orderToFinalize = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
+            if (orderToFinalize) {
+                orderToFinalize.id = scannedValue;
+                orderToFinalize.marketplaceOrderId = scannedValue;
+                orderToFinalize.status = 'Mengantri';
+            }
+        }
+
+        // Kosongkan input setelah diproses
         uiState.bulk_scan_input = '';
-    }, 200); // Jeda 200 milidetik (0.2 detik)
+    }, 400); // <-- Angka 400 ini kuncinya (Waktu tunggu)
+});
+
+// 2. Watcher untuk KASIR POS (Dengan Jeda Waktu)
+watch(() => uiState.pos_scan_input, (newValue) => {
+    // Reset timer
+    if (posScanTimer) clearTimeout(posScanTimer);
+
+    // Tetap jalankan pencarian rekomendasi (visual saja)
+    handlePosSearch();
+
+    // Jangan proses submit jika kosong
+    if (!newValue || newValue.trim() === '') return;
+
+    // Tunggu 400ms sebelum Enter otomatis
+    posScanTimer = setTimeout(() => {
+        const scannedValue = newValue.trim();
+        
+        // Pastikan panjang karakter cukup (misal minimal 3) untuk menghindari error ketik
+        if (scannedValue.length >= 3) {
+            // Panggil fungsi submit yang sudah ada
+            handlePosSubmit();
+        }
+    }, 400); 
 });
 
 watch(() => uiState.notesData.type, () => {
