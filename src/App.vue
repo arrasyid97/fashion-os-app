@@ -7197,6 +7197,71 @@ function deleteSpecialPrice(channelId, sku) {
         }
     }
 }
+
+const prosesBulkScanManual = () => {
+    // 1. Ambil nilai dan bersihkan spasi
+    const rawValue = uiState.bulk_scan_input;
+    if (!rawValue || rawValue.trim() === '') return;
+
+    const scannedValue = rawValue.trim();
+
+    // 2. Matikan timer yang mungkin sedang berjalan agar tidak proses 2x
+    if (bulkScanTimer) clearTimeout(bulkScanTimer);
+
+    // 3. Validasi Channel
+    if (!uiState.activeCartChannel) {
+        alert("Pilih Channel Penjualan terlebih dahulu!");
+        uiState.bulk_scan_input = '';
+        return;
+    }
+
+    // 4. Cari Produk
+    const product = getProductBySku(scannedValue);
+
+    if (product) {
+        // ==> A. JIKA PRODUK DITEMUKAN: Masukkan ke antrian
+        addProductToBulkQueue(product);
+    } else {
+        // ==> B. JIKA BUKAN PRODUK: Cek apakah ini RESI?
+        // Cari order sementara yang statusnya 'Sedang Diisi'
+        let orderToFinalize = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
+        
+        if (orderToFinalize) {
+            // Update jadi Resi
+            orderToFinalize.id = scannedValue;
+            orderToFinalize.marketplaceOrderId = scannedValue;
+            orderToFinalize.status = 'Mengantri';
+        } else {
+            // ==> C. GAGAL TOTAL: Bukan Produk & Tidak ada pesanan yang menunggu Resi
+            // Tampilkan pesan error agar Anda tahu kenapa data tidak masuk
+            alert(`Gagal: Kode "${scannedValue}" tidak dikenali sebagai Produk ataupun Resi.`);
+        }
+    }
+
+    // 5. Kosongkan input setelah selesai (beri sedikit delay agar terasa responsif)
+    nextTick(() => {
+        uiState.bulk_scan_input = '';
+    });
+};
+
+// Fungsi Enter untuk POS
+const handlePosScanEnter = () => {
+    if (posScanTimer) clearTimeout(posScanTimer);
+    const scannedValue = uiState.pos_scan_input.trim();
+    if (scannedValue.length >= 3) {
+        const product = getProductBySku(scannedValue);
+        if (product) {
+            addProductToCart(product);
+            uiState.pos_scan_input = '';
+            uiState.posSearchRecommendations = [];
+        } else {
+            // Jika di POS tidak ketemu, mungkin user mau tekan tombol "Jadikan ID Pesanan" manual
+            // Jadi kita biarkan saja, atau bisa tambahkan alert jika mau.
+            alert(`Produk "${scannedValue}" tidak ditemukan di POS.`);
+        }
+    }
+};
+
 // --- LIFECYCLE & WATCHERS ---
 
 watch(dashboardFilteredData, () => { if (activePage.value === 'dashboard') nextTick(renderCharts); });
@@ -7215,72 +7280,31 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
 });
 
 watch(() => uiState.bulk_scan_input, (newValue) => {
-    // Setiap kali scanner mengetik huruf, HAPUS timer sebelumnya (JANGAN PROSES DULU)
     if (bulkScanTimer) clearTimeout(bulkScanTimer);
-
-    // Jika input kosong, abaikan
     if (!newValue || newValue.trim() === '') return;
 
-    // BUAT TIMER BARU: Tunggu 500ms (setengah detik)
-    // Angka 500 ini memberi waktu scanner untuk mengetik "SLW-HTM-M" sampai selesai
+    // Tunggu 500ms. Jika scanner lambat, dia akan menunggu.
+    // Jika scanner kirim Enter duluan, fungsi 'prosesBulkScanManual' akan dipanggil dan timer ini dibatalkan.
     bulkScanTimer = setTimeout(() => {
-        
-        const scannedValue = newValue.trim(); // Ambil nilai lengkap "SLW-HTM-M"
-        
-        if (!uiState.activeCartChannel) {
-            alert("Harap pilih channel penjualan dulu!");
-            uiState.bulk_scan_input = '';
-            return;
-        }
-
-        // Cari produk berdasarkan data LENGKAP
-        const product = getProductBySku(scannedValue);
-
-        if (product) {
-            // Jika yang discan adalah Produk
-            addProductToBulkQueue(product);
-        } else {
-            // Jika bukan produk, anggap ini RESI / ID PESANAN
-            let orderToFinalize = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
-            if (orderToFinalize) {
-                orderToFinalize.id = scannedValue;
-                orderToFinalize.marketplaceOrderId = scannedValue;
-                orderToFinalize.status = 'Mengantri';
-            }
-        }
-
-        // KOSONGKAN KOLOM SETELAH SELESAI PROSES (Otomatis, tidak perlu hapus manual)
-        uiState.bulk_scan_input = ''; 
-        
-    }, 500); // <--- JEDA 500ms (Bisa dinaikkan ke 600 atau 800 jika scanner sangat lambat)
+        prosesBulkScanManual();
+    }, 500); 
 });
 
 // 2. Watcher untuk KASIR POS (Dengan Jeda Waktu)
 watch(() => uiState.pos_scan_input, (newValue) => {
     if (posScanTimer) clearTimeout(posScanTimer);
-
-    // Jalankan pencarian rekomendasi visual (agar user melihat list produk saat mengetik manual)
-    handlePosSearch(); 
-
+    handlePosSearch(); // Tetap jalankan pencarian visual
     if (!newValue || newValue.trim() === '') return;
 
-    // Tunggu 500ms agar data barcode masuk sepenuhnya
     posScanTimer = setTimeout(() => {
-        const scannedValue = newValue.trim();
-
-        // Pastikan panjang karakter cukup (misal minimal 3)
-        if (scannedValue.length >= 3) {
-            
-            const product = getProductBySku(scannedValue);
-            
-            if (product) {
-                // Jika produk ketemu, langsung masuk keranjang
-                addProductToCart(product);
-                // Kosongkan input dan rekomendasi
-                uiState.pos_scan_input = '';
-                uiState.posSearchRecommendations = [];
-            } 
-            // Jika tidak ketemu produk, biarkan (mungkin user mau menekan tombol "Jadikan ID Pesanan")
+        const val = newValue.trim();
+        if (val.length >= 3) {
+             const product = getProductBySku(val);
+             if (product) {
+                 addProductToCart(product);
+                 uiState.pos_scan_input = '';
+                 uiState.posSearchRecommendations = [];
+             }
         }
     }, 500);
 });
@@ -8328,7 +8352,16 @@ watch(activePage, (newPage, oldPage) => {
         <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Cari di Sini</label>
         <div class="relative flex items-center gap-2">
             <form @submit.prevent="handlePosSubmit" class="flex-grow">
-                <input type="text" v-model="uiState.pos_scan_input" @input="handlePosSearch" :disabled="!uiState.activeCartChannel || !!uiState.pos_order_id" :placeholder="uiState.activeCartChannel ? 'Scan/Ketik Produk atau Resi...' : 'Pilih channel dulu...'" :class="{'bg-slate-100 cursor-not-allowed': !!uiState.pos_order_id}" class="w-full p-4 text-lg border-2 border-slate-300 rounded-lg shadow-inner" autocomplete="off">
+                <input 
+    type="text" 
+    v-model="uiState.pos_scan_input" 
+    @input="handlePosSearch" 
+    :disabled="!uiState.activeCartChannel || !!uiState.pos_order_id" 
+    placeholder="Scan/Ketik Produk atau Resi..." 
+    class="w-full p-4 text-lg border-2 border-slate-300 rounded-lg shadow-inner" 
+    @keyup.enter="handlePosScanEnter"
+    autocomplete="off"
+>
                 <div v-if="uiState.posSearchRecommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg">
                     <div v-for="p in uiState.posSearchRecommendations" :key="p.sku" @click="selectPosRecommendation(p)" class="p-3 hover:bg-slate-100 cursor-pointer border-b">
                         <p class="font-semibold">{{ p.nama }} - {{ p.varian }}</p>
@@ -8529,7 +8562,7 @@ watch(activePage, (newPage, oldPage) => {
     :disabled="!uiState.activeCartChannel" 
     placeholder="Scan Produk -> Scan Resi" 
     class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg"
-    @keydown.enter.prevent 
+    @keyup.enter="prosesBulkScanManual"  
     autocomplete="off"
 >
                         </div>
