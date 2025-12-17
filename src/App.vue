@@ -7262,6 +7262,52 @@ const handlePosScanEnter = () => {
     }
 };
 
+const prosesBulkScanFinal = (scannedValue) => {
+    if (!uiState.activeCartChannel) {
+        alert("Pilih Channel Penjualan terlebih dahulu!");
+        uiState.bulk_scan_input = '';
+        return;
+    }
+
+    const product = getProductBySku(scannedValue);
+
+    if (product) {
+        // Jika Produk Ditemukan
+        addProductToBulkQueue(product);
+        // Kosongkan input TANPA Alert (agar smooth)
+        uiState.bulk_scan_input = '';
+    } else {
+        // Jika Bukan Produk, Cek apakah Resi
+        let orderToFinalize = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
+        
+        if (orderToFinalize) {
+            orderToFinalize.id = scannedValue;
+            orderToFinalize.marketplaceOrderId = scannedValue;
+            orderToFinalize.status = 'Mengantri';
+            // Kosongkan input TANPA Alert
+            uiState.bulk_scan_input = '';
+        } else {
+            // GAGAL
+            // Kita kosongkan dulu inputnya SEBELUM alert muncul
+            // Supaya jika user menutup alert, dia bisa scan ulang
+            uiState.bulk_scan_input = ''; 
+            alert(`Gagal: Kode "${scannedValue}" tidak ditemukan.`);
+        }
+    }
+};
+
+// Fungsi Handle Tombol Enter (Jika scanner mengirim Enter)
+const handleBulkEnter = () => {
+    // Matikan timer debounce agar tidak jalan 2 kali
+    if (bulkScanTimer) clearTimeout(bulkScanTimer);
+
+    const val = uiState.bulk_scan_input.trim();
+    // Validasi panjang karakter lagi
+    if (val.length >= 3) {
+        prosesBulkScanFinal(val);
+    }
+};
+
 // --- LIFECYCLE & WATCHERS ---
 
 watch(dashboardFilteredData, () => { if (activePage.value === 'dashboard') nextTick(renderCharts); });
@@ -7280,13 +7326,26 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
 });
 
 watch(() => uiState.bulk_scan_input, (newValue) => {
-    if (bulkScanTimer) clearTimeout(bulkScanTimer);
+    // 1. Jika kosong, abaikan
     if (!newValue || newValue.trim() === '') return;
 
-    // Tunggu 500ms. Jika scanner lambat, dia akan menunggu.
-    // Jika scanner kirim Enter duluan, fungsi 'prosesBulkScanManual' akan dipanggil dan timer ini dibatalkan.
+    // 2. Clear timer lama
+    if (bulkScanTimer) clearTimeout(bulkScanTimer);
+
+    // 3. Buat timer baru (Tunggu 500ms)
     bulkScanTimer = setTimeout(() => {
-        prosesBulkScanManual();
+        const scannedValue = newValue.trim();
+
+        // 4. [PENTING] Cek Panjang Karakter
+        // Jangan proses jika cuma 1 atau 2 huruf (seperti 's' atau 'sl')
+        // Ini mencegah error muncul saat scanner baru mulai mengetik
+        if (scannedValue.length < 3) {
+            return; 
+        }
+
+        // Jika panjang sudah oke (minimal 3 huruf), baru proses
+        prosesBulkScanFinal(scannedValue);
+
     }, 500); 
 });
 
@@ -8562,8 +8621,9 @@ watch(activePage, (newPage, oldPage) => {
     :disabled="!uiState.activeCartChannel" 
     placeholder="Scan Produk -> Scan Resi" 
     class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg"
-    @keyup.enter="prosesBulkScanManual"  
+    @keydown.enter.prevent="handleBulkEnter"
     autocomplete="off"
+    autofocus
 >
                         </div>
                     </div>
