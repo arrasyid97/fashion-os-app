@@ -7198,69 +7198,7 @@ function deleteSpecialPrice(channelId, sku) {
     }
 }
 
-const prosesBulkScanManual = () => {
-    // 1. Ambil nilai dan bersihkan spasi
-    const rawValue = uiState.bulk_scan_input;
-    if (!rawValue || rawValue.trim() === '') return;
 
-    const scannedValue = rawValue.trim();
-
-    // 2. Matikan timer yang mungkin sedang berjalan agar tidak proses 2x
-    if (bulkScanTimer) clearTimeout(bulkScanTimer);
-
-    // 3. Validasi Channel
-    if (!uiState.activeCartChannel) {
-        alert("Pilih Channel Penjualan terlebih dahulu!");
-        uiState.bulk_scan_input = '';
-        return;
-    }
-
-    // 4. Cari Produk
-    const product = getProductBySku(scannedValue);
-
-    if (product) {
-        // ==> A. JIKA PRODUK DITEMUKAN: Masukkan ke antrian
-        addProductToBulkQueue(product);
-    } else {
-        // ==> B. JIKA BUKAN PRODUK: Cek apakah ini RESI?
-        // Cari order sementara yang statusnya 'Sedang Diisi'
-        let orderToFinalize = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
-        
-        if (orderToFinalize) {
-            // Update jadi Resi
-            orderToFinalize.id = scannedValue;
-            orderToFinalize.marketplaceOrderId = scannedValue;
-            orderToFinalize.status = 'Mengantri';
-        } else {
-            // ==> C. GAGAL TOTAL: Bukan Produk & Tidak ada pesanan yang menunggu Resi
-            // Tampilkan pesan error agar Anda tahu kenapa data tidak masuk
-            alert(`Gagal: Kode "${scannedValue}" tidak dikenali sebagai Produk ataupun Resi.`);
-        }
-    }
-
-    // 5. Kosongkan input setelah selesai (beri sedikit delay agar terasa responsif)
-    nextTick(() => {
-        uiState.bulk_scan_input = '';
-    });
-};
-
-// Fungsi Enter untuk POS
-const handlePosScanEnter = () => {
-    if (posScanTimer) clearTimeout(posScanTimer);
-    const scannedValue = uiState.pos_scan_input.trim();
-    if (scannedValue.length >= 3) {
-        const product = getProductBySku(scannedValue);
-        if (product) {
-            addProductToCart(product);
-            uiState.pos_scan_input = '';
-            uiState.posSearchRecommendations = [];
-        } else {
-            // Jika di POS tidak ketemu, mungkin user mau tekan tombol "Jadikan ID Pesanan" manual
-            // Jadi kita biarkan saja, atau bisa tambahkan alert jika mau.
-            alert(`Produk "${scannedValue}" tidak ditemukan di POS.`);
-        }
-    }
-};
 
 const prosesBulkScanFinal = (scannedValue) => {
     if (!uiState.activeCartChannel) {
@@ -8621,9 +8559,8 @@ watch(activePage, (newPage, oldPage) => {
     :disabled="!uiState.activeCartChannel" 
     placeholder="Scan Produk -> Scan Resi" 
     class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg"
-    @keydown.enter.prevent="handleBulkEnter"
-    autocomplete="off"
-    autofocus
+    @keydown.enter.prevent
+    @keyup.enter="prosesBulkScanManual"  autocomplete="off"
 >
                         </div>
                     </div>
