@@ -7215,15 +7215,17 @@ watch(() => uiState.promosiSelectedModel, (newModel) => {
 });
 
 watch(() => uiState.bulk_scan_input, (newValue) => {
-    // Reset timer setiap kali ada huruf masuk
+    // Setiap kali scanner mengetik huruf, HAPUS timer sebelumnya (JANGAN PROSES DULU)
     if (bulkScanTimer) clearTimeout(bulkScanTimer);
 
-    // Jangan proses jika kosong
+    // Jika input kosong, abaikan
     if (!newValue || newValue.trim() === '') return;
 
-    // Tunggu 400ms (0.4 detik) agar scanner selesai mengetik SLW-HTM-M
-    bulkScanTimer = setTimeout(async () => {
-        const scannedValue = newValue.trim();
+    // BUAT TIMER BARU: Tunggu 500ms (setengah detik)
+    // Angka 500 ini memberi waktu scanner untuk mengetik "SLW-HTM-M" sampai selesai
+    bulkScanTimer = setTimeout(() => {
+        
+        const scannedValue = newValue.trim(); // Ambil nilai lengkap "SLW-HTM-M"
         
         if (!uiState.activeCartChannel) {
             alert("Harap pilih channel penjualan dulu!");
@@ -7231,13 +7233,14 @@ watch(() => uiState.bulk_scan_input, (newValue) => {
             return;
         }
 
+        // Cari produk berdasarkan data LENGKAP
         const product = getProductBySku(scannedValue);
 
         if (product) {
-            // Jika Produk
+            // Jika yang discan adalah Produk
             addProductToBulkQueue(product);
         } else {
-            // Jika Resi
+            // Jika bukan produk, anggap ini RESI / ID PESANAN
             let orderToFinalize = uiState.bulk_order_queue.find(o => o.id.startsWith('TEMP-'));
             if (orderToFinalize) {
                 orderToFinalize.id = scannedValue;
@@ -7246,32 +7249,40 @@ watch(() => uiState.bulk_scan_input, (newValue) => {
             }
         }
 
-        // Kosongkan input setelah diproses
-        uiState.bulk_scan_input = '';
-    }, 1200); // <-- Angka 400 ini kuncinya (Waktu tunggu)
+        // KOSONGKAN KOLOM SETELAH SELESAI PROSES (Otomatis, tidak perlu hapus manual)
+        uiState.bulk_scan_input = ''; 
+        
+    }, 500); // <--- JEDA 500ms (Bisa dinaikkan ke 600 atau 800 jika scanner sangat lambat)
 });
 
 // 2. Watcher untuk KASIR POS (Dengan Jeda Waktu)
 watch(() => uiState.pos_scan_input, (newValue) => {
-    // Reset timer
     if (posScanTimer) clearTimeout(posScanTimer);
 
-    // Tetap jalankan pencarian rekomendasi (visual saja)
-    handlePosSearch();
+    // Jalankan pencarian rekomendasi visual (agar user melihat list produk saat mengetik manual)
+    handlePosSearch(); 
 
-    // Jangan proses submit jika kosong
     if (!newValue || newValue.trim() === '') return;
 
-    // Tunggu 400ms sebelum Enter otomatis
+    // Tunggu 500ms agar data barcode masuk sepenuhnya
     posScanTimer = setTimeout(() => {
         const scannedValue = newValue.trim();
-        
-        // Pastikan panjang karakter cukup (misal minimal 3) untuk menghindari error ketik
+
+        // Pastikan panjang karakter cukup (misal minimal 3)
         if (scannedValue.length >= 3) {
-            // Panggil fungsi submit yang sudah ada
-            handlePosSubmit();
+            
+            const product = getProductBySku(scannedValue);
+            
+            if (product) {
+                // Jika produk ketemu, langsung masuk keranjang
+                addProductToCart(product);
+                // Kosongkan input dan rekomendasi
+                uiState.pos_scan_input = '';
+                uiState.posSearchRecommendations = [];
+            } 
+            // Jika tidak ketemu produk, biarkan (mungkin user mau menekan tombol "Jadikan ID Pesanan")
         }
-    }, 1200); 
+    }, 500);
 });
 
 watch(() => uiState.notesData.type, () => {
@@ -8512,7 +8523,15 @@ watch(activePage, (newPage, oldPage) => {
 
                         <div class="border-t pt-6">
                             <label class="block text-sm font-semibold text-slate-700 mb-2">3. KHUSUS SCANNER (Otomatis)</label>
-                            <input type="text" v-model="uiState.bulk_scan_input" :disabled="!uiState.activeCartChannel" placeholder="Scan Produk -> Scan Resi" class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg">
+                            <input 
+    type="text" 
+    v-model="uiState.bulk_scan_input" 
+    :disabled="!uiState.activeCartChannel" 
+    placeholder="Scan Produk -> Scan Resi" 
+    class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg"
+    @keydown.enter.prevent 
+    autocomplete="off"
+>
                         </div>
                     </div>
                 </div>
