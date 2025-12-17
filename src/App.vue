@@ -7248,7 +7248,7 @@ watch(() => uiState.bulk_scan_input, (newValue) => {
 
         // Kosongkan input setelah diproses
         uiState.bulk_scan_input = '';
-    }, 800); // <-- Angka 400 ini kuncinya (Waktu tunggu)
+    }, 1200); // <-- Angka 400 ini kuncinya (Waktu tunggu)
 });
 
 // 2. Watcher untuk KASIR POS (Dengan Jeda Waktu)
@@ -7271,7 +7271,7 @@ watch(() => uiState.pos_scan_input, (newValue) => {
             // Panggil fungsi submit yang sudah ada
             handlePosSubmit();
         }
-    }, 800); 
+    }, 1200); 
 });
 
 watch(() => uiState.notesData.type, () => {
