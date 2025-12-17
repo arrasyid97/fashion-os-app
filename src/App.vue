@@ -8552,16 +8552,17 @@ watch(activePage, (newPage, oldPage) => {
                         </div>
 
                         <div class="border-t pt-6">
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">3. KHUSUS SCANNER (Otomatis)</label>
-                            <input 
-    type="text" 
-    v-model="uiState.bulk_scan_input" 
-    :disabled="!uiState.activeCartChannel" 
-    placeholder="Scan Produk -> Scan Resi" 
-    class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg"
-    @keydown.enter.prevent
-    @keyup.enter="prosesBulkScanManual"  autocomplete="off"
->
+    <label class="block text-sm font-semibold text-slate-700 mb-2">3. KHUSUS SCANNER (Otomatis)</label>
+    <input 
+        type="text" 
+        v-model="uiState.bulk_scan_input" 
+        :disabled="!uiState.activeCartChannel" 
+        placeholder="Scan Produk -> Scan Resi" 
+        class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg"
+        @keydown.enter.prevent
+        @keyup.enter="handleBulkEnter"  
+        autocomplete="off"
+    >
                         </div>
                     </div>
                 </div>
