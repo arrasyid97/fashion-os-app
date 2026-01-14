@@ -2324,19 +2324,29 @@ async function processBatchOrders() {
             batch.set(transactionRef, newTransactionData);
             newTransactions.push({ ...newTransactionData, id: transactionRef.id });
 
+            // --- BAGIAN INI DIMODIFIKASI ---
+            // Kode pengecekan stok (if newStock < 0 throw Error) DIHAPUS
+            // Agar stok bisa minus
             for (const item of order.items) {
                 const productRef = doc(db, "products", item.docId);
                 const productInState = state.produk.find(p => p.docId === item.docId);
+                
+                // Hitung stok baru (bisa negatif)
                 const newStock = (productInState.stokFisik || 0) - item.qty;
-                if (newStock < 0) throw new Error(`Stok untuk ${item.sku} tidak cukup!`);
+                
+                // Langsung update tanpa validasi
                 batch.update(productRef, { physical_stock: newStock });
             }
+            // -------------------------------
+            
             successCount++;
         }
         
         await batch.commit();
 
         state.transaksi.unshift(...newTransactions);
+        
+        // Update tampilan stok lokal (agar langsung terlihat minus)
         ordersToProcess.forEach(order => {
             order.items.forEach(item => {
                 const productInState = state.produk.find(p => p.docId === item.docId);
@@ -5000,34 +5010,33 @@ async function executeCompleteTransaction() {
     }
 
     const biayaList = [];
-let totalBiaya = 0;
+    let totalBiaya = 0;
 
-// --- [Langkah 1: Hitung Komisi Produk (Biaya Bisnis)] ---
-let totalKomisiProduk = 0;
+    // --- [Langkah 1: Hitung Komisi Produk (Biaya Bisnis)] ---
+    let totalKomisiProduk = 0;
 
-for (const item of activeCart.value) {
-    const modelId = item.model_id; 
-    const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
-    const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
+    for (const item of activeCart.value) {
+        const modelId = item.model_id;
+        const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
+        const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
 
-    if (commissionRate > 0) {
-        totalKomisiProduk += (commissionRate / 100) * (item.hargaJualAktual * item.qty);
+        if (commissionRate > 0) {
+            totalKomisiProduk += (commissionRate / 100) * (item.hargaJualAktual * item.qty);
+        }
     }
-}
 
-// Tambahkan Komisi ke Biaya Marketplace di Awal
-if (totalKomisiProduk > 0) {
-    biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
-    totalBiaya += totalKomisiProduk;
-}
-    // --- [AKHIR PERUBAIAN] ---
+    // Tambahkan Komisi ke Biaya Marketplace di Awal
+    if (totalKomisiProduk > 0) {
+        biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
+        totalBiaya += totalKomisiProduk;
+    }
+    // --- [AKHIR PERUBAHAN KOMISI] ---
 
-    // Biaya Marketplace lainnya (baris 'marketplace.komisi' sudah dihapus)
     if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
     if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
     if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
     if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
-    
+
     const newTransactionData = {
         marketplaceOrderId: uiState.pos_order_id,
         tanggal: new Date(),
@@ -5046,28 +5055,33 @@ if (totalKomisiProduk > 0) {
         const transactionRef = doc(collection(db, "transactions"));
         batch.set(transactionRef, newTransactionData);
 
+        // --- UPDATE PENGURANGAN STOK (DIPERBOLEHKAN MINUS) ---
         for (const item of activeCart.value) {
             const productRef = doc(db, "products", item.docId);
+            // Hitung stok baru (bisa negatif)
             const newStock = (item.stokFisik || 0) - item.qty;
+
+            /* KODE PENGECEKAN STOK DI HAPUS DI SINI 
+               Agar transaksi tetap jalan walau stok 0
+            */
             
-            if (newStock < 0) {
-                throw new Error(`Stok untuk produk ${item.nama} (${item.sku}) tidak mencukupi!`);
-            }
+            // Update stok fisik (akan jadi minus jika stok awal kurang)
             batch.update(productRef, { physical_stock: newStock });
         }
+        // -----------------------------------------------------
 
         await batch.commit();
 
-        
         await fetchTransactionAndReturnData(currentUser.value.uid, false);
-        
+
+        // Update tampilan lokal agar stok minus langsung terlihat tanpa refresh
         activeCart.value.forEach(item => {
             const productInState = state.produk.find(p => p.docId === item.docId);
             if (productInState) {
                 productInState.stokFisik -= item.qty;
             }
         });
-        
+
         state.carts[uiState.activeCartChannel] = [];
         uiState.pos_order_id = '';
         hideModal();
