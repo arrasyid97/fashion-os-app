@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, orderBy, limit, startAfter, documentId } from 'firebase/firestore'; 
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, orderBy, limit, startAfter, documentId, increment } from 'firebase/firestore'; 
 let bulkSearchDebounceTimer = null;
 let bulkScanTimer = null;
 let posScanTimer = null;
@@ -1870,34 +1870,56 @@ async function addPurchaseOrderItemToInventory(item) {
         return alert(`Error: Produk dengan SKU ${item.sku} tidak ditemukan di inventaris.`);
     }
 
+    // Validasi Qty
+    const qtyToAdd = parseInt(item.qty, 10) || 0;
+    if (qtyToAdd <= 0) return alert("Jumlah barang 0.");
+
     isSaving.value = true;
     try {
         const batch = writeBatch(db);
         
+        // --- PERBAIKAN UTAMA: Gunakan increment() ---
         const productRef = doc(db, "products", productInState.docId);
-        const newStock = (productInState.stokFisik || 0) + (item.qty || 0);
-        batch.update(productRef, { physical_stock: newStock });
+        batch.update(productRef, { physical_stock: increment(qtyToAdd) });
 
+        // Update status item di purchase_orders
         const orderRef = doc(db, "purchase_orders", item.orderId);
         const orderInState = state.purchaseOrders.find(o => o.id === item.orderId);
         
+        // Teknik aman update array object di Firestore
         const updatedProdukItems = JSON.parse(JSON.stringify(orderInState.produk));
-        const itemToUpdate = updatedProdukItems.find(p => p.sku === item.sku && p.hargaJual === item.hargaJual && p.qty === item.qty && !p.isInventoried);
+        // Cari index item yang cocok
+        const itemIndex = updatedProdukItems.findIndex(p => 
+            p.sku === item.sku && 
+            p.hargaJual === item.hargaJual && 
+            p.qty === item.qty && 
+            !p.isInventoried // Pastikan kita update yg belum masuk
+        );
         
-        if (itemToUpdate) {
-            itemToUpdate.isInventoried = true;
-        }
-        batch.update(orderRef, { produk: updatedProdukItems });
-        
-        await batch.commit();
+        if (itemIndex !== -1) {
+            updatedProdukItems[itemIndex].isInventoried = true;
+            batch.update(orderRef, { produk: updatedProdukItems });
+            
+            await batch.commit();
 
-        productInState.stokFisik = newStock;
-        const originalItemInOrder = orderInState.produk.find(p => p.sku === item.sku && p.hargaJual === item.hargaJual && p.qty === item.qty && !p.isInventoried);
-        if (originalItemInOrder) {
-            originalItemInOrder.isInventoried = true;
+            // Update State Lokal
+            productInState.stokFisik = (productInState.stokFisik || 0) + qtyToAdd;
+            
+             // Cari juga di inventoryPaginated dan update
+            const invItem = state.inventoryPaginated.find(p => p.docId === productInState.docId);
+            if (invItem) invItem.stokFisik = (invItem.stokFisik || 0) + qtyToAdd;
+
+            // Update tampilan di tabel riwayat supplier
+            const originalItemInOrder = orderInState.produk[itemIndex]; 
+            if (originalItemInOrder) {
+                originalItemInOrder.isInventoried = true;
+            }
+
+            alert('Stok berhasil dimasukkan ke inventaris!');
+        } else {
+             throw new Error("Item pesanan tidak ditemukan atau sudah diproses.");
         }
 
-        alert('Stok berhasil dimasukkan ke inventaris!');
     } catch (error) {
         console.error("Gagal memasukkan stok ke inventaris:", error);
         alert(`Gagal: ${error.message}`);
@@ -5731,48 +5753,62 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
         return;
     }
     const itemToUpdate = originalBatch.kainBahan[itemIndex];
+    
+    // Validasi Qty
+    const qtyToAdd = parseInt(itemToUpdate.aktualJadi, 10) || 0;
+    if (qtyToAdd <= 0) {
+        alert("Jumlah aktual jadi 0, tidak ada stok yang perlu dimasukkan.");
+        return;
+    }
 
+    isSaving.value = true; // Tambahkan loading state biar tombol tidak diklik 2x
     try {
         const batch = writeBatch(db);
         const batchRef = doc(db, "production_batches", batchId);
-
+        
+        // Cari produk berdasarkan SKU
         const matchingProduct = getProductBySku(itemToUpdate.sku);
 
         if (matchingProduct) {
             const productRef = doc(db, "products", matchingProduct.docId);
             const allocationRef = doc(db, "stock_allocations", matchingProduct.docId);
 
-            const newStock = (matchingProduct.stokFisik || 0) + (itemToUpdate.aktualJadi || 0);
+            // --- PERBAIKAN UTAMA: Gunakan increment() ---
+            // Jangan hitung stok manual (product.stokFisik + qty). Biarkan server yang hitung.
+            batch.update(productRef, { physical_stock: increment(qtyToAdd) });
 
+            // Update status di dokumen produksi
             const newKainBahan = JSON.parse(JSON.stringify(originalBatch.kainBahan));
             newKainBahan[itemIndex].isInventoried = true;
             batch.update(batchRef, { kainBahan: newKainBahan });
 
-            batch.update(productRef, { physical_stock: newStock });
-
-            const newAlokasi = {
-                userId: currentUser.value.uid
-            };
-            state.settings.marketplaces.forEach(mp => {
-                newAlokasi[mp.id] = (matchingProduct.stokAlokasi[mp.id] || 0);
-            });
-            batch.set(allocationRef, newAlokasi, { merge: true });
+            // Update alokasi (opsional: tambahkan ke alokasi default atau biarkan di gudang)
+            // Di sini kita hanya update timestamp userId agar trigger alokasi (jika ada) berjalan
+            batch.set(allocationRef, { userId: currentUser.value.uid }, { merge: true });
 
             await batch.commit();
 
+            // Update State Lokal (Tampilan)
             itemToUpdate.isInventoried = true;
             if (matchingProduct) {
-                matchingProduct.stokFisik = newStock;
+                // Update tampilan lokal manual agar user langsung lihat perubahannya
+                matchingProduct.stokFisik = (matchingProduct.stokFisik || 0) + qtyToAdd;
+                
+                // Cari juga di inventoryPaginated dan update
+                const invItem = state.inventoryPaginated.find(p => p.docId === matchingProduct.docId);
+                if (invItem) invItem.stokFisik = (invItem.stokFisik || 0) + qtyToAdd;
             }
 
             alert("Stok berhasil ditambahkan ke inventaris!");
 
         } else {
-            throw new Error("Produk yang cocok tidak ditemukan di Inventaris. Harap tambahkan produk ini secara manual di halaman Manajemen Inventaris terlebih dahulu.");
+            throw new Error("Produk dengan SKU ini tidak ditemukan di Inventaris Master. Harap buat produknya dulu.");
         }
     } catch (error) {
         console.error("Error saat memperbarui status inventaris:", error);
         alert(`Gagal memperbarui status inventaris. Detail: ${error.message}`);
+    } finally {
+        isSaving.value = false;
     }
 }
 
