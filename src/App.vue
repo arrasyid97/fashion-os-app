@@ -2346,20 +2346,13 @@ async function processBatchOrders() {
             batch.set(transactionRef, newTransactionData);
             newTransactions.push({ ...newTransactionData, id: transactionRef.id });
 
-            // --- BAGIAN INI DIMODIFIKASI ---
-            // Kode pengecekan stok (if newStock < 0 throw Error) DIHAPUS
-            // Agar stok bisa minus
+            // --- PERBAIKAN STOK SUPAYA TIDAK NGACO (PAKAI INCREMENT) ---
             for (const item of order.items) {
                 const productRef = doc(db, "products", item.docId);
-                const productInState = state.produk.find(p => p.docId === item.docId);
-                
-                // Hitung stok baru (bisa negatif)
-                const newStock = (productInState.stokFisik || 0) - item.qty;
-                
-                // Langsung update tanpa validasi
-                batch.update(productRef, { physical_stock: newStock });
+                // Gunakan increment negatif agar perhitungan terjadi di server
+                batch.update(productRef, { physical_stock: increment(-item.qty) });
             }
-            // -------------------------------
+            // -----------------------------------------------------------
             
             successCount++;
         }
@@ -2368,13 +2361,16 @@ async function processBatchOrders() {
 
         state.transaksi.unshift(...newTransactions);
         
-        // Update tampilan stok lokal (agar langsung terlihat minus)
+        // Update tampilan stok lokal
         ordersToProcess.forEach(order => {
             order.items.forEach(item => {
                 const productInState = state.produk.find(p => p.docId === item.docId);
                 if (productInState) {
                     productInState.stokFisik -= item.qty;
                 }
+                // Cari juga di inventoryPaginated dan update
+                const invItem = state.inventoryPaginated.find(p => p.docId === item.docId);
+                if (invItem) invItem.stokFisik -= item.qty;
             });
         });
 
@@ -2385,16 +2381,6 @@ async function processBatchOrders() {
     } finally {
         uiState.is_processing_scan = false;
     }
-}
-
-function generateUniqueCode() {
-    const numbers = Math.floor(10 + Math.random() * 90); // 2 angka acak
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    let result = '';
-    for (let i = 0; i < 3; i++) {
-        result += letters.charAt(Math.floor(Math.random() * letters.length));
-    }
-    return `${numbers}${result}`;
 }
 
 function showNotesModal() {
@@ -5034,9 +5020,7 @@ async function executeCompleteTransaction() {
     const biayaList = [];
     let totalBiaya = 0;
 
-    // --- [Langkah 1: Hitung Komisi Produk (Biaya Bisnis)] ---
     let totalKomisiProduk = 0;
-
     for (const item of activeCart.value) {
         const modelId = item.model_id;
         const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
@@ -5047,12 +5031,10 @@ async function executeCompleteTransaction() {
         }
     }
 
-    // Tambahkan Komisi ke Biaya Marketplace di Awal
     if (totalKomisiProduk > 0) {
         biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
         totalBiaya += totalKomisiProduk;
     }
-    // --- [AKHIR PERUBAHAN KOMISI] ---
 
     if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
     if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
@@ -5077,37 +5059,34 @@ async function executeCompleteTransaction() {
         const transactionRef = doc(collection(db, "transactions"));
         batch.set(transactionRef, newTransactionData);
 
-        // --- UPDATE PENGURANGAN STOK (DIPERBOLEHKAN MINUS) ---
+        // --- PERBAIKAN STOK SUPAYA TIDAK NGACO (PAKAI INCREMENT) ---
         for (const item of activeCart.value) {
             const productRef = doc(db, "products", item.docId);
-            // Hitung stok baru (bisa negatif)
-            const newStock = (item.stokFisik || 0) - item.qty;
-
-            /* KODE PENGECEKAN STOK DI HAPUS DI SINI 
-               Agar transaksi tetap jalan walau stok 0
-            */
-            
-            // Update stok fisik (akan jadi minus jika stok awal kurang)
-            batch.update(productRef, { physical_stock: newStock });
+            // increment(-qty) artinya kurangi stok langsung di server
+            // Tidak peduli stok sekarang berapa, dia akan dikurangi.
+            batch.update(productRef, { physical_stock: increment(-item.qty) });
         }
-        // -----------------------------------------------------
+        // -----------------------------------------------------------
 
         await batch.commit();
 
-        await fetchTransactionAndReturnData(currentUser.value.uid, false);
-
-        // Update tampilan lokal agar stok minus langsung terlihat tanpa refresh
+        // Update tampilan lokal agar user melihat perubahan tanpa refresh
         activeCart.value.forEach(item => {
             const productInState = state.produk.find(p => p.docId === item.docId);
             if (productInState) {
                 productInState.stokFisik -= item.qty;
             }
+             // Cari juga di inventoryPaginated dan update
+             const invItem = state.inventoryPaginated.find(p => p.docId === item.docId);
+             if (invItem) invItem.stokFisik -= item.qty;
         });
+        
+        await fetchTransactionAndReturnData(currentUser.value.uid, false);
 
         state.carts[uiState.activeCartChannel] = [];
         uiState.pos_order_id = '';
         hideModal();
-        alert("Transaksi berhasil disimpan ke Database!");
+        alert("Transaksi berhasil disimpan! Stok telah dipotong otomatis.");
 
     } catch (error) {
         console.error("Error saat menyimpan transaksi:", error);
