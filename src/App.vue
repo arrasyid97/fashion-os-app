@@ -1860,70 +1860,81 @@ async function addSupplierPayment() {
 }
 
 async function addPurchaseOrderItemToInventory(item) {
+    // 1. CEK KUNCI (Cegah double click saat lag)
+    if (isSaving.value) return;
+
     if (!currentUser.value) return alert("Anda harus login.");
-    if (!confirm(`Anda yakin ingin memasukkan ${item.qty} pcs produk ${item.sku} ke inventaris? Stok akan bertambah.`)) {
+
+    // 2. CEK STATUS ITEM
+    if (item.isInventoried) {
+        return; 
+    }
+
+    if (!confirm(`Masukan ${item.qty} pcs ke inventaris?`)) {
         return;
     }
 
     const productInState = state.produk.find(p => p.sku === item.sku);
     if (!productInState) {
-        return alert(`Error: Produk dengan SKU ${item.sku} tidak ditemukan di inventaris.`);
+        return alert(`Error: Produk SKU ${item.sku} tidak ditemukan.`);
     }
 
-    // Validasi Qty
     const qtyToAdd = parseInt(item.qty, 10) || 0;
     if (qtyToAdd <= 0) return alert("Jumlah barang 0.");
 
+    // KUNCI TOMBOL DETIK INI JUGA
     isSaving.value = true;
+
     try {
         const batch = writeBatch(db);
         
-        // --- PERBAIKAN UTAMA: Gunakan increment() ---
+        // Gunakan INCREMENT (Server Google yang hitung)
         const productRef = doc(db, "products", productInState.docId);
         batch.update(productRef, { physical_stock: increment(qtyToAdd) });
 
-        // Update status item di purchase_orders
         const orderRef = doc(db, "purchase_orders", item.orderId);
         const orderInState = state.purchaseOrders.find(o => o.id === item.orderId);
         
-        // Teknik aman update array object di Firestore
+        // Siapkan update status item di dalam pesanan
         const updatedProdukItems = JSON.parse(JSON.stringify(orderInState.produk));
-        // Cari index item yang cocok
         const itemIndex = updatedProdukItems.findIndex(p => 
             p.sku === item.sku && 
             p.hargaJual === item.hargaJual && 
             p.qty === item.qty && 
-            !p.isInventoried // Pastikan kita update yg belum masuk
+            !p.isInventoried
         );
         
         if (itemIndex !== -1) {
             updatedProdukItems[itemIndex].isInventoried = true;
             batch.update(orderRef, { produk: updatedProdukItems });
             
+            // EKSEKUSI KE DATABASE
             await batch.commit();
 
-            // Update State Lokal
+            // --- UPDATE TAMPILAN (Agar terasa cepat) ---
             productInState.stokFisik = (productInState.stokFisik || 0) + qtyToAdd;
             
-             // Cari juga di inventoryPaginated dan update
             const invItem = state.inventoryPaginated.find(p => p.docId === productInState.docId);
             if (invItem) invItem.stokFisik = (invItem.stokFisik || 0) + qtyToAdd;
 
-            // Update tampilan di tabel riwayat supplier
+            // Update item spesifik di tampilan agar tombol hilang
             const originalItemInOrder = orderInState.produk[itemIndex]; 
             if (originalItemInOrder) {
                 originalItemInOrder.isInventoried = true;
             }
+            // Update juga view item yang sedang dirender
+            item.isInventoried = true;
 
-            alert('Stok berhasil dimasukkan ke inventaris!');
+            alert('Berhasil! Stok masuk.');
         } else {
-             throw new Error("Item pesanan tidak ditemukan atau sudah diproses.");
+             throw new Error("Item tidak ditemukan atau sudah diproses.");
         }
 
     } catch (error) {
-        console.error("Gagal memasukkan stok ke inventaris:", error);
+        console.error("Gagal update stok:", error);
         alert(`Gagal: ${error.message}`);
     } finally {
+        // BUKA KUNCI
         isSaving.value = false;
     }
 }
@@ -5718,11 +5729,11 @@ async function submitEditProduksiBatch() {
 // KODE BARU
 
 async function updateProductionInventoryStatus(batchId, itemIndex) {
+    // 1. CEK STATUS KUNCI (Agar tidak bisa diklik saat sedang loading)
+    if (isSaving.value) return; 
+
     if (!currentUser.value) {
         alert("Anda harus login untuk mengelola inventaris.");
-        return;
-    }
-    if (!confirm("Anda yakin ingin menandai item ini sebagai sudah masuk inventaris? Stok master akan bertambah.")) {
         return;
     }
 
@@ -5732,61 +5743,73 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
         return;
     }
     const itemToUpdate = originalBatch.kainBahan[itemIndex];
+
+    // 2. CEK STATUS ITEM (Agar tidak diproses ulang jika data lokal sudah update)
+    if (itemToUpdate.isInventoried) {
+        return; // Diam saja, jangan muncul alert biar tidak mengganggu flow
+    }
     
-    // Validasi Qty
+    // Konfirmasi
+    if (!confirm("Masukan stok ke inventaris?")) {
+        return;
+    }
+    
     const qtyToAdd = parseInt(itemToUpdate.aktualJadi, 10) || 0;
     if (qtyToAdd <= 0) {
-        alert("Jumlah aktual jadi 0, tidak ada stok yang perlu dimasukkan.");
+        alert("Jumlah 0, stok tidak bertambah.");
         return;
     }
 
-    isSaving.value = true; // Tambahkan loading state biar tombol tidak diklik 2x
+    // --- KUNCI UTAMA (INI YANG MEMBUAT AMAN) ---
+    // Kita set loading TRUE detik ini juga. 
+    // Jadi walaupun HP/Laptop lag, klik kedua tidak akan tembus ke bawah.
+    isSaving.value = true; 
+
     try {
         const batch = writeBatch(db);
         const batchRef = doc(db, "production_batches", batchId);
-        
-        // Cari produk berdasarkan SKU
         const matchingProduct = getProductBySku(itemToUpdate.sku);
 
         if (matchingProduct) {
             const productRef = doc(db, "products", matchingProduct.docId);
             const allocationRef = doc(db, "stock_allocations", matchingProduct.docId);
 
-            // --- PERBAIKAN UTAMA: Gunakan increment() ---
-            // Jangan hitung stok manual (product.stokFisik + qty). Biarkan server yang hitung.
+            // Gunakan INCREMENT agar hitungan dilakukan di server Google (Pasti Akurat)
             batch.update(productRef, { physical_stock: increment(qtyToAdd) });
 
-            // Update status di dokumen produksi
+            // Tandai item ini sudah masuk (Update Dokumen Produksi)
             const newKainBahan = JSON.parse(JSON.stringify(originalBatch.kainBahan));
             newKainBahan[itemIndex].isInventoried = true;
             batch.update(batchRef, { kainBahan: newKainBahan });
 
-            // Update alokasi (opsional: tambahkan ke alokasi default atau biarkan di gudang)
-            // Di sini kita hanya update timestamp userId agar trigger alokasi (jika ada) berjalan
+            // Update timestamp alokasi
             batch.set(allocationRef, { userId: currentUser.value.uid }, { merge: true });
 
+            // EKSEKUSI KE DATABASE
             await batch.commit();
 
-            // Update State Lokal (Tampilan)
-            itemToUpdate.isInventoried = true;
+            // --- UPDATE TAMPILAN (OPTIMISTIC UI) ---
+            // Langsung update layar agar user melihat hasilnya
+            itemToUpdate.isInventoried = true; // Tombol akan hilang/berubah
+            
             if (matchingProduct) {
-                // Update tampilan lokal manual agar user langsung lihat perubahannya
                 matchingProduct.stokFisik = (matchingProduct.stokFisik || 0) + qtyToAdd;
-                
-                // Cari juga di inventoryPaginated dan update
+                // Update juga di tabel inventaris paginasi
                 const invItem = state.inventoryPaginated.find(p => p.docId === matchingProduct.docId);
                 if (invItem) invItem.stokFisik = (invItem.stokFisik || 0) + qtyToAdd;
             }
 
-            alert("Stok berhasil ditambahkan ke inventaris!");
+            // Pesan Sukses
+            alert("Berhasil! Stok bertambah.");
 
         } else {
-            throw new Error("Produk dengan SKU ini tidak ditemukan di Inventaris Master. Harap buat produknya dulu.");
+            throw new Error("Produk SKU ini belum terdaftar di Inventaris.");
         }
     } catch (error) {
-        console.error("Error saat memperbarui status inventaris:", error);
-        alert(`Gagal memperbarui status inventaris. Detail: ${error.message}`);
+        console.error("Error update stok:", error);
+        alert(`Gagal: ${error.message}`);
     } finally {
+        // BUKA KUNCI SETELAH SEMUA SELESAI
         isSaving.value = false;
     }
 }
