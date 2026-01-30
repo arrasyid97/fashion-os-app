@@ -3039,6 +3039,9 @@ function removeProgram(programId) {
 }
 
 async function submitStockAdjustment() {
+    // --- 1. GEMBOK PENGAMAN: Cegah Double Click ---
+    if (isSaving.value) return;
+
     const form = uiState.modalData;
     if (!form.sku || !form.qty || form.qty <= 0 || !form.alasan || !form.tipe) {
         alert('Semua kolom wajib diisi dan jumlah harus lebih dari 0.');
@@ -3046,9 +3049,12 @@ async function submitStockAdjustment() {
     }
 
     const skuToUpdate = form.sku.toUpperCase();
-    const quantity = form.qty;
-    const adjustmentType = form.tipe;
+    const quantity = parseInt(form.qty, 10); // Pastikan jadi angka integer
+    const adjustmentType = form.tipe; // 'penambahan' atau 'pengurangan'
     let hppLoss = 0;
+
+    // KUNCI TOMBOL
+    isSaving.value = true;
 
     try {
         const productsCollection = collection(db, "products");
@@ -3063,30 +3069,39 @@ async function submitStockAdjustment() {
         const productId = productDocSnapshot.id;
         const productRef = doc(db, "products", productId);
         
-        // --- PERBAIKAN UTAMA DIMULAI DI SINI ---
-
-        // Cari produk di kedua state untuk nanti diperbarui setelah transaksi berhasil
+        // Cari produk di state lokal untuk update tampilan
         const productInState = state.produk.find(p => p.docId === productId);
         const inventoryProductInState = state.inventoryPaginated.find(p => p.docId === productId);
 
         await runTransaction(db, async (transaction) => {
             const productDoc = await transaction.get(productRef);
-            const currentStock = productDoc.data().physical_stock || 0;
-            let newStock;
+            if (!productDoc.exists()) throw new Error("Dokumen produk hilang!");
+
+            const currentData = productDoc.data();
+            const currentStock = currentData.physical_stock || 0;
+
+            // --- LOGIKA UTAMA: Gunakan INCREMENT ---
+            let adjustmentValue = 0;
 
             if (adjustmentType === 'penambahan') {
-                newStock = currentStock + quantity;
-            } else { // 'pengurangan'
-                newStock = currentStock - quantity;
-                if (newStock < 0) {
+                adjustmentValue = quantity;
+            } else { // pengurangan
+                // Cek stok cukup atau tidak (Opsional, jika ingin membolehkan minus, hapus if ini)
+                if (currentStock < quantity) {
                     throw new Error(`Stok tidak cukup. Stok saat ini: ${currentStock}, akan dikurangi: ${quantity}.`);
                 }
-                hppLoss = (productDoc.data().hpp || 0) * quantity;
+                adjustmentValue = -quantity; // Negatif
+                
+                // Hitung kerugian finansial
+                hppLoss = (currentData.hpp || 0) * quantity;
             }
 
-            transaction.update(productRef, { physical_stock: newStock });
+            // Update stok menggunakan increment (Server Side Calculation)
+            transaction.update(productRef, { physical_stock: increment(adjustmentValue) });
 
+            // Catat pengeluaran jika ada kerugian (pengurangan stok karena rusak/hilang)
             if (adjustmentType === 'pengurangan' && hppLoss > 0) {
+                const expenseRef = doc(collection(db, "keuangan"));
                 const expenseData = {
                     kategori: 'Kerugian Stok',
                     jumlah: hppLoss,
@@ -3095,33 +3110,27 @@ async function submitStockAdjustment() {
                     userId: currentUser.value.uid,
                     tanggal: new Date()
                 };
-                const expenseRef = doc(collection(db, "keuangan"));
                 transaction.set(expenseRef, expenseData);
-                state.keuangan.push({ id: expenseRef.id, ...expenseData });
+                // Kita push ke state lokal nanti setelah transaksi sukses
             }
         });
 
-        // Perbarui state lokal setelah transaksi selesai
-        
-        // 1. Perbarui state.produk (untuk konsistensi di halaman lain)
+        // --- UPDATE TAMPILAN (State Lokal) ---
+        // Update tanpa refresh halaman
         if (productInState) {
-            if (adjustmentType === 'penambahan') {
-                productInState.stokFisik += quantity;
-            } else {
-                productInState.stokFisik -= quantity;
-            }
+            if (adjustmentType === 'penambahan') productInState.stokFisik += quantity;
+            else productInState.stokFisik -= quantity;
         }
         
-        // 2. Perbarui state.inventoryPaginated (agar UI di halaman Inventaris langsung berubah)
         if (inventoryProductInState) {
-             if (adjustmentType === 'penambahan') {
-                inventoryProductInState.stokFisik += quantity;
-            } else {
-                inventoryProductInState.stokFisik -= quantity;
-            }
+             if (adjustmentType === 'penambahan') inventoryProductInState.stokFisik += quantity;
+             else inventoryProductInState.stokFisik -= quantity;
         }
 
-        // --- AKHIR PERBAIKAN ---
+        // Jika ada kerugian, tambahkan ke tabel keuangan lokal (kosmetik)
+        if (adjustmentType === 'pengurangan' && hppLoss > 0) {
+            await fetchKeuanganData(); // Reload data keuangan biar aman
+        }
 
         alert(`Stok untuk SKU ${skuToUpdate} berhasil disesuaikan.`);
         hideModal();
@@ -3129,6 +3138,9 @@ async function submitStockAdjustment() {
     } catch (error) {
         console.error("Error dalam transaksi penyesuaian stok:", error);
         alert(`Gagal memperbarui stok: ${error.message}`);
+    } finally {
+        // BUKA KUNCI
+        isSaving.value = false;
     }
 }
 
@@ -6728,6 +6740,9 @@ async function saveModelProdukEdit() {
 }
 
 async function saveStockAllocation() {
+    // --- 1. GEMBOK PENGAMAN ---
+    if (isSaving.value) return;
+
     if (!currentUser.value) return alert("Anda harus login untuk menyimpan perubahan.");
     const modalData = uiState.modalData;
 
@@ -6741,35 +6756,35 @@ async function saveStockAllocation() {
     const userId = currentUser.value.uid;
     const cleanAllocationData = JSON.parse(JSON.stringify(product.stokAlokasi));
     
+    // KUNCI TOMBOL
+    isSaving.value = true;
+
     try {
-        isSaving.value = true;
         const batch = writeBatch(db);
 
         const productRef = doc(db, "products", original.docId);
+        
+        // Update Stok Fisik (Override sesuai inputan user di form)
         batch.update(productRef, { physical_stock: product.stokFisik || 0 });
         
+        // Update Alokasi
         const allocationRef = doc(db, "stock_allocations", original.docId);
         batch.set(allocationRef, { ...cleanAllocationData, userId: userId }, { merge: true });
 
         await batch.commit();
 
-        // --- PERBAIKAN DIMULAI DI SINI ---
-
-        // 1. Perbarui state.produk (untuk konsistensi di halaman HPP & Promosi)
+        // Update State Lokal
         const index = state.produk.findIndex(p => p.docId === original.docId);
         if (index !== -1) {
             state.produk[index].stokFisik = product.stokFisik || 0;
             state.produk[index].stokAlokasi = { ...product.stokAlokasi };
         }
 
-        // 2. Perbarui state.inventoryPaginated (agar UI di halaman Inventaris langsung berubah)
         const inventoryIndex = state.inventoryPaginated.findIndex(p => p.docId === original.docId);
         if (inventoryIndex !== -1) {
             state.inventoryPaginated[inventoryIndex].stokFisik = product.stokFisik || 0;
             state.inventoryPaginated[inventoryIndex].stokAlokasi = { ...product.stokAlokasi };
         }
-
-        // --- AKHIR PERBAIKAN ---
 
         const targetModel = state.settings.modelProduk.find(m => m.id === original.model_id);
         if (targetModel) {
@@ -6783,6 +6798,7 @@ async function saveStockAllocation() {
         console.error("Error menyimpan alokasi stok:", error);
         alert(`Gagal menyimpan perubahan stok: ${error.message}`);
     } finally {
+        // BUKA KUNCI
         isSaving.value = false;
     }
 }
