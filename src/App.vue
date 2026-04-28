@@ -3226,12 +3226,18 @@ function filterDataByDate(data, filterType, startDateStr, endDateStr, startMonth
         if (!item.tanggal) return false;
         
         // KRITIS: Pastikan konversi ke Date dan waktu di-reset
-        const itemDate = (item.tanggal instanceof Date) ? new Date(item.tanggal) : new Date(item.tanggal);
+        const itemDate = item.tanggal?.seconds 
+    ? new Date(item.tanggal.seconds * 1000) 
+    : new Date(item.tanggal);
         itemDate.setHours(0, 0, 0, 0); 
 
         switch (filterType) {
-            case 'today':
-                return itemDate.toDateString() === today.toDateString();
+            case 'today': {
+    const t = new Date(); // Ambil waktu detik ini
+    return itemDate.getDate() === t.getDate() &&
+           itemDate.getMonth() === t.getMonth() &&
+           itemDate.getFullYear() === t.getFullYear();
+}
 
             case 'last_7_days': {
                 const sevenDaysAgo = new Date(today);
