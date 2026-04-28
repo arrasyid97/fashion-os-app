@@ -3422,13 +3422,12 @@ const dashboardKpis = computed(() => {
         totalBiayaOperasional: 0, 
         totalNilaiRetur: 0,
         pemasukanLain: 0,
-        danaBelumCair: 0 // <-- KPI BARU UNTUK DANA MENGAMBANG
+        danaBelumCair: 0, // Nilai payout (HPP + Laba Bersih)
+        qtyBelumCair: 0  // Total QTY barang gantung
     };
 
     if (isLongTermFilter && state.summaryData && Object.keys(state.summaryData).length > 0) {
-        // --- LOGIKA UNTUK FILTER JANGKA PANJANG ---
-        // Catatan: summaryData berasal dari Cloud Functions. 
-        // Secara default data lama di summary akan dianggap sudah cair.
+        // --- LOGIKA JANGKA PANJANG (Data dari Cloud Functions) ---
         const processSummary = (summary) => {
             if (!summary) return;
             kpis.omsetKotor += summary.omsetKotor || 0;
@@ -3469,40 +3468,43 @@ const dashboardKpis = computed(() => {
                 }
             }
         }
-        
-        // Perhitungan Saldo Kas Jangka Panjang
         kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
 
     } else {
-        // --- LOGIKA UNTUK FILTER JANGKA PENDEK (REAL-TIME) ---
+        // --- LOGIKA JANGKA PENDEK (Real-time dari transaksi mentah) ---
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
         
-        // Inisialisasi variabel bantu
         let omsetKotorAwal = 0;
         let totalDiskonAwal = 0;
         let totalHppTerjualAwal = 0;
         let totalBiayaTransaksiAwal = 0;
         let danaBelumCair = 0;
+        let qtyBelumCair = 0;
 
-        // LOOP TRANSAKSI DENGAN LOGIKA PENCAIRAN
         (transaksi || []).forEach(trx => {
-            // LOGIKA AMAN UNTUK PENGGUNA LAIN: 
-            // Jika statusPencairan tidak ada (data lama), dianggap 'Sudah Cair'
+            const totalHppTrx = (trx.items || []).reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
+            const totalBiayaTrx = trx.biaya?.total || 0;
+            const trxQty = (trx.items || []).reduce((s, i) => s + i.qty, 0);
+            
+            // Cek apakah data lama atau sudah dikonfirmasi cair
             const isCair = !trx.statusPencairan || trx.statusPencairan === 'Sudah Cair';
 
             if (isCair) {
                 omsetKotorAwal += (trx.subtotal || 0);
                 totalDiskonAwal += (trx.diskon?.totalDiscount || 0);
-                totalHppTerjualAwal += (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0);
-                totalBiayaTransaksiAwal += (trx.biaya?.total || 0);
+                totalHppTerjualAwal += totalHppTrx;
+                totalBiayaTransaksiAwal += totalBiayaTrx;
             } else {
-                // Masukkan ke Dana Mengambang jika statusnya 'Belum Cair'
-                danaBelumCair += (trx.total || 0);
+                // --- PERBAIKAN DI SINI ---
+                // Dana Belum Cair = Omset Bersih - Biaya Marketplace (Alias HPP + Untung)
+                const payout = (trx.total || 0) - totalBiayaTrx;
+                danaBelumCair += payout;
+                qtyBelumCair += trxQty;
             }
         });
 
-        // Simpan dana belum cair ke kpis
         kpis.danaBelumCair = danaBelumCair;
+        kpis.qtyBelumCair = qtyBelumCair;
 
         // Hitung Retur (Sesuai kode asli Anda)
         let totalNilaiReturGross = 0;
@@ -3522,7 +3524,6 @@ const dashboardKpis = computed(() => {
             });
         });
 
-        // Perhitungan Final KPI (Hanya dari data yang sudah CAIR)
         kpis.totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
         const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
 
@@ -3538,7 +3539,6 @@ const dashboardKpis = computed(() => {
         kpis.saldoKas = (kpis.omsetBersih + pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
     }
     
-    // Stok tetap dihitung global (Real-time)
     kpis.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     kpis.totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
@@ -8507,11 +8507,14 @@ watch(activePage, (newPage, oldPage) => {
             </svg>
         </div>
         <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-medium text-slate-500">Dana Gantung (Belum Cair)</h3>
+            <h3 class="text-sm font-medium text-slate-500">Dana Gantung (HPP + Laba)</h3>
             <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">{{ formatCurrency(dashboardKpis.danaBelumCair) }}</p>
+            <p class="text-xs text-slate-500 mt-1 font-medium italic">
+                Total: <span class="text-slate-800 font-bold">{{ formatNumber(dashboardKpis.qtyBelumCair) }} pcs</span> belum cair
+            </p>
         </div>
     </div>
-    <button @click="showModal('kpiHelp', {title: 'Dana Gantung', description: 'Total uang dari pesanan yang sudah Anda kirim tapi dananya belum masuk/dikonfirmasi cair dari marketplace.'})" class="help-icon-button">?</button>
+    <button @click="showModal('kpiHelp', {title: 'Dana Gantung (Piutang)', description: 'Ini adalah estimasi uang bersih (HPP + Laba) yang akan Anda terima dari marketplace. Biaya administrasi sudah dipotong dari angka ini.'})" class="help-icon-button">?</button>
 </div>
 
     <div v-if="activePage === 'transaksi'">
