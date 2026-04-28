@@ -8510,7 +8510,7 @@ watch(activePage, (newPage, oldPage) => {
             <h3 class="text-sm font-medium text-slate-500">Dana Gantung (HPP + Laba)</h3>
             <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">{{ formatCurrency(dashboardKpis.danaBelumCair) }}</p>
             <p class="text-xs text-slate-500 mt-1 font-medium italic">
-                Total: <span class="text-slate-800 font-bold">{{ formatNumber(dashboardKpis.qtyBelumCair) }} pcs</span> belum cair
+                Total: <span class="text-slate-800 font-bold">{{ formatNumber(dashboardKpis.qtyBelumCair) }} qty</span> belum cair
             </p>
         </div>
     </div>
