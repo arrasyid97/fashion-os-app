@@ -15136,40 +15136,75 @@ watch(activePage, (newPage, oldPage) => {
             </div>
 
             <div class="mb-4">
-                <input v-model="searchCatalogQuery" type="text" placeholder="Cari SKU..." class="w-full p-2 border rounded-lg">
-            </div>
-            
-            <div class="overflow-y-auto max-h-[400px]">
-                </div>
-
-            <div class="mt-6 flex justify-end gap-3">
-                <button @click="hideModal" class="px-4 py-2 border rounded-lg">Batal</button>
-                <button @click="saveMasterHargaSupplier" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">Simpan Semua</button>
-            </div>
-        </div>
-    </div>
-
-    <div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-            <h3 class="text-lg font-bold text-slate-800 mb-2">Konfirmasi Aksi</h3>
-            <p class="text-sm text-slate-600 mb-4">Untuk melanjutkan, masukkan PIN keamanan Anda.</p>
-            <form @submit.prevent="confirmPinAndToggle">
                 <input 
-                    type="password" 
-                    v-model="uiState.pinConfirmInput" 
-                    placeholder="Masukkan PIN" 
-                    class="w-full p-2 border rounded-md text-center text-lg mb-2"
-                >
-                <p v-if="uiState.pinConfirmError" class="text-red-500 text-xs mb-2">{{ uiState.pinConfirmError }}</p>
-                <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-                    <button type="button" @click="uiState.isPinConfirmModalVisible = false" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                    <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Konfirmasi</button>
-                </div>
-            </form>
+                    v-model="searchCatalogQuery" 
+                    type="text" 
+                    placeholder="Cari SKU atau Nama..." 
+                    class="w-full p-3 border rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+            </div>
+
+            <div class="overflow-y-auto max-h-[400px] border rounded-xl">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-slate-100 sticky top-0">
+                        <tr>
+                            <th class="p-3 font-bold text-slate-600">Produk / SKU</th>
+                            <th class="p-3 font-bold text-slate-600 w-40 text-right">Harga Beli</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <tr v-for="p in filteredCatalog" :key="p.id || p.docId" class="hover:bg-slate-50">
+                            <td class="p-3 text-slate-700">
+                                <p class="font-bold">{{ p.namaModel || 'Tanpa Nama' }}</p>
+                                <p class="text-xs font-mono text-slate-400">{{ p.sku }}</p>
+                            </td>
+                            <td class="p-3">
+                                <input 
+                                    type="number" 
+                                    v-model.number="p.hargaBeli" 
+                                    class="w-full p-2 border rounded text-right font-bold text-indigo-600 outline-none focus:bg-indigo-50"
+                                    placeholder="0"
+                                />
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3 border-t pt-4">
+                <button @click="hideModal" class="px-6 py-2 border rounded-lg hover:bg-slate-50">Batal</button>
+                <button @click="saveMasterHargaSupplier" :disabled="isSaving" class="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700">
+                    {{ isSaving ? 'Menyimpan...' : 'Simpan Semua Harga' }}
+                </button>
+            </div>
         </div>
     </div>
 
-  </div> </template>
+<div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+        <h3 class="text-lg font-bold text-slate-800 mb-2">Konfirmasi Aksi</h3>
+        <p class="text-sm text-slate-600 mb-4">Untuk melanjutkan, masukkan PIN keamanan Anda.</p>
+        <form @submit.prevent="confirmPinAndToggle">
+            <input 
+                type="password" 
+                v-model="uiState.pinConfirmInput" 
+                placeholder="Masukkan PIN" 
+                class="w-full p-2 border rounded-md text-center text-lg mb-2"
+            >
+            <p v-if="uiState.pinConfirmError" class="text-red-500 text-xs mb-2">{{ uiState.pinConfirmError }}</p>
+            <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <button type="button" @click="uiState.isPinConfirmModalVisible = false" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Konfirmasi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+
+
+</div>
+</template>
 
 <style scoped>
 .help-icon-button {
