@@ -2350,6 +2350,7 @@ async function processBatchOrders() {
                 channel: marketplace.name,
                 channelId: uiState.activeCartChannel,
                 biaya: { rincian: biayaList, total: totalBiaya },
+                statusPencairan: 'Belum Cair',
                 userId: currentUser.value.uid
             };
 
@@ -3410,14 +3411,24 @@ const dashboardKpis = computed(() => {
     const isLongTermFilter = ['by_month_range', 'this_year', 'all_time', 'by_year_range'].includes(uiState.dashboardDateFilter);
 
     let kpis = {
-        saldoKas: 0, omsetBersih: 0, labaKotor: 0, labaBersih: 0, omsetKotor: 0,
-        totalDiskon: 0, totalHppTerjual: 0, totalBiayaTransaksi: 0,
-        totalBiayaOperasional: 0, totalNilaiRetur: 0,
-        pemasukanLain: 0 // Properti baru untuk menampung pemasukan lain
+        saldoKas: 0, 
+        omsetBersih: 0, 
+        labaKotor: 0, 
+        labaBersih: 0, 
+        omsetKotor: 0,
+        totalDiskon: 0, 
+        totalHppTerjual: 0, 
+        totalBiayaTransaksi: 0,
+        totalBiayaOperasional: 0, 
+        totalNilaiRetur: 0,
+        pemasukanLain: 0,
+        danaBelumCair: 0 // <-- KPI BARU UNTUK DANA MENGAMBANG
     };
 
     if (isLongTermFilter && state.summaryData && Object.keys(state.summaryData).length > 0) {
         // --- LOGIKA UNTUK FILTER JANGKA PANJANG ---
+        // Catatan: summaryData berasal dari Cloud Functions. 
+        // Secara default data lama di summary akan dianggap sudah cair.
         const processSummary = (summary) => {
             if (!summary) return;
             kpis.omsetKotor += summary.omsetKotor || 0;
@@ -3429,21 +3440,20 @@ const dashboardKpis = computed(() => {
             kpis.totalBiayaOperasional += summary.biayaOperasional || 0;
             kpis.labaBersih += summary.labaBersihOperasional || 0;
             kpis.totalNilaiRetur += summary.nilaiRetur || 0;
-            kpis.pemasukanLain += summary.pemasukanLain || 0; // <-- PERBAIKAN: Ambil data pemasukanLain
+            kpis.pemasukanLain += summary.pemasukanLain || 0;
         };
 
         if (uiState.dashboardDateFilter === 'by_month_range') {
-    // const year = uiState.dashboardStartYear; // BARIS INI DIHAPUS KARENA TIDAK DIGUNAKAN
-    for (let y = uiState.dashboardStartYear; y <= uiState.dashboardEndYear; y++) {
-        const startMonth = (y === uiState.dashboardStartYear) ? uiState.dashboardStartMonth : 1;
-        const endMonth = (y === uiState.dashboardEndYear) ? uiState.dashboardEndMonth : 12;
-        for (let m = startMonth; m <= endMonth; m++) {
-            const monthStr = m.toString().padStart(2, '0');
-            const summary = state.summaryData?.[`summary_${y}`]?.months?.[monthStr];
-            processSummary(summary);
-        }
-    }
-} else if (uiState.dashboardDateFilter === 'this_year') {
+            for (let y = uiState.dashboardStartYear; y <= uiState.dashboardEndYear; y++) {
+                const startMonth = (y === uiState.dashboardStartYear) ? uiState.dashboardStartMonth : 1;
+                const endMonth = (y === uiState.dashboardEndYear) ? uiState.dashboardEndMonth : 12;
+                for (let m = startMonth; m <= endMonth; m++) {
+                    const monthStr = m.toString().padStart(2, '0');
+                    const summary = state.summaryData?.[`summary_${y}`]?.months?.[monthStr];
+                    processSummary(summary);
+                }
+            }
+        } else if (uiState.dashboardDateFilter === 'this_year') {
             const year = new Date().getFullYear();
             const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
             processSummary(summary);
@@ -3460,17 +3470,41 @@ const dashboardKpis = computed(() => {
             }
         }
         
-        // --- PERBAIKAN PERHITUNGAN SALDO KAS ---
+        // Perhitungan Saldo Kas Jangka Panjang
         kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
 
     } else {
-        // --- LOGIKA UNTUK FILTER JANGKA PENDEK (SUDAH BENAR) ---
+        // --- LOGIKA UNTUK FILTER JANGKA PENDEK (REAL-TIME) ---
         const { transaksi, keuangan, retur } = dashboardFilteredData.value;
         
-        const omsetKotorAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.subtotal || 0), 0);
-        const totalDiskonAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.diskon?.totalDiscount || 0), 0);
-        const totalHppTerjualAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0), 0);
-        const totalBiayaTransaksiAwal = (transaksi || []).reduce((sum, trx) => sum + (trx.biaya?.total || 0), 0);
+        // Inisialisasi variabel bantu
+        let omsetKotorAwal = 0;
+        let totalDiskonAwal = 0;
+        let totalHppTerjualAwal = 0;
+        let totalBiayaTransaksiAwal = 0;
+        let danaBelumCair = 0;
+
+        // LOOP TRANSAKSI DENGAN LOGIKA PENCAIRAN
+        (transaksi || []).forEach(trx => {
+            // LOGIKA AMAN UNTUK PENGGUNA LAIN: 
+            // Jika statusPencairan tidak ada (data lama), dianggap 'Sudah Cair'
+            const isCair = !trx.statusPencairan || trx.statusPencairan === 'Sudah Cair';
+
+            if (isCair) {
+                omsetKotorAwal += (trx.subtotal || 0);
+                totalDiskonAwal += (trx.diskon?.totalDiscount || 0);
+                totalHppTerjualAwal += (trx.items || []).reduce((itemSum, item) => itemSum + (item.hpp || 0) * item.qty, 0);
+                totalBiayaTransaksiAwal += (trx.biaya?.total || 0);
+            } else {
+                // Masukkan ke Dana Mengambang jika statusnya 'Belum Cair'
+                danaBelumCair += (trx.total || 0);
+            }
+        });
+
+        // Simpan dana belum cair ke kpis
+        kpis.danaBelumCair = danaBelumCair;
+
+        // Hitung Retur (Sesuai kode asli Anda)
         let totalNilaiReturGross = 0;
         let totalDiskonBatal = 0;
         let totalHppRetur = 0;
@@ -3488,6 +3522,7 @@ const dashboardKpis = computed(() => {
             });
         });
 
+        // Perhitungan Final KPI (Hanya dari data yang sudah CAIR)
         kpis.totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
         const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
 
@@ -3496,13 +3531,14 @@ const dashboardKpis = computed(() => {
         kpis.totalHppTerjual = totalHppTerjualAwal - totalHppRetur;
         kpis.totalBiayaTransaksi = totalBiayaTransaksiAwal - biayaMarketplaceBatal;
         kpis.totalNilaiRetur = totalNilaiReturGross;
+        
         kpis.omsetBersih = kpis.omsetKotor - kpis.totalDiskon;
         kpis.labaKotor = kpis.omsetBersih - kpis.totalHppTerjual;
         kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
         kpis.saldoKas = (kpis.omsetBersih + pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
     }
     
-    // Ini dihitung terpisah dan sudah benar
+    // Stok tetap dihitung global (Real-time)
     kpis.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     kpis.totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
@@ -5074,6 +5110,7 @@ async function executeCompleteTransaction() {
         channel: marketplace.name,
         channelId: marketplace.id,
         biaya: { rincian: biayaList, total: totalBiaya },
+        statusPencairan: 'Belum Cair',
         userId: currentUser.value.uid
     };
 
@@ -7903,6 +7940,57 @@ const fetchSupplierData = async (userId, loadMore = false) => {
     }
 };
 
+const bulkSettlementInput = ref(''); // State untuk menampung data paste dari Excel
+
+async function processBulkSettlement() {
+    if (!bulkSettlementInput.value.trim()) return alert("Tempelkan daftar ID Pesanan terlebih dahulu.");
+    
+    // 1. Pecah teks berdasarkan baris atau koma, lalu bersihkan spasi
+    const rawIds = bulkSettlementInput.value.split(/[\n,]+/).map(id => id.trim()).filter(id => id !== "");
+    const uniqueIds = [...new Set(rawIds)]; // Hapus duplikat
+
+    if (!confirm(`Sistem mendeteksi ${uniqueIds.length} ID Pesanan. Tandai semuanya sebagai 'Sudah Cair'?`)) return;
+
+    isSaving.value = true;
+    let countSuccess = 0;
+
+    try {
+        const batch = writeBatch(db);
+        
+        // 2. Loop semua ID yang di-paste
+        uniqueIds.forEach(orderId => {
+            // Cari transaksi yang cocok di data lokal (state.transaksi)
+            const foundTrx = state.transaksi.find(t => t.marketplaceOrderId === orderId);
+            
+            // Hanya proses yang statusnya belum cair
+            if (foundTrx && foundTrx.statusPencairan !== 'Sudah Cair') {
+                const docRef = doc(db, "transactions", foundTrx.id);
+                batch.update(docRef, { statusPencairan: 'Sudah Cair' });
+                
+                // Update tampilan lokal seketika agar dashboard langsung berubah
+                foundTrx.statusPencairan = 'Sudah Cair';
+                countSuccess++;
+            }
+        });
+
+        if (countSuccess === 0) {
+            throw new Error("Tidak ada ID yang cocok dengan daftar 'Belum Cair' di aplikasi. Pastikan ID Pesanan sudah benar.");
+        }
+
+        // 3. Eksekusi massal ke Firebase
+        await batch.commit();
+        
+        alert(`Berhasil! ${countSuccess} pesanan dikonfirmasi cair. Laba di Dashboard telah diperbarui.`);
+        bulkSettlementInput.value = ''; // Kosongkan input setelah sukses
+
+    } catch (error) {
+        console.error("Error mass settlement:", error);
+        alert(error.message);
+    } finally {
+        isSaving.value = false;
+    }
+}
+
 // Fungsi khusus untuk catatan voucher
 const fetchNotesData = async (userId) => {
     if (dataFetched.notes) return;
@@ -8061,6 +8149,12 @@ watch(activePage, (newPage, oldPage) => {
                     <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 Proses Massal
+            </a>
+            <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">
+                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+               </svg>
+               Cek Pencairan Dana
             </a>
             <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7s0 4 8 4 8-4 8-4"/></svg>
@@ -8405,6 +8499,21 @@ watch(activePage, (newPage, oldPage) => {
     </div>
 </div>
 
+<div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-yellow-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 50ms;">
+    <div class="flex items-start gap-4">
+        <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div class="flex-1 min-w-0">
+            <h3 class="text-sm font-medium text-slate-500">Dana Gantung (Belum Cair)</h3>
+            <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">{{ formatCurrency(dashboardKpis.danaBelumCair) }}</p>
+        </div>
+    </div>
+    <button @click="showModal('kpiHelp', {title: 'Dana Gantung', description: 'Total uang dari pesanan yang sudah Anda kirim tapi dananya belum masuk/dikonfirmasi cair dari marketplace.'})" class="help-icon-button">?</button>
+</div>
+
     <div v-if="activePage === 'transaksi'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
@@ -8692,6 +8801,83 @@ watch(activePage, (newPage, oldPage) => {
                     </div>
                 </div>
                 </div>
+        </div>
+    </div>
+</div>
+
+<div v-if="activePage === 'rekonsiliasi'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-50 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto">
+        <div class="mb-8 animate-fade-in-up">
+            <h2 class="text-3xl font-bold text-slate-800">Audit & Pencairan Dana</h2>
+            <p class="text-slate-500 mt-1">Gunakan halaman ini untuk mencocokkan laporan pencairan dari Marketplace dengan data aplikasi.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+                <h4 class="font-bold text-slate-700 mb-2">1. Tempel ID Pesanan</h4>
+                <p class="text-xs text-slate-500 mb-4">Buka Excel pencairan dana marketplace, salin kolom ID Pesanan, lalu tempel di bawah ini.</p>
+                
+                <textarea 
+                    v-model="bulkSettlementInput" 
+                    rows="15" 
+                    class="w-full p-3 border rounded-lg font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                    placeholder="Tempel ID Pesanan di sini...&#10;Contoh:&#10;240501ABC123&#10;240501XYZ456"
+                ></textarea>
+
+                <button 
+                    @click="processBulkSettlement" 
+                    :disabled="isSaving || !isSubscriptionActive" 
+                    class="mt-4 w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-600/30 disabled:bg-slate-400"
+                >
+                    <span v-if="isSaving">Memproses...</span>
+                    <span v-else>Konfirmasi Dana Cair</span>
+                </button>
+            </div>
+
+            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="font-bold text-slate-700">2. Daftar Pesanan Belum Cair (Gantung)</h4>
+                    <span class="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">
+                        {{ state.transaksi.filter(t => t.statusPencairan === 'Belum Cair').length }} Pesanan
+                    </span>
+                </div>
+
+                <div class="overflow-x-auto max-h-[600px] border rounded-lg">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-50 sticky top-0 text-slate-600 uppercase text-[10px] font-bold">
+                            <tr>
+                                <th class="p-4">Tanggal</th>
+                                <th class="p-4">ID Pesanan</th>
+                                <th class="p-4 text-right">Estimasi Cair</th>
+                                <th class="p-4 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="trx in state.transaksi.filter(t => t.statusPencairan === 'Belum Cair')" :key="trx.id" class="hover:bg-yellow-50/50 transition-colors">
+                                <td class="p-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
+                                <td class="p-4">
+                                    <p class="font-mono font-bold text-indigo-600">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</p>
+                                    <p class="text-[10px] text-slate-400">{{ trx.channel }}</p>
+                                </td>
+                                <td class="p-4 text-right font-bold text-slate-700">{{ formatCurrency(trx.total) }}</td>
+                                <td class="p-4 text-center">
+                                    <span class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Waiting</span>
+                                </td>
+                            </tr>
+                            
+                            <tr v-if="state.transaksi.filter(t => t.statusPencairan === 'Belum Cair').length === 0">
+                                <td colspan="4" class="p-20 text-center">
+                                    <div class="flex flex-col items-center">
+                                        <div class="text-4xl mb-2">🎉</div>
+                                        <p class="text-slate-500 font-medium">Semua dana sudah cair!</p>
+                                        <p class="text-xs text-slate-400">Tidak ada pesanan gantung untuk saat ini.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
