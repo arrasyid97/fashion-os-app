@@ -15129,63 +15129,13 @@ watch(activePage, (newPage, oldPage) => {
 </div>
   
 <div v-if="uiState.activeModal === 'masterHargaSupplier'" class="modal-overlay">
-    <div class="modal-content max-w-4xl w-full p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-xl font-bold text-slate-800">Katalog Harga Beli (Supplier)</h3>
-            <button @click="hideModal" class="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-
-        <div class="mb-4">
-            <input 
-                v-model="searchCatalogQuery" 
-                type="text" 
-                placeholder="Cari SKU atau Nama Model..." 
-                class="w-full p-3 border rounded-xl bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"
-            />
-        </div>
-
-        <div class="overflow-y-auto max-h-[400px] border rounded-xl">
-            <table class="w-full text-sm text-left">
-                <thead class="bg-slate-100 sticky top-0">
-                    <tr>
-                        <th class="p-3">Produk / SKU</th>
-                        <th class="p-3">Harga Saat Ini (Marketplace)</th>
-                        <th class="p-3 w-40">Harga Beli Supplier</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">
-                    <tr v-for="p in filteredCatalog" :key="p.docId" class="hover:bg-slate-50">
-                        <td class="p-3">
-                            <p class="font-bold text-slate-700">{{ p.namaModel }}</p>
-                            <p class="text-xs text-slate-500 font-mono">{{ p.sku }}</p>
-                        </td>
-                        <td class="p-3 text-slate-400">
-                            {{ formatCurrency(p.hargaJual) }}
-                        </td>
-                        <td class="p-3 text-right">
-                            <div class="flex items-center gap-2">
-                                <span class="text-slate-400">Rp</span>
-                                <input 
-                                    type="number" 
-                                    v-model.number="p.hargaBeli" 
-                                    placeholder="0"
-                                    class="w-full p-2 border rounded text-right font-bold text-indigo-600 focus:bg-indigo-50 outline-none"
-                                />
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="mt-6 flex justify-end gap-3">
-            <button @click="hideModal" class="px-6 py-2 border rounded-lg hover:bg-slate-50">Batal</button>
-            <button @click="saveMasterHargaSupplier" :disabled="isSaving" class="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700">
-                {{ isSaving ? 'Menyimpan...' : 'Simpan Semua Harga' }}
-            </button>
-        </div>
+        <div class="modal-content max-w-4xl w-full p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Katalog Harga Beli (Supplier)</h3>
+                <button @click="hideModal" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            </div>
     </div>
-</div>
 
 <div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
