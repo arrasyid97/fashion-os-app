@@ -15067,14 +15067,7 @@ watch(activePage, (newPage, oldPage) => {
 
       </div>
     
-      <div v-if="uiState.activeModal === 'masterHargaSupplier'" class="modal-overlay">
-        <div class="modal-content max-w-4xl w-full p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-slate-800">Katalog Harga Beli (Supplier)</h3>
-                <button @click="hideModal" class="text-slate-400 hover:text-slate-600">✕</button>
-            </div>
-            </div>
-    </div>
+      
   
     <div v-if="uiState.nestedModalType === 'manageInflowCategories'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-xl w-full max-h-[90vh] flex flex-col">
@@ -15135,33 +15128,48 @@ watch(activePage, (newPage, oldPage) => {
         </form>
     </div>
 </div>
-  
-
-<div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-        <h3 class="text-lg font-bold text-slate-800 mb-2">Konfirmasi Aksi</h3>
-        <p class="text-sm text-slate-600 mb-4">Untuk melanjutkan, masukkan PIN keamanan Anda.</p>
-        <form @submit.prevent="confirmPinAndToggle">
-            <input 
-                type="password" 
-                v-model="uiState.pinConfirmInput" 
-                placeholder="Masukkan PIN" 
-                class="w-full p-2 border rounded-md text-center text-lg mb-2"
-            >
-            <p v-if="uiState.pinConfirmError" class="text-red-500 text-xs mb-2">{{ uiState.pinConfirmError }}</p>
-            <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-                <button type="button" @click="uiState.isPinConfirmModalVisible = false" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Konfirmasi</button>
+  <div v-if="uiState.activeModal === 'masterHargaSupplier'" class="modal-overlay">
+        <div class="modal-content max-w-4xl w-full p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Katalog Harga Beli (Supplier)</h3>
+                <button @click="hideModal" class="text-slate-400 hover:text-slate-600">✕</button>
             </div>
-        </form>
+
+            <div class="mb-4">
+                <input v-model="searchCatalogQuery" type="text" placeholder="Cari SKU..." class="w-full p-2 border rounded-lg">
+            </div>
+            
+            <div class="overflow-y-auto max-h-[400px]">
+                </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button @click="hideModal" class="px-4 py-2 border rounded-lg">Batal</button>
+                <button @click="saveMasterHargaSupplier" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">Simpan Semua</button>
+            </div>
+        </div>
     </div>
-</div>
 
+    <div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+            <h3 class="text-lg font-bold text-slate-800 mb-2">Konfirmasi Aksi</h3>
+            <p class="text-sm text-slate-600 mb-4">Untuk melanjutkan, masukkan PIN keamanan Anda.</p>
+            <form @submit.prevent="confirmPinAndToggle">
+                <input 
+                    type="password" 
+                    v-model="uiState.pinConfirmInput" 
+                    placeholder="Masukkan PIN" 
+                    class="w-full p-2 border rounded-md text-center text-lg mb-2"
+                >
+                <p v-if="uiState.pinConfirmError" class="text-red-500 text-xs mb-2">{{ uiState.pinConfirmError }}</p>
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+                    <button type="button" @click="uiState.isPinConfirmModalVisible = false" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                    <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Konfirmasi</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-
-
-</div>
-</template>
+  </div> </template>
 
 <style scoped>
 .help-icon-button {
