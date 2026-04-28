@@ -15067,6 +15067,14 @@ watch(activePage, (newPage, oldPage) => {
 
       </div>
     
+      <div v-if="uiState.activeModal === 'masterHargaSupplier'" class="modal-overlay">
+        <div class="modal-content max-w-4xl w-full p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Katalog Harga Beli (Supplier)</h3>
+                <button @click="hideModal" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            </div>
+    </div>
   
     <div v-if="uiState.nestedModalType === 'manageInflowCategories'" class="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-xl w-full max-h-[90vh] flex flex-col">
@@ -15128,14 +15136,6 @@ watch(activePage, (newPage, oldPage) => {
     </div>
 </div>
   
-<div v-if="uiState.activeModal === 'masterHargaSupplier'" class="modal-overlay">
-        <div class="modal-content max-w-4xl w-full p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-slate-800">Katalog Harga Beli (Supplier)</h3>
-                <button @click="hideModal" class="text-slate-400 hover:text-slate-600">✕</button>
-            </div>
-            </div>
-    </div>
 
 <div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
