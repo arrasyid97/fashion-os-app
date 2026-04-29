@@ -12077,6 +12077,58 @@ watch(activePage, (newPage, oldPage) => {
         </div>
     </form>
 </div>
+
+<div v-if="uiState.modalType === 'masterHargaSupplier'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Katalog Harga Beli (Supplier)</h3>
+                <button @click="hideModal" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <div class="mb-4">
+                <input 
+                    v-model="searchCatalogQuery" 
+                    type="text" 
+                    placeholder="Cari SKU atau Nama..." 
+                    class="w-full p-3 border rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+            </div>
+
+            <div class="overflow-y-auto max-h-[400px] border rounded-xl">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-slate-100 sticky top-0">
+                        <tr>
+                            <th class="p-3 font-bold text-slate-600">Produk / SKU</th>
+                            <th class="p-3 font-bold text-slate-600 w-40 text-right">Harga Beli</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <tr v-for="p in filteredCatalog" :key="p.id || p.docId" class="hover:bg-slate-50">
+                            <td class="p-3 text-slate-700">
+                                <p class="font-bold">{{ p.namaModel || 'Tanpa Nama' }}</p>
+                                <p class="text-xs font-mono text-slate-400">{{ p.sku }}</p>
+                            </td>
+                            <td class="p-3">
+                                <input 
+                                    type="number" 
+                                    v-model.number="p.hargaBeli" 
+                                    class="w-full p-2 border rounded text-right font-bold text-indigo-600 outline-none focus:bg-indigo-50"
+                                    placeholder="0"
+                                />
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3 border-t pt-4">
+                <button @click="hideModal" class="px-6 py-2 border rounded-lg hover:bg-slate-50">Batal</button>
+                <button @click="saveMasterHargaSupplier" :disabled="isSaving" class="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700">
+                    {{ isSaving ? 'Menyimpan...' : 'Simpan Semua Harga' }}
+                </button>
+            </div>
+        </div>
+        </div>
+
 <div v-if="uiState.modalType === 'viewPurchaseOrder'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col animate-fade-in-up" @click.stop>
     <div class="flex-shrink-0 pb-4 border-b">
         <h3 class="text-2xl font-bold text-slate-800">Detail Penerimaan Barang</h3>
@@ -15128,57 +15180,7 @@ watch(activePage, (newPage, oldPage) => {
         </form>
     </div>
 </div>
-  <div v-if="uiState.activeModal === 'masterHargaSupplier'" class="modal-overlay">
-        <div class="modal-content max-w-4xl w-full p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-slate-800">Katalog Harga Beli (Supplier)</h3>
-                <button @click="hideModal" class="text-slate-400 hover:text-slate-600">✕</button>
-            </div>
-
-            <div class="mb-4">
-                <input 
-                    v-model="searchCatalogQuery" 
-                    type="text" 
-                    placeholder="Cari SKU atau Nama..." 
-                    class="w-full p-3 border rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-            </div>
-
-            <div class="overflow-y-auto max-h-[400px] border rounded-xl">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-slate-100 sticky top-0">
-                        <tr>
-                            <th class="p-3 font-bold text-slate-600">Produk / SKU</th>
-                            <th class="p-3 font-bold text-slate-600 w-40 text-right">Harga Beli</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr v-for="p in filteredCatalog" :key="p.id || p.docId" class="hover:bg-slate-50">
-                            <td class="p-3 text-slate-700">
-                                <p class="font-bold">{{ p.namaModel || 'Tanpa Nama' }}</p>
-                                <p class="text-xs font-mono text-slate-400">{{ p.sku }}</p>
-                            </td>
-                            <td class="p-3">
-                                <input 
-                                    type="number" 
-                                    v-model.number="p.hargaBeli" 
-                                    class="w-full p-2 border rounded text-right font-bold text-indigo-600 outline-none focus:bg-indigo-50"
-                                    placeholder="0"
-                                />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="mt-6 flex justify-end gap-3 border-t pt-4">
-                <button @click="hideModal" class="px-6 py-2 border rounded-lg hover:bg-slate-50">Batal</button>
-                <button @click="saveMasterHargaSupplier" :disabled="isSaving" class="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700">
-                    {{ isSaving ? 'Menyimpan...' : 'Simpan Semua Harga' }}
-                </button>
-            </div>
-        </div>
-    </div>
+  
 
 <div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
