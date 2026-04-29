@@ -6106,6 +6106,146 @@ function printProduksiDetail(batch) {
     printWindow.print();
 }
 
+function printPurchaseInvoice(order) {
+    if (!order) return;
+    
+    const brandName = state.settings.brandName || 'FASHION OS';
+    const totalTagihan = order.totalQtyValue || 0;
+    const sudahDibayar = order.dibayarkan || 0;
+    const sisa = totalTagihan - sudahDibayar;
+    const statusBayar = sisa <= 0 ? 'LUNAS' : (sudahDibayar > 0 ? 'DICICIL' : 'BELUM BAYAR');
+
+    const printContent = `
+        <html>
+        <head>
+            <title>Invoice #${order.id.slice(-6)}</title>
+            <style>
+                body { font-family: sans-serif; color: #333; margin: 0; padding: 40px; line-height: 1.6; }
+                .invoice-box { max-width: 800px; margin: auto; border: 1px solid #eee; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+                .header { display: flex; justify-content: space-between; border-bottom: 3px solid #4f46e5; padding-bottom: 20px; margin-bottom: 30px; }
+                .brand-name { font-size: 28px; font-weight: 900; color: #4f46e5; text-transform: uppercase; letter-spacing: -1px; }
+                .invoice-title { text-align: right; }
+                .info-section { display: flex; justify-content: space-between; margin-bottom: 40px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                th { background: #f8fafc; padding: 12px; border-bottom: 2px solid #e2e8f0; text-align: left; font-size: 12px; color: #64748b; text-transform: uppercase; }
+                td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+                .totals { margin-left: auto; width: 300px; }
+                .total-row { display: flex; justify-content: space-between; padding: 5px 0; }
+                .grand-total { border-top: 2px solid #4f46e5; margin-top: 10px; padding-top: 10px; font-weight: bold; font-size: 18px; color: #4f46e5; }
+                .status-stamp { 
+                    border: 4px double #ef4444; color: #ef4444; font-size: 22px; font-weight: 900; 
+                    display: inline-block; padding: 5px 20px; transform: rotate(-12deg); 
+                    margin-top: 10px; text-transform: uppercase; border-radius: 5px;
+                }
+                .status-lunas { border-color: #10b981; color: #10b981; }
+                .footer { margin-top: 50px; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="invoice-box">
+                <div class="header">
+                    <div class="brand-name">${brandName}</div>
+                    <div class="invoice-title">
+                        <h2 style="margin:0">PURCHASE INVOICE</h2>
+                        <p style="margin:0; color:#64748b">#${order.id.slice(-6).toUpperCase()}</p>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <div>
+                        <p style="margin:0; font-size:12px; color:#64748b; font-weight:bold; text-transform:uppercase">Supplier:</p>
+                        <p style="margin:0; font-size:16px; font-weight:bold">${order.supplierName}</p>
+                        <p style="margin:0">Tanggal: ${new Date(order.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                    </div>
+                    <div style="text-align: right">
+                        <div class="status-stamp ${sisa <= 0 ? 'status-lunas' : ''}">${statusBayar}</div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Item Produk</th>
+                            <th style="text-align: right">Harga Beli</th>
+                            <th style="text-align: center">Qty</th>
+                            <th style="text-align: right">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${order.produk.map(p => `
+                            <tr>
+                                <td>
+                                    <div style="font-weight:bold">${p.modelName}</div>
+                                    <div style="font-size:11px; color:#64748b">${p.sku} (${p.color}/${p.size})</div>
+                                </td>
+                                <td style="text-align: right">${formatCurrency(p.hargaJual)}</td>
+                                <td style="text-align: center">${p.qty}</td>
+                                <td style="text-align: right; font-weight:bold">${formatCurrency(p.hargaJual * p.qty)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div class="totals">
+                    <div class="total-row"><span>Total Tagihan</span><span>${formatCurrency(totalTagihan)}</span></div>
+                    <div class="total-row" style="color:#10b981"><span>Sudah Dibayar</span><span>${formatCurrency(sudahDibayar)}</span></div>
+                    <div class="total-row grand-total"><span>Sisa Tagihan</span><span>${formatCurrency(sisa)}</span></div>
+                </div>
+
+                <div class="footer">
+                    <p><strong>Catatan:</strong> ${order.catatan || '-'}</p>
+                    <p>Dokumen ini adalah bukti resmi penerimaan barang yang dihasilkan secara elektronik oleh sistem ${brandName}.</p>
+                </div>
+            </div>
+            <script>
+                window.onload = function() { window.print(); window.close(); }
+            <\/script>
+        </body>
+        </html>
+    `;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+}
+
+function exportInvoiceToExcel(order) {
+    const brandName = state.settings.brandName || 'FASHION OS';
+    
+    // Header Nota
+    const header = [
+        [brandName.toUpperCase()],
+        ["INVOICE PENERIMAAN BARANG"],
+        ["ID Pesanan:", order.id.slice(-6).toUpperCase()],
+        ["Supplier:", order.supplierName],
+        ["Tanggal:", new Date(order.tanggal).toLocaleDateString('id-ID')],
+        [], // Baris kosong
+        ["PRODUK", "SKU", "HARGA", "QTY", "SUBTOTAL"]
+    ];
+
+    // Data Produk
+    const body = order.produk.map(p => [
+        p.modelName,
+        p.sku,
+        p.hargaJual,
+        p.qty,
+        p.hargaJual * p.qty
+    ]);
+
+    // Footer Keuangan
+    const footer = [
+        [],
+        ["", "", "", "TOTAL TAGIHAN:", order.totalQtyValue],
+        ["", "", "", "SUDAH DIBAYAR:", order.dibayarkan],
+        ["", "", "", "SISA TAGIHAN:", order.totalQtyValue - order.dibayarkan]
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet([...header, ...body, ...footer]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Invoice");
+    
+    XLSX.writeFile(workbook, `Invoice_${order.supplierName}_${order.id.slice(-6)}.xlsx`);
+}
+
 function exportProduksiDetailToExcel(batch) {
     const dataForExcel = (batch.kainBahan || []).map(kb => {
         const modelName = state.settings.modelProduk.find(m => m.id === kb.modelProdukId)?.namaModel || 'N/A';
@@ -12078,65 +12218,97 @@ watch(activePage, (newPage, oldPage) => {
     </form>
 </div>
 
-<div v-if="uiState.modalType === 'viewPurchaseOrder'" class="bg-white rounded-lg shadow-xl p-6 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col animate-fade-in-up" @click.stop>
-    <div class="flex-shrink-0 pb-4 border-b">
-        <h3 class="text-2xl font-bold text-slate-800">Detail Penerimaan Barang</h3>
-        <p class="text-slate-500 mt-1">Pesanan untuk: <span class="font-semibold">{{ uiState.modalData.supplierName }}</span> | ID: #{{ uiState.modalData.id.slice(-6) }}</p>
-    </div>
-    
-    <div class="flex-1 overflow-y-auto py-4 pr-2 grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div class="space-y-4">
-            <h4 class="font-semibold text-lg text-slate-700">Ringkasan & Riwayat</h4>
-            <div class="p-4 bg-slate-50 rounded-lg border text-sm space-y-2">
-                <div class="flex justify-between"><span>Total Tagihan:</span><span class="font-bold text-lg text-indigo-600">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</span></div>
-                <div class="flex justify-between"><span>Sudah Dibayar:</span><span class="font-medium text-green-600">{{ formatCurrency(uiState.modalData.dibayarkan) }}</span></div>
-                <div class="flex justify-between font-bold border-t pt-2 mt-2"><span>Sisa Tagihan:</span><span class="text-red-600">{{ formatCurrency(uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan) }}</span></div>
-            </div>
-            <div class="border-t pt-4">
-                <p class="font-medium mb-2">Riwayat Pembayaran:</p>
-                <p v-if="!uiState.modalData.paymentHistory || uiState.modalData.paymentHistory.length === 0" class="text-xs text-slate-500 text-center py-4">Belum ada riwayat pembayaran.</p>
-                <ul v-else class="space-y-2 max-h-60 overflow-y-auto">
-                    <li v-for="(payment, index) in (uiState.modalData.paymentHistory || [])" :key="index" class="flex justify-between items-center text-xs p-2 bg-white border rounded-md">
-                        <div>
-                            <p class="font-semibold">{{ formatCurrency(payment.amount) }}</p>
-                            <p class="text-slate-500">{{ new Date(payment.date.seconds ? payment.date.seconds * 1000 : payment.date).toLocaleDateString('id-ID') }} ({{ payment.method }})</p>
-                        </div>
-                        <p class="text-slate-500 italic">{{ payment.notes }}</p>
-                    </li>
-                </ul>
-            </div>
+<div v-if="uiState.modalType === 'viewPurchaseOrder'" class="bg-white rounded-lg shadow-2xl p-0 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
+    <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-black tracking-tighter">{{ state.settings.brandName }}</h1>
+            <p class="text-slate-400 text-xs uppercase tracking-widest">Official Purchase Invoice</p>
         </div>
-
-        <div class="space-y-4">
-             <h4 class="font-semibold text-lg text-slate-700">Rincian Produk Pesanan</h4>
-             <div class="overflow-x-auto border rounded-lg">
-                <table class="w-full text-sm text-left text-slate-500">
-                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                        <tr>
-                            <th class="px-4 py-3">Produk</th>
-                            <th class="px-4 py-3 text-right">Harga</th>
-                            <th class="px-4 py-3 text-center">Qty</th>
-                            <th class="px-4 py-3 text-right">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200/50">
-                        <tr v-for="(p, index) in (uiState.modalData.produk || [])" :key="index">
-                            <td class="px-4 py-3">
-                                <p class="font-semibold text-slate-800">{{ p.modelName }}</p>
-                                <p class="text-xs">{{ p.sku }} ({{ p.color }} / {{ p.size }})</p>
-                            </td>
-                            <td class="px-4 py-3 text-right">{{ formatCurrency(p.hargaJual) }}</td>
-                            <td class="px-4 py-3 text-center font-medium">{{ p.qty }}</td>
-                            <td class="px-4 py-3 text-right font-semibold">{{ formatCurrency(p.hargaJual * p.qty) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+        <div class="text-right">
+            <h2 class="text-xl font-bold">INVOICE</h2>
+            <p class="font-mono text-sm">#{{ uiState.modalData.id.slice(-6).toUpperCase() }}</p>
         </div>
     </div>
 
-    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+    <div class="flex-1 overflow-y-auto p-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-8">
+            <div>
+                <h4 class="text-xs font-bold text-slate-400 uppercase mb-2">Ditujukan Untuk:</h4>
+                <p class="text-lg font-bold text-slate-800">{{ uiState.modalData.supplierName }}</p>
+                <p class="text-sm text-slate-500">Penerimaan barang dari gudang supplier.</p>
+                <p class="text-sm mt-4 text-slate-500">Tanggal: <span class="text-slate-800 font-semibold">{{ new Date(uiState.modalData.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}</span></p>
+            </div>
+
+            <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Ringkasan Pembayaran</h4>
+                <div class="space-y-3">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">Total Tagihan</span>
+                        <span class="font-bold text-slate-800">{{ formatCurrency(uiState.modalData.totalQtyValue) }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">Sudah Dibayar</span>
+                        <span class="font-bold text-green-600">{{ formatCurrency(uiState.modalData.dibayarkan) }}</span>
+                    </div>
+                    <div class="flex justify-between text-lg pt-3 border-t-2 border-dashed border-slate-200 mt-3">
+                        <span class="font-bold text-slate-800">Sisa Tagihan</span>
+                        <span class="font-black text-red-600">{{ formatCurrency(uiState.modalData.totalQtyValue - uiState.modalData.dibayarkan) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Rincian Item</h4>
+        <div class="border rounded-xl overflow-hidden mb-8">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-[10px]">
+                    <tr>
+                        <th class="p-4">Produk</th>
+                        <th class="p-4 text-right">Harga Beli</th>
+                        <th class="p-4 text-center">Qty</th>
+                        <th class="p-4 text-right">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    <tr v-for="p in uiState.modalData.produk" :key="p.sku" class="hover:bg-slate-50/50">
+                        <td class="p-4">
+                            <p class="font-bold text-slate-800">{{ p.modelName }}</p>
+                            <p class="text-[10px] font-mono text-slate-500">{{ p.sku }} ({{ p.color }} / {{ p.size }})</p>
+                        </td>
+                        <td class="p-4 text-right">{{ formatCurrency(p.hargaJual) }}</td>
+                        <td class="p-4 text-center font-medium">{{ p.qty }}</td>
+                        <td class="p-4 text-right font-bold text-slate-800">{{ formatCurrency(p.hargaJual * p.qty) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div v-if="uiState.modalData.paymentHistory?.length > 0">
+            <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Log Pembayaran</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div v-for="(pay, idx) in uiState.modalData.paymentHistory" :key="idx" class="p-3 bg-white border rounded-xl flex justify-between items-center shadow-sm">
+                    <div>
+                        <p class="text-xs text-slate-400">{{ new Date(pay.date.seconds ? pay.date.seconds * 1000 : pay.date).toLocaleDateString() }}</p>
+                        <p class="text-sm font-bold text-slate-700">{{ pay.method }}</p>
+                    </div>
+                    <p class="font-bold text-indigo-600">{{ formatCurrency(pay.amount) }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-slate-50 p-6 border-t flex flex-wrap justify-between gap-4">
+        <div class="flex gap-2">
+            <button @click="printPurchaseInvoice(uiState.modalData)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 flex items-center gap-2 shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Cetak Nota
+            </button>
+            <button @click="exportInvoiceToExcel(uiState.modalData)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 flex items-center gap-2 shadow-sm">
+                <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14.78 3.653a3.936 3.936 0 115.567 5.567l-3.627 3.627a3.936 3.936 0 01-5.567 0 3.936 3.936 0 010-5.567l3.627-3.627zm-3.045 4.385a2.146 2.146 0 100 4.292 2.146 2.146 0 000-4.292z"/></svg>
+                Export Excel
+            </button>
+        </div>
+        <button @click="hideModal" class="bg-slate-900 text-white font-bold py-2 px-8 rounded-lg hover:bg-slate-800 shadow-lg shadow-slate-900/20">Tutup</button>
     </div>
 </div>
 
@@ -13786,6 +13958,8 @@ watch(activePage, (newPage, oldPage) => {
                 </button>
             </div>
         </div>
+
+
 
 <div v-if="uiState.nestedModalType === 'addInflowCategory' || uiState.nestedModalType === 'editInflowCategory'" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
