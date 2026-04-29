@@ -6115,6 +6115,9 @@ function printPurchaseInvoice(order) {
     const sisa = totalTagihan - sudahDibayar;
     const statusBayar = sisa <= 0 ? 'LUNAS' : (sudahDibayar > 0 ? 'DICICIL' : 'BELUM BAYAR');
 
+    // Trik agar ESLint tidak error: pisah tag script menjadi dua bagian
+    const closingScript = '<' + '/script>';
+
     const printContent = `
         <html>
         <head>
@@ -6198,8 +6201,11 @@ function printPurchaseInvoice(order) {
                 </div>
             </div>
             <script>
-                window.onload = function() { window.print(); window.close(); }
-            <\/script>
+                window.onload = function() { 
+                    window.print(); 
+                    setTimeout(function() { window.close(); }, 500); 
+                }
+            ${closingScript}
         </body>
         </html>
     `;
