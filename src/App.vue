@@ -12452,10 +12452,16 @@ watch(activePage, (newPage, oldPage) => {
     <div class="bg-slate-50 p-6 border-t flex flex-wrap justify-between gap-4">
         <div class="flex gap-2">
             <button @click="printPurchaseInvoice(uiState.modalData)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 flex items-center gap-2 shadow-sm">
-                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 Cetak Nota Pembelian
             </button>
+
+            <button @click="exportInvoiceToExcel(uiState.modalData)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 flex items-center gap-2 shadow-sm">
+                <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M14.78 3.653a3.936 3.936 0 115.567 5.567l-3.627 3.627a3.936 3.936 0 01-5.567 0 3.936 3.936 0 010-5.567l3.627-3.627zm-3.045 4.385a2.146 2.146 0 100 4.292 2.146 2.146 0 000-4.292z"/></svg>
+                Export Excel
+            </button>
         </div>
+        
         <button @click="hideModal" class="bg-slate-900 text-white font-bold py-2 px-8 rounded-lg hover:bg-slate-800 shadow-lg shadow-slate-900/20">Tutup</button>
     </div>
 </div>
