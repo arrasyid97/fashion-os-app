@@ -6115,7 +6115,6 @@ function printPurchaseInvoice(order) {
     const sisa = totalTagihan - sudahDibayar;
     const statusBayar = sisa <= 0 ? 'LUNAS' : (sudahDibayar > 0 ? 'DICICIL' : 'BELUM BAYAR');
 
-    // Trik agar ESLint tidak error: pisah tag script menjadi dua bagian
     const closingScript = '<' + '/script>';
 
     const printContent = `
@@ -6123,44 +6122,179 @@ function printPurchaseInvoice(order) {
         <head>
             <title>Invoice #${order.id.slice(-6)}</title>
             <style>
-                body { font-family: sans-serif; color: #333; margin: 0; padding: 40px; line-height: 1.6; }
-                .invoice-box { max-width: 800px; margin: auto; border: 1px solid #eee; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
-                .header { display: flex; justify-content: space-between; border-bottom: 3px solid #4f46e5; padding-bottom: 20px; margin-bottom: 30px; }
-                .brand-name { font-size: 28px; font-weight: 900; color: #4f46e5; text-transform: uppercase; letter-spacing: -1px; }
-                .invoice-title { text-align: right; }
-                .info-section { display: flex; justify-content: space-between; margin-bottom: 40px; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                th { background: #f8fafc; padding: 12px; border-bottom: 2px solid #e2e8f0; text-align: left; font-size: 12px; color: #64748b; text-transform: uppercase; }
-                td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
-                .totals { margin-left: auto; width: 300px; }
-                .total-row { display: flex; justify-content: space-between; padding: 5px 0; }
-                .grand-total { border-top: 2px solid #4f46e5; margin-top: 10px; padding-top: 10px; font-weight: bold; font-size: 18px; color: #4f46e5; }
-                .status-stamp { 
-                    border: 4px double #ef4444; color: #ef4444; font-size: 22px; font-weight: 900; 
-                    display: inline-block; padding: 5px 20px; transform: rotate(-12deg); 
-                    margin-top: 10px; text-transform: uppercase; border-radius: 5px;
+                /* Pengaturan Dasar Kertas A4/HVS */
+                @page {
+                    size: A4 portrait;
+                    margin: 10mm;
                 }
-                .status-lunas { border-color: #10b981; color: #10b981; }
-                .footer { margin-top: 50px; font-size: 11px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 20px; }
+
+                * {
+                    box-sizing: border-box;
+                    -webkit-print-color-adjust: exact;
+                }
+
+                body { 
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                    color: #333; 
+                    margin: 0; 
+                    padding: 0; 
+                    font-size: 12px;
+                    background: white;
+                }
+
+                .invoice-box { 
+                    width: 100%;
+                    max-width: 190mm; /* Lebar maksimal A4 dikurangi margin */
+                    margin: auto;
+                    padding: 10px;
+                }
+
+                /* Header: Nama Brand & Judul */
+                .header { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: flex-start;
+                    border-bottom: 3px solid #4f46e5; 
+                    padding-bottom: 15px; 
+                    margin-bottom: 20px; 
+                }
+
+                .brand-section {
+                    flex: 1;
+                }
+
+                .brand-name { 
+                    font-size: 24px; 
+                    font-weight: 900; 
+                    color: #4f46e5; 
+                    text-transform: uppercase;
+                    margin: 0;
+                }
+
+                .invoice-title-section {
+                    text-align: right;
+                    flex: 1;
+                }
+
+                .invoice-title-section h2 {
+                    margin: 0;
+                    font-size: 20px;
+                    color: #1e293b;
+                }
+
+                /* Info Section */
+                .info-grid { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    margin-bottom: 30px; 
+                }
+
+                .supplier-info {
+                    line-height: 1.5;
+                }
+
+                .status-container {
+                    text-align: right;
+                }
+
+                .status-stamp { 
+                    border: 3px double #ef4444; 
+                    color: #ef4444; 
+                    font-size: 18px; 
+                    font-weight: 900; 
+                    padding: 5px 15px; 
+                    transform: rotate(-10deg); 
+                    display: inline-block;
+                    text-transform: uppercase;
+                    border-radius: 4px;
+                }
+
+                .status-lunas { 
+                    border-color: #10b981; 
+                    color: #10b981; 
+                }
+
+                /* Tabel Produk */
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin-bottom: 20px; 
+                }
+
+                th { 
+                    background: #f8fafc; 
+                    padding: 10px; 
+                    border-bottom: 2px solid #e2e8f0; 
+                    text-align: left; 
+                    font-size: 11px;
+                    color: #64748b;
+                }
+
+                td { 
+                    padding: 10px; 
+                    border-bottom: 1px solid #f1f5f9; 
+                }
+
+                /* Bagian Total */
+                .summary-wrapper {
+                    display: flex;
+                    justify-content: flex-end;
+                }
+
+                .totals-table { 
+                    width: 250px;
+                }
+
+                .total-row { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    padding: 4px 0; 
+                }
+
+                .grand-total { 
+                    border-top: 2px solid #4f46e5; 
+                    margin-top: 8px; 
+                    padding-top: 8px; 
+                    font-weight: bold; 
+                    font-size: 14px; 
+                    color: #4f46e5; 
+                }
+
+                .footer { 
+                    margin-top: 50px; 
+                    font-size: 10px; 
+                    color: #94a3b8; 
+                    border-top: 1px solid #f1f5f9; 
+                    padding-top: 15px; 
+                }
+
+                /* Menghilangkan header/footer browser */
+                @media print {
+                    body { margin: 0; }
+                    .no-print { display: none; }
+                }
             </style>
         </head>
         <body>
             <div class="invoice-box">
                 <div class="header">
-                    <div class="brand-name">${brandName}</div>
-                    <div class="invoice-title">
-                        <h2 style="margin:0">PURCHASE INVOICE</h2>
-                        <p style="margin:0; color:#64748b">#${order.id.slice(-6).toUpperCase()}</p>
+                    <div class="brand-section">
+                        <h1 class="brand-name">${brandName}</h1>
+                        <p style="margin:0; color:#64748b; font-size: 10px;">Official Purchase Record</p>
+                    </div>
+                    <div class="invoice-title-section">
+                        <h2>PURCHASE INVOICE</h2>
+                        <p style="margin:0; color:#64748b; font-family:monospace;">#${order.id.slice(-6).toUpperCase()}</p>
                     </div>
                 </div>
 
-                <div class="info-section">
-                    <div>
-                        <p style="margin:0; font-size:12px; color:#64748b; font-weight:bold; text-transform:uppercase">Supplier:</p>
-                        <p style="margin:0; font-size:16px; font-weight:bold">${order.supplierName}</p>
+                <div class="info-grid">
+                    <div class="supplier-info">
+                        <p style="margin:0; font-size:10px; color:#64748b; font-weight:bold; text-transform:uppercase">Ditujukan Ke Supplier:</p>
+                        <p style="margin:0; font-size:14px; font-weight:bold">${order.supplierName}</p>
                         <p style="margin:0">Tanggal: ${new Date(order.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                     </div>
-                    <div style="text-align: right">
+                    <div class="status-container">
                         <div class="status-stamp ${sisa <= 0 ? 'status-lunas' : ''}">${statusBayar}</div>
                     </div>
                 </div>
@@ -6168,8 +6302,8 @@ function printPurchaseInvoice(order) {
                 <table>
                     <thead>
                         <tr>
-                            <th>Item Produk</th>
-                            <th style="text-align: right">Harga Beli</th>
+                            <th style="width: 50%">Deskripsi Produk</th>
+                            <th style="text-align: right">Harga</th>
                             <th style="text-align: center">Qty</th>
                             <th style="text-align: right">Subtotal</th>
                         </tr>
@@ -6179,7 +6313,7 @@ function printPurchaseInvoice(order) {
                             <tr>
                                 <td>
                                     <div style="font-weight:bold">${p.modelName}</div>
-                                    <div style="font-size:11px; color:#64748b">${p.sku} (${p.color}/${p.size})</div>
+                                    <div style="font-size:10px; color:#64748b">${p.sku} (${p.color}/${p.size})</div>
                                 </td>
                                 <td style="text-align: right">${formatCurrency(p.hargaJual)}</td>
                                 <td style="text-align: center">${p.qty}</td>
@@ -6189,15 +6323,26 @@ function printPurchaseInvoice(order) {
                     </tbody>
                 </table>
 
-                <div class="totals">
-                    <div class="total-row"><span>Total Tagihan</span><span>${formatCurrency(totalTagihan)}</span></div>
-                    <div class="total-row" style="color:#10b981"><span>Sudah Dibayar</span><span>${formatCurrency(sudahDibayar)}</span></div>
-                    <div class="total-row grand-total"><span>Sisa Tagihan</span><span>${formatCurrency(sisa)}</span></div>
+                <div class="summary-wrapper">
+                    <div class="totals-table">
+                        <div class="total-row">
+                            <span>Total Tagihan</span>
+                            <span>${formatCurrency(totalTagihan)}</span>
+                        </div>
+                        <div class="total-row" style="color:#10b981">
+                            <span>Total Dibayar</span>
+                            <span>${formatCurrency(sudahDibayar)}</span>
+                        </div>
+                        <div class="total-row grand-total">
+                            <span>Sisa Tagihan</span>
+                            <span>${formatCurrency(sisa)}</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="footer">
                     <p><strong>Catatan:</strong> ${order.catatan || '-'}</p>
-                    <p>Dokumen ini adalah bukti resmi penerimaan barang yang dihasilkan secara elektronik oleh sistem ${brandName}.</p>
+                    <p>Dicetak otomatis melalui Sistem Manajemen ${brandName} pada ${new Date().toLocaleString('id-ID')}.</p>
                 </div>
             </div>
             <script>
