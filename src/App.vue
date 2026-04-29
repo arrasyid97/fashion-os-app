@@ -9143,10 +9143,16 @@ watch(activePage, (newPage, oldPage) => {
 
 <div v-if="activePage === 'rekonsiliasi'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-50 p-4 sm:p-8">
     <div class="max-w-7xl mx-auto">
-        <div class="mb-8 animate-fade-in-up">
-            <h2 class="text-3xl font-bold text-slate-800">Audit & Pencairan Dana</h2>
-            <p class="text-slate-500 mt-1">Gunakan halaman ini untuk mencocokkan laporan pencairan dari Marketplace dengan data aplikasi.</p>
-        </div>
+        <div class="mb-8 animate-fade-in-up flex flex-wrap justify-between items-center gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Audit & Pencairan Dana</h2>
+        <p class="text-slate-500 mt-1">Sinkronisasi data pencairan marketplace dengan aplikasi.</p>
+    </div>
+    <button @click="showModal('rekonsiliasiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2 flex-shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+        Informasi & Logika
+    </button>
+</div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
@@ -15505,7 +15511,43 @@ watch(activePage, (newPage, oldPage) => {
     </div>
 </div>
   
+<div v-if="uiState.modalType === 'rekonsiliasiInfo'" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col animate-fade-in-up">
+            <div class="flex-shrink-0 pb-4 border-b flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-slate-800">Logika Pencairan & Dashboard</h3>
+                <button @click="hideModal" class="text-slate-400 hover:text-slate-600 text-2xl">×</button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto py-6 space-y-6">
+                <div class="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                    <h4 class="font-bold text-blue-800 mb-2">1. Apa Fungsi Halaman Ini?</h4>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Halaman ini digunakan untuk <strong>Audit Massal</strong>. Marketplace biasanya mencairkan dana beberapa hari setelah pesanan selesai. Anda cukup tempel ID Pesanan dari Excel pencairan marketplace ke sini untuk menandai uang sudah masuk ke rekening.
+                    </p>
+                </div>
 
+                <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+                    <h4 class="font-bold text-indigo-800 mb-2">2. Hubungan dengan Dashboard (PENTING)</h4>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Agar laporan keuangan Anda akurat, sistem memisahkan dua status:
+                    </p>
+                    <ul class="list-disc list-inside mt-3 space-y-2 text-sm text-slate-700">
+                        <li><strong>Belum Cair:</strong> Masuk ke kolom <strong>"Dana Gantung"</strong> di Dashboard (Belum dianggap laba karena uang belum Anda pegang).</li>
+                        <li><strong>Sudah Cair:</strong> Setelah Anda proses di halaman ini, transaksi tersebut baru akan dihitung sebagai <strong>Omset Bersih & Laba Bersih</strong> di Dashboard.</li>
+                    </ul>
+                </div>
+
+                <div class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-sm text-amber-800 italic">
+                    "Gunakan fitur ini setiap kali Anda menerima email/laporan pencairan dana dari marketplace agar angka Laba di Dashboard Anda selalu nyata."
+                </div>
+            </div>
+
+            <div class="flex-shrink-0 flex justify-end pt-4 border-t">
+                <button @click="hideModal" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-all active:scale-95">Saya Mengerti</button>
+            </div>
+        </div>
+    </div>
+    
 <div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
         <h3 class="text-lg font-bold text-slate-800 mb-2">Konfirmasi Aksi</h3>
