@@ -6109,23 +6109,28 @@ function printProduksiDetail(batch) {
 function printPurchaseInvoice(order) {
     if (!order) return;
     
+    // Mengambil Nama Brand dari Pengaturan
     const brandName = state.settings.brandName || 'FASHION OS';
     const totalTagihan = order.totalQtyValue || 0;
     const sudahDibayar = order.dibayarkan || 0;
     const sisa = totalTagihan - sudahDibayar;
-    const statusBayar = sisa <= 0 ? 'LUNAS' : (sudahDibayar > 0 ? 'DICICIL' : 'BELUM BAYAR');
+    
+    // Penentuan Status yang lebih pas untuk Reseller
+    let statusBayar = 'BELUM BAYAR';
+    if (sisa <= 0) statusBayar = 'LUNAS';
+    else if (sudahDibayar > 0) statusBayar = 'DICICIL';
 
     const closingScript = '<' + '/script>';
 
     const printContent = `
         <html>
         <head>
-            <title>Invoice #${order.id.slice(-6)}</title>
+            <title>Nota #${order.id.slice(-6)}</title>
             <style>
-                /* Pengaturan Dasar Kertas A4/HVS */
+                /* Pengaturan Kertas HVS / A4 */
                 @page {
                     size: A4 portrait;
-                    margin: 10mm;
+                    margin: 15mm;
                 }
 
                 * {
@@ -6134,141 +6139,129 @@ function printPurchaseInvoice(order) {
                 }
 
                 body { 
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                    color: #333; 
+                    font-family: 'Arial', sans-serif; 
+                    color: #1e293b; 
                     margin: 0; 
                     padding: 0; 
                     font-size: 12px;
                     background: white;
                 }
 
-                .invoice-box { 
+                .container { 
                     width: 100%;
-                    max-width: 190mm; /* Lebar maksimal A4 dikurangi margin */
+                    max-width: 190mm;
                     margin: auto;
-                    padding: 10px;
                 }
 
-                /* Header: Nama Brand & Judul */
+                /* Header: Nama Toko Anda */
                 .header { 
                     display: flex; 
                     justify-content: space-between; 
-                    align-items: flex-start;
-                    border-bottom: 3px solid #4f46e5; 
+                    align-items: center;
+                    border-bottom: 4px solid #1e293b; 
                     padding-bottom: 15px; 
-                    margin-bottom: 20px; 
+                    margin-bottom: 25px; 
                 }
 
-                .brand-section {
-                    flex: 1;
-                }
-
-                .brand-name { 
-                    font-size: 24px; 
+                .brand-section h1 { 
+                    font-size: 28px; 
                     font-weight: 900; 
-                    color: #4f46e5; 
+                    color: #1e293b; 
                     text-transform: uppercase;
                     margin: 0;
+                    letter-spacing: -1px;
                 }
 
-                .invoice-title-section {
+                .document-title {
                     text-align: right;
-                    flex: 1;
                 }
 
-                .invoice-title-section h2 {
+                .document-title h2 {
                     margin: 0;
-                    font-size: 20px;
-                    color: #1e293b;
+                    font-size: 18px;
+                    color: #475569;
+                    letter-spacing: 2px;
                 }
 
-                /* Info Section */
+                /* Detail Transaksi */
                 .info-grid { 
                     display: flex; 
                     justify-content: space-between; 
                     margin-bottom: 30px; 
                 }
 
-                .supplier-info {
-                    line-height: 1.5;
-                }
+                .info-box p { margin: 2px 0; }
+                .label-small { font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase; }
 
-                .status-container {
-                    text-align: right;
-                }
-
-                .status-stamp { 
+                .status-badge { 
                     border: 3px double #ef4444; 
                     color: #ef4444; 
-                    font-size: 18px; 
+                    font-size: 20px; 
                     font-weight: 900; 
-                    padding: 5px 15px; 
+                    padding: 5px 20px; 
                     transform: rotate(-10deg); 
                     display: inline-block;
                     text-transform: uppercase;
                     border-radius: 4px;
                 }
 
-                .status-lunas { 
-                    border-color: #10b981; 
-                    color: #10b981; 
-                }
+                .status-lunas { border-color: #10b981; color: #10b981; }
 
-                /* Tabel Produk */
+                /* Tabel Barang */
                 table { 
                     width: 100%; 
                     border-collapse: collapse; 
-                    margin-bottom: 20px; 
+                    margin-bottom: 30px; 
                 }
 
                 th { 
-                    background: #f8fafc; 
-                    padding: 10px; 
-                    border-bottom: 2px solid #e2e8f0; 
+                    background: #f1f5f9; 
+                    padding: 12px 10px; 
+                    border-bottom: 2px solid #cbd5e1; 
                     text-align: left; 
                     font-size: 11px;
-                    color: #64748b;
+                    color: #475569;
                 }
 
                 td { 
-                    padding: 10px; 
-                    border-bottom: 1px solid #f1f5f9; 
+                    padding: 12px 10px; 
+                    border-bottom: 1px solid #e2e8f0; 
                 }
 
-                /* Bagian Total */
-                .summary-wrapper {
+                /* Perhitungan Total */
+                .summary-section {
                     display: flex;
                     justify-content: flex-end;
                 }
 
                 .totals-table { 
-                    width: 250px;
+                    width: 280px;
                 }
 
                 .total-row { 
                     display: flex; 
                     justify-content: space-between; 
-                    padding: 4px 0; 
+                    padding: 6px 0; 
+                    font-size: 13px;
                 }
 
                 .grand-total { 
-                    border-top: 2px solid #4f46e5; 
-                    margin-top: 8px; 
-                    padding-top: 8px; 
+                    border-top: 2px solid #1e293b; 
+                    margin-top: 10px; 
+                    padding-top: 10px; 
                     font-weight: bold; 
-                    font-size: 14px; 
-                    color: #4f46e5; 
+                    font-size: 16px; 
                 }
 
                 .footer { 
-                    margin-top: 50px; 
+                    margin-top: 60px; 
                     font-size: 10px; 
                     color: #94a3b8; 
-                    border-top: 1px solid #f1f5f9; 
-                    padding-top: 15px; 
+                    border-top: 1px solid #e2e8f0; 
+                    padding-top: 20px;
+                    text-align: center;
                 }
 
-                /* Menghilangkan header/footer browser */
                 @media print {
                     body { margin: 0; }
                     .no-print { display: none; }
@@ -6276,34 +6269,35 @@ function printPurchaseInvoice(order) {
             </style>
         </head>
         <body>
-            <div class="invoice-box">
+            <div class="container">
                 <div class="header">
                     <div class="brand-section">
-                        <h1 class="brand-name">${brandName}</h1>
-                        <p style="margin:0; color:#64748b; font-size: 10px;">Official Purchase Record</p>
+                        <h1>${brandName}</h1>
+                        <p style="margin:0; font-weight: bold; color: #64748b;">LAPORAN PEMBELIAN BARANG</p>
                     </div>
-                    <div class="invoice-title-section">
-                        <h2>PURCHASE INVOICE</h2>
-                        <p style="margin:0; color:#64748b; font-family:monospace;">#${order.id.slice(-6).toUpperCase()}</p>
+                    <div class="document-title">
+                        <h2>NOTA RESMI</h2>
+                        <p style="margin:0; font-family:monospace; font-weight: bold;">Ref: #${order.id.slice(-6).toUpperCase()}</p>
                     </div>
                 </div>
 
                 <div class="info-grid">
-                    <div class="supplier-info">
-                        <p style="margin:0; font-size:10px; color:#64748b; font-weight:bold; text-transform:uppercase">Ditujukan Ke Supplier:</p>
-                        <p style="margin:0; font-size:14px; font-weight:bold">${order.supplierName}</p>
-                        <p style="margin:0">Tanggal: ${new Date(order.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                    <div class="info-box">
+                        <p class="label-small">Asal Gudang / Supplier:</p>
+                        <p style="font-size: 16px; font-weight: bold;">${order.supplierName}</p>
+                        <p class="label-small" style="margin-top:10px;">Waktu Pengambilan:</p>
+                        <p style="font-weight: bold;">${new Date(order.tanggal).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
                     </div>
-                    <div class="status-container">
-                        <div class="status-stamp ${sisa <= 0 ? 'status-lunas' : ''}">${statusBayar}</div>
+                    <div class="info-box" style="text-align: right;">
+                        <div class="status-badge ${sisa <= 0 ? 'status-lunas' : ''}">${statusBayar}</div>
                     </div>
                 </div>
 
                 <table>
                     <thead>
                         <tr>
-                            <th style="width: 50%">Deskripsi Produk</th>
-                            <th style="text-align: right">Harga</th>
+                            <th style="width: 55%">Deskripsi Produk & SKU</th>
+                            <th style="text-align: right">Harga Satuan</th>
                             <th style="text-align: center">Qty</th>
                             <th style="text-align: right">Subtotal</th>
                         </tr>
@@ -6312,43 +6306,44 @@ function printPurchaseInvoice(order) {
                         ${order.produk.map(p => `
                             <tr>
                                 <td>
-                                    <div style="font-weight:bold">${p.modelName}</div>
-                                    <div style="font-size:10px; color:#64748b">${p.sku} (${p.color}/${p.size})</div>
+                                    <div style="font-weight:bold; font-size: 13px;">${p.modelName}</div>
+                                    <div style="font-size:10px; color:#64748b; font-family: monospace;">SKU: ${p.sku} | Varian: ${p.color} - ${p.size}</div>
                                 </td>
                                 <td style="text-align: right">${formatCurrency(p.hargaJual)}</td>
-                                <td style="text-align: center">${p.qty}</td>
+                                <td style="text-align: center; font-weight: bold;">${p.qty}</td>
                                 <td style="text-align: right; font-weight:bold">${formatCurrency(p.hargaJual * p.qty)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
 
-                <div class="summary-wrapper">
+                <div class="summary-section">
                     <div class="totals-table">
                         <div class="total-row">
-                            <span>Total Tagihan</span>
+                            <span>Total Belanja</span>
                             <span>${formatCurrency(totalTagihan)}</span>
                         </div>
-                        <div class="total-row" style="color:#10b981">
-                            <span>Total Dibayar</span>
+                        <div class="total-row" style="color: #10b981; font-weight: bold;">
+                            <span>Total Sudah Dibayar</span>
                             <span>${formatCurrency(sudahDibayar)}</span>
                         </div>
                         <div class="total-row grand-total">
-                            <span>Sisa Tagihan</span>
-                            <span>${formatCurrency(sisa)}</span>
+                            <span>Sisa Hutang / Tagihan</span>
+                            <span style="color: ${sisa > 0 ? '#ef4444' : '#1e293b'}">${formatCurrency(sisa)}</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="footer">
-                    <p><strong>Catatan:</strong> ${order.catatan || '-'}</p>
-                    <p>Dicetak otomatis melalui Sistem Manajemen ${brandName} pada ${new Date().toLocaleString('id-ID')}.</p>
+                    <p><strong>Catatan Tambahan:</strong> ${order.catatan || 'Tidak ada catatan.'}</p>
+                    <p>Nota ini diterbitkan secara otomatis oleh sistem manajemen internal <strong>${brandName}</strong>.</p>
+                    <p>Waktu Cetak: ${new Date().toLocaleString('id-ID')}</p>
                 </div>
             </div>
             <script>
                 window.onload = function() { 
                     window.print(); 
-                    setTimeout(function() { window.close(); }, 500); 
+                    setTimeout(function() { window.close(); }, 1000); 
                 }
             ${closingScript}
         </body>
@@ -12375,14 +12370,14 @@ watch(activePage, (newPage, oldPage) => {
     </form>
 </div>
 
-<div v-if="uiState.modalType === 'viewPurchaseOrder'" class="bg-white rounded-lg shadow-2xl p-0 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
+<div v-if="uiState.modalType === 'viewPurchaseOrder'" class="bg-white rounded-lg shadow-2xl p-0 max-w-5xl w-full h-full md:max-h-[90vh] flex flex-col overflow-hidden animate-fade-in-up" @click.stop>
     <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
         <div>
             <h1 class="text-2xl font-black tracking-tighter">{{ state.settings.brandName }}</h1>
-            <p class="text-slate-400 text-xs uppercase tracking-widest">Official Purchase Invoice</p>
+            <p class="text-slate-400 text-xs uppercase tracking-widest">Bukti Pembelian Barang</p>
         </div>
         <div class="text-right">
-            <h2 class="text-xl font-bold">INVOICE</h2>
+            <h2 class="text-xl font-bold">NOTA PEMBELIAN</h2>
             <p class="font-mono text-sm">#{{ uiState.modalData.id.slice(-6).toUpperCase() }}</p>
         </div>
     </div>
@@ -12390,10 +12385,10 @@ watch(activePage, (newPage, oldPage) => {
     <div class="flex-1 overflow-y-auto p-8">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-8">
             <div>
-                <h4 class="text-xs font-bold text-slate-400 uppercase mb-2">Ditujukan Untuk:</h4>
+                <h4 class="text-xs font-bold text-slate-400 uppercase mb-2">Supplier / Gudang:</h4>
                 <p class="text-lg font-bold text-slate-800">{{ uiState.modalData.supplierName }}</p>
-                <p class="text-sm text-slate-500">Penerimaan barang dari gudang supplier.</p>
-                <p class="text-sm mt-4 text-slate-500">Tanggal: <span class="text-slate-800 font-semibold">{{ new Date(uiState.modalData.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}</span></p>
+                <p class="text-sm text-slate-500">Rincian pembelian dan pengambilan barang.</p>
+                <p class="text-sm mt-4 text-slate-500">Tanggal Ambil: <span class="text-slate-800 font-semibold">{{ new Date(uiState.modalData.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}</span></p>
             </div>
 
             <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100">
@@ -12415,12 +12410,12 @@ watch(activePage, (newPage, oldPage) => {
             </div>
         </div>
 
-        <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Rincian Item</h4>
+        <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Rincian Item Produk</h4>
         <div class="border rounded-xl overflow-hidden mb-8">
             <table class="w-full text-sm text-left">
                 <thead class="bg-slate-50 text-slate-600 font-bold uppercase text-[10px]">
                     <tr>
-                        <th class="p-4">Produk</th>
+                        <th class="p-4">Deskripsi Produk</th>
                         <th class="p-4 text-right">Harga Beli</th>
                         <th class="p-4 text-center">Qty</th>
                         <th class="p-4 text-right">Subtotal</th>
@@ -12441,7 +12436,7 @@ watch(activePage, (newPage, oldPage) => {
         </div>
 
         <div v-if="uiState.modalData.paymentHistory?.length > 0">
-            <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Log Pembayaran</h4>
+            <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Log Cicilan / Pembayaran</h4>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div v-for="(pay, idx) in uiState.modalData.paymentHistory" :key="idx" class="p-3 bg-white border rounded-xl flex justify-between items-center shadow-sm">
                     <div>
@@ -12457,12 +12452,8 @@ watch(activePage, (newPage, oldPage) => {
     <div class="bg-slate-50 p-6 border-t flex flex-wrap justify-between gap-4">
         <div class="flex gap-2">
             <button @click="printPurchaseInvoice(uiState.modalData)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 flex items-center gap-2 shadow-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                Cetak Nota
-            </button>
-            <button @click="exportInvoiceToExcel(uiState.modalData)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 flex items-center gap-2 shadow-sm">
-                <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M14.78 3.653a3.936 3.936 0 115.567 5.567l-3.627 3.627a3.936 3.936 0 01-5.567 0 3.936 3.936 0 010-5.567l3.627-3.627zm-3.045 4.385a2.146 2.146 0 100 4.292 2.146 2.146 0 000-4.292z"/></svg>
-                Export Excel
+                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                Cetak Nota Pembelian
             </button>
         </div>
         <button @click="hideModal" class="bg-slate-900 text-white font-bold py-2 px-8 rounded-lg hover:bg-slate-800 shadow-lg shadow-slate-900/20">Tutup</button>
