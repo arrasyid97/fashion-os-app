@@ -3523,26 +3523,36 @@ const dashboardKpis = computed(() => {
         let danaBelumCair = 0;
         let qtyBelumCair = 0;
 
+        // --- PROSES SETIAP TRANSAKSI DENGAN LOGIKA FILTER BARU ---
         (transaksi || []).forEach(trx => {
             const totalHppTrx = (trx.items || []).reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
             const totalBiayaTrx = trx.biaya?.total || 0;
             const trxQty = (trx.items || []).reduce((s, i) => s + i.qty, 0);
             
-            // Cek apakah data lama atau sudah dikonfirmasi cair
-            const isCair = !trx.statusPencairan || trx.statusPencairan === 'Sudah Cair';
+            // 1. Tentukan status transaksi
+            // Hanya transaksi yang sudah dikonfirmasi cair yang masuk ke laporan pendapatan
+            const isCair = trx.statusPencairan === 'Sudah Cair';
+            
+            // Transaksi baru (kosong), 'Belum Cair', atau 'Waiting' dianggap masih menggantung
+            const isPending = !trx.statusPencairan || trx.statusPencairan === 'Belum Cair' || trx.statusPencairan === 'Waiting';
 
             if (isCair) {
+                // A. JIKA SUDAH CAIR: Masuk ke perhitungan Omset, HPP, dan Laba
                 omsetKotorAwal += (trx.subtotal || 0);
                 totalDiskonAwal += (trx.diskon?.totalDiscount || 0);
                 totalHppTerjualAwal += totalHppTrx;
                 totalBiayaTransaksiAwal += totalBiayaTrx;
-            } else {
-                // --- PERBAIKAN DI SINI ---
-                // Dana Belum Cair = Omset Bersih - Biaya Marketplace (Alias HPP + Untung)
+            } else if (isPending) {
+                // B. JIKA MASIH GANTUNG: Masuk ke KPI "Dana Gantung"
+                // Dana Belum Cair = Omset Bersih - Biaya Marketplace (HPP + Laba Bersih yang akan diterima)
                 const payout = (trx.total || 0) - totalBiayaTrx;
                 danaBelumCair += payout;
                 qtyBelumCair += trxQty;
             }
+
+            // C. JIKA STATUS LAIN (Misal: 'Gagal Cair / Retur'):
+            // Sistem akan otomatis melewatinya. 
+            // Pesanannya hilang dari daftar gantung, tapi TIDAK menambah angka laba.
         });
 
         kpis.danaBelumCair = danaBelumCair;
@@ -8270,14 +8280,19 @@ const fetchSupplierData = async (userId, loadMore = false) => {
 
 const bulkSettlementInput = ref(''); // State untuk menampung data paste dari Excel
 
-async function processBulkSettlement() {
+async function processBulkSettlement(targetStatus = 'Sudah Cair') {
     if (!bulkSettlementInput.value.trim()) return alert("Tempelkan daftar ID Pesanan terlebih dahulu.");
     
-    // 1. Pecah teks berdasarkan baris atau koma, lalu bersihkan spasi
     const rawIds = bulkSettlementInput.value.split(/[\n,]+/).map(id => id.trim()).filter(id => id !== "");
-    const uniqueIds = [...new Set(rawIds)]; // Hapus duplikat
+    const uniqueIds = [...new Set(rawIds)];
 
-    if (!confirm(`Sistem mendeteksi ${uniqueIds.length} ID Pesanan. Tandai semuanya sebagai 'Sudah Cair'?`)) return;
+    // Sesuaikan pesan konfirmasi berdasarkan aksi
+    const isGugur = targetStatus.includes('Gagal');
+    const confirmMsg = isGugur 
+        ? `Sistem mendeteksi ${uniqueIds.length} ID. GUGURKAN pesanan ini (Batal/Retur)?` 
+        : `Sistem mendeteksi ${uniqueIds.length} ID. Tandai sebagai 'Sudah Cair'?`;
+
+    if (!confirm(confirmMsg)) return;
 
     isSaving.value = true;
     let countSuccess = 0;
@@ -8285,31 +8300,28 @@ async function processBulkSettlement() {
     try {
         const batch = writeBatch(db);
         
-        // 2. Loop semua ID yang di-paste
         uniqueIds.forEach(orderId => {
-            // Cari transaksi yang cocok di data lokal (state.transaksi)
             const foundTrx = state.transaksi.find(t => t.marketplaceOrderId === orderId);
             
-            // Hanya proses yang statusnya belum cair
-            if (foundTrx && foundTrx.statusPencairan !== 'Sudah Cair') {
+            // Proses jika transaksi ditemukan dan statusnya belum sesuai target
+            if (foundTrx && foundTrx.statusPencairan !== targetStatus) {
                 const docRef = doc(db, "transactions", foundTrx.id);
-                batch.update(docRef, { statusPencairan: 'Sudah Cair' });
+                batch.update(docRef, { statusPencairan: targetStatus });
                 
-                // Update tampilan lokal seketika agar dashboard langsung berubah
-                foundTrx.statusPencairan = 'Sudah Cair';
+                // Update tampilan lokal seketika
+                foundTrx.statusPencairan = targetStatus;
                 countSuccess++;
             }
         });
 
         if (countSuccess === 0) {
-            throw new Error("Tidak ada ID yang cocok dengan daftar 'Belum Cair' di aplikasi. Pastikan ID Pesanan sudah benar.");
+            throw new Error("Tidak ada ID yang cocok dengan daftar 'Belum Cair'. Periksa kembali ID Pesanan Anda.");
         }
 
-        // 3. Eksekusi massal ke Firebase
         await batch.commit();
         
-        alert(`Berhasil! ${countSuccess} pesanan dikonfirmasi cair. Laba di Dashboard telah diperbarui.`);
-        bulkSettlementInput.value = ''; // Kosongkan input setelah sukses
+        alert(`Berhasil! ${countSuccess} pesanan diperbarui menjadi: ${targetStatus}.`);
+        bulkSettlementInput.value = '';
 
     } catch (error) {
         console.error("Error mass settlement:", error);
@@ -9138,44 +9150,60 @@ watch(activePage, (newPage, oldPage) => {
 
 <div v-if="activePage === 'rekonsiliasi'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-50 p-4 sm:p-8">
     <div class="max-w-7xl mx-auto">
+        <!-- HEADER HALAMAN -->
         <div class="mb-8 animate-fade-in-up flex flex-wrap justify-between items-center gap-4">
-    <div>
-        <h2 class="text-3xl font-bold text-slate-800">Audit & Pencairan Dana</h2>
-        <p class="text-slate-500 mt-1">Sinkronisasi data pencairan marketplace dengan aplikasi.</p>
-    </div>
-    <button @click="showModal('rekonsiliasiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2 flex-shrink-0">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
-        Informasi & Logika
-    </button>
-</div>
+            <div>
+                <h2 class="text-3xl font-bold text-slate-800">Audit & Pencairan Dana</h2>
+                <p class="text-slate-500 mt-1">Sinkronisasi data pencairan marketplace dengan aplikasi.</p>
+            </div>
+            <button @click="showModal('rekonsiliasiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2 flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                Informasi & Logika
+            </button>
+        </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- BAGIAN 1: INPUT ID PESANAN -->
             <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
                 <h4 class="font-bold text-slate-700 mb-2">1. Tempel ID Pesanan</h4>
-                <p class="text-xs text-slate-500 mb-4">Buka Excel pencairan dana marketplace, salin kolom ID Pesanan, lalu tempel di bawah ini.</p>
+                <p class="text-xs text-slate-500 mb-4">Buka Excel pencairan marketplace, salin kolom ID Pesanan, lalu tempel di bawah ini.</p>
                 
                 <textarea 
                     v-model="bulkSettlementInput" 
-                    rows="15" 
+                    rows="12" 
                     class="w-full p-3 border rounded-lg font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
                     placeholder="Tempel ID Pesanan di sini...&#10;Contoh:&#10;240501ABC123&#10;240501XYZ456"
                 ></textarea>
 
-                <button 
-                    @click="processBulkSettlement" 
-                    :disabled="isSaving || !isSubscriptionActive" 
-                    class="mt-4 w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-600/30 disabled:bg-slate-400"
-                >
-                    <span v-if="isSaving">Memproses...</span>
-                    <span v-else>Konfirmasi Dana Cair</span>
-                </button>
+                <div class="flex flex-col gap-3 mt-4">
+                    <!-- Tombol untuk Uang yang Benar-benar Masuk -->
+                    <button 
+                        @click="processBulkSettlement('Sudah Cair')" 
+                        :disabled="isSaving || !isSubscriptionActive" 
+                        class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-all shadow-lg shadow-green-600/30 disabled:bg-slate-400"
+                    >
+                        <span v-if="isSaving">Memproses...</span>
+                        <span v-else>Konfirmasi Dana Cair (Uang Masuk)</span>
+                    </button>
+
+                    <!-- Tombol untuk Pesanan yang Retur/Batal (Menghilangkan dari Gantung) -->
+                    <button 
+                        @click="processBulkSettlement('Gagal Cair (Retur/Batal)')" 
+                        :disabled="isSaving || !isSubscriptionActive" 
+                        class="w-full bg-slate-200 text-slate-700 font-bold py-3 rounded-lg hover:bg-slate-300 border border-slate-300 transition-all disabled:bg-slate-100"
+                    >
+                        <span v-if="isSaving">...</span>
+                        <span v-else>Gugurkan Pesanan (Retur / Batal)</span>
+                    </button>
+                </div>
             </div>
 
+            <!-- BAGIAN 2: DAFTAR PESANAN GANTUNG -->
             <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
                 <div class="flex justify-between items-center mb-4">
                     <h4 class="font-bold text-slate-700">2. Daftar Pesanan Belum Cair (Gantung)</h4>
                     <span class="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">
-                        {{ state.transaksi.filter(t => t.statusPencairan === 'Belum Cair').length }} Pesanan
+                        {{ state.transaksi.filter(t => !t.statusPencairan || t.statusPencairan === 'Belum Cair').length }} Pesanan
                     </span>
                 </div>
 
@@ -9190,7 +9218,8 @@ watch(activePage, (newPage, oldPage) => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <tr v-for="trx in state.transaksi.filter(t => t.statusPencairan === 'Belum Cair')" :key="trx.id" class="hover:bg-yellow-50/50 transition-colors">
+                            <!-- Filter hanya menampilkan yang benar-benar belum cair -->
+                            <tr v-for="trx in state.transaksi.filter(t => !t.statusPencairan || t.statusPencairan === 'Belum Cair')" :key="trx.id" class="hover:bg-yellow-50/50 transition-colors">
                                 <td class="p-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
                                 <td class="p-4">
                                     <p class="font-mono font-bold text-indigo-600">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</p>
@@ -9202,7 +9231,7 @@ watch(activePage, (newPage, oldPage) => {
                                 </td>
                             </tr>
                             
-                            <tr v-if="state.transaksi.filter(t => t.statusPencairan === 'Belum Cair').length === 0">
+                            <tr v-if="state.transaksi.filter(t => !t.statusPencairan || t.statusPencairan === 'Belum Cair').length === 0">
                                 <td colspan="4" class="p-20 text-center">
                                     <div class="flex flex-col items-center">
                                         <div class="text-4xl mb-2">🎉</div>
