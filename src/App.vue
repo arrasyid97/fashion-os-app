@@ -303,6 +303,7 @@ roasDashboard: {
     adSpend: null,
     operationalBudget: null,
     taxPercent: null,
+    discount: 0,
 },
 
 roasCalculator: {
@@ -362,7 +363,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     investorPaymentStartYear: new Date().getFullYear(),
     investorPaymentEndYear: new Date().getFullYear(),
     investorPaymentSearch: '',
-
+    
 
     isPinConfirmModalVisible: false,
     pinConfirmInput: '',
@@ -3443,7 +3444,14 @@ const roasDashboardData = computed(() => {
     const roas = biayaIklan > 0 ? omset / biayaIklan : 0;
     const marginBersih = omset > 0 ? (labaBersih / omset) * 100 : 0;
 
-    const grossProfit = omset - totalHpp - biayaMarketplace - biayaOperasional - pajak;
+    const discount =
+    parseInputNumber(uiState.roasDashboard.discount);
+
+const grossProfit =
+    omset -
+    discount -
+    totalHpp -
+    biayaMarketplace;
 const bepRoas = grossProfit > 0 ? omset / grossProfit : 0;
 
     let status = 'Data belum cukup';
@@ -3465,6 +3473,7 @@ const bepRoas = grossProfit > 0 ? omset / grossProfit : 0;
     roas,
     marginBersih,
     bepRoas,
+    discount,
     targetCompetitive: uiState.roasDashboard.targetCompetitive,
     targetConservative: uiState.roasDashboard.targetConservative,
     targetProspective: uiState.roasDashboard.targetProspective,
@@ -11042,7 +11051,18 @@ watch(activePage, (newPage, oldPage) => {
                     <label class="block text-sm font-medium text-slate-700">Biaya Operasional</label>
                     <input type="number" v-model.number="uiState.roasDashboard.operationalBudget" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 50000">
                 </div>
+                <div>
+                   <label class="block text-sm font-medium text-slate-700">
+                   Diskon
+                  </label>
 
+    <input
+        type="number"
+        v-model.number="uiState.roasDashboard.discount"
+        class="mt-1 w-full p-2 border rounded-lg"
+        placeholder="Contoh: 2000"
+    >
+</div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Pajak (%)</label>
                     <input type="number" v-model.number="uiState.roasDashboard.taxPercent" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 0.5">
@@ -11107,9 +11127,17 @@ watch(activePage, (newPage, oldPage) => {
 
                 <div class="space-y-3">
                     <div class="flex justify-between border-b pb-2">
+                        <div class="flex justify-between border-b pb-2">
+    <span>Diskon</span>
+
+    <strong class="text-red-600">
+        -{{ formatCurrency(roasDashboardData.discount) }}
+    </strong>
+</div>
                         <span>HPP Terjual</span>
                         <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.totalHpp) }}</strong>
                     </div>
+                
                     <div class="flex justify-between border-b pb-2">
                         <span>Biaya Marketplace</span>
                         <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaMarketplace) }}</strong>
