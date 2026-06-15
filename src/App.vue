@@ -291,6 +291,20 @@ laporanKeuanganTahun: new Date().getFullYear(),
 laporanTransaksiTahun: new Date().getFullYear(),
 hargaHppSelectedModelName: '',
 
+roasDashboard: {
+    dateFilter: 'today',
+    startDate: '',
+    endDate: '',
+    startMonth: new Date().getMonth() + 1,
+    endMonth: new Date().getMonth() + 1,
+    startYear: new Date().getFullYear(),
+    endYear: new Date().getFullYear(),
+    channelId: 'all',
+    adSpend: null,
+    operationalBudget: null,
+    taxPercent: null,
+},
+
 roasCalculator: {
         hargaJual: 150000,
         modalProduk: 65000,
@@ -471,11 +485,15 @@ const loadDataForPage = async (pageName) => {
             
             // --- PENAMBAHAN CASE BARU DI SINI ---
             case 'panduan-baru':
-            case 'roas-calculator':
-                // Halaman-halaman ini tidak perlu memuat data apa pun
-                break;
-        }
+case 'roas-calculator':
+    break;
 
+case 'roas-dashboard':
+    dataPromises.push(fetchAllProductData(userId));
+    dataPromises.push(fetchTransactionAndReturnData(userId));
+    dataPromises.push(fetchKeuanganData());
+    break;
+}
         if (dataPromises.length > 0) {
             await Promise.all(dataPromises);
         }
@@ -485,9 +503,9 @@ const loadDataForPage = async (pageName) => {
         }
 
     } catch (error) {
-        console.error(`Failed to load data for page ${pageName}:`, error);
-    }
-};
+    console.error(`Failed to load data for page ${pageName}:`, error);
+}
+}
 
 const lastEditedModel = ref(null);
 const groupRefs = ref({});
@@ -3376,6 +3394,81 @@ const parseInputNumber = (value) => {
 
 
 // --- COMPUTED PROPERTIES ---
+
+const roasDashboardData = computed(() => {
+    let transaksi = state.transaksi || [];
+
+    transaksi = filterDataByDate(
+        transaksi,
+        uiState.roasDashboard.dateFilter,
+        uiState.roasDashboard.startDate,
+        uiState.roasDashboard.endDate,
+        uiState.roasDashboard.startMonth,
+        uiState.roasDashboard.startYear,
+        uiState.roasDashboard.endMonth,
+        uiState.roasDashboard.endYear
+    );
+
+    if (uiState.roasDashboard.channelId !== 'all') {
+        transaksi = transaksi.filter(t => 
+            t.channelId === uiState.roasDashboard.channelId || 
+            t.channel === uiState.roasDashboard.channelId
+        );
+    }
+
+    const omset = transaksi.reduce((sum, t) => sum + (t.total || 0), 0);
+    const totalOrder = transaksi.length;
+
+    const qtyTerjual = transaksi.reduce((sum, t) => {
+        return sum + (t.items || []).reduce((s, item) => s + (item.qty || 0), 0);
+    }, 0);
+
+    const totalHpp = transaksi.reduce((sum, t) => {
+        return sum + (t.items || []).reduce((s, item) => {
+            return s + ((item.hpp || 0) * (item.qty || 0));
+        }, 0);
+    }, 0);
+
+    const biayaMarketplace = transaksi.reduce((sum, t) => {
+        return sum + (t.biaya?.total || 0);
+    }, 0);
+
+    const biayaIklan = parseInputNumber(uiState.roasDashboard.adSpend);
+    const biayaOperasional = parseInputNumber(uiState.roasDashboard.operationalBudget);
+    const pajakPersen = parseFloat(uiState.roasDashboard.taxPercent) || 0;
+    const pajak = omset * (pajakPersen / 100);
+
+    const labaKotor = omset - totalHpp;
+    const labaBersih = omset - totalHpp - biayaMarketplace - biayaIklan - biayaOperasional - pajak;
+
+    const roas = biayaIklan > 0 ? omset / biayaIklan : 0;
+    const marginBersih = omset > 0 ? (labaBersih / omset) * 100 : 0;
+
+    const profitSebelumIklan = omset - totalHpp - biayaMarketplace - biayaOperasional - pajak;
+    const bepRoas = profitSebelumIklan > 0 ? omset / profitSebelumIklan : 0;
+
+    let status = 'Data belum cukup';
+    if (biayaIklan > 0 && labaBersih > 0) status = 'PROFIT';
+    if (biayaIklan > 0 && labaBersih <= 0) status = 'RUGI / PERLU OPTIMASI';
+
+    return {
+        omset,
+        totalOrder,
+        qtyTerjual,
+        totalHpp,
+        biayaMarketplace,
+        biayaIklan,
+        biayaOperasional,
+        pajak,
+        labaKotor,
+        labaBersih,
+        roas,
+        marginBersih,
+        bepRoas,
+        status
+    };
+});
+
 const dashboardFilteredData = computed(() => {
     // Memastikan konversi ke objek Date agar filter berfungsi dengan benar
     const mapToDateObject = (dataArray) => {
@@ -8555,6 +8648,12 @@ watch(activePage, (newPage, oldPage) => {
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01"/></svg>
                 Harga & HPP
             </a>
+            <a href="#" @click.prevent="changePage('roas-dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-dashboard' }">
+    <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3v18m4-14v14m4-10v10M5 13v8" />
+    </svg>
+    Dashboard ROAS
+</a>
             <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'promosi' }">
                 <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 8v-3c0-1.105.895-2 2-2z"/></svg>
                 Promosi
