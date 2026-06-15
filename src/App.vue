@@ -2403,6 +2403,9 @@ async function processBatchOrders() {
 
             let totalBiaya = 0;
             const biayaList = [];
+            
+            // Menghitung rasio sisa harga setelah dipotong diskon voucher secara global untuk antrian ini
+            const rasioBersih = subtotal > 0 ? (finalTotal / subtotal) : 1;
             let totalKomisiProduk = 0;
 
             // LOGIKA TOTAL KOMISI PRODUK TETAP DIJAGA UTUH
@@ -2411,20 +2414,21 @@ async function processBatchOrders() {
                 const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
                 const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
                 if (commissionRate > 0) {
-                    totalKomisiProduk += (commissionRate / 100) * (item.hargaJualAktual * item.qty);
+                    // Komisi Produk (Affiliate) disesuaikan agar dikali ke nilai bersih setelah diskon voucher
+                    totalKomisiProduk += (commissionRate / 100) * ((item.hargaJualAktual * item.qty) * rasioBersih);
                 }
             }
 
             if (totalKomisiProduk > 0) {
-                biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
-                totalBiaya += totalKomisiProduk;
+                biayaList.push({ name: 'Komisi Produk', value: Math.round(totalKomisiProduk) });
+                totalBiaya += Math.round(totalKomisiProduk);
             }
             
-            // --- ATURAN BARU SHOPEE: Pengali menggunakan finalTotal (Omset Bersih setelah diskon penjual) ---
-            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
-            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
-            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
-            if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
+            // Perhitungan biaya admin dan program shopee berdasarkan finalTotal (Omset Bersih) & dibulatkan ke Rupiah utuh
+            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: Math.round(val) }); totalBiaya += Math.round(val); }
+            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: Math.round(val) }); totalBiaya += Math.round(val); }
+            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: Math.round(val) }); totalBiaya += Math.round(val); }
+            if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * finalTotal; biayaList.push({ name: p.name, value: Math.round(val) }); totalBiaya += Math.round(val); } }); }
 
             const newTransactionData = {
                 marketplaceOrderId: order.marketplaceOrderId,
@@ -5179,6 +5183,9 @@ async function executeCompleteTransaction() {
     const biayaList = [];
     let totalBiaya = 0;
 
+    // Menghitung rasio sisa harga setelah dipotong diskon voucher secara global
+    const rasioBersih = summary.subtotal > 0 ? (summary.finalTotal / summary.subtotal) : 1;
+
     let totalKomisiProduk = 0;
     for (const item of activeCart.value) {
         const modelId = item.model_id;
@@ -5186,20 +5193,21 @@ async function executeCompleteTransaction() {
         const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
 
         if (commissionRate > 0) {
-            totalKomisiProduk += (commissionRate / 100) * (item.hargaJualAktual * item.qty);
+            // Komisi Produk (Affiliate) disesuaikan agar dikali ke nilai bersih setelah diskon voucher
+            totalKomisiProduk += (commissionRate / 100) * ((item.hargaJualAktual * item.qty) * rasioBersih);
         }
     }
 
     if (totalKomisiProduk > 0) {
-        biayaList.push({ name: 'Komisi Produk', value: totalKomisiProduk });
-        totalBiaya += totalKomisiProduk;
+        biayaList.push({ name: 'Komisi Produk', value: Math.round(totalKomisiProduk) });
+        totalBiaya += Math.round(totalKomisiProduk);
     }
 
-    // --- PERBAIKAN FIXED: Menggunakan 'summary.finalTotal' (Omset Bersih setelah potongan voucher toko sesuai aturan Shopee) ---
-    if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
-    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
-    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
-    if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.finalTotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
+    // Semua biaya admin dan program marketplace dihitung dari summary.finalTotal (Omset Bersih) & dibulatkan ke Rupiah utuh
+    if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: Math.round(val) }); totalBiaya += Math.round(val); }
+    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: Math.round(val) }); totalBiaya += Math.round(val); }
+    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: Math.round(val) }); totalBiaya += Math.round(val); }
+    if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.finalTotal; biayaList.push({ name: p.name, value: Math.round(val) }); totalBiaya += Math.round(val); } }); }
 
     const newTransactionData = {
         marketplaceOrderId: uiState.pos_order_id,
@@ -5220,24 +5228,18 @@ async function executeCompleteTransaction() {
         const transactionRef = doc(collection(db, "transactions"));
         batch.set(transactionRef, newTransactionData);
 
-        // --- PERBAIKAN STOK SUPAYA TIDAK NGACO (PAKAI INCREMENT) ---
         for (const item of activeCart.value) {
             const productRef = doc(db, "products", item.docId);
-            // increment(-qty) artinya kurangi stok langsung di server
-            // Tidak peduli stok sekarang berapa, dia akan dikurangi.
             batch.update(productRef, { physical_stock: increment(-item.qty) });
         }
-        // -----------------------------------------------------------
 
         await batch.commit();
 
-        // Update tampilan lokal agar user melihat perubahan tanpa refresh
         activeCart.value.forEach(item => {
             const productInState = state.produk.find(p => p.docId === item.docId);
             if (productInState) {
                 productInState.stokFisik -= item.qty;
             }
-             // Cari juga di inventoryPaginated dan update
              const invItem = state.inventoryPaginated.find(p => p.docId === item.docId);
              if (invItem) invItem.stokFisik -= item.qty;
         });
@@ -5247,7 +5249,7 @@ async function executeCompleteTransaction() {
         state.carts[uiState.activeCartChannel] = [];
         uiState.pos_order_id = '';
         hideModal();
-        alert("Transaksi berhasil disimpan! Potongan Shopee dihitung dari Omset Bersih.");
+        alert("Transaksi berhasil disimpan! Semua biaya marketplace telah sinkron.");
 
     } catch (error) {
         console.error("Error saat menyimpan transaksi:", error);
