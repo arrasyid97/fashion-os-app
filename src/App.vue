@@ -385,7 +385,9 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
 
 });
 
-
+const targetCompetitive = bepRoas * 1.7;
+const targetConservative = bepRoas * 2;
+const targetProspective = bepRoas * 4;
 
 const dataFetched = reactive({
   products: false,
@@ -3444,29 +3446,33 @@ const roasDashboardData = computed(() => {
     const roas = biayaIklan > 0 ? omset / biayaIklan : 0;
     const marginBersih = omset > 0 ? (labaBersih / omset) * 100 : 0;
 
-    const profitSebelumIklan = omset - totalHpp - biayaMarketplace - biayaOperasional - pajak;
-    const bepRoas = profitSebelumIklan > 0 ? omset / profitSebelumIklan : 0;
+    const grossProfit = omset - totalHpp - biayaMarketplace - biayaOperasional - pajak;
+const bepRoas = grossProfit > 0 ? omset / grossProfit : 0;
 
     let status = 'Data belum cukup';
     if (biayaIklan > 0 && labaBersih > 0) status = 'PROFIT';
     if (biayaIklan > 0 && labaBersih <= 0) status = 'RUGI / PERLU OPTIMASI';
 
     return {
-        omset,
-        totalOrder,
-        qtyTerjual,
-        totalHpp,
-        biayaMarketplace,
-        biayaIklan,
-        biayaOperasional,
-        pajak,
-        labaKotor,
-        labaBersih,
-        roas,
-        marginBersih,
-        bepRoas,
-        status
-    };
+    omset,
+    totalOrder,
+    qtyTerjual,
+    totalHpp,
+    biayaMarketplace,
+    biayaIklan,
+    biayaOperasional,
+    pajak,
+    labaKotor,
+    grossProfit,
+    labaBersih,
+    roas,
+    marginBersih,
+    bepRoas,
+    targetCompetitive: uiState.roasDashboard.targetCompetitive,
+    targetConservative: uiState.roasDashboard.targetConservative,
+    targetProspective: uiState.roasDashboard.targetProspective,
+    status
+};
 });
 
 const dashboardFilteredData = computed(() => {
@@ -11059,7 +11065,7 @@ watch(activePage, (newPage, oldPage) => {
             </div>
 
             <div class="bg-white p-5 rounded-2xl shadow border">
-                <p class="text-sm text-slate-500">BEP ROAS</p>
+                <p class="text-sm text-slate-500">Rugi ROAS (BEP)</p>
                 <p class="text-2xl font-bold text-orange-600">{{ roasDashboardData.bepRoas.toFixed(2) }}x</p>
             </div>
 
