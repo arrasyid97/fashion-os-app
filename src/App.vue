@@ -2371,10 +2371,11 @@ async function processBatchOrders() {
                 totalBiaya += totalKomisiProduk;
             }
             
-            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.subtotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
-    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
-    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.subtotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
-    if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.subtotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
+            // --- PERBAIKAN: Menggunakan 'subtotal' (Omset Kotor sebelum diskon voucher) sebagai dasar pengali biaya ---
+            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * subtotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
+            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
+            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * subtotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
+            if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * subtotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
 
             const newTransactionData = {
                 marketplaceOrderId: order.marketplaceOrderId,
@@ -5147,11 +5148,11 @@ async function executeCompleteTransaction() {
         totalBiaya += totalKomisiProduk;
     }
 
-    // --- PERBAIKAN: Dasar pengali diubah ke Omset Kotor (subtotal) sebelum potongan voucher ---
-            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * subtotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
-            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
-            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * subtotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
-            if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * subtotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
+    // --- PERBAIKAN FIXED: Menggunakan 'summary.subtotal' (Omset Kotor asli sebelum potongan voucher toko) ---
+    if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.subtotal; biayaList.push({ name: 'Administrasi', value: val }); totalBiaya += val; }
+    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: val }); totalBiaya += val; }
+    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.subtotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: val }); totalBiaya += val; }
+    if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.subtotal; biayaList.push({ name: p.name, value: val }); totalBiaya += val; } }); }
 
     const newTransactionData = {
         marketplaceOrderId: uiState.pos_order_id,
