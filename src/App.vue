@@ -2428,7 +2428,17 @@ async function processBatchOrders() {
             if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: Math.round(val) }); totalBiaya += Math.round(val); }
             if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: Math.round(val) }); totalBiaya += Math.round(val); }
             if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * finalTotal; biayaList.push({ name: p.name, value: Math.round(val) }); totalBiaya += Math.round(val); } }); }
+            // Perbaikan hitungan program tambahan massal (Bisa Persen atau Rupiah)
+            if (marketplace.programs && marketplace.programs.length > 0) {
+                marketplace.programs.forEach(p => {
+                    if (p.rate > 0) {
+                        // Jika type == 'fixed' gunakan nominal rupiah langsung, jika tidak hitung persentase dari finalTotal pesanan ini
+                        const val = p.type === 'fixed' ? p.rate : (p.rate / 100) * finalTotal;
+                        biayaList.push({ name: p.name, value: Math.round(val) });
+                        totalBiaya += Math.round(val);
+                    }
+                });
+            }
 
             const newTransactionData = {
                 marketplaceOrderId: order.marketplaceOrderId,
@@ -3104,19 +3114,7 @@ const authForm = reactive({
     referredBy: ''
 });
 
-function addProgram() {
-    const marketplace = uiState.modalData;
-    if (marketplace) {
-        if (!marketplace.programs) {
-            marketplace.programs = [];
-        }
-        marketplace.programs.push({
-            id: `program-${Date.now()}`,
-            name: '',
-            rate: 0
-        });
-    }
-}
+
 function removeProgram(programId) {
     const marketplace = uiState.modalData;
     if (marketplace && marketplace.programs) {
@@ -5207,7 +5205,16 @@ async function executeCompleteTransaction() {
     if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: Math.round(val) }); totalBiaya += Math.round(val); }
     if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: Math.round(val) }); totalBiaya += Math.round(val); }
     if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: Math.round(val) }); totalBiaya += Math.round(val); }
-    if (marketplace.programs && marketplace.programs.length > 0) { marketplace.programs.forEach(p => { if (p.rate > 0) { const val = (p.rate / 100) * summary.finalTotal; biayaList.push({ name: p.name, value: Math.round(val) }); totalBiaya += Math.round(val); } }); }
+    if (marketplace.programs && marketplace.programs.length > 0) {
+        marketplace.programs.forEach(p => {
+            if (p.rate > 0) {
+                // Jika type == 'fixed' gunakan nominal rupiah langsung, jika tidak hitung persentase dari finalTotal
+                const val = p.type === 'fixed' ? p.rate : (p.rate / 100) * summary.finalTotal;
+                biayaList.push({ name: p.name, value: Math.round(val) });
+                totalBiaya += Math.round(val);
+            }
+        });
+    }
 
     const newTransactionData = {
         marketplaceOrderId: uiState.pos_order_id,
@@ -14520,13 +14527,18 @@ watch(activePage, (newPage, oldPage) => {
         <div class="space-y-2 mt-6">
             <h4 class="font-semibold text-slate-700 mb-2">Program Marketplace</h4>
             <div v-for="(program, index) in uiState.modalData.programs" :key="program.id || index" class="flex items-center gap-2 mb-2">
-                <input type="text" v-model="program.name" placeholder="Nama Program" class="w-full p-2 border rounded-md text-sm">
-                
-                <input type="text" :value="programRateComputed(program).value" @input="programRateComputed(program).setValue($event.target.value)" placeholder="Rate (%)" class="w-24 p-2 border rounded-md text-sm text-right">
-                
-                <button type="button" @click="removeProgram(program.id)" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-            </div>
-            <button type="button" @click="addProgram()" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Program</button>
+    <input type="text" v-model="program.name" placeholder="Nama Program (misal: Promo Xtra)" class="w-full p-2 border rounded-md text-sm">
+    
+    <select v-model="program.type" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm border p-2 bg-white">
+        <option value="percentage">%</option>
+        <option value="fixed">Rp</option>
+    </select>
+
+    <input type="number" step="any" v-model.number="program.rate" placeholder="Nilai" class="w-24 p-2 border rounded-md text-sm text-right">
+    
+    <button type="button" @click="removeProgram(program.id)" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
+</div>
+<button type="button" @click="if (!uiState.modalData.programs) { uiState.modalData.programs = [] }; uiState.modalData.programs.push({ id: 'program-' + Date.now(), name: '', rate: 0, type: 'percentage' })" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Program</button>
         </div>
     </form>
     <div class="flex-shrink-0 flex justify-end gap-3 pt-4 border-t mt-4">
