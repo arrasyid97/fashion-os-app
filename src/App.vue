@@ -3394,7 +3394,7 @@ const parseInputNumber = (value) => {
 
 
 // --- COMPUTED PROPERTIES ---
-// eslint-disable-next-line no-unused-vars
+
 const roasDashboardData = computed(() => {
     let transaksi = state.transaksi || [];
 
@@ -11002,6 +11002,137 @@ watch(activePage, (newPage, oldPage) => {
                 </table>
             </div>
         </div>
+    </div>
+</div>
+
+<div v-if="activePage === 'roas-dashboard'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto animate-fade-in-up">
+
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-slate-800">Dashboard ROAS Iklan</h2>
+            <p class="text-slate-500 mt-1">
+                Pantau performa iklan berdasarkan data POS, HPP produk, biaya marketplace, dan anggaran iklan.
+            </p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow border border-slate-200 mb-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Filter & Anggaran</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Periode</label>
+                    <select v-model="uiState.roasDashboard.dateFilter" class="mt-1 w-full p-2 border rounded-lg">
+                        <option value="today">Hari Ini</option>
+                        <option value="last_7_days">7 Hari Terakhir</option>
+                        <option value="last_30_days">30 Hari Terakhir</option>
+                        <option value="this_month">Bulan Ini</option>
+                        <option value="all_time">Semua Data</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Biaya Iklan</label>
+                    <input type="number" v-model.number="uiState.roasDashboard.adSpend" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 100000">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Biaya Operasional</label>
+                    <input type="number" v-model.number="uiState.roasDashboard.operationalBudget" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 50000">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Pajak (%)</label>
+                    <input type="number" v-model.number="uiState.roasDashboard.taxPercent" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 0.5">
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
+            <div class="bg-white p-5 rounded-2xl shadow border">
+                <p class="text-sm text-slate-500">Omset</p>
+                <p class="text-2xl font-bold text-slate-800">{{ formatCurrency(roasDashboardData.omset) }}</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow border">
+                <p class="text-sm text-slate-500">ROAS</p>
+                <p class="text-2xl font-bold text-blue-700">{{ roasDashboardData.roas.toFixed(2) }}x</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow border">
+                <p class="text-sm text-slate-500">BEP ROAS</p>
+                <p class="text-2xl font-bold text-orange-600">{{ roasDashboardData.bepRoas.toFixed(2) }}x</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow border">
+                <p class="text-sm text-slate-500">Status</p>
+                <p class="text-xl font-bold" :class="roasDashboardData.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">
+                    {{ roasDashboardData.status }}
+                </p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow border">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">Ringkasan Penjualan</h3>
+
+                <div class="space-y-3">
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Total Order</span>
+                        <strong>{{ roasDashboardData.totalOrder }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Qty Terjual</span>
+                        <strong>{{ formatNumber(roasDashboardData.qtyTerjual) }} pcs</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Omset</span>
+                        <strong>{{ formatCurrency(roasDashboardData.omset) }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Laba Kotor</span>
+                        <strong>{{ formatCurrency(roasDashboardData.labaKotor) }}</strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Margin Bersih</span>
+                        <strong>{{ roasDashboardData.marginBersih.toFixed(2) }}%</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow border">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">Rincian Biaya</h3>
+
+                <div class="space-y-3">
+                    <div class="flex justify-between border-b pb-2">
+                        <span>HPP Terjual</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.totalHpp) }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Biaya Marketplace</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaMarketplace) }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Biaya Iklan</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaIklan) }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Biaya Operasional</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaOperasional) }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Estimasi Pajak</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.pajak) }}</strong>
+                    </div>
+                    <div class="flex justify-between pt-2 text-lg">
+                        <span class="font-bold">Laba Bersih</span>
+                        <strong :class="roasDashboardData.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">
+                            {{ formatCurrency(roasDashboardData.labaBersih) }}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
