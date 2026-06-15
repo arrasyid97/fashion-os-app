@@ -3435,7 +3435,7 @@ const roasDashboardData = computed(() => {
     const biayaIklan = parseInputNumber(uiState.roasDashboard.adSpend);
     const biayaOperasional = parseInputNumber(uiState.roasDashboard.operationalBudget);
     const pajakPersen = parseFloat(uiState.roasDashboard.taxPercent) || 0;
-    const pajak = omset * (pajakPersen / 100);
+    const pajak = biayaIklan * (pajakPersen / 100);
 
     const labaKotor = omset - totalHpp;
     const labaBersih = omset - totalHpp - biayaMarketplace - biayaIklan - biayaOperasional - pajak;
