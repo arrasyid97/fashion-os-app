@@ -3444,21 +3444,22 @@ const roasDashboardData = computed(() => {
     const roas = biayaIklan > 0 ? omset / biayaIklan : 0;
     const marginBersih = omset > 0 ? (labaBersih / omset) * 100 : 0;
 
-    const discount =
-    parseInputNumber(uiState.roasDashboard.discount);
+const discount = transaksi.reduce((sum, t) => {
+    const diskonValue = typeof t.diskon === 'object'
+        ? (t.diskon.totalDiscount || 0)
+        : (t.diskon || 0);
 
-const grossProfit =
-    omset -
-    discount -
-    totalHpp -
-    biayaMarketplace;
+    return sum + diskonValue;
+}, 0);
+
+const grossProfit = omset - discount - totalHpp - biayaMarketplace;
 const bepRoas = grossProfit > 0 ? omset / grossProfit : 0;
 
-    let status = 'Data belum cukup';
-    if (biayaIklan > 0 && labaBersih > 0) status = 'PROFIT';
-    if (biayaIklan > 0 && labaBersih <= 0) status = 'RUGI / PERLU OPTIMASI';
+let status = 'Data belum cukup';
+if (biayaIklan > 0 && labaBersih > 0) status = 'PROFIT';
+if (biayaIklan > 0 && labaBersih <= 0) status = 'RUGI / PERLU OPTIMASI';
 
-    return {
+return {
     omset,
     totalOrder,
     qtyTerjual,
@@ -3474,9 +3475,6 @@ const bepRoas = grossProfit > 0 ? omset / grossProfit : 0;
     marginBersih,
     bepRoas,
     discount,
-    targetCompetitive: uiState.roasDashboard.targetCompetitive,
-    targetConservative: uiState.roasDashboard.targetConservative,
-    targetProspective: uiState.roasDashboard.targetProspective,
     status
 };
 });
