@@ -451,11 +451,12 @@ const loadDataForPage = async (pageName) => {
                 dataPromises.push(fetchProductionData(userId));
                 break;
             case 'laporan-transaksi':
+            case 'laporan-keuangan': {
                 dataPromises.push(fetchSummaryData(userId));
+                // Ambil juga data transaksi mentah sebagai fallback jika cloud function belum merangkum
+                dataPromises.push(fetchTransactionAndReturnData(userId));
                 break;
-            case 'laporan-keuangan':
-                dataPromises.push(fetchSummaryData(userId));
-                break;
+            }
             case 'keuangan':
                 dataPromises.push(fetchKeuanganData());
                 break;
