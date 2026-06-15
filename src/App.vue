@@ -11050,18 +11050,7 @@ watch(activePage, (newPage, oldPage) => {
                     <label class="block text-sm font-medium text-slate-700">Biaya Operasional</label>
                     <input type="number" v-model.number="uiState.roasDashboard.operationalBudget" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 50000">
                 </div>
-                <div>
-                   <label class="block text-sm font-medium text-slate-700">
-                   Diskon
-                  </label>
-
-    <input
-        type="number"
-        v-model.number="uiState.roasDashboard.discount"
-        class="mt-1 w-full p-2 border rounded-lg"
-        placeholder="Contoh: 2000"
-    >
-</div>
+                
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Pajak (%)</label>
                     <input type="number" v-model.number="uiState.roasDashboard.taxPercent" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 0.5">
