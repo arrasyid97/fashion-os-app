@@ -1604,11 +1604,38 @@ const laporanKeuanganData = computed(() => {
     const summaryForYear = state.summaryData?.[`summary_${year}`];
     const months = [];
 
-    // Loop 12 bulan untuk membuat baris tabel
+    // --- LOGIKA CADANGAN: Ambil dari transaksi mentah jika summary Firebase kosong ---
+    const dataTransaksiMentah = state.transaksi || [];
+    const dataKeuanganMentah = state.keuangan || [];
+
     for (let i = 1; i <= 12; i++) {
         const monthStr = i.toString().padStart(2, '0');
         const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
-        const data = summaryForYear?.months?.[monthStr] || {};
+        
+        let data = summaryForYear?.months?.[monthStr] || null;
+
+        // Jika data dari server kosong, hitung manual secara real-time di lokal
+        if (!data) {
+            const trxBulanIni = dataTransaksiMentah.filter(t => {
+                const d = new Date(t.tanggal);
+                return d.getFullYear() === year && (d.getMonth() + 1) === i && t.statusPencairan === 'Sudah Cair';
+            });
+            const biayaBulanIni = dataKeuanganMentah.filter(k => {
+                const d = new Date(k.tanggal);
+                return d.getFullYear() === year && (d.getMonth() + 1) === i && k.jenis === 'pengeluaran';
+            });
+
+            const omsetKotor = trxBulanIni.reduce((sum, t) => sum + (t.subtotal || 0), 0);
+            const diskon = trxBulanIni.reduce((sum, t) => sum + (t.diskon?.totalDiscount || 0), 0);
+            const omsetBersih = omsetKotor - diskon;
+            const hppTerjual = trxBulanIni.reduce((sum, t) => sum + (t.items || []).reduce((s, item) => s + (item.hpp || 0) * item.qty, 0), 0);
+            const biayaTransaksi = trxBulanIni.reduce((sum, t) => sum + (t.biaya?.total || 0), 0);
+            const biayaOperasional = biayaBulanIni.reduce((sum, k) => sum + (k.jumlah || 0), 0);
+            const labaKotor = omsetBersih - hppTerjual;
+            const labaBersih = labaKotor - biayaTransaksi - biayaOperasional;
+
+            data = { omsetKotor, omsetBersih, labaKotor, biayaTransaksi, biayaOperasional: biayaOperasional, labaBersihOperasional: labaBersih };
+        }
 
         months.push({
             monthName: monthName,
@@ -1621,14 +1648,14 @@ const laporanKeuanganData = computed(() => {
         });
     }
     
-    // Ambil total tahunan yang sudah dihitung oleh Cloud Functions
+    // Hitung Total Tahunan
     const yearlyTotals = {
-        omsetKotor: summaryForYear?.yearlyTotals?.omsetKotor || 0,
-        omsetBersih: summaryForYear?.yearlyTotals?.omsetBersih || 0,
-        labaKotor: summaryForYear?.yearlyTotals?.labaKotor || 0,
-        labaBersih: summaryForYear?.yearlyTotals?.labaBersihOperasional || 0,
-        totalBiayaOperasional: summaryForYear?.yearlyTotals?.biayaOperasional || 0,
-        totalBiayaTransaksi: summaryForYear?.yearlyTotals?.biayaTransaksi || 0,
+        omsetKotor: months.reduce((sum, m) => sum + m.omsetKotor, 0),
+        omsetBersih: months.reduce((sum, m) => sum + m.omsetBersih, 0),
+        labaKotor: months.reduce((sum, m) => sum + m.labaKotor, 0),
+        labaBersih: months.reduce((sum, m) => sum + m.labaBersih, 0),
+        totalBiayaOperasional: months.reduce((sum, m) => sum + m.totalBiayaOperasional, 0),
+        totalBiayaTransaksi: months.reduce((sum, m) => sum + m.totalBiayaTransaksi, 0),
     };
 
     return { months, yearlyTotals };
@@ -1638,15 +1665,35 @@ const laporanTransaksiData = computed(() => {
     const year = uiState.laporanTransaksiTahun;
     const summaryForYear = state.summaryData?.[`summary_${year}`];
     const months = [];
+    const dataTransaksiMentah = state.transaksi || [];
 
     for (let i = 1; i <= 12; i++) {
         const monthStr = i.toString().padStart(2, '0');
         const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
-        const data = summaryForYear?.months?.[monthStr] || {};
+        
+        let data = summaryForYear?.months?.[monthStr] || null;
+
+        // Jika data dari server kosong, hitung manual secara real-time di lokal
+        if (!data) {
+            const trxBulanIni = dataTransaksiMentah.filter(t => {
+                const d = new Date(t.tanggal);
+                return d.getFullYear() === year && (d.getMonth() + 1) === i && t.statusPencairan === 'Sudah Cair';
+            });
+
+            const totalQty = trxBulanIni.reduce((sum, t) => sum + (t.items || []).reduce((s, item) => s + item.qty, 0), 0);
+            const omsetKotor = trxBulanIni.reduce((sum, t) => sum + (t.subtotal || 0), 0);
+            const totalDiskon = trxBulanIni.reduce((sum, t) => sum + (t.diskon?.totalDiscount || 0), 0);
+            const omsetBersih = omsetKotor - totalDiskon;
+            const hppTerjual = trxBulanIni.reduce((sum, t) => sum + (t.items || []).reduce((s, item) => s + (item.hpp || 0) * item.qty, 0), 0);
+            const biayaTransaksi = trxBulanIni.reduce((sum, t) => sum + (t.biaya?.total || 0), 0);
+            const labaKotor = omsetBersih - hppTerjual;
+
+            data = { totalQty, omsetKotor, totalDiskon, nilaiRetur: 0, omsetBersih, hppTerjual, biayaTransaksi, labaKotor };
+        }
 
         months.push({
             monthName: monthName,
-            totalQty: data.totalQty || 0, // <-- TAMBAHKAN INI
+            totalQty: data.totalQty || 0,
             omsetKotor: data.omsetKotor || 0,
             totalDiskon: data.totalDiskon || 0,
             totalNilaiRetur: data.nilaiRetur || 0,
@@ -1658,14 +1705,14 @@ const laporanTransaksiData = computed(() => {
     }
     
     const yearlyTotals = {
-        totalQty: summaryForYear?.yearlyTotals?.totalQty || 0, // <-- TAMBAHKAN INI
-        omsetKotor: summaryForYear?.yearlyTotals?.omsetKotor || 0,
-        totalDiskon: summaryForYear?.yearlyTotals?.totalDiskon || 0,
-        totalNilaiRetur: summaryForYear?.yearlyTotals?.nilaiRetur || 0,
-        omsetBersih: summaryForYear?.yearlyTotals?.omsetBersih || 0,
-        totalHppTerjual: summaryForYear?.yearlyTotals?.hppTerjual || 0,
-        totalBiayaTransaksi: summaryForYear?.yearlyTotals?.biayaTransaksi || 0,
-        labaKotor: summaryForYear?.yearlyTotals?.labaKotor || 0,
+        totalQty: months.reduce((sum, m) => sum + m.totalQty, 0),
+        omsetKotor: months.reduce((sum, m) => sum + m.omsetKotor, 0),
+        totalDiskon: months.reduce((sum, m) => sum + m.totalDiskon, 0),
+        totalNilaiRetur: months.reduce((sum, m) => sum + m.totalNilaiRetur, 0),
+        omsetBersih: months.reduce((sum, m) => sum + m.omsetBersih, 0),
+        totalHppTerjual: months.reduce((sum, m) => sum + m.totalHppTerjual, 0),
+        totalBiayaTransaksi: months.reduce((sum, m) => sum + m.totalBiayaTransaksi, 0),
+        labaKotor: months.reduce((sum, m) => sum + m.labaKotor, 0),
     };
 
     return { months, yearlyTotals };
