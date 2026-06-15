@@ -385,9 +385,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
 
 });
 
-const targetCompetitive = bepRoas * 1.7;
-const targetConservative = bepRoas * 2;
-const targetProspective = bepRoas * 4;
+
 
 const dataFetched = reactive({
   products: false,
