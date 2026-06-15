@@ -3273,14 +3273,7 @@ const layananComputed = computed({
     get() { return uiState.modalData.layanan ? uiState.modalData.layanan + '%' : ''; },
     set(newValue) { uiState.modalData.layanan = parsePercentageInput(newValue); }
 });
-const programRateComputed = (program) => ({
-    get value() {
-        return program.rate ? program.rate + '%' : '';
-    },
-    setValue(newValue) {
-        program.rate = parsePercentageInput(newValue);
-    }
-});
+
 
 
 const formatNumber = (value) => (value === null || value === undefined) ? '' : new Intl.NumberFormat('id-ID').format(value);
