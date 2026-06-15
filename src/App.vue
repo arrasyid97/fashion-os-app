@@ -3452,6 +3452,7 @@ const discount = transaksi.reduce((sum, t) => {
     return sum + diskonValue;
 }, 0);
 
+
 const grossProfit = omset - discount - totalHpp - biayaMarketplace;
 const bepRoas = grossProfit > 0 ? omset / grossProfit : 0;
 
