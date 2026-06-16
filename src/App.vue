@@ -3497,9 +3497,18 @@ if (uiState.roasDashboard.selectedModelId !== 'all') {
         }, 0);
     }, 0);
 
+
     const biayaMarketplace = transaksi.reduce((sum, t) => {
         return sum + (t.biaya?.total || 0);
     }, 0);
+
+    const discount = transaksi.reduce((sum, t) => {
+    const diskonValue = typeof t.diskon === 'object'
+        ? (t.diskon.totalDiscount || 0)
+        : (t.diskon || 0);
+
+    return sum + diskonValue;
+}, 0);
 
     const biayaIklan = parseInputNumber(uiState.roasDashboard.adSpend);
     const biayaOperasional = parseInputNumber(uiState.roasDashboard.operationalBudget);
@@ -3511,14 +3520,6 @@ if (uiState.roasDashboard.selectedModelId !== 'all') {
 
     const roas = biayaIklan > 0 ? omset / biayaIklan : 0;
     const marginBersih = omset > 0 ? (labaBersih / omset) * 100 : 0;
-
-const discount = transaksi.reduce((sum, t) => {
-    const diskonValue = typeof t.diskon === 'object'
-        ? (t.diskon.totalDiscount || 0)
-        : (t.diskon || 0);
-
-    return sum + diskonValue;
-}, 0);
 
 
 const grossProfit = omset - discount - totalHpp - biayaMarketplace;
