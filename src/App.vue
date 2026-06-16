@@ -3438,15 +3438,19 @@ if (uiState.roasDashboard.selectedModelId !== 'all') {
 
     transaksi = transaksi
         .map(t => {
-            const filteredItems = (t.items || []).filter(item => {
-                const productData = state.produk.find(p => p.sku === item.sku);
-                const modelData = state.settings.modelProduk.find(m =>
-                    m.id === item.model_id ||
-                    m.id === item.modelId ||
-                    m.id === productData?.model_id ||
-                    m.id === productData?.modelId
-                );
+            const originalItems = t.items || [];
 
+            const filteredItems = originalItems.filter(item => {
+                const productData = state.produk.find(p => p.sku === item.sku);
+
+                const modelId =
+                    item.model_id ||
+                    item.modelId ||
+                    productData?.model_id ||
+                    productData?.modelId ||
+                    '';
+
+                const modelData = state.settings.modelProduk.find(m => m.id === modelId);
                 const namaDasar = (modelData?.namaModel || '').split(' ')[0];
 
                 return namaDasar === selectedModelName;
@@ -3455,14 +3459,14 @@ if (uiState.roasDashboard.selectedModelId !== 'all') {
             if (filteredItems.length === 0) return null;
 
             const itemSubtotal = filteredItems.reduce((sum, item) => {
-                return sum + ((item.hargaJual || 0) * (item.qty || 0));
+                return sum + ((item.hargaJual || item.price || 0) * (item.qty || 0));
             }, 0);
 
-            const transaksiSubtotal = (t.items || []).reduce((sum, item) => {
-                return sum + ((item.hargaJual || 0) * (item.qty || 0));
+            const transaksiSubtotal = originalItems.reduce((sum, item) => {
+                return sum + ((item.hargaJual || item.price || 0) * (item.qty || 0));
             }, 0);
 
-            const ratio = transaksiSubtotal > 0 ? itemSubtotal / transaksiSubtotal : 0;
+            const ratio = transaksiSubtotal > 0 ? itemSubtotal / transaksiSubtotal : 1;
 
             return {
                 ...t,
