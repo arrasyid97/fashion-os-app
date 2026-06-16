@@ -3510,6 +3510,7 @@ if (uiState.roasDashboard.selectedModelId !== 'all') {
     return sum + diskonValue;
 }, 0);
 
+
     const biayaIklan = parseInputNumber(uiState.roasDashboard.adSpend);
     const biayaOperasional = parseInputNumber(uiState.roasDashboard.operationalBudget);
     const pajakPersen = parseFloat(uiState.roasDashboard.taxPercent) || 0;
