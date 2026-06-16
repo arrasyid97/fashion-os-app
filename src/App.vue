@@ -5316,7 +5316,16 @@ async function executeCompleteTransaction() {
     const newTransactionData = {
         marketplaceOrderId: uiState.pos_order_id,
         tanggal: new Date(),
-        items: activeCart.value.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
+        items: activeCart.value.map(i => ({
+    sku: i.sku,
+    qty: i.qty,
+    hargaJual: i.hargaJualAktual,
+    hpp: i.hpp,
+    model_id: i.model_id || i.modelId || '',
+    nama: i.nama || i.product_name || '',
+    warna: i.warna || i.color || '',
+    varian: i.varian || i.variant || ''
+})),
         subtotal: summary.subtotal,
         diskon: summary.discount,
         total: summary.finalTotal,
