@@ -3436,21 +3436,20 @@ const roasDashboardData = computed(() => {
 if (uiState.roasDashboard.selectedModelId !== 'all') {
     const selectedModelName = uiState.roasDashboard.selectedModelId;
 
-    const selectedModelIds = (state.settings.modelProduk || [])
-        .filter(model => model.namaModel === selectedModelName)
-        .map(model => model.id);
-
     transaksi = transaksi
         .map(t => {
             const filteredItems = (t.items || []).filter(item => {
                 const productData = state.produk.find(p => p.sku === item.sku);
-
-                return (
-                    selectedModelIds.includes(item.model_id) ||
-                    selectedModelIds.includes(item.modelId) ||
-                    selectedModelIds.includes(productData?.model_id) ||
-                    selectedModelIds.includes(productData?.modelId)
+                const modelData = state.settings.modelProduk.find(m =>
+                    m.id === item.model_id ||
+                    m.id === item.modelId ||
+                    m.id === productData?.model_id ||
+                    m.id === productData?.modelId
                 );
+
+                const namaDasar = (modelData?.namaModel || '').split(' ')[0];
+
+                return namaDasar === selectedModelName;
             });
 
             if (filteredItems.length === 0) return null;
