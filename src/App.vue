@@ -3408,6 +3408,7 @@ const uniqueRoasModels = computed(() => {
 
     return Array.from(modelMap.values());
 });
+console.log('MODEL PRODUK', state.settings.modelProduk);
 const roasDashboardData = computed(() => {
     let transaksi = state.transaksi || [];
 
