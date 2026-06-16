@@ -3399,16 +3399,20 @@ const uniqueRoasModels = computed(() => {
     const modelMap = new Map();
 
     (state.settings.modelProduk || []).forEach(model => {
-        if (model.namaModel && !modelMap.has(model.namaModel)) {
-            modelMap.set(model.namaModel, {
-                namaModel: model.namaModel
+        const namaDasar = (model.namaModel || '').split(' ')[0];
+
+        if (namaDasar && !modelMap.has(namaDasar)) {
+            modelMap.set(namaDasar, {
+                namaModel: namaDasar
             });
         }
     });
 
-    return Array.from(modelMap.values());
+    return Array.from(modelMap.values()).sort((a, b) =>
+        a.namaModel.localeCompare(b.namaModel)
+    );
 });
-console.log('MODEL PRODUK', state.settings.modelProduk);
+
 const roasDashboardData = computed(() => {
     let transaksi = state.transaksi || [];
 
