@@ -3484,7 +3484,7 @@ if (uiState.roasDashboard.selectedModelId !== 'all') {
         })
         .filter(Boolean);
 }
-    const omset = transaksi.reduce((sum, t) => sum + (t.total || 0), 0);
+    const omset = transaksi.reduce((sum, t) => sum + (t.subtotal || t.total || 0), 0);
     const totalOrder = transaksi.length;
 
     const qtyTerjual = transaksi.reduce((sum, t) => {
@@ -3507,7 +3507,7 @@ if (uiState.roasDashboard.selectedModelId !== 'all') {
     const pajak = biayaIklan * (pajakPersen / 100);
 
     const labaKotor = omset - totalHpp;
-    const labaBersih = omset - totalHpp - biayaMarketplace - biayaIklan - biayaOperasional - pajak;
+    const labaBersih = omset - discount - totalHpp - biayaMarketplace - biayaIklan - biayaOperasional - pajak;
 
     const roas = biayaIklan > 0 ? omset / biayaIklan : 0;
     const marginBersih = omset > 0 ? (labaBersih / omset) * 100 : 0;
