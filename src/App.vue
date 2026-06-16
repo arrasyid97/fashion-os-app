@@ -300,6 +300,7 @@ roasDashboard: {
     startYear: new Date().getFullYear(),
     endYear: new Date().getFullYear(),
     channelId: 'all',
+    selectedModelId: 'all',
     adSpend: null,
     operationalBudget: null,
     taxPercent: null,
@@ -3415,7 +3416,42 @@ const roasDashboardData = computed(() => {
             t.channel === uiState.roasDashboard.channelId
         );
     }
+if (uiState.roasDashboard.selectedModelId !== 'all') {
+    transaksi = transaksi
+        .map(t => {
+            const filteredItems = (t.items || []).filter(item =>
+                item.model_id === uiState.roasDashboard.selectedModelId ||
+                item.modelId === uiState.roasDashboard.selectedModelId
+            );
 
+            if (filteredItems.length === 0) return null;
+
+            const itemSubtotal = filteredItems.reduce((sum, item) => {
+                return sum + ((item.hargaJual || 0) * (item.qty || 0));
+            }, 0);
+
+            const transaksiSubtotal = (t.items || []).reduce((sum, item) => {
+                return sum + ((item.hargaJual || 0) * (item.qty || 0));
+            }, 0);
+
+            const ratio = transaksiSubtotal > 0 ? itemSubtotal / transaksiSubtotal : 0;
+
+            return {
+                ...t,
+                items: filteredItems,
+                total: itemSubtotal,
+                subtotal: itemSubtotal,
+                diskon: typeof t.diskon === 'object'
+                    ? { ...t.diskon, totalDiscount: (t.diskon.totalDiscount || 0) * ratio }
+                    : (t.diskon || 0) * ratio,
+                biaya: {
+                    ...(t.biaya || {}),
+                    total: (t.biaya?.total || 0) * ratio
+                }
+            };
+        })
+        .filter(Boolean);
+}
     const omset = transaksi.reduce((sum, t) => sum + (t.total || 0), 0);
     const totalOrder = transaksi.length;
 
@@ -11049,6 +11085,20 @@ watch(activePage, (newPage, oldPage) => {
                         <option value="all_time">Semua Data</option>
                     </select>
                 </div>
+
+<div>
+    <label class="block text-sm font-medium text-slate-700">Model Produk</label>
+    <select v-model="uiState.roasDashboard.selectedModelId" class="mt-1 w-full p-2 border rounded-lg">
+        <option value="all">Semua Model</option>
+        <option
+            v-for="model in state.settings.modelProduk"
+            :key="model.id"
+            :value="model.id"
+        >
+            {{ model.namaModel }}
+        </option>
+    </select>
+</div>
 
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Biaya Iklan</label>
