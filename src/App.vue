@@ -3395,7 +3395,19 @@ const parseInputNumber = (value) => {
 
 
 // --- COMPUTED PROPERTIES ---
+const uniqueRoasModels = computed(() => {
+    const modelMap = new Map();
 
+    (state.settings.modelProduk || []).forEach(model => {
+        if (model.namaModel && !modelMap.has(model.namaModel)) {
+            modelMap.set(model.namaModel, {
+                namaModel: model.namaModel
+            });
+        }
+    });
+
+    return Array.from(modelMap.values());
+});
 const roasDashboardData = computed(() => {
     let transaksi = state.transaksi || [];
 
@@ -3417,12 +3429,24 @@ const roasDashboardData = computed(() => {
         );
     }
 if (uiState.roasDashboard.selectedModelId !== 'all') {
+    const selectedModelName = uiState.roasDashboard.selectedModelId;
+
+    const selectedModelIds = (state.settings.modelProduk || [])
+        .filter(model => model.namaModel === selectedModelName)
+        .map(model => model.id);
+
     transaksi = transaksi
         .map(t => {
-            const filteredItems = (t.items || []).filter(item =>
-                item.model_id === uiState.roasDashboard.selectedModelId ||
-                item.modelId === uiState.roasDashboard.selectedModelId
-            );
+            const filteredItems = (t.items || []).filter(item => {
+                const productData = state.produk.find(p => p.sku === item.sku);
+
+                return (
+                    selectedModelIds.includes(item.model_id) ||
+                    selectedModelIds.includes(item.modelId) ||
+                    selectedModelIds.includes(productData?.model_id) ||
+                    selectedModelIds.includes(productData?.modelId)
+                );
+            });
 
             if (filteredItems.length === 0) return null;
 
@@ -11091,12 +11115,12 @@ watch(activePage, (newPage, oldPage) => {
     <select v-model="uiState.roasDashboard.selectedModelId" class="mt-1 w-full p-2 border rounded-lg">
         <option value="all">Semua Model</option>
         <option
-            v-for="model in state.settings.modelProduk"
-            :key="model.id"
-            :value="model.id"
-        >
-            {{ model.namaModel }}
-        </option>
+    v-for="model in uniqueRoasModels"
+    :key="model.namaModel"
+    :value="model.namaModel"
+>
+    {{ model.namaModel }}
+</option>
     </select>
 </div>
 
