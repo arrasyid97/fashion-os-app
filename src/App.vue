@@ -11121,6 +11121,20 @@ watch(activePage, (newPage, oldPage) => {
                 </div>
 
 <div>
+    <label class="block text-sm font-medium text-slate-700">Channel Penjualan</label>
+    <select v-model="uiState.roasDashboard.channelId" class="mt-1 w-full p-2 border rounded-lg">
+        <option value="all">Semua Channel</option>
+        <option
+            v-for="channel in state.settings.marketplaces"
+            :key="channel.id"
+            :value="channel.id"
+        >
+            {{ channel.name }}
+        </option>
+    </select>
+</div>
+
+<div>
     <label class="block text-sm font-medium text-slate-700">Model Produk</label>
     <select v-model="uiState.roasDashboard.selectedModelId" class="mt-1 w-full p-2 border rounded-lg">
         <option value="all">Semua Model</option>
