@@ -5548,6 +5548,24 @@ function calculateBestDiscount(cart, channelId) {
     });
 }
 
+function getMarketplaceFeeValue(fee, price) {
+    const value = parseFloat(fee?.rate ?? fee?.value ?? fee ?? 0) || 0;
+    const type = fee?.type || fee?.feeType || fee?.jenis || 'percent';
+
+    if (type === 'rupiah' || type === 'nominal' || type === 'fixed') {
+        return value;
+    }
+
+    return price * (value / 100);
+}
+
+function getMarketplaceFeeRate(fee) {
+    const value = parseFloat(fee?.rate ?? fee?.value ?? fee ?? 0) || 0;
+    const type = fee?.type || fee?.feeType || fee?.jenis || 'percent';
+
+    return (type === 'rupiah' || type === 'nominal' || type === 'fixed') ? 0 : value / 100;
+}
+
 function calculateSellingPrice() {
     const { hpp, targetMargin, selectedMarketplace, selectedModelName } = uiState.priceCalculator;
 
@@ -5578,26 +5596,41 @@ function calculateSellingPrice() {
     const discountInfo = calculateBestDiscount([dummyProduct], selectedMarketplace);
     const bestDiscountRate = (discountInfo.rate || 0) / 100;
 
-    const totalMarketplacePercentageFees = (mp.adm || 0) + (mp.layanan || 0);
-    const perOrderFee = mp.perPesanan || 0;
-    const targetProfitPercentage = (targetMargin || 0) / 100;
+    const perOrderFee = parseFloat(mp.perPesanan || 0) || 0;
+const targetProfitPercentage = (targetMargin || 0) / 100;
 
-    const itemizedProgramFeesBase = (mp.programs || []).map(p => (parseFloat(p.rate) || 0) / 100);
-    const totalProgramPercentage = itemizedProgramFeesBase.reduce((sum, rate) => sum + rate, 0);
+const adminRate = getMarketplaceFeeRate(mp.adm);
+const layananRate = getMarketplaceFeeRate(mp.layanan);
 
-    const allPercentageFees = (totalMarketplacePercentageFees / 100) + targetProfitPercentage + bestDiscountRate + totalProgramPercentage + commissionRate;
-    
-    const calculatedPrice = (hpp + perOrderFee) / (1 - allPercentageFees);
+const programRates = (mp.programs || []).map(p => getMarketplaceFeeRate(p));
+const totalProgramPercentage = programRates.reduce((sum, rate) => sum + rate, 0);
 
-    const adminFee = calculatedPrice * (mp.adm || 0) / 100;
-    const commission = calculatedPrice * commissionRate;
-    const serviceFee = calculatedPrice * (mp.layanan || 0) / 100;
+const allPercentageFees =
+    adminRate +
+    layananRate +
+    targetProfitPercentage +
+    bestDiscountRate +
+    totalProgramPercentage +
+    commissionRate;
+
+const calculatedPrice = (hpp + perOrderFee) / (1 - allPercentageFees);
+
+const adminFee = getMarketplaceFeeValue(mp.adm, calculatedPrice);
+const commission = calculatedPrice * commissionRate;
+const serviceFee = getMarketplaceFeeValue(mp.layanan, calculatedPrice);
     const bestDiscount = calculatedPrice * bestDiscountRate;
 
     const itemizedProgramFees = (mp.programs || []).map(program => {
-        const rate = parseFloat(program.rate) || 0;
-        return { name: program.name, rate: rate, fee: calculatedPrice * (rate / 100) };
-    });
+    const value = parseFloat(program.rate ?? program.value ?? 0) || 0;
+    const type = program.type || program.feeType || program.jenis || 'percent';
+
+    return {
+        name: program.name,
+        rate: type === 'rupiah' || type === 'nominal' || type === 'fixed' ? 0 : value,
+        type,
+        fee: getMarketplaceFeeValue(program, calculatedPrice)
+    };
+});
     const totalProgramFeeValue = itemizedProgramFees.reduce((sum, item) => sum + item.fee, 0);
 
     const totalFees = adminFee + commission + serviceFee + totalProgramFeeValue + perOrderFee;
