@@ -5035,6 +5035,48 @@ function generateBagiHasilReport() {
 
 function changePage(pageName) {
     activePage.value = pageName;
+    localStorage.setItem('lastActivePage', pageName);
+
+    const sidebarPageGroups = {
+        inventaris: 'produk',
+        'harga-hpp': 'produk',
+        promosi: 'produk',
+
+        produksi: 'produksi',
+        supplier: 'produksi',
+        'gudang-kain': 'produksi',
+
+        transaksi: 'penjualan',
+        bulk_process: 'penjualan',
+        rekonsiliasi: 'penjualan',
+        retur: 'penjualan',
+
+        keuangan: 'keuangan',
+        'roas-dashboard': 'keuangan',
+        'roas-calculator': 'keuangan',
+        investasi: 'keuangan',
+        'laporan-transaksi': 'keuangan',
+        'laporan-keuangan': 'keuangan',
+
+        mitra: 'sistem',
+        pengaturan: 'sistem',
+
+        langganan: 'bantuan',
+        'panduan-baru': 'bantuan',
+        'barcode-generator': 'bantuan',
+        panduan: 'bantuan',
+        tentang: 'bantuan'
+    };
+
+    const targetGroup = sidebarPageGroups[pageName];
+
+    if (targetGroup) {
+        Object.keys(uiState.sidebarGroups).forEach(key => {
+            uiState.sidebarGroups[key] = false;
+        });
+
+        uiState.sidebarGroups[targetGroup] = true;
+    }
 
     // Logika Kunci Halaman Dashboard
     if (pageName === 'dashboard') {
@@ -5069,7 +5111,6 @@ function changePage(pageName) {
         }
     }
 
-    // --- LOGIKA BARU DIMULAI DI SINI ---
     // Logika Kunci Laporan Transaksi
     if (pageName === 'laporan-transaksi') {
         if (state.settings.dashboardPin && state.settings.pinProtection?.laporanTransaksi) {
