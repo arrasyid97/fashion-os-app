@@ -91,6 +91,13 @@ const state = reactive({
 
 const uiState = reactive({
     activeAccordion: null,
+    sidebarGroups: {
+    produk: true,
+    produksi: false,
+    penjualan: false,
+    keuangan: false,
+    sistem: false
+},
     activeCartChannel: null,
 
     massUpdateVariants: [],
@@ -387,6 +394,9 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
 
 });
 
+function toggleSidebarGroup(group) {
+    uiState.sidebarGroups[group] = !uiState.sidebarGroups[group];
+}
 
 const dataFetched = reactive({
   products: false,
@@ -8802,114 +8812,77 @@ watch(activePage, (newPage, oldPage) => {
         Dashboard
     </a>
 
-    <div class="pt-4">
-        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Produk</p>
-
-        <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">
+    <button type="button" @click="toggleSidebarGroup('produk')" class="w-full sidebar-link justify-between">
+        <span class="flex items-center">
             <span class="w-6 mr-3 text-center">📦</span>
-            Inventaris
-        </a>
+            Produk
+        </span>
+        <span>{{ uiState.sidebarGroups.produk ? '▲' : '▼' }}</span>
+    </button>
 
-        <a href="#" @click.prevent="changePage('harga-hpp')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'harga-hpp' }">
-            <span class="w-6 mr-3 text-center">💰</span>
-            Harga & HPP
-        </a>
-
-        <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'promosi' }">
-            <span class="w-6 mr-3 text-center">🏷️</span>
-            Promosi
-        </a>
+    <div v-show="uiState.sidebarGroups.produk" class="ml-4 space-y-1">
+        <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">Inventaris</a>
+        <a href="#" @click.prevent="changePage('harga-hpp')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'harga-hpp' }">Harga & HPP</a>
+        <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'promosi' }">Promosi</a>
     </div>
 
-    <div class="pt-4">
-        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Produksi</p>
-
-        <a href="#" @click.prevent="changePage('produksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'produksi' }">
+    <button type="button" @click="toggleSidebarGroup('produksi')" class="w-full sidebar-link justify-between">
+        <span class="flex items-center">
             <span class="w-6 mr-3 text-center">🏭</span>
             Produksi
-        </a>
+        </span>
+        <span>{{ uiState.sidebarGroups.produksi ? '▲' : '▼' }}</span>
+    </button>
 
-        <a href="#" @click.prevent="changePage('supplier')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'supplier' }">
-            <span class="w-6 mr-3 text-center">🚚</span>
-            Manajemen Supplier
-        </a>
-
-        <a href="#" @click.prevent="changePage('gudang-kain')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'gudang-kain' }">
-            <span class="w-6 mr-3 text-center">🧵</span>
-            Stok Kain
-        </a>
+    <div v-show="uiState.sidebarGroups.produksi" class="ml-4 space-y-1">
+        <a href="#" @click.prevent="changePage('produksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'produksi' }">Produksi</a>
+        <a href="#" @click.prevent="changePage('supplier')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'supplier' }">Manajemen Supplier</a>
+        <a href="#" @click.prevent="changePage('gudang-kain')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'gudang-kain' }">Stok Kain</a>
     </div>
 
-    <div class="pt-4">
-        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Penjualan</p>
-
-        <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">
+    <button type="button" @click="toggleSidebarGroup('penjualan')" class="w-full sidebar-link justify-between">
+        <span class="flex items-center">
             <span class="w-6 mr-3 text-center">🛒</span>
-            Kasir (POS)
-        </a>
+            Penjualan
+        </span>
+        <span>{{ uiState.sidebarGroups.penjualan ? '▲' : '▼' }}</span>
+    </button>
 
-        <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">
-            <span class="w-6 mr-3 text-center">⚡</span>
-            Proses Massal
-        </a>
-
-        <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">
-            <span class="w-6 mr-3 text-center">✅</span>
-            Cek Pencairan Dana
-        </a>
-
-        <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">
-            <span class="w-6 mr-3 text-center">↩️</span>
-            Manajemen Retur
-        </a>
+    <div v-show="uiState.sidebarGroups.penjualan" class="ml-4 space-y-1">
+        <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">Kasir (POS)</a>
+        <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Proses Massal</a>
+        <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">Cek Pencairan Dana</a>
+        <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
     </div>
 
-    <div class="pt-4">
-        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Keuangan</p>
-
-        <a href="#" @click.prevent="changePage('keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'keuangan' }">
-            <span class="w-6 mr-3 text-center">💵</span>
+    <button type="button" @click="toggleSidebarGroup('keuangan')" class="w-full sidebar-link justify-between">
+        <span class="flex items-center">
+            <span class="w-6 mr-3 text-center">💰</span>
             Keuangan
-        </a>
+        </span>
+        <span>{{ uiState.sidebarGroups.keuangan ? '▲' : '▼' }}</span>
+    </button>
 
-        <a href="#" @click.prevent="changePage('roas-dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-dashboard' }">
-            <span class="w-6 mr-3 text-center">📊</span>
-            Dashboard ROAS
-        </a>
-
-        <a href="#" @click.prevent="changePage('roas-calculator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-calculator' }">
-            <span class="w-6 mr-3 text-center">🧮</span>
-            Kalkulator ROAS
-        </a>
-
-        <a href="#" @click.prevent="changePage('investasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'investasi' }">
-            <span class="w-6 mr-3 text-center">🏦</span>
-            Investasi
-        </a>
-
-        <a href="#" @click.prevent="changePage('laporan-transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-transaksi' }">
-            <span class="w-6 mr-3 text-center">📄</span>
-            Laporan Transaksi
-        </a>
-
-        <a href="#" @click.prevent="changePage('laporan-keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-keuangan' }">
-            <span class="w-6 mr-3 text-center">📈</span>
-            Laporan Keuangan
-        </a>
+    <div v-show="uiState.sidebarGroups.keuangan" class="ml-4 space-y-1">
+        <a href="#" @click.prevent="changePage('keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'keuangan' }">Keuangan</a>
+        <a href="#" @click.prevent="changePage('roas-dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-dashboard' }">Dashboard ROAS</a>
+        <a href="#" @click.prevent="changePage('roas-calculator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-calculator' }">Kalkulator ROAS</a>
+        <a href="#" @click.prevent="changePage('investasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'investasi' }">Investasi</a>
+        <a href="#" @click.prevent="changePage('laporan-transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-transaksi' }">Laporan Transaksi</a>
+        <a href="#" @click.prevent="changePage('laporan-keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-keuangan' }">Laporan Keuangan</a>
     </div>
 
-    <div class="pt-4">
-        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Sistem</p>
-
-        <a v-if="userProfile.data?.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">
-            <span class="w-6 mr-3 text-center">🤝</span>
-            Dashboard Mitra
-        </a>
-
-        <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'pengaturan' }">
+    <button type="button" @click="toggleSidebarGroup('sistem')" class="w-full sidebar-link justify-between">
+        <span class="flex items-center">
             <span class="w-6 mr-3 text-center">⚙️</span>
-            Pengaturan
-        </a>
+            Sistem
+        </span>
+        <span>{{ uiState.sidebarGroups.sistem ? '▲' : '▼' }}</span>
+    </button>
+
+    <div v-show="uiState.sidebarGroups.sistem" class="ml-4 space-y-1">
+        <a v-if="userProfile.data?.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">Dashboard Mitra</a>
+        <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'pengaturan' }">Pengaturan</a>
     </div>
 
 </nav>
