@@ -396,7 +396,13 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
 });
 
 function toggleSidebarGroup(group) {
-    uiState.sidebarGroups[group] = !uiState.sidebarGroups[group];
+    const isCurrentlyOpen = uiState.sidebarGroups[group];
+
+    Object.keys(uiState.sidebarGroups).forEach(key => {
+        uiState.sidebarGroups[key] = false;
+    });
+
+    uiState.sidebarGroups[group] = !isCurrentlyOpen;
 }
 
 const dataFetched = reactive({
