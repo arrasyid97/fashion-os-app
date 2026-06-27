@@ -622,6 +622,38 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
+const getExpenseTypeByCategory = (kategori) => {
+    const category = (state.settings.categories || []).find(cat => cat.name === kategori);
+
+    if (category?.type) {
+        return category.type;
+    }
+
+    const nama = (kategori || '').toLowerCase();
+
+    const productionKeywords = [
+        'kain',
+        'jahit',
+        'maklun',
+        'supplier',
+        'produksi',
+        'bahan',
+        'aksesoris',
+        'resleting',
+        'kancing',
+        'label',
+        'hangtag',
+        'bordir',
+        'payet',
+        'obras',
+        'kerugian stok'
+    ];
+
+    return productionKeywords.some(keyword => nama.includes(keyword))
+        ? 'produksi'
+        : 'operasional';
+};
+
 // --- LOGIKA FILTER YANG SUDAH DIPERBAIKI ---
 const filteredMassPriceVariants = computed(() => {
     // 1. Ambil data source
@@ -1623,56 +1655,70 @@ const laporanKeuanganData = computed(() => {
     const summaryForYear = state.summaryData?.[`summary_${year}`];
     const months = [];
 
-    // --- LOGIKA CADANGAN: Ambil dari transaksi mentah jika summary Firebase kosong ---
     const dataTransaksiMentah = state.transaksi || [];
     const dataKeuanganMentah = state.keuangan || [];
 
     for (let i = 1; i <= 12; i++) {
         const monthStr = i.toString().padStart(2, '0');
         const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
-        
+
         let data = summaryForYear?.months?.[monthStr] || null;
 
-        // Jika data dari server kosong, hitung manual secara real-time di lokal
-        if (!data) {
-            const trxBulanIni = dataTransaksiMentah.filter(t => {
-                const d = new Date(t.tanggal);
-                return d.getFullYear() === year && (d.getMonth() + 1) === i && t.statusPencairan === 'Sudah Cair';
-            });
-            const biayaBulanIni = dataKeuanganMentah.filter(k => {
-                const d = new Date(k.tanggal);
-                return d.getFullYear() === year && (d.getMonth() + 1) === i && k.jenis === 'pengeluaran';
-            });
+        const trxBulanIni = dataTransaksiMentah.filter(t => {
+            const d = new Date(t.tanggal);
+            return d.getFullYear() === year && (d.getMonth() + 1) === i && t.statusPencairan === 'Sudah Cair';
+        });
 
+        const biayaBulanIni = dataKeuanganMentah.filter(k => {
+            const d = new Date(k.tanggal);
+            return d.getFullYear() === year && (d.getMonth() + 1) === i && k.jenis === 'pengeluaran';
+        });
+
+        const biayaProduksi = biayaBulanIni
+            .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) === 'produksi')
+            .reduce((sum, k) => sum + (k.jumlah || 0), 0);
+
+        const biayaOperasional = biayaBulanIni
+            .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) !== 'produksi')
+            .reduce((sum, k) => sum + (k.jumlah || 0), 0);
+
+        if (!data) {
             const omsetKotor = trxBulanIni.reduce((sum, t) => sum + (t.subtotal || 0), 0);
             const diskon = trxBulanIni.reduce((sum, t) => sum + (t.diskon?.totalDiscount || 0), 0);
             const omsetBersih = omsetKotor - diskon;
-            const hppTerjual = trxBulanIni.reduce((sum, t) => sum + (t.items || []).reduce((s, item) => s + (item.hpp || 0) * item.qty, 0), 0);
+            const hppTerjual = trxBulanIni.reduce((sum, t) => {
+                return sum + (t.items || []).reduce((s, item) => s + (item.hpp || 0) * item.qty, 0);
+            }, 0);
             const biayaTransaksi = trxBulanIni.reduce((sum, t) => sum + (t.biaya?.total || 0), 0);
-            const biayaOperasional = biayaBulanIni.reduce((sum, k) => sum + (k.jumlah || 0), 0);
             const labaKotor = omsetBersih - hppTerjual;
-            const labaBersih = labaKotor - biayaTransaksi - biayaOperasional;
 
-            data = { omsetKotor, omsetBersih, labaKotor, biayaTransaksi, biayaOperasional: biayaOperasional, labaBersihOperasional: labaBersih };
+            data = { omsetKotor, omsetBersih, labaKotor, biayaTransaksi };
         }
 
+        const labaBersihFinal =
+            (data.labaKotor || 0) -
+            (data.biayaTransaksi || 0) -
+            biayaProduksi -
+            biayaOperasional;
+
         months.push({
-            monthName: monthName,
+            monthName,
             omsetKotor: data.omsetKotor || 0,
             omsetBersih: data.omsetBersih || 0,
             labaKotor: data.labaKotor || 0,
-            labaBersih: data.labaBersihOperasional || 0,
-            totalBiayaOperasional: data.biayaOperasional || 0,
+            labaBersih: labaBersihFinal,
+            totalBiayaProduksi: biayaProduksi,
+            totalBiayaOperasional: biayaOperasional,
             totalBiayaTransaksi: data.biayaTransaksi || 0,
         });
     }
-    
-    // Hitung Total Tahunan
+
     const yearlyTotals = {
         omsetKotor: months.reduce((sum, m) => sum + m.omsetKotor, 0),
         omsetBersih: months.reduce((sum, m) => sum + m.omsetBersih, 0),
         labaKotor: months.reduce((sum, m) => sum + m.labaKotor, 0),
         labaBersih: months.reduce((sum, m) => sum + m.labaBersih, 0),
+        totalBiayaProduksi: months.reduce((sum, m) => sum + m.totalBiayaProduksi, 0),
         totalBiayaOperasional: months.reduce((sum, m) => sum + m.totalBiayaOperasional, 0),
         totalBiayaTransaksi: months.reduce((sum, m) => sum + m.totalBiayaTransaksi, 0),
     };
@@ -2885,11 +2931,12 @@ async function addCategory() {
     if (!form.name) return alert("Nama kategori tidak boleh kosong.");
 
     const newCategory = {
-        id: `CAT-${Date.now()}`,
-        name: form.name,
-        description: form.description || '',
-        userId: currentUser.value.uid,
-    };
+    id: `CAT-${Date.now()}`,
+    name: form.name,
+    description: form.description || '',
+    type: form.type || 'operasional',
+    userId: currentUser.value.uid,
+};
     try {
         const categoryRef = doc(db, "categories", newCategory.id);
         await setDoc(categoryRef, newCategory);
@@ -2913,9 +2960,10 @@ async function updateCategory() {
     try {
         const categoryRef = doc(db, "categories", form.id);
         await updateDoc(categoryRef, {
-            name: form.name,
-            description: form.description,
-        });
+    name: form.name,
+    description: form.description,
+    type: form.type || 'operasional',
+});
 
         // Cari dan perbarui kategori di state lokal
         const index = state.settings.categories.findIndex(cat => cat.id === form.id);
@@ -6733,16 +6781,21 @@ async function submitBiaya() {
         catatanLengkap = `${catatanLengkap} (Pembayaran via Tunai)`.trim();
     }
     
-    isLoading.value = true;
-    try {
-        await addDoc(collection(db, "keuangan"), { 
-            kategori: form.kategori,
-            jumlah: totalPengeluaran,
-            catatan: catatanLengkap,
-            jenis: 'pengeluaran',
-            userId: currentUser.value.uid,
-            tanggal: new Date(form.tanggal)
-        });
+    const selectedCategory = (state.settings.categories || []).find(cat => cat.name === form.kategori);
+const tipeBiaya = selectedCategory?.type || getExpenseTypeByCategory(form.kategori);
+
+isLoading.value = true;
+try {
+    await addDoc(collection(db, "keuangan"), { 
+        kategori: form.kategori,
+        kategoriId: selectedCategory?.id || '',
+        tipeBiaya: tipeBiaya,
+        jumlah: totalPengeluaran,
+        catatan: catatanLengkap,
+        jenis: 'pengeluaran',
+        userId: currentUser.value.uid,
+        tanggal: new Date(form.tanggal)
+    });
 
         // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
         await fetchKeuanganData(); 
@@ -11445,56 +11498,66 @@ watch(activePage, (newPage, oldPage) => {
     </div>
 
     <div v-else class="max-w-7xl mx-auto">
-        <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
-            <div>
-                <h2 class="text-3xl font-bold text-slate-800">Laporan Keuangan Tahunan</h2>
-                <p class="text-slate-500 mt-1">Lihat ringkasan performa bisnis Anda dari bulan ke bulan.</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <label for="tahun-laporan" class="text-sm font-medium">Pilih Tahun:</label>
-                <input type="number" id="tahun-laporan" v-model.number="uiState.laporanKeuanganTahun" class="w-32 p-2 border border-slate-300 rounded-md shadow-sm">
-            </div>
+    <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
+        <div>
+            <h2 class="text-3xl font-bold text-slate-800">Laporan Keuangan Tahunan</h2>
+            <p class="text-slate-500 mt-1">Lihat ringkasan performa bisnis Anda dari bulan ke bulan.</p>
         </div>
-        <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                        <tr>
-                            <th class="px-6 py-4 font-semibold">Bulan</th>
-                            <th class="px-6 py-4 font-semibold text-right">Omset Kotor</th>
-                            <th class="px-6 py-4 font-semibold text-right">Omset Bersih</th>
-                            <th class="px-6 py-4 font-semibold text-right">Laba Kotor</th>
-                            <th class="px-6 py-4 font-semibold text-right">Biaya Transaksi</th>
-                            <th class="px-6 py-4 font-semibold text-right">Biaya Operasional</th>
-                            <th class="px-6 py-4 font-semibold text-right bg-indigo-100 text-indigo-800">Laba Bersih</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200/50">
-                        <tr v-for="month in laporanKeuanganData.months" :key="month.monthName" class="hover:bg-slate-50/50">
-                            <td class="px-6 py-4 font-semibold text-slate-800">{{ month.monthName }}</td>
-                            <td class="px-6 py-4 text-right">{{ formatCurrency(month.omsetKotor) }}</td>
-                            <td class="px-6 py-4 text-right">{{ formatCurrency(month.omsetBersih) }}</td>
-                            <td class="px-6 py-4 text-right">{{ formatCurrency(month.labaKotor) }}</td>
-                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaTransaksi) }}</td>
-                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaOperasional) }}</td>
-                            <td class="px-6 py-4 text-right font-bold" :class="month.labaBersih >= 0 ? 'text-green-600' : 'text-red-600'">{{ formatCurrency(month.labaBersih) }}</td>
-                        </tr>
-                    </tbody>
-                    <tfoot class="border-t-2 border-slate-300 bg-slate-100/80">
-                        <tr class="font-bold text-slate-900">
-                            <td class="px-6 py-4">TOTAL {{ uiState.laporanKeuanganTahun }}</td>
-                            <td class="px-6 py-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.omsetKotor) }}</td>
-                            <td class="px-6 py-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.omsetBersih) }}</td>
-                            <td class="px-6 py-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.labaKotor) }}</td>
-                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.totalBiayaTransaksi) }}</td>
-                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.totalBiayaOperasional) }}</td>
-                            <td class="px-6 py-4 text-right text-lg" :class="laporanKeuanganData.yearlyTotals.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">{{ formatCurrency(laporanKeuanganData.yearlyTotals.labaBersih) }}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+        <div class="flex items-center gap-3">
+            <label for="tahun-laporan" class="text-sm font-medium">Pilih Tahun:</label>
+            <input type="number" id="tahun-laporan" v-model.number="uiState.laporanKeuanganTahun" class="w-32 p-2 border border-slate-300 rounded-md shadow-sm">
         </div>
     </div>
+
+    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                    <tr>
+                        <th class="px-6 py-4 font-semibold">Bulan</th>
+                        <th class="px-6 py-4 font-semibold text-right">Omset Kotor</th>
+                        <th class="px-6 py-4 font-semibold text-right">Omset Bersih</th>
+                        <th class="px-6 py-4 font-semibold text-right">Laba Kotor</th>
+                        <th class="px-6 py-4 font-semibold text-right">Biaya Transaksi</th>
+                        <th class="px-6 py-4 font-semibold text-right">Biaya Produksi</th>
+                        <th class="px-6 py-4 font-semibold text-right">Biaya Operasional</th>
+                        <th class="px-6 py-4 font-semibold text-right bg-indigo-100 text-indigo-800">Laba Bersih</th>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-slate-200/50">
+                    <tr v-for="month in laporanKeuanganData.months" :key="month.monthName" class="hover:bg-slate-50/50">
+                        <td class="px-6 py-4 font-semibold text-slate-800">{{ month.monthName }}</td>
+                        <td class="px-6 py-4 text-right">{{ formatCurrency(month.omsetKotor) }}</td>
+                        <td class="px-6 py-4 text-right">{{ formatCurrency(month.omsetBersih) }}</td>
+                        <td class="px-6 py-4 text-right">{{ formatCurrency(month.labaKotor) }}</td>
+                        <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaTransaksi || 0) }}</td>
+                        <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaProduksi || 0) }}</td>
+                        <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaOperasional || 0) }}</td>
+                        <td class="px-6 py-4 text-right font-bold" :class="month.labaBersih >= 0 ? 'text-green-600' : 'text-red-600'">
+                            {{ formatCurrency(month.labaBersih) }}
+                        </td>
+                    </tr>
+                </tbody>
+
+                <tfoot class="border-t-2 border-slate-300 bg-slate-100/80">
+                    <tr class="font-bold text-slate-900">
+                        <td class="px-6 py-4">TOTAL {{ uiState.laporanKeuanganTahun }}</td>
+                        <td class="px-6 py-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.omsetKotor) }}</td>
+                        <td class="px-6 py-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.omsetBersih) }}</td>
+                        <td class="px-6 py-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.labaKotor) }}</td>
+                        <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.totalBiayaTransaksi || 0) }}</td>
+                        <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.totalBiayaProduksi || 0) }}</td>
+                        <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.totalBiayaOperasional || 0) }}</td>
+                        <td class="px-6 py-4 text-right text-lg" :class="laporanKeuanganData.yearlyTotals.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">
+                            {{ formatCurrency(laporanKeuanganData.yearlyTotals.labaBersih) }}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+  </div>
 </div>
 
 <div v-if="activePage === 'pengaturan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
@@ -14395,7 +14458,9 @@ watch(activePage, (newPage, oldPage) => {
                 <div class="flex items-center gap-2 mt-1">
                     <select v-model="uiState.modalData.kategori" class="w-full p-2 border rounded-md" required>
                         <option value="" disabled>-- Pilih Kategori --</option>
-                        <option v-for="cat in state.settings.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
+                        <option v-for="cat in state.settings.categories" :key="cat.id" :value="cat.name">
+    {{ cat.name }} - {{ (cat.type || 'operasional') === 'produksi' ? 'Produksi' : 'Operasional' }}
+</option>
                     </select>
                     <button type="button" @click="showNestedModal('manageCategories')" class="bg-slate-100 p-2 text-slate-600 rounded-md hover:bg-slate-200" title="Kelola Kategori">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -14610,7 +14675,7 @@ watch(activePage, (newPage, oldPage) => {
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-xl w-full h-full md:max-h-[60vh] flex flex-col">
         <div class="flex justify-between items-center pb-4 border-b">
             <h3 class="text-xl font-bold">Kelola Kategori Pengeluaran</h3>
-            <button @click="showNestedModal('addCategory', { name: '', description: '' })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 text-sm">
+            <button @click="showNestedModal('addCategory', { name: '', description: '', type: 'operasional' })" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 text-sm">
                 + Tambah Kategori
             </button>
         </div>
@@ -14645,17 +14710,52 @@ watch(activePage, (newPage, oldPage) => {
 </div>
 <div v-if="uiState.isModalVisible && (uiState.nestedModalType === 'addCategory' || uiState.nestedModalType === 'editCategory')" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-        <h3 class="text-xl font-bold mb-4">{{ uiState.nestedModalType === 'addCategory' ? 'Tambah Kategori Baru' : 'Edit Kategori' }}</h3>
+        <h3 class="text-xl font-bold mb-4">
+            {{ uiState.nestedModalType === 'addCategory' ? 'Tambah Kategori Baru' : 'Edit Kategori' }}
+        </h3>
+
         <form @submit.prevent="uiState.nestedModalType === 'addCategory' ? addCategory() : updateCategory()">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium">Nama Kategori</label>
-                    <input type="text" v-model="uiState.nestedModalData.name" class="mt-1 w-full p-2 border rounded-md" required>
+                    <input
+                        type="text"
+                        v-model="uiState.nestedModalData.name"
+                        class="mt-1 w-full p-2 border rounded-md"
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium">Tipe Biaya</label>
+                    <select
+                        v-model="uiState.nestedModalData.type"
+                        class="mt-1 w-full p-2 border rounded-md bg-white"
+                        required
+                    >
+                        <option value="operasional">Operasional</option>
+                        <option value="produksi">Produksi</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium">Deskripsi</label>
+                    <textarea
+                        v-model="uiState.nestedModalData.description"
+                        rows="2"
+                        class="mt-1 w-full p-2 border rounded-md"
+                        placeholder="Opsional"
+                    ></textarea>
                 </div>
             </div>
+
             <div class="flex justify-end gap-3 mt-6 border-t pt-4">
-                <button type="button" @click="hideNestedModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
+                <button type="button" @click="hideNestedModal" class="bg-slate-200 py-2 px-4 rounded-lg">
+                    Batal
+                </button>
+                <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">
+                    Simpan
+                </button>
             </div>
         </form>
     </div>
