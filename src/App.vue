@@ -96,7 +96,8 @@ const uiState = reactive({
     produksi: false,
     penjualan: false,
     keuangan: false,
-    sistem: false
+    sistem: false,
+    bantuan: false
 },
     activeCartChannel: null,
 
@@ -8887,39 +8888,69 @@ watch(activePage, (newPage, oldPage) => {
 
 </nav>
 
-<div class="mt-auto p-2">
-    <hr class="border-gray-700 mx-2 my-2">
+<button
+    type="button"
+    @click="toggleSidebarGroup('bantuan')"
+    class="w-full sidebar-link justify-between"
+>
+    <span class="flex items-center">
+        <span class="w-6 mr-3 text-center">📖</span>
+        Bantuan
+    </span>
 
-    <a href="#" @click.prevent="changePage('langganan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'langganan' }">
-        <span class="w-6 mr-3 text-center">💳</span>
+    <span>
+        {{ uiState.sidebarGroups.bantuan ? '▲' : '▼' }}
+    </span>
+</button>
+
+<div
+    v-show="uiState.sidebarGroups.bantuan"
+    class="ml-4 space-y-1"
+>
+
+    <a href="#"
+        @click.prevent="changePage('langganan')"
+        class="sidebar-link"
+        :class="{ 'sidebar-link-active': activePage === 'langganan' }">
         Langganan
     </a>
 
-    <a href="#" @click.prevent="changePage('panduan-baru')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'panduan-baru' }">
-        <span class="w-6 mr-3 text-center">🚀</span>
+    <a href="#"
+        @click.prevent="changePage('panduan-baru')"
+        class="sidebar-link"
+        :class="{ 'sidebar-link-active': activePage === 'panduan-baru' }">
         Panduan Pengguna Baru
     </a>
 
-    <a href="#" @click.prevent="changePage('barcode-generator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'barcode-generator' }">
-        <span class="w-6 mr-3 text-center">🏷️</span>
+    <a href="#"
+        @click.prevent="changePage('barcode-generator')"
+        class="sidebar-link"
+        :class="{ 'sidebar-link-active': activePage === 'barcode-generator' }">
         Panduan Barcode
     </a>
 
-    <a href="#" @click.prevent="changePage('panduan')" class="sidebar-link text-sm" :class="{ 'sidebar-link-active': activePage === 'panduan' }">
-        <span class="w-6 mr-3 text-center">❓</span>
+    <a href="#"
+        @click.prevent="changePage('panduan')"
+        class="sidebar-link"
+        :class="{ 'sidebar-link-active': activePage === 'panduan' }">
         Panduan Aplikasi
     </a>
 
-    <a href="#" @click.prevent="changePage('tentang')" class="sidebar-link text-sm" :class="{ 'sidebar-link-active': activePage === 'tentang' }">
-        <span class="w-6 mr-3 text-center">ℹ️</span>
+    <a href="#"
+        @click.prevent="changePage('tentang')"
+        class="sidebar-link"
+        :class="{ 'sidebar-link-active': activePage === 'tentang' }">
         Tentang Aplikasi
     </a>
 
-    <button @click="handleLogout" class="w-full mt-2 sidebar-link hover:bg-red-500/20 hover:text-red-400">
-        <span class="w-6 mr-3 text-center">🚪</span>
+    <button
+        @click="handleLogout"
+        class="w-full sidebar-link text-left hover:bg-red-500/20 hover:text-red-400"
+    >
         Logout
     </button>
- </div>
+
+</div>
 </div>
 </aside>
 
