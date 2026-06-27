@@ -5035,6 +5035,8 @@ function generateBagiHasilReport() {
 
 function changePage(pageName) {
     activePage.value = pageName;
+
+    // Simpan halaman terakhir secara langsung
     localStorage.setItem('lastActivePage', pageName);
 
     const sidebarPageGroups = {
@@ -5089,7 +5091,7 @@ function changePage(pageName) {
         }
     }
 
-    // Logika Kunci Halaman Keuangan (Riwayat Pemasukan)
+    // Logika Kunci Halaman Keuangan
     if (pageName === 'keuangan') {
         if (state.settings.dashboardPin && state.settings.pinProtection?.incomeHistory) {
             uiState.isPemasukanLocked = true;
