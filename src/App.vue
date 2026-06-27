@@ -8795,136 +8795,159 @@ watch(activePage, (newPage, oldPage) => {
     </div>
     
     <div class="flex-1 flex flex-col overflow-y-auto">
-        <nav class="flex-1 px-2 py-4 space-y-1">
-            <a href="#" @click.prevent="changePage('dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'dashboard' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                Dashboard
-            </a>
-            <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                Kasir (POS)
-            </a>
-            <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Proses Massal
-            </a>
-            <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-               </svg>
-               Cek Pencairan Dana
-            </a>
-            <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4M4 7s0 4 8 4 8-4 8-4"/></svg>
-                Inventaris
-            </a>
-            <a href="#" @click.prevent="changePage('harga-hpp')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'harga-hpp' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01"/></svg>
-                Harga & HPP
-            </a>
-            <a href="#" @click.prevent="changePage('roas-dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-dashboard' }">
-    <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3v18m4-14v14m4-10v10M5 13v8" />
-    </svg>
-    Dashboard ROAS
-</a>
-            <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'promosi' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 8v-3c0-1.105.895-2 2-2z"/></svg>
-                Promosi
-            </a>
-            <a href="#" @click.prevent="changePage('produksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'produksi' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                Produksi
-            </a>
-            <a href="#" @click.prevent="changePage('supplier')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'supplier' }">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.412 9.45 5 8 5c-4.418 0-8 2.5-8 5s3.582 5 8 5c1.45 0 2.832-.412 4-1.253M12 6.253c1.168.841 2.55 1.253 4 1.253 4.418 0 8-2.5 8-5s-3.582-5-8-5c-1.45 0-2.832.412-4 1.253" />
-    </svg>
-    Manajemen Supplier
-</a>
-            <a href="#" @click.prevent="changePage('gudang-kain')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'gudang-kain' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121M12 12l2.879 2.879M12 12L9.121 14.879M12 12L14.879 9.121M12 12L19 5"/></svg>
-                Stok Kain
-            </a>
-            <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2"/></svg>
-                Manajemen Retur
-            </a>
-            <a href="#" @click.prevent="changePage('laporan-transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-transaksi' }">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-    Laporan Transaksi
-</a>
-            <a href="#" @click.prevent="changePage('laporan-keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-keuangan' }">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2a4 4 0 00-4-4H5a2 2 0 00-2 2v2a2 2 0 002 2h2a4 4 0 004-4zm0 0v-2a4 4 0 014-4h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a4 4 0 01-4-4z" />
-    </svg>
-    Laporan Keuangan
-</a>
-            <a href="#" @click.prevent="changePage('keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'keuangan' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                Keuangan
-            </a>
-            <a href="#" @click.prevent="changePage('roas-calculator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-calculator' }">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-        <path stroke-linecap="round" stroke-linejoin="round" d="M13 21.945A9.001 9.001 0 0013 3.055V13h8.945c-.53 4.437-4.213 8.12-8.65 8.655z" />
-    </svg>
-    Kalkulator ROAS
-</a>
-            <a href="#" @click.prevent="changePage('investasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'investasi' }">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM17 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM5 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM5 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM11 9.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2zM11 14.5a.5.5 0 01.5.5v2a.5.5 0 01-.5.5h-2a.5.5 0 01-.5-.5v-2a.5.5 0 01.5-.5h2z"/>
-                </svg>
-                Investasi
-            </a>
-            <a v-if="userProfile.data?.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-                Dashboard Mitra
-            </a>
-            <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'pengaturan' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.82 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.82 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.82-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.82-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                Pengaturan
-            </a>
-        </nav>
-        
-        <div class="mt-auto p-2">
-            <hr class="border-gray-700 mx-2 my-2">
-            <a href="#" @click.prevent="changePage('langganan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'langganan' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v1h-14v-1zM14 11h-4a1 1 0 00-1 1v2a1 1 0 001 1h4a1 1 0 001-1v-2a1 1 0 00-1-1zM5 19h14a2 2 0 002-2v-5H3v5a2 2 0 002 2z"/></svg>
-                Langganan
-            </a>
-            <a href="#" @click.prevent="changePage('panduan-baru')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'panduan-baru' }">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-    </svg>
-    Panduan Pengguna Baru
-</a>
-            <a href="#" @click.prevent="changePage('barcode-generator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'barcode-generator' }">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m-4-12h8M7 16h10" />
-    </svg>
-    Panduan Barcode
-</a>
-            <a href="#" @click.prevent="changePage('panduan')" class="sidebar-link text-sm" :class="{ 'sidebar-link-active': activePage === 'panduan' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Panduan Aplikasi
-            </a>
-            <a href="#" @click.prevent="changePage('tentang')" class="sidebar-link text-sm" :class="{ 'sidebar-link-active': activePage === 'tentang' }">
-                <svg class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Tentang Aplikasi
-            </a>
-            <button @click="handleLogout" class="w-full mt-2 sidebar-link hover:bg-red-500/20 hover:text-red-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                Logout
-            </button>
-        </div>
+        <nav class="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
+
+    <a href="#" @click.prevent="changePage('dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'dashboard' }">
+        <span class="w-6 mr-3 text-center">🏠</span>
+        Dashboard
+    </a>
+
+    <div class="pt-4">
+        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Produk</p>
+
+        <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">
+            <span class="w-6 mr-3 text-center">📦</span>
+            Inventaris
+        </a>
+
+        <a href="#" @click.prevent="changePage('harga-hpp')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'harga-hpp' }">
+            <span class="w-6 mr-3 text-center">💰</span>
+            Harga & HPP
+        </a>
+
+        <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'promosi' }">
+            <span class="w-6 mr-3 text-center">🏷️</span>
+            Promosi
+        </a>
     </div>
+
+    <div class="pt-4">
+        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Produksi</p>
+
+        <a href="#" @click.prevent="changePage('produksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'produksi' }">
+            <span class="w-6 mr-3 text-center">🏭</span>
+            Produksi
+        </a>
+
+        <a href="#" @click.prevent="changePage('supplier')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'supplier' }">
+            <span class="w-6 mr-3 text-center">🚚</span>
+            Manajemen Supplier
+        </a>
+
+        <a href="#" @click.prevent="changePage('gudang-kain')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'gudang-kain' }">
+            <span class="w-6 mr-3 text-center">🧵</span>
+            Stok Kain
+        </a>
+    </div>
+
+    <div class="pt-4">
+        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Penjualan</p>
+
+        <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">
+            <span class="w-6 mr-3 text-center">🛒</span>
+            Kasir (POS)
+        </a>
+
+        <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">
+            <span class="w-6 mr-3 text-center">⚡</span>
+            Proses Massal
+        </a>
+
+        <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">
+            <span class="w-6 mr-3 text-center">✅</span>
+            Cek Pencairan Dana
+        </a>
+
+        <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">
+            <span class="w-6 mr-3 text-center">↩️</span>
+            Manajemen Retur
+        </a>
+    </div>
+
+    <div class="pt-4">
+        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Keuangan</p>
+
+        <a href="#" @click.prevent="changePage('keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'keuangan' }">
+            <span class="w-6 mr-3 text-center">💵</span>
+            Keuangan
+        </a>
+
+        <a href="#" @click.prevent="changePage('roas-dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-dashboard' }">
+            <span class="w-6 mr-3 text-center">📊</span>
+            Dashboard ROAS
+        </a>
+
+        <a href="#" @click.prevent="changePage('roas-calculator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'roas-calculator' }">
+            <span class="w-6 mr-3 text-center">🧮</span>
+            Kalkulator ROAS
+        </a>
+
+        <a href="#" @click.prevent="changePage('investasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'investasi' }">
+            <span class="w-6 mr-3 text-center">🏦</span>
+            Investasi
+        </a>
+
+        <a href="#" @click.prevent="changePage('laporan-transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-transaksi' }">
+            <span class="w-6 mr-3 text-center">📄</span>
+            Laporan Transaksi
+        </a>
+
+        <a href="#" @click.prevent="changePage('laporan-keuangan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'laporan-keuangan' }">
+            <span class="w-6 mr-3 text-center">📈</span>
+            Laporan Keuangan
+        </a>
+    </div>
+
+    <div class="pt-4">
+        <p class="px-3 mb-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Sistem</p>
+
+        <a v-if="userProfile.data?.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">
+            <span class="w-6 mr-3 text-center">🤝</span>
+            Dashboard Mitra
+        </a>
+
+        <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'pengaturan' }">
+            <span class="w-6 mr-3 text-center">⚙️</span>
+            Pengaturan
+        </a>
+    </div>
+
+</nav>
+
+<div class="mt-auto p-2">
+    <hr class="border-gray-700 mx-2 my-2">
+
+    <a href="#" @click.prevent="changePage('langganan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'langganan' }">
+        <span class="w-6 mr-3 text-center">💳</span>
+        Langganan
+    </a>
+
+    <a href="#" @click.prevent="changePage('panduan-baru')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'panduan-baru' }">
+        <span class="w-6 mr-3 text-center">🚀</span>
+        Panduan Pengguna Baru
+    </a>
+
+    <a href="#" @click.prevent="changePage('barcode-generator')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'barcode-generator' }">
+        <span class="w-6 mr-3 text-center">🏷️</span>
+        Panduan Barcode
+    </a>
+
+    <a href="#" @click.prevent="changePage('panduan')" class="sidebar-link text-sm" :class="{ 'sidebar-link-active': activePage === 'panduan' }">
+        <span class="w-6 mr-3 text-center">❓</span>
+        Panduan Aplikasi
+    </a>
+
+    <a href="#" @click.prevent="changePage('tentang')" class="sidebar-link text-sm" :class="{ 'sidebar-link-active': activePage === 'tentang' }">
+        <span class="w-6 mr-3 text-center">ℹ️</span>
+        Tentang Aplikasi
+    </a>
+
+    <button @click="handleLogout" class="w-full mt-2 sidebar-link hover:bg-red-500/20 hover:text-red-400">
+        <span class="w-6 mr-3 text-center">🚪</span>
+        Logout
+    </button>
+ </div>
+</div>
 </aside>
 
       <!-- Main Content -->
