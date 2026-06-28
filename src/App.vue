@@ -5252,7 +5252,7 @@ function changePage(pageName) {
         uiState.sidebarGroups[targetGroup] = true;
     }
 
-    // Logika Kunci Halaman Dashboard
+    // Logika Kunci Halaman Dashboardd
     if (pageName === 'dashboard') {
         if (state.settings.dashboardPin && state.settings.pinProtection?.dashboard) {
             isDashboardLocked.value = true;
