@@ -9359,41 +9359,7 @@ watch(activePage, (newPage, oldPage) => {
         </div>
     </div>
 
-    <!-- PRIORITAS HARI INI -->
-    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-            <div>
-                <p class="text-sm text-slate-500">Ringkasan yang perlu diperhatikan</p>
-                <h3 class="text-xl font-bold text-slate-800">Prioritas Hari Ini</h3>
-            </div>
-
-            <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
-                Update otomatis
-            </span>
-        </div>
-
-        <div class="space-y-4">
-            <div
-                v-for="(item,index) in dashboardInsights"
-                :key="index"
-                class="flex items-start gap-4 rounded-xl border border-slate-200 p-4 hover:bg-slate-50 transition-all duration-200"
-            >
-                <div class="text-3xl">
-                    {{ item.icon }}
-                </div>
-
-                <div class="flex-1">
-                    <div class="font-semibold text-slate-800">
-                        {{ item.title }}
-                    </div>
-
-                    <div class="text-sm text-slate-500 mt-1">
-                        {{ item.description }}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    
 <!-- STATISTIK PENJUALAN SIMPLE -->
 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
