@@ -4671,6 +4671,71 @@ const analisisModelData = computed(() => {
     return finalResult;
 });
 
+const dashboardPremiumData = computed(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const transaksiHariIni = (state.transaksi || []).filter(t => {
+        const d = new Date(t.tanggal);
+        return d >= today && d < tomorrow;
+    });
+
+    const omsetHariIni = transaksiHariIni.reduce((sum, t) => sum + (t.subtotal || t.total || 0), 0);
+
+    const hppHariIni = transaksiHariIni.reduce((sum, t) => {
+        return sum + (t.items || []).reduce((s, item) => {
+            return s + ((item.hpp || 0) * (item.qty || 0));
+        }, 0);
+    }, 0);
+
+    const biayaTransaksiHariIni = transaksiHariIni.reduce((sum, t) => {
+        return sum + (t.biaya?.total || 0);
+    }, 0);
+
+    const pengeluaranHariIni = (state.keuangan || []).filter(k => {
+        const d = new Date(k.tanggal);
+        return d >= today && d < tomorrow && (k.jenis === 'pengeluaran' || k.jenis === 'biaya');
+    }).reduce((sum, k) => sum + (k.jumlah || 0), 0);
+
+    const profitBersihHariIni =
+        omsetHariIni -
+        hppHariIni -
+        biayaTransaksiHariIni -
+        pengeluaranHariIni;
+
+    const produkTerjualHariIni = transaksiHariIni.reduce((sum, t) => {
+        return sum + (t.items || []).reduce((s, item) => s + (item.qty || 0), 0);
+    }, 0);
+
+    const produkHampirHabis = (state.produk || [])
+        .filter(p => (p.stokFisik || 0) > 0 && (p.stokFisik || 0) <= (state.settings.minStok || 10))
+        .sort((a, b) => (a.stokFisik || 0) - (b.stokFisik || 0))
+        .slice(0, 5);
+
+    const batchBelumSelesai = (state.produksi || []).filter(p => {
+        return (p.statusProses || '').toLowerCase() !== 'selesai';
+    });
+
+    const maklunTerlambat = batchBelumSelesai.filter(p => {
+        const d = new Date(p.tanggal);
+        const diffDays = Math.floor((today - d) / (1000 * 60 * 60 * 24));
+        return (p.produksiType || '').toLowerCase() === 'pemaklun' && diffDays >= 14;
+    });
+
+    return {
+        omsetHariIni,
+        profitBersihHariIni,
+        orderHariIni: transaksiHariIni.length,
+        produkTerjualHariIni,
+        produkHampirHabis,
+        batchBelumSelesai: batchBelumSelesai.length,
+        maklunTerlambat: maklunTerlambat.length
+    };
+});
+
 const kpiExplanations = {
     'saldo-kas': { 
     title: 'Saldo Kas Saat Ini', 
