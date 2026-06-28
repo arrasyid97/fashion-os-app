@@ -4761,58 +4761,7 @@ const dashboardPremiumData = computed(() => {
     };
 });
 
-const dashboardInsights = computed(() => {
 
-    const insights = [];
-
-    if (dashboardPremiumData.value.produkHampirHabis.length > 0) {
-        insights.push({
-            type: "danger",
-            icon: "📦",
-            title: `${dashboardPremiumData.value.produkHampirHabis.length} produk hampir habis`,
-            description: "Segera lakukan produksi atau restock."
-        });
-    }
-
-    if (dashboardPremiumData.value.batchBelumSelesai > 0) {
-        insights.push({
-            type: "warning",
-            icon: "🏭",
-            title: `${dashboardPremiumData.value.batchBelumSelesai} batch produksi belum selesai`,
-            description: "Pastikan produksi selesai tepat waktu."
-        });
-    }
-
-    if (dashboardPremiumData.value.orderHariIni === 0) {
-        insights.push({
-            type: "info",
-            icon: "🛒",
-            title: "Belum ada order hari ini",
-            description: "Promosikan produk atau optimalkan iklan."
-        });
-    }
-
-    if (dashboardPremiumData.value.omsetHariIni > 0) {
-        insights.push({
-            type: "success",
-            icon: "💰",
-            title: "Penjualan hari ini sudah berjalan",
-            description: `Omset ${formatCurrency(dashboardPremiumData.value.omsetHariIni)}`
-        });
-    }
-
-    if (insights.length === 0) {
-        insights.push({
-            type: "success",
-            icon: "✅",
-            title: "Semua indikator dalam kondisi baik",
-            description: "Belum ada hal yang perlu perhatian khusus."
-        });
-    }
-
-    return insights;
-
-});
 
 const dashboardSalesStats = computed(() => {
     const modelMap = {};
