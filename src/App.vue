@@ -9484,7 +9484,7 @@ watch(activePage, (newPage, oldPage) => {
     </div>
 </div>
     <!-- DETAIL STOK & PRODUKSI -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6">
 
         <!-- PRODUK HAMPIR HABIS -->
         <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-6">
@@ -9528,39 +9528,7 @@ watch(activePage, (newPage, oldPage) => {
             </div>
         </div>
 
-        <!-- PRODUKSI -->
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-6">
-            <div class="mb-4">
-                <p class="text-sm text-slate-500">Kontrol produksi</p>
-                <h3 class="text-lg font-bold text-slate-800">Produksi</h3>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
-                    <p class="text-sm text-indigo-700">Batch Belum Selesai</p>
-                    <p class="text-3xl font-bold text-indigo-700 mt-2">
-                        {{ formatNumber(dashboardPremiumData.batchBelumSelesai) }}
-                    </p>
-                    <p class="text-xs text-indigo-600 mt-1">
-                        Produksi yang masih perlu dipantau.
-                    </p>
-                </div>
-
-                <div class="p-4 rounded-xl bg-orange-50 border border-orange-100">
-                    <p class="text-sm text-orange-700">Maklun Terlambat</p>
-                    <p class="text-3xl font-bold text-orange-700 mt-2">
-                        {{ formatNumber(dashboardPremiumData.maklunTerlambat) }}
-                    </p>
-                    <p class="text-xs text-orange-600 mt-1">
-                        Patokan: lebih dari 14 hari.
-                    </p>
-                </div>
-            </div>
-
-            <div class="mt-4 text-sm text-slate-500">
-                Data ini membantu kamu melihat produksi yang perlu segera dicek.
-            </div>
-        </div>
+        
     </div>
 
 </div>
