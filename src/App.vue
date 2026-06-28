@@ -8327,17 +8327,7 @@ const prosesBulkScanFinal = (scannedValue) => {
     }
 };
 
-// Fungsi Handle Tombol Enter (Jika scanner mengirim Enter)
-const handleBulkEnter = () => {
-    // Matikan timer debounce agar tidak jalan 2 kali
-    if (bulkScanTimer) clearTimeout(bulkScanTimer);
 
-    const val = uiState.bulk_scan_input.trim();
-    // Validasi panjang karakter lagi
-    if (val.length >= 3) {
-        prosesBulkScanFinal(val);
-    }
-};
 
 // --- LIFECYCLE & WATCHERS ---
 
