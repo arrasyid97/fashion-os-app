@@ -4801,17 +4801,13 @@ const dashboardSalesStats = computed(() => {
             );
 
             const masterModel = (state.settings.modelProduk || []).find(m =>
-    m.id === productData?.model_id ||
-    m.id === productData?.modelId ||
-    m.namaModel === productData?.namaModel
-);
+                m.id === productData?.model_id ||
+                m.id === productData?.modelId ||
+                m.id === item.modelProdukId ||
+                m.id === item.model_id
+            );
 
-const modelName =
-    item.modelName ||
-    masterModel?.namaModel ||
-    productData?.namaModel ||
-    productData?.modelName ||
-    'Tanpa Model';
+            const modelName = masterModel?.namaModel || 'Tanpa Model';
 
             if (selectedModel !== 'all' && modelName !== selectedModel) {
                 return;
@@ -9334,15 +9330,15 @@ watch(activePage, (newPage, oldPage) => {
                 <h3 class="text-xl font-bold text-slate-800">Statistik Penjualan</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
     <select v-model="uiState.dashboardSalesModelFilter" class="p-2 border rounded-lg text-sm">
-        <option value="all">Semua Model</option>
-        <option
-    v-for="model in uniqueDashboardSalesModels"
+    <option value="all">Semua Model</option>
+    <option
+    v-for="model in uniqueRoasModels"
     :key="model.namaModel"
     :value="model.namaModel"
 >
     {{ model.namaModel }}
 </option>
-    </select>
+</select>
 
     <select v-model="uiState.dashboardSalesChannelFilter" class="p-2 border rounded-lg text-sm">
         <option value="all">Semua Channel</option>
