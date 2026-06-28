@@ -4864,7 +4864,7 @@ const kpiExplanations = {
     'laba-bersih-operasional': { title: 'Laba Bersih', description: 'Angka ini adalah indikator keuntungan final. Dihitung dari Laba Kotor dikurangi semua Biaya Operasional dan Biaya Transaksi Marketplace.' },
     'total-unit-stok': { title: 'Total Unit Stok', description: 'Jumlah total fisik semua produk yang tersedia di gudang Anda.' },
     'nilai-stok': { title: 'Total Nilai Stok (HPP)', description: 'Total nilai moneter dari semua stok yang tersisa di gudang, dihitung berdasarkan Harga Pokok Produksi (HPP) per unit.' },
-    // BARIS BARU DITAMBAHKAN
+    // BARIS BARU DITAMBAHKANN
     'nilai-retur': { title: 'Total Nilai Retur', description: 'Jumlah total moneter dari semua produk yang dikembalikan oleh pelanggan. Nilai ini mengurangi Omset Kotor dan secara otomatis disesuaikan dari laporan keuangan.' },
 };
 
