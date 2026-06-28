@@ -365,6 +365,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     bulk_scan_input: '',         // Untuk kolom scanner lama
     bulk_paste_input: '',        // Untuk salin-tempel massal ID pesanan dan SKU
     bulkPasteInfoVisible: false,
+    bulkPasteValidation: null,
     bulk_recommendations: [],    // Rekomendasi untuk input manual
     last_processed_orders: [],
     bulk_order_queue: [],
@@ -8245,57 +8246,163 @@ function showBulkPasteInfo() {
     uiState.bulkPasteInfoVisible = !uiState.bulkPasteInfoVisible;
 }
 
-function processBulkPasteOrders() {
-    if (!uiState.activeCartChannel) {
-        return alert("Pilih Channel Penjualan terlebih dahulu.");
-    }
-
-    const rawText = uiState.bulk_paste_input || '';
-
-    const rows = rawText
+function getBulkPasteRows() {
+    return (uiState.bulk_paste_input || '')
         .split(/\r?\n|\t/)
         .map(row => row.trim())
         .filter(row => row.length > 0);
+}
 
-    if (rows.length === 0) {
-        return alert("Data masih kosong.");
+function findProductBySkuForBulkPaste(value) {
+    const keyword = value.toString().trim().toLowerCase();
+
+    return (state.produk || []).find(product => {
+        return (product.sku || '').toString().trim().toLowerCase() === keyword;
+    });
+}
+
+function looksLikeOrderId(value) {
+    const code = value.toString().trim();
+
+    if (!code) return false;
+
+    // Patokan aman:
+    // ID pesanan biasanya panjang dan tidak pakai strip.
+    // SKU produk biasanya pakai strip seperti BAJU-HITAM-M.
+    return code.length >= 8 && !code.includes('-') && !code.includes('_');
+}
+
+function buildBulkPasteValidation() {
+    const rows = getBulkPasteRows();
+    const errors = [];
+    const orders = [];
+    let currentOrder = null;
+
+    if (!uiState.activeCartChannel) {
+        errors.push('Pilih Channel Penjualan terlebih dahulu.');
     }
 
-    let currentOrder = null;
-    let totalOrderMasuk = 0;
-    let totalProdukMasuk = 0;
-    const dataBermasalah = [];
+    if (rows.length === 0) {
+        errors.push('Data masih kosong.');
+    }
 
-    rows.forEach(value => {
-        const product = getProductBySku(value);
+    rows.forEach((value, index) => {
+        const lineNumber = index + 1;
+        const product = findProductBySkuForBulkPaste(value);
 
         if (product) {
             if (!currentOrder) {
-                dataBermasalah.push(`${value} tidak punya ID Pesanan di atasnya`);
+                errors.push(`Baris ${lineNumber}: SKU "${value}" tidak punya ID Pesanan di atasnya.`);
                 return;
             }
 
-            addProductToSpecificBulkOrder(currentOrder, product);
-            totalProdukMasuk++;
-        } else {
-            currentOrder = getOrCreateBulkOrderById(value);
-            totalOrderMasuk++;
+            const existingItem = currentOrder.items.find(item => item.sku === product.sku);
+
+            if (existingItem) {
+                existingItem.qty += 1;
+            } else {
+                currentOrder.items.push({
+                    ...product,
+                    qty: 1
+                });
+            }
+
+            return;
+        }
+
+        if (looksLikeOrderId(value)) {
+            currentOrder = {
+                marketplaceOrderId: value,
+                items: []
+            };
+
+            orders.push(currentOrder);
+            return;
+        }
+
+        errors.push(`Baris ${lineNumber}: "${value}" tidak ditemukan sebagai SKU dan tidak terbaca sebagai ID Pesanan.`);
+    });
+
+    orders.forEach(order => {
+        if (!order.items || order.items.length === 0) {
+            errors.push(`ID Pesanan "${order.marketplaceOrderId}" belum punya produk.`);
         }
     });
 
-    uiState.bulk_order_queue = uiState.bulk_order_queue.filter(order => {
-        return order.items && order.items.length > 0;
+    const totalProducts = orders.reduce((sum, order) => {
+        return sum + order.items.reduce((itemSum, item) => itemSum + item.qty, 0);
+    }, 0);
+
+    return {
+        orders,
+        errors,
+        totalOrders: orders.length,
+        totalProducts,
+        hasError: errors.length > 0
+    };
+}
+
+function validateBulkPasteOrders() {
+    uiState.bulkPasteValidation = buildBulkPasteValidation();
+}
+
+function addValidatedBulkOrderToQueue(orderData) {
+    let existingOrder = uiState.bulk_order_queue.find(order => {
+        return order.marketplaceOrderId === orderData.marketplaceOrderId;
     });
 
-    uiState.bulk_paste_input = '';
+    if (!existingOrder) {
+        existingOrder = {
+            id: orderData.marketplaceOrderId,
+            marketplaceOrderId: orderData.marketplaceOrderId,
+            items: [],
+            status: 'Mengantri'
+        };
 
-    let message = `Berhasil memasukkan ${totalOrderMasuk} ID pesanan dan ${totalProdukMasuk} produk ke antrian.`;
-
-    if (dataBermasalah.length > 0) {
-        message += `\n\nCatatan:\n${dataBermasalah.slice(0, 10).join('\n')}`;
+        uiState.bulk_order_queue.unshift(existingOrder);
     }
 
-    alert(message);
+    orderData.items.forEach(product => {
+        const specialPrice = state.specialPrices[uiState.activeCartChannel]?.[product.sku];
+        const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? 0;
+        const finalPrice = specialPrice !== undefined ? specialPrice : regularPrice;
+        const commissionRate = product.commissions?.[uiState.activeCartChannel] || 0;
+
+        const existingItem = existingOrder.items.find(item => item.sku === product.sku);
+
+        if (existingItem) {
+            existingItem.qty += product.qty;
+            existingItem.commissionRate = commissionRate;
+        } else {
+            existingOrder.items.push({
+                ...product,
+                hargaJualAktual: finalPrice,
+                commissionRate: commissionRate
+            });
+        }
+    });
+}
+
+function processBulkPasteOrders() {
+    if (!uiState.bulkPasteValidation) {
+        validateBulkPasteOrders();
+    }
+
+    if (!uiState.bulkPasteValidation || uiState.bulkPasteValidation.hasError) {
+        return alert('Data belum aman. Klik Validasi Data dan perbaiki baris yang bermasalah dulu.');
+    }
+
+    uiState.bulkPasteValidation.orders.forEach(order => {
+        addValidatedBulkOrderToQueue(order);
+    });
+
+    const totalOrders = uiState.bulkPasteValidation.totalOrders;
+    const totalProducts = uiState.bulkPasteValidation.totalProducts;
+
+    uiState.bulk_paste_input = '';
+    uiState.bulkPasteValidation = null;
+
+    alert(`Berhasil memasukkan ${totalOrders} ID pesanan dan ${totalProducts} produk ke antrian.`);
 }
 
 const prosesBulkScanFinal = (scannedValue) => {
@@ -8337,6 +8444,9 @@ const prosesBulkScanFinal = (scannedValue) => {
 // --- LIFECYCLE & WATCHERS ---
 
 watch(dashboardFilteredData, () => { if (activePage.value === 'dashboard') nextTick(renderCharts); });
+watch(() => uiState.bulk_paste_input, () => {
+    uiState.bulkPasteValidation = null;
+});
 watch(() => uiState.activeCartChannel, (newChannel) => { if (newChannel && !state.carts[newChannel]) state.carts[newChannel] = []; });
 watch(() => uiState.promosiSelectedModel, (newModel) => {
   if (newModel) {
@@ -10054,13 +10164,84 @@ SKU-BAJU-PUTIH-S"
         class="w-full p-3 text-sm border-2 border-dashed border-green-500 rounded-lg resize-y"
     ></textarea>
 
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
     <button
-        @click="processBulkPasteOrders"
+        type="button"
+        @click="validateBulkPasteOrders"
         :disabled="!uiState.activeCartChannel || !uiState.bulk_paste_input || !isSubscriptionActive"
-        class="mt-3 w-full bg-green-600 text-white font-bold py-2.5 rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+        class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+    >
+        Validasi Data
+    </button>
+
+    <button
+        type="button"
+        @click="processBulkPasteOrders"
+        :disabled="!uiState.bulkPasteValidation || uiState.bulkPasteValidation.hasError || !isSubscriptionActive"
+        class="w-full bg-green-600 text-white font-bold py-2.5 rounded-lg hover:bg-green-700 disabled:bg-gray-400"
     >
         Masukkan ke Antrian Pesanan
     </button>
+</div>
+
+<div
+    v-if="uiState.bulkPasteValidation"
+    class="mt-4 rounded-xl border p-4"
+    :class="uiState.bulkPasteValidation.hasError ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'"
+>
+    <div class="flex items-start justify-between gap-3">
+        <div>
+            <p
+                class="font-bold"
+                :class="uiState.bulkPasteValidation.hasError ? 'text-red-700' : 'text-green-700'"
+            >
+                {{ uiState.bulkPasteValidation.hasError ? 'Data masih perlu diperbaiki' : 'Data aman untuk diproses' }}
+            </p>
+
+            <p class="text-sm text-slate-600 mt-1">
+                ID Pesanan: {{ uiState.bulkPasteValidation.totalOrders }} |
+                Produk: {{ uiState.bulkPasteValidation.totalProducts }} |
+                Baris bermasalah: {{ uiState.bulkPasteValidation.errors.length }}
+            </p>
+        </div>
+    </div>
+
+    <div v-if="uiState.bulkPasteValidation.orders.length" class="mt-4">
+        <p class="text-xs font-bold text-slate-600 mb-2">Preview Pesanan:</p>
+
+        <div class="max-h-48 overflow-y-auto space-y-2">
+            <div
+                v-for="order in uiState.bulkPasteValidation.orders"
+                :key="order.marketplaceOrderId"
+                class="bg-white border rounded-lg p-3 text-xs"
+            >
+                <p class="font-bold text-slate-700">
+                    {{ order.marketplaceOrderId }}
+                </p>
+
+                <p class="text-slate-500 mt-1">
+                    {{ order.items.length }} produk
+                </p>
+
+                <ul class="mt-2 list-disc ml-5 text-slate-600">
+                    <li v-for="item in order.items" :key="item.sku">
+                        {{ item.sku }} x {{ item.qty }}
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="uiState.bulkPasteValidation.errors.length" class="mt-4">
+        <p class="text-xs font-bold text-red-700 mb-2">Yang perlu dicek:</p>
+
+        <ul class="text-xs text-red-700 list-disc ml-5 space-y-1">
+            <li v-for="(err, index) in uiState.bulkPasteValidation.errors.slice(0, 20)" :key="index">
+                {{ err }}
+            </li>
+        </ul>
+    </div>
+</div>
 
     <p class="text-xs text-slate-500 mt-2">
         Format: ID Pesanan lalu SKU produk. Jika 1 pesanan berisi 2 baju, tempel ID pesanan lalu 2 baris SKU di bawahnya.
