@@ -362,7 +362,8 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     
     stockInSearchRecommendations: [],
     bulk_manual_input: '',       // Untuk kolom input manual
-    bulk_scan_input: '',         // Untuk kolom input scanner otomatis
+    bulk_scan_input: '',         // Untuk kolom scanner lama
+    bulk_paste_input: '',        // Untuk salin-tempel massal ID pesanan dan SKU
     bulk_recommendations: [],    // Rekomendasi untuk input manual
     last_processed_orders: [],
     bulk_order_queue: [],
@@ -8199,7 +8200,98 @@ function deleteSpecialPrice(channelId, sku) {
     }
 }
 
+function addProductToSpecificBulkOrder(order, product) {
+    const specialPrice = state.specialPrices[uiState.activeCartChannel]?.[product.sku];
+    const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? 0;
+    const finalPrice = specialPrice !== undefined ? specialPrice : regularPrice;
+    const commissionRate = product.commissions?.[uiState.activeCartChannel] || 0;
 
+    const existingItem = order.items.find(item => item.sku === product.sku);
+
+    if (existingItem) {
+        existingItem.qty++;
+        existingItem.commissionRate = commissionRate;
+    } else {
+        order.items.push({
+            ...product,
+            qty: 1,
+            hargaJualAktual: finalPrice,
+            commissionRate: commissionRate
+        });
+    }
+}
+
+function getOrCreateBulkOrderById(orderId) {
+    let existingOrder = uiState.bulk_order_queue.find(order => order.marketplaceOrderId === orderId);
+
+    if (existingOrder) {
+        return existingOrder;
+    }
+
+    const newOrder = {
+        id: orderId,
+        marketplaceOrderId: orderId,
+        items: [],
+        status: 'Mengantri'
+    };
+
+    uiState.bulk_order_queue.unshift(newOrder);
+
+    return newOrder;
+}
+
+function processBulkPasteOrders() {
+    if (!uiState.activeCartChannel) {
+        return alert("Pilih Channel Penjualan terlebih dahulu.");
+    }
+
+    const rawText = uiState.bulk_paste_input || '';
+
+    const rows = rawText
+        .split(/\r?\n|\t/)
+        .map(row => row.trim())
+        .filter(row => row.length > 0);
+
+    if (rows.length === 0) {
+        return alert("Data masih kosong.");
+    }
+
+    let currentOrder = null;
+    let totalOrderMasuk = 0;
+    let totalProdukMasuk = 0;
+    const dataBermasalah = [];
+
+    rows.forEach(value => {
+        const product = getProductBySku(value);
+
+        if (product) {
+            if (!currentOrder) {
+                dataBermasalah.push(`${value} tidak punya ID Pesanan di atasnya`);
+                return;
+            }
+
+            addProductToSpecificBulkOrder(currentOrder, product);
+            totalProdukMasuk++;
+        } else {
+            currentOrder = getOrCreateBulkOrderById(value);
+            totalOrderMasuk++;
+        }
+    });
+
+    uiState.bulk_order_queue = uiState.bulk_order_queue.filter(order => {
+        return order.items && order.items.length > 0;
+    });
+
+    uiState.bulk_paste_input = '';
+
+    let message = `Berhasil memasukkan ${totalOrderMasuk} ID pesanan dan ${totalProdukMasuk} produk ke antrian.`;
+
+    if (dataBermasalah.length > 0) {
+        message += `\n\nCatatan:\n${dataBermasalah.slice(0, 10).join('\n')}`;
+    }
+
+    alert(message);
+}
 
 const prosesBulkScanFinal = (scannedValue) => {
     if (!uiState.activeCartChannel) {
@@ -9905,18 +9997,35 @@ watch(activePage, (newPage, oldPage) => {
                         </div>
 
                         <div class="border-t pt-6">
-    <label class="block text-sm font-semibold text-slate-700 mb-2">3. KHUSUS SCANNER (Otomatis)</label>
-    <input 
-        type="text" 
-        v-model="uiState.bulk_scan_input" 
-        :disabled="!uiState.activeCartChannel" 
-        placeholder="Scan Produk -> Scan Resi" 
-        class="w-full p-3 text-lg border-2 border-dashed border-green-500 rounded-lg"
-        @keydown.enter.prevent
-        @keyup.enter="handleBulkEnter"  
-        autocomplete="off"
+    <label class="block text-sm font-semibold text-slate-700 mb-2">
+        3. Salin & Tempel Massal ID Pesanan
+    </label>
+
+    <textarea
+        v-model="uiState.bulk_paste_input"
+        :disabled="!uiState.activeCartChannel"
+        rows="8"
+        placeholder="Tempel data dari Excel/SHEET di sini. Contoh:
+IDPESANAN001
+SKU-BAJU-HITAM-M
+SKU-BAJU-HITAM-L
+IDPESANAN002
+SKU-BAJU-PUTIH-S"
+        class="w-full p-3 text-sm border-2 border-dashed border-green-500 rounded-lg resize-y"
+    ></textarea>
+
+    <button
+        @click="processBulkPasteOrders"
+        :disabled="!uiState.activeCartChannel || !uiState.bulk_paste_input || !isSubscriptionActive"
+        class="mt-3 w-full bg-green-600 text-white font-bold py-2.5 rounded-lg hover:bg-green-700 disabled:bg-gray-400"
     >
-                        </div>
+        Masukkan ke Antrian Pesanan
+    </button>
+
+    <p class="text-xs text-slate-500 mt-2">
+        Format: ID Pesanan lalu SKU produk. Jika 1 pesanan berisi 2 baju, tempel ID pesanan lalu 2 baris SKU di bawahnya.
+    </p>
+</div>
                     </div>
                 </div>
 
