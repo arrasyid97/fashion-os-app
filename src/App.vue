@@ -9307,38 +9307,36 @@ watch(activePage, (newPage, oldPage) => {
         </div>
     </div>
 
-    
-<!-- STATISTIK PENJUALAN SIMPLE -->
-<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-
+    <!-- STATISTIK PENJUALAN SIMPLE -->
     <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
         <div class="flex items-center justify-between mb-5">
-            <div>
+            <div class="w-full">
                 <p class="text-sm text-slate-500">Ringkasan performa produk</p>
                 <h3 class="text-xl font-bold text-slate-800">Statistik Penjualan</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-    <select v-model="uiState.dashboardSalesModelFilter" class="p-2 border rounded-lg text-sm">
-    <option value="all">Semua Model</option>
-    <option
-    v-for="model in uniqueRoasModels"
-    :key="model.namaModel"
-    :value="model.namaModel"
->
-    {{ model.namaModel }}
-</option>
-</select>
 
-    <select v-model="uiState.dashboardSalesChannelFilter" class="p-2 border rounded-lg text-sm">
-        <option value="all">Semua Channel</option>
-        <option
-            v-for="channel in state.settings.marketplaces"
-            :key="channel.id"
-            :value="channel.name"
-        >
-            {{ channel.name }}
-        </option>
-    </select>
-</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                    <select v-model="uiState.dashboardSalesModelFilter" class="p-2 border rounded-lg text-sm">
+                        <option value="all">Semua Model</option>
+                        <option
+                            v-for="model in uniqueRoasModels"
+                            :key="model.namaModel"
+                            :value="model.namaModel"
+                        >
+                            {{ model.namaModel }}
+                        </option>
+                    </select>
+
+                    <select v-model="uiState.dashboardSalesChannelFilter" class="p-2 border rounded-lg text-sm">
+                        <option value="all">Semua Channel</option>
+                        <option
+                            v-for="channel in state.settings.marketplaces"
+                            :key="channel.id"
+                            :value="channel.name"
+                        >
+                            {{ channel.name }}
+                        </option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -9372,40 +9370,6 @@ watch(activePage, (newPage, oldPage) => {
             </div>
         </div>
     </div>
-
-    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
-        <div class="flex items-center justify-between mb-5">
-            <div>
-                <p class="text-sm text-slate-500">Kontrol stok</p>
-                <h3 class="text-xl font-bold text-slate-800">Produk Hampir Habis</h3>
-            </div>
-
-            <span class="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full">
-                Min stok: {{ state.settings.minStok || 10 }}
-            </span>
-        </div>
-
-        <div v-if="dashboardPremiumData.produkHampirHabis.length > 0" class="space-y-3">
-            <div
-                v-for="produk in dashboardPremiumData.produkHampirHabis"
-                :key="`${produk.nama}-${produk.warna}-${produk.varian}`"
-                class="flex items-center justify-between border-b pb-3"
-            >
-                <span class="font-medium">
-                    {{ produk.nama }} {{ produk.warna }} {{ produk.varian }}
-                </span>
-                <span class="font-bold text-red-600">
-                    {{ produk.stok }} pcs
-                </span>
-            </div>
-        </div>
-
-        <div v-else class="rounded-xl bg-emerald-50 text-emerald-700 text-sm p-4">
-            Semua stok masih aman.
-        </div>
-    </div>
-
-</div>
 
 </div>
 
