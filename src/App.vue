@@ -4683,7 +4683,9 @@ const dashboardPremiumData = computed(() => {
         return d >= today && d < tomorrow;
     });
 
-    const omsetHariIni = transaksiHariIni.reduce((sum, t) => sum + (t.subtotal || t.total || 0), 0);
+    const omsetHariIni = transaksiHariIni.reduce((sum, t) => {
+        return sum + (t.subtotal || t.total || 0);
+    }, 0);
 
     const hppHariIni = transaksiHariIni.reduce((sum, t) => {
         return sum + (t.items || []).reduce((s, item) => {
@@ -4695,10 +4697,14 @@ const dashboardPremiumData = computed(() => {
         return sum + (t.biaya?.total || 0);
     }, 0);
 
-    const pengeluaranHariIni = (state.keuangan || []).filter(k => {
-        const d = new Date(k.tanggal);
-        return d >= today && d < tomorrow && (k.jenis === 'pengeluaran' || k.jenis === 'biaya');
-    }).reduce((sum, k) => sum + (k.jumlah || 0), 0);
+    const pengeluaranHariIni = (state.keuangan || [])
+        .filter(k => {
+            const d = new Date(k.tanggal);
+            return d >= today &&
+                d < tomorrow &&
+                (k.jenis === 'pengeluaran' || k.jenis === 'biaya');
+        })
+        .reduce((sum, k) => sum + (k.jumlah || 0), 0);
 
     const profitBersihHariIni =
         omsetHariIni -
@@ -4707,13 +4713,28 @@ const dashboardPremiumData = computed(() => {
         pengeluaranHariIni;
 
     const produkTerjualHariIni = transaksiHariIni.reduce((sum, t) => {
-        return sum + (t.items || []).reduce((s, item) => s + (item.qty || 0), 0);
+        return sum + (t.items || []).reduce((s, item) => {
+            return s + (item.qty || 0);
+        }, 0);
     }, 0);
 
     const produkHampirHabis = (state.produk || [])
-        .filter(p => (p.stokFisik || 0) > 0 && (p.stokFisik || 0) <= (state.settings.minStok || 10))
-        .sort((a, b) => (a.stokFisik || 0) - (b.stokFisik || 0))
-        .slice(0, 5);
+        .filter(p => {
+            const stok = p.stokFisik ?? p.physical_stock ?? 0;
+            return stok > 0 && stok <= (state.settings.minStok || 10);
+        })
+        .sort((a, b) => {
+            const stokA = a.stokFisik ?? a.physical_stock ?? 0;
+            const stokB = b.stokFisik ?? b.physical_stock ?? 0;
+            return stokA - stokB;
+        })
+        .slice(0, 5)
+        .map(p => ({
+            nama: p.nama || p.product_name || '-',
+            warna: p.warna || p.color || '-',
+            varian: p.varian || p.variant || '-',
+            stok: p.stokFisik ?? p.physical_stock ?? 0
+        }));
 
     const batchBelumSelesai = (state.produksi || []).filter(p => {
         return (p.statusProses || '').toLowerCase() !== 'selesai';
@@ -4721,8 +4742,10 @@ const dashboardPremiumData = computed(() => {
 
     const maklunTerlambat = batchBelumSelesai.filter(p => {
         const d = new Date(p.tanggal);
-        const diffDays = Math.floor((today - d) / (1000 * 60 * 60 * 24));
-        return (p.produksiType || '').toLowerCase() === 'pemaklun' && diffDays >= 14;
+        const umurHari = Math.floor((today - d) / (1000 * 60 * 60 * 24));
+
+        return (p.produksiType || '').toLowerCase() === 'pemaklun' &&
+            umurHari >= 14;
     });
 
     return {
@@ -9147,6 +9170,115 @@ watch(activePage, (newPage, oldPage) => {
                 </div>
             </div>
             
+<!-- DASHBOARD PREMIUM HARI INI -->
+<div class="mb-8 space-y-6 animate-fade-in-up">
+
+    <div class="bg-slate-900 text-white rounded-2xl shadow-xl p-6 border border-slate-800">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div>
+                <p class="text-sm text-slate-300">Ringkasan Hari Ini</p>
+                <h3 class="text-2xl font-bold">Kondisi Bisnis Sekarang</h3>
+            </div>
+            <span class="text-xs bg-white/10 px-3 py-1 rounded-full text-slate-200">
+                Update otomatis dari transaksi hari ini
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white/10 rounded-xl p-4">
+                <p class="text-sm text-slate-300">Omset Hari Ini</p>
+                <p class="text-2xl font-bold mt-2">
+                    {{ formatCurrency(dashboardPremiumData.omsetHariIni) }}
+                </p>
+            </div>
+
+            <div class="bg-white/10 rounded-xl p-4">
+                <p class="text-sm text-slate-300">Profit Bersih Hari Ini</p>
+                <p class="text-2xl font-bold mt-2"
+                    :class="dashboardPremiumData.profitBersihHariIni >= 0 ? 'text-emerald-300' : 'text-red-300'">
+                    {{ formatCurrency(dashboardPremiumData.profitBersihHariIni) }}
+                </p>
+            </div>
+
+            <div class="bg-white/10 rounded-xl p-4">
+                <p class="text-sm text-slate-300">Order Hari Ini</p>
+                <p class="text-2xl font-bold mt-2">
+                    {{ formatNumber(dashboardPremiumData.orderHariIni) }}
+                </p>
+            </div>
+
+            <div class="bg-white/10 rounded-xl p-4">
+                <p class="text-sm text-slate-300">Produk Terjual</p>
+                <p class="text-2xl font-bold mt-2">
+                    {{ formatNumber(dashboardPremiumData.produkTerjualHariIni) }} pcs
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-slate-800">Produk Hampir Habis</h3>
+                <span class="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full">
+                    Min stok: {{ state.settings.minStok || 10 }}
+                </span>
+            </div>
+
+            <div v-if="dashboardPremiumData.produkHampirHabis.length > 0" class="space-y-3">
+                <div
+                    v-for="produk in dashboardPremiumData.produkHampirHabis"
+                    :key="`${produk.nama}-${produk.warna}-${produk.varian}`"
+                    class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100"
+                >
+                    <div>
+                        <p class="font-semibold text-slate-800">
+                            {{ produk.nama }} {{ produk.warna }} {{ produk.varian }}
+                        </p>
+                        <p class="text-xs text-slate-500">Perlu dipantau / restock</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-lg font-bold text-red-600">{{ produk.stok }}</p>
+                        <p class="text-xs text-slate-500">pcs</p>
+                    </div>
+                </div>
+            </div>
+
+            <div v-else class="p-4 rounded-xl bg-emerald-50 text-emerald-700 text-sm">
+                Semua stok masih aman.
+            </div>
+        </div>
+
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Produksi</h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+                    <p class="text-sm text-indigo-700">Batch Belum Selesai</p>
+                    <p class="text-3xl font-bold text-indigo-700 mt-2">
+                        {{ formatNumber(dashboardPremiumData.batchBelumSelesai) }}
+                    </p>
+                </div>
+
+                <div class="p-4 rounded-xl bg-orange-50 border border-orange-100">
+                    <p class="text-sm text-orange-700">Maklun Terlambat</p>
+                    <p class="text-3xl font-bold text-orange-700 mt-2">
+                        {{ formatNumber(dashboardPremiumData.maklunTerlambat) }}
+                    </p>
+                    <p class="text-xs text-orange-600 mt-1">
+                        Patokan: lebih dari 14 hari
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-4 text-sm text-slate-500">
+                Data ini membantu kamu melihat produksi yang perlu segera dicek.
+            </div>
+        </div>
+    </div>
+
+</div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 100ms;">
                     <div class="flex items-start gap-4">
