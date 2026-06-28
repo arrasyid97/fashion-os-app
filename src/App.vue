@@ -108,6 +108,8 @@ massUpdateFilterSize: '', // <-- BARU: Untuk menyimpan input ukuran
 
     analisisModelLimit: 10,
     dashboardDateFilter: 'today',
+    dashboardSalesModelFilter: 'all',
+    dashboardSalesChannelFilter: 'all',
     dashboardStartDate: '',
     dashboardEndDate: '',
     dashboardStartMonth: new Date().getMonth() + 1,
@@ -4818,29 +4820,18 @@ const dashboardSalesStats = computed(() => {
     const sizeMap = {};
     const channelMap = {};
 
+    const selectedModel = uiState.dashboardSalesModelFilter;
+    const selectedChannel = uiState.dashboardSalesChannelFilter;
+
     (state.transaksi || []).forEach(transaksi => {
         const channelName = transaksi.channel || transaksi.channelId || 'Tanpa Channel';
-        const omsetTransaksi = transaksi.subtotal || transaksi.total || 0;
 
-        if (!channelMap[channelName]) {
-            channelMap[channelName] = {
-                name: channelName,
-                qty: 0,
-                omset: 0
-            };
+        if (selectedChannel !== 'all' && channelName !== selectedChannel) {
+            return;
         }
-
-        channelMap[channelName].omset += omsetTransaksi;
 
         (transaksi.items || []).forEach(item => {
             const qty = item.qty || 0;
-
-            const skuText = [
-                item.nama,
-                item.product_name,
-                item.modelName,
-                item.sku
-            ].filter(Boolean).join(' ');
 
             const productData = (state.produk || []).find(p =>
                 p.sku === item.sku ||
@@ -4854,8 +4845,13 @@ const dashboardSalesStats = computed(() => {
                 productData?.modelName ||
                 productData?.nama ||
                 productData?.product_name ||
-                skuText.split(' ')[0] ||
+                item.nama ||
+                item.sku ||
                 'Tanpa Model';
+
+            if (selectedModel !== 'all' && modelName !== selectedModel) {
+                return;
+            }
 
             const colorName =
                 item.warna ||
@@ -4873,36 +4869,23 @@ const dashboardSalesStats = computed(() => {
                 productData?.ukuran ||
                 'Tanpa Ukuran';
 
-            if (!modelMap[modelName]) {
-                modelMap[modelName] = { name: modelName, qty: 0 };
-            }
+            const itemOmset = (item.hargaJual || item.price || item.harga || 0) * qty;
 
-            if (!colorMap[colorName]) {
-                colorMap[colorName] = { name: colorName, qty: 0 };
-            }
-
-            if (!sizeMap[sizeName]) {
-                sizeMap[sizeName] = { name: sizeName, qty: 0 };
-            }
+            if (!modelMap[modelName]) modelMap[modelName] = { name: modelName, qty: 0 };
+            if (!colorMap[colorName]) colorMap[colorName] = { name: colorName, qty: 0 };
+            if (!sizeMap[sizeName]) sizeMap[sizeName] = { name: sizeName, qty: 0 };
+            if (!channelMap[channelName]) channelMap[channelName] = { name: channelName, qty: 0, omset: 0 };
 
             modelMap[modelName].qty += qty;
             colorMap[colorName].qty += qty;
             sizeMap[sizeName].qty += qty;
             channelMap[channelName].qty += qty;
+            channelMap[channelName].omset += itemOmset;
         });
     });
 
-    const sortByQty = data => {
-        return Object.values(data)
-            .sort((a, b) => b.qty - a.qty)
-            .slice(0, 3);
-    };
-
-    const sortByOmset = data => {
-        return Object.values(data)
-            .sort((a, b) => b.omset - a.omset)
-            .slice(0, 3);
-    };
+    const sortByQty = data => Object.values(data).sort((a, b) => b.qty - a.qty).slice(0, 3);
+    const sortByOmset = data => Object.values(data).sort((a, b) => b.omset - a.omset).slice(0, 3);
 
     return {
         topModels: sortByQty(modelMap),
@@ -9419,6 +9402,29 @@ watch(activePage, (newPage, oldPage) => {
             <div>
                 <p class="text-sm text-slate-500">Ringkasan performa produk</p>
                 <h3 class="text-xl font-bold text-slate-800">Statistik Penjualan</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+    <select v-model="uiState.dashboardSalesModelFilter" class="p-2 border rounded-lg text-sm">
+        <option value="all">Semua Model</option>
+        <option
+            v-for="model in state.settings.modelProduk"
+            :key="model.id"
+            :value="model.namaModel"
+        >
+            {{ model.namaModel }}
+        </option>
+    </select>
+
+    <select v-model="uiState.dashboardSalesChannelFilter" class="p-2 border rounded-lg text-sm">
+        <option value="all">Semua Channel</option>
+        <option
+            v-for="channel in state.settings.marketplaces"
+            :key="channel.id"
+            :value="channel.name"
+        >
+            {{ channel.name }}
+        </option>
+    </select>
+</div>
             </div>
         </div>
 
