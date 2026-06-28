@@ -4812,6 +4812,106 @@ const dashboardInsights = computed(() => {
 
 });
 
+const dashboardSalesStats = computed(() => {
+    const modelMap = {};
+    const colorMap = {};
+    const sizeMap = {};
+    const channelMap = {};
+
+    (state.transaksi || []).forEach(transaksi => {
+        const channelName = transaksi.channel || transaksi.channelId || 'Tanpa Channel';
+        const omsetTransaksi = transaksi.subtotal || transaksi.total || 0;
+
+        if (!channelMap[channelName]) {
+            channelMap[channelName] = {
+                name: channelName,
+                qty: 0,
+                omset: 0
+            };
+        }
+
+        channelMap[channelName].omset += omsetTransaksi;
+
+        (transaksi.items || []).forEach(item => {
+            const qty = item.qty || 0;
+
+            const skuText = [
+                item.nama,
+                item.product_name,
+                item.modelName,
+                item.sku
+            ].filter(Boolean).join(' ');
+
+            const productData = (state.produk || []).find(p =>
+                p.sku === item.sku ||
+                p.docId === item.product_id ||
+                p.id === item.product_id
+            );
+
+            const modelName =
+                item.modelName ||
+                productData?.namaModel ||
+                productData?.modelName ||
+                productData?.nama ||
+                productData?.product_name ||
+                skuText.split(' ')[0] ||
+                'Tanpa Model';
+
+            const colorName =
+                item.warna ||
+                item.color ||
+                productData?.warna ||
+                productData?.color ||
+                'Tanpa Warna';
+
+            const sizeName =
+                item.varian ||
+                item.size ||
+                item.ukuran ||
+                productData?.varian ||
+                productData?.variant ||
+                productData?.ukuran ||
+                'Tanpa Ukuran';
+
+            if (!modelMap[modelName]) {
+                modelMap[modelName] = { name: modelName, qty: 0 };
+            }
+
+            if (!colorMap[colorName]) {
+                colorMap[colorName] = { name: colorName, qty: 0 };
+            }
+
+            if (!sizeMap[sizeName]) {
+                sizeMap[sizeName] = { name: sizeName, qty: 0 };
+            }
+
+            modelMap[modelName].qty += qty;
+            colorMap[colorName].qty += qty;
+            sizeMap[sizeName].qty += qty;
+            channelMap[channelName].qty += qty;
+        });
+    });
+
+    const sortByQty = data => {
+        return Object.values(data)
+            .sort((a, b) => b.qty - a.qty)
+            .slice(0, 3);
+    };
+
+    const sortByOmset = data => {
+        return Object.values(data)
+            .sort((a, b) => b.omset - a.omset)
+            .slice(0, 3);
+    };
+
+    return {
+        topModels: sortByQty(modelMap),
+        topColors: sortByQty(colorMap),
+        topSizes: sortByQty(sizeMap),
+        topChannels: sortByOmset(channelMap)
+    };
+});
+
 const kpiExplanations = {
     'saldo-kas': { 
     title: 'Saldo Kas Saat Ini', 
