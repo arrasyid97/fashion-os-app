@@ -9036,52 +9036,52 @@ watch(activePage, (newPage, oldPage) => {
         <nav class="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
 
     <a href="#" @click.prevent="changePage('dashboard')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'dashboard' }">
-        <span class="w-6 mr-3 text-center">🏠</span>
-        Dashboard
-    </a>
+    <span class="w-6 mr-3 text-center">🏠</span>
+    Dashboard
+</a>
 
-    <button type="button" @click="toggleSidebarGroup('produk')" class="w-full sidebar-link justify-between">
-        <span class="flex items-center">
-            <span class="w-6 mr-3 text-center">📦</span>
-            Produk
-        </span>
-        <span>{{ uiState.sidebarGroups.produk ? '▲' : '▼' }}</span>
-    </button>
+<button type="button" @click="toggleSidebarGroup('penjualan')" class="w-full sidebar-link justify-between">
+    <span class="flex items-center">
+        <span class="w-6 mr-3 text-center">🛒</span>
+        Penjualan
+    </span>
+    <span>{{ uiState.sidebarGroups.penjualan ? '▲' : '▼' }}</span>
+</button>
 
-    <div v-show="uiState.sidebarGroups.produk" class="ml-4 space-y-1">
-        <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">Inventaris</a>
-        <a href="#" @click.prevent="changePage('harga-hpp')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'harga-hpp' }">Harga & HPP</a>
-        <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'promosi' }">Promosi</a>
-    </div>
+<div v-show="uiState.sidebarGroups.penjualan" class="ml-4 space-y-1">
+    <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">Kasir (POS)</a>
+    <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Proses Massal</a>
+    <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">Cek Pencairan Dana</a>
+    <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
+</div>
 
-    <button type="button" @click="toggleSidebarGroup('produksi')" class="w-full sidebar-link justify-between">
-        <span class="flex items-center">
-            <span class="w-6 mr-3 text-center">🏭</span>
-            Produksi
-        </span>
-        <span>{{ uiState.sidebarGroups.produksi ? '▲' : '▼' }}</span>
-    </button>
+<button type="button" @click="toggleSidebarGroup('produk')" class="w-full sidebar-link justify-between">
+    <span class="flex items-center">
+        <span class="w-6 mr-3 text-center">📦</span>
+        Produk
+    </span>
+    <span>{{ uiState.sidebarGroups.produk ? '▲' : '▼' }}</span>
+</button>
 
-    <div v-show="uiState.sidebarGroups.produksi" class="ml-4 space-y-1">
-        <a href="#" @click.prevent="changePage('produksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'produksi' }">Produksi</a>
-        <a href="#" @click.prevent="changePage('supplier')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'supplier' }">Manajemen Supplier</a>
-        <a href="#" @click.prevent="changePage('gudang-kain')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'gudang-kain' }">Stok Kain</a>
-    </div>
+<div v-show="uiState.sidebarGroups.produk" class="ml-4 space-y-1">
+    <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">Inventaris</a>
+    <a href="#" @click.prevent="changePage('harga-hpp')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'harga-hpp' }">Harga & HPP</a>
+    <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'promosi' }">Promosi</a>
+</div>
 
-    <button type="button" @click="toggleSidebarGroup('penjualan')" class="w-full sidebar-link justify-between">
-        <span class="flex items-center">
-            <span class="w-6 mr-3 text-center">🛒</span>
-            Penjualan
-        </span>
-        <span>{{ uiState.sidebarGroups.penjualan ? '▲' : '▼' }}</span>
-    </button>
+<button type="button" @click="toggleSidebarGroup('produksi')" class="w-full sidebar-link justify-between">
+    <span class="flex items-center">
+        <span class="w-6 mr-3 text-center">🏭</span>
+        Produksi
+    </span>
+    <span>{{ uiState.sidebarGroups.produksi ? '▲' : '▼' }}</span>
+</button>
 
-    <div v-show="uiState.sidebarGroups.penjualan" class="ml-4 space-y-1">
-        <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">Kasir (POS)</a>
-        <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Proses Massal</a>
-        <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">Cek Pencairan Dana</a>
-        <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
-    </div>
+<div v-show="uiState.sidebarGroups.produksi" class="ml-4 space-y-1">
+    <a href="#" @click.prevent="changePage('produksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'produksi' }">Produksi</a>
+    <a href="#" @click.prevent="changePage('supplier')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'supplier' }">Manajemen Supplier</a>
+    <a href="#" @click.prevent="changePage('gudang-kain')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'gudang-kain' }">Stok Kain</a>
+</div>
 
     <button type="button" @click="toggleSidebarGroup('keuangan')" class="w-full sidebar-link justify-between">
         <span class="flex items-center">
@@ -9216,43 +9216,16 @@ watch(activePage, (newPage, oldPage) => {
         
         <div v-else class="max-w-7xl mx-auto">
             <div class="flex flex-wrap justify-between items-center mb-8 gap-4 animate-fade-in-up">
-                <div class="flex items-center gap-4">
-                    <h2 class="text-3xl font-bold text-slate-800">Dashboard Analitik</h2>
-                    <button @click="showModal('dashboardKpiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                        Informasi
-                    </button>
-                </div>
-                <div class="flex flex-wrap items-center gap-2 p-3 bg-white/70 backdrop-blur-sm rounded-lg border shadow-sm">
-                    <select v-model="uiState.dashboardDateFilter" class="w-full sm:w-auto bg-white border-slate-300 text-sm rounded-lg p-2.5 capitalize">
-                        <option value="today">hari ini</option>
-                        <option value="last_7_days">7 hari terakhir</option>
-                        <option value="last_30_days">30 hari terakhir</option>
-                        <option value="this_year">tahun ini</option>
-                        <option value="by_date_range">rentang tanggal</option>
-                        <option value="by_month_range">rentang bulan</option>
-                        <option value="by_year_range">rentang tahun</option>
-                        <option value="all_time">semua</option>
-                    </select>
-                    <div v-if="uiState.dashboardDateFilter === 'by_date_range'" class="flex items-center gap-2">
-                        <input type="date" v-model="uiState.dashboardStartDate" class="border-slate-300 text-sm rounded-lg p-2">
-                        <span>s/d</span>
-                        <input type="date" v-model="uiState.dashboardEndDate" class="border-slate-300 text-sm rounded-lg p-2">
-                    </div>
-                    <div v-if="uiState.dashboardDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
-                        <select v-model.number="uiState.dashboardStartMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                        <input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
-                        <span class="mx-2">s/d</span>
-                        <select v-model.number="uiState.dashboardEndMonth" class="border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                        <input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
-                    </div>
-                    <div v-if="uiState.dashboardDateFilter === 'by_year_range'" class="flex items-center gap-2">
-                        <input type="number" v-model.number="uiState.dashboardStartYear" placeholder="Dari Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
-                        <span>s/d</span>
-                        <input type="number" v-model.number="uiState.dashboardEndYear" placeholder="Sampai Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
-                    </div>
-                </div>
-            </div>
+    <div class="flex items-center gap-4">
+        <h2 class="text-3xl font-bold text-slate-800">Dashboard Analitik</h2>
+        <button @click="showModal('dashboardKpiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+            </svg>
+            Informasi
+        </button>
+    </div>
+</div>
             
 <!-- DASHBOARD PREMIUM HARI INI -->
 <div class="mb-8 space-y-6 animate-fade-in-up">
@@ -9456,20 +9429,71 @@ watch(activePage, (newPage, oldPage) => {
 
 <!-- PEMISAH KPI FINAL -->
 <div class="mb-6 mt-10">
-    <div class="flex items-center justify-between gap-4">
-        <div>
-            <p class="text-sm text-slate-500">Laporan Bisnis Final</p>
-            <h3 class="text-2xl font-bold text-slate-800">
-                Performa Berdasarkan Dana Cair
-            </h3>
-            <p class="text-sm text-slate-500 mt-1">
-                Data di bawah ini dihitung dari pesanan yang sudah selesai dan dana yang sudah dicairkan.
-            </p>
-        </div>
+    <div class="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+            
+            <div>
+                <p class="text-sm text-slate-500">Laporan Bisnis Final</p>
+                <h3 class="text-2xl font-bold text-slate-800">
+                    Performa Berdasarkan Dana Cair
+                </h3>
+                <p class="text-sm text-slate-500 mt-1">
+                    Data di bawah ini dihitung dari pesanan yang sudah selesai dan dana yang sudah dicairkan.
+                </p>
+            </div>
 
-        <span class="hidden md:inline-flex text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full font-semibold">
-            Data final
-        </span>
+            <div class="w-full xl:w-auto">
+                <div class="flex flex-wrap items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <select v-model="uiState.dashboardDateFilter" class="w-full sm:w-auto bg-white border-slate-300 text-sm rounded-lg p-2.5 capitalize">
+                        <option value="today">hari ini</option>
+                        <option value="last_7_days">7 hari terakhir</option>
+                        <option value="last_30_days">30 hari terakhir</option>
+                        <option value="this_year">tahun ini</option>
+                        <option value="by_date_range">rentang tanggal</option>
+                        <option value="by_month_range">rentang bulan</option>
+                        <option value="by_year_range">rentang tahun</option>
+                        <option value="all_time">semua</option>
+                    </select>
+
+                    <div v-if="uiState.dashboardDateFilter === 'by_date_range'" class="flex items-center gap-2">
+                        <input type="date" v-model="uiState.dashboardStartDate" class="border-slate-300 text-sm rounded-lg p-2">
+                        <span>s/d</span>
+                        <input type="date" v-model="uiState.dashboardEndDate" class="border-slate-300 text-sm rounded-lg p-2">
+                    </div>
+
+                    <div v-if="uiState.dashboardDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
+                        <select v-model.number="uiState.dashboardStartMonth" class="border-slate-300 text-sm rounded-lg p-2">
+                            <option v-for="m in 12" :key="m" :value="m">
+                                {{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}
+                            </option>
+                        </select>
+
+                        <input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+
+                        <span class="mx-2">s/d</span>
+
+                        <select v-model.number="uiState.dashboardEndMonth" class="border-slate-300 text-sm rounded-lg p-2">
+                            <option v-for="m in 12" :key="m" :value="m">
+                                {{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}
+                            </option>
+                        </select>
+
+                        <input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
+                    </div>
+
+                    <div v-if="uiState.dashboardDateFilter === 'by_year_range'" class="flex items-center gap-2">
+                        <input type="number" v-model.number="uiState.dashboardStartYear" placeholder="Dari Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
+                        <span>s/d</span>
+                        <input type="number" v-model.number="uiState.dashboardEndYear" placeholder="Sampai Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
+                    </div>
+                </div>
+
+                <p class="text-xs text-slate-500 mt-2">
+                    Filter ini hanya untuk laporan bisnis final di bawah.
+                </p>
+            </div>
+
+        </div>
     </div>
 </div>
 
