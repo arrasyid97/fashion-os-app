@@ -9454,6 +9454,25 @@ watch(activePage, (newPage, oldPage) => {
 
 </div>
 
+<!-- PEMISAH KPI FINAL -->
+<div class="mb-6 mt-10">
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <p class="text-sm text-slate-500">Laporan Bisnis Final</p>
+            <h3 class="text-2xl font-bold text-slate-800">
+                Performa Berdasarkan Dana Cair
+            </h3>
+            <p class="text-sm text-slate-500 mt-1">
+                Data di bawah ini dihitung dari pesanan yang sudah selesai dan dana yang sudah dicairkan.
+            </p>
+        </div>
+
+        <span class="hidden md:inline-flex text-xs bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full font-semibold">
+            Data final
+        </span>
+    </div>
+</div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 100ms;">
                     <div class="flex items-start gap-4">
