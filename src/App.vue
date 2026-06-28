@@ -8240,6 +8240,36 @@ function getOrCreateBulkOrderById(orderId) {
     return newOrder;
 }
 
+function showBulkPasteInfo() {
+    alert(
+`Alur kerja Salin & Tempel Massal ID Pesanan:
+
+1. Scan ID pesanan / resi terlebih dahulu.
+2. Setelah itu scan barcode SKU produk.
+3. Jika 1 pesanan berisi 2 baju, maka Scan 1 ID pesanan lalu 2 SKU produk di bawahnya.
+4. Ulangi pola yang sama untuk pesanan berikutnya.
+5. Semua hasil scan bisa kamu masukkan dulu ke Excel / Sheet.
+6. Setelah selesai, salin semua isi kolom Excel lalu tempel ke kolom ini.
+7. Klik tombol "Masukkan ke Antrian Pesanan".
+
+Contoh format:
+
+250628ABC001
+Baju-HITAM-M
+Baju-HITAM-L
+250628ABC002
+Baju-Putih-S
+250628ABC003
+Baju-merah-XS
+Baju-merah-M
+
+Keterangan:
+- Baris yang cocok dengan SKU produk akan dianggap sebagai produk.
+- Baris yang tidak cocok dengan SKU produk akan dianggap sebagai ID Pesanan.
+- Pastikan SKU hasil scan barcode sama persis dengan SKU di aplikasi.`
+    );
+}
+
 function processBulkPasteOrders() {
     if (!uiState.activeCartChannel) {
         return alert("Pilih Channel Penjualan terlebih dahulu.");
@@ -9987,9 +10017,19 @@ watch(activePage, (newPage, oldPage) => {
                         </div>
 
                         <div class="border-t pt-6">
-    <label class="block text-sm font-semibold text-slate-700 mb-2">
+    <div class="flex items-center justify-between gap-3 mb-2">
+    <label class="block text-sm font-semibold text-slate-700">
         3. Salin & Tempel Massal ID Pesanan
     </label>
+
+    <button
+        type="button"
+        @click="showBulkPasteInfo"
+        class="text-xs bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded-lg hover:bg-blue-200"
+    >
+        ℹ️ Informasi
+    </button>
+</div>
 
     <textarea
         v-model="uiState.bulk_paste_input"
