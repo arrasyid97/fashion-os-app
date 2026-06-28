@@ -14744,49 +14744,152 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
 
-<div v-if="uiState.modalType === 'panduanBulkProcess'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
-    <div class="flex-shrink-0 pb-4 border-b">
-        <h3 class="text-2xl font-bold text-slate-800">Panduan Fitur Proses Massal</h3>
-        <p class="text-slate-500">Alur kerja yang dirancang untuk kecepatan dan efisiensi saat volume pesanan tinggi.</p>
-    </div>
-    
-    <div class="flex-1 overflow-y-auto py-4 pr-2">
-        <div class="space-y-6 text-slate-700 leading-relaxed prose">
-            <p>Halaman Proses Massal adalah solusi untuk efisiensi tertinggi. Halaman ini menyediakan dua alur kerja yang berbeda untuk melayani pengguna dengan atau tanpa barcode scanner.</p>
-            
-            <div class="p-4 border rounded-lg bg-slate-50">
-                <h4 class="text-lg font-semibold text-indigo-700">Alur Kerja #1: Khusus Scanner (Super Cepat & Otomatis)</h4>
-                <p class="mt-1 text-sm text-slate-500"><em>Gunakan kolom input <strong>"KHUSUS SCANNER (Otomatis)"</strong>.</em></p>
-                <p class="mt-2 text-sm">Alur ini dirancang untuk kecepatan maksimal tanpa klik. Sistem cerdas akan membedakan produk dan resi berdasarkan urutan scan:</p>
-                <ol class="list-decimal list-inside space-y-1 mt-2 text-sm">
-                    <li><strong>Scan Produk:</strong> Pindai barcode pada produk. Item akan otomatis ditambahkan ke "Daftar Produk yang Sedang di-Scan".</li>
-                    <li><strong>Scan Produk Berikutnya (jika ada):</strong> Jika pesanan multi-item, lanjutkan scan semua produknya.</li>
-                    <li><strong>Scan Resi Pengiriman:</strong> Setelah semua produk untuk satu pesanan di-scan, langsung scan resinya.</li>
-                    <li><strong>Proses Otomatis:</strong> Sistem akan langsung memproses pesanan tersebut dan menambahkannya ke "Riwayat Proses Terakhir". Layar siap untuk pesanan berikutnya.</li>
-                </ol>
+<div
+    v-if="uiState.modalType === 'panduanBulkProcess'"
+    class="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-5xl max-h-[92vh] flex flex-col overflow-hidden"
+>
+    <!-- HEADER -->
+    <div class="flex-shrink-0 px-5 sm:px-6 py-4 border-b bg-white">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h3 class="text-xl sm:text-2xl font-bold text-slate-800">
+                    Panduan Fitur Proses Massal
+                </h3>
+                <p class="text-sm text-slate-500 mt-1">
+                    Panduan untuk memproses banyak pesanan dengan lebih cepat, rapi, dan minim kesalahan.
+                </p>
             </div>
 
-            <div class="p-4 border rounded-lg bg-slate-50">
-                <h4 class="text-lg font-semibold text-slate-700">Alur Kerja #2: Input Manual (Tanpa Scanner)</h4>
-                 <p class="mt-1 text-sm text-slate-500"><em>Gunakan kolom input <strong>"Input Manual"</strong>.</em></p>
-                <p class="mt-2 text-sm">Alur ini memberikan kontrol penuh bagi pengguna yang mengetik manual:</p>
-                <ol class="list-decimal list-inside space-y-1 mt-2 text-sm">
-                    <li><strong>Ketik SKU/Nama Produk:</strong> Saat Anda mengetik, daftar rekomendasi akan muncul. Klik produk yang benar untuk menambahkannya ke "Daftar Produk yang Sedang di-Scan".</li>
-                    <li><strong>Ulangi untuk Produk Lain (jika ada):</strong> Tambahkan semua produk untuk satu pesanan ke dalam daftar.</li>
-                    <li><strong>Ketik ID Pesanan (Resi):</strong> Setelah semua produk ada di daftar, ketik ID Pesanan dari resi ke dalam kolom yang sama.</li>
-                    <li><strong>Proses Pesanan:</strong> Klik tombol <strong>"Proses Pesanan Ini"</strong>. Pesanan akan difinalisasi dan ditambahkan ke "Riwayat Proses Terakhir".</li>
-                </ol>
-            </div>
-
-            <div class="mt-4 p-3 bg-green-50 text-green-800 border-l-4 border-green-500 text-sm">
-                <p class="font-bold">Pilih Alur Kerja Anda</p>
-                <p class="mt-2">Kedua metode di atas akan menghasilkan data transaksi yang sama akuratnya. Gunakan metode yang paling sesuai dengan peralatan dan kenyamanan Anda.</p>
-            </div>
+            <button
+                @click="hideModal"
+                class="text-slate-400 hover:text-slate-700 text-2xl leading-none"
+                title="Tutup"
+            >
+                ×
+            </button>
         </div>
     </div>
 
-    <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-        <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
+    <!-- BODY -->
+    <div class="flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 py-5">
+        <div class="space-y-5 text-slate-700 leading-relaxed">
+
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p class="text-sm">
+                    Halaman <strong>Proses Massal</strong> digunakan untuk memasukkan ID pesanan dan produk yang terjual dalam jumlah banyak.
+                    Fitur ini cocok dipakai ketika pesanan sedang ramai dan Anda ingin mempercepat proses input transaksi.
+                </p>
+
+                <p class="text-sm mt-2 font-semibold text-slate-800">
+                    Sebelum mulai, pastikan Anda sudah memilih Channel Penjualan terlebih dahulu.
+                </p>
+            </div>
+
+            <!-- ALUR 1 -->
+            <div class="p-4 sm:p-5 border rounded-xl bg-blue-50 border-blue-200">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <h4 class="text-lg font-bold text-blue-800">
+                        Alur Kerja #1: Salin & Tempel Massal ID Pesanan
+                    </h4>
+
+                    <span class="w-fit text-xs bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full">
+                        Cocok untuk banyak pesanan
+                    </span>
+                </div>
+
+                <p class="mt-2 text-sm text-slate-600">
+                    Gunakan alur ini jika hasil scan ID pesanan dan SKU produk sudah dikumpulkan terlebih dahulu di Excel.
+                    Setelah itu, Anda cukup salin semua data dari Excel lalu tempel ke kolom
+                    <strong>Salin & Tempel Massal ID Pesanan</strong>.
+                </p>
+
+                <ol class="list-decimal ml-5 space-y-1 mt-3 text-sm">
+                    <li>Scan ID pesanan atau resi terlebih dahulu.</li>
+                    <li>Setelah itu scan barcode SKU produk.</li>
+                    <li>Jika 1 pesanan berisi lebih dari 1 produk, masukkan semua SKU produk di bawah ID pesanan tersebut.</li>
+                    <li>Ulangi pola yang sama untuk pesanan berikutnya.</li>
+                    <li>Semua hasil scan bisa dimasukkan dulu ke Excel dalam 1 kolom.</li>
+                    <li>Salin semua isi kolom Excel lalu tempel ke kolom salin-tempel massal.</li>
+                    <li>Klik <strong>Validasi Data</strong> untuk mengecek apakah ID pesanan dan SKU sudah terbaca dengan benar.</li>
+                    <li>Jika data sudah aman, klik <strong>Masukkan ke Antrian Pesanan</strong>.</li>
+                    <li>Pesanan akan masuk ke bagian <strong>Antrian Pesanan untuk Diproses</strong>.</li>
+                </ol>
+
+                <div class="mt-4">
+                    <p class="text-xs font-bold text-slate-600 mb-2">
+                        Contoh format:
+                    </p>
+
+                    <pre class="bg-white border border-blue-100 rounded-lg p-3 text-xs text-slate-700 overflow-x-auto">SPX2345
+BAJU-HTM-L
+BAJU-HTM-M
+BAJU-HTM-L
+SPX5678
+BAJU-PUTIH-M</pre>
+                </div>
+
+                <div class="mt-4 text-xs text-slate-600 space-y-1">
+                    <p><strong>Keterangan:</strong></p>
+                    <p>- <strong>SPX2345</strong> dianggap sebagai ID pesanan.</p>
+                    <p>- <strong>BAJU-HTM-L</strong> dianggap sebagai SKU produk.</p>
+                    <p>- Jika SKU yang sama muncul 3 kali, maka qty produk menjadi 3.</p>
+                    <p>- Baris yang cocok dengan SKU di aplikasi akan dianggap sebagai produk.</p>
+                    <p>- Baris yang tidak cocok dengan SKU akan dianggap sebagai ID pesanan.</p>
+                    <p>- Format ID pesanan bebas, bisa angka, huruf, campuran, spasi, strip, atau underscore.</p>
+                    <p>- Pastikan SKU hasil scan barcode sama persis dengan SKU produk yang ada di aplikasi.</p>
+                </div>
+            </div>
+
+            <!-- ALUR 2 -->
+            <div class="p-4 sm:p-5 border rounded-xl bg-slate-50 border-slate-200">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <h4 class="text-lg font-bold text-slate-800">
+                        Alur Kerja #2: Input Manual Tanpa Scanner
+                    </h4>
+
+                    <span class="w-fit text-xs bg-slate-200 text-slate-700 font-bold px-3 py-1 rounded-full">
+                        Cocok untuk sedikit pesanan
+                    </span>
+                </div>
+
+                <p class="mt-2 text-sm text-slate-600">
+                    Gunakan alur ini jika Anda ingin memasukkan pesanan satu per satu secara manual.
+                    Alur ini cocok dipakai saat jumlah pesanan sedikit atau saat Anda ingin mengecek produk dengan lebih teliti.
+                </p>
+
+                <ol class="list-decimal ml-5 space-y-1 mt-3 text-sm">
+                    <li>Ketik SKU atau nama produk di kolom <strong>Input Manual</strong>.</li>
+                    <li>Pilih produk dari daftar rekomendasi yang muncul.</li>
+                    <li>Jika pesanan berisi lebih dari 1 produk, tambahkan semua produknya terlebih dahulu.</li>
+                    <li>Setelah produk lengkap, masukkan ID pesanan atau resi.</li>
+                    <li>Klik <strong>Proses Pesanan Ini</strong>.</li>
+                    <li>Pesanan akan masuk ke antrian atau riwayat proses sesuai alur yang tersedia di sistem.</li>
+                </ol>
+            </div>
+
+            <!-- PENUTUP -->
+            <div class="p-4 bg-green-50 text-green-800 border-l-4 border-green-500 rounded-r-xl text-sm">
+                <p class="font-bold">
+                    Pilih Alur Kerja yang Sesuai
+                </p>
+
+                <p class="mt-2">
+                    Gunakan <strong>Salin & Tempel Massal</strong> jika Anda menangani banyak pesanan sekaligus.
+                    Gunakan <strong>Input Manual</strong> jika Anda hanya memproses sedikit pesanan atau ingin memasukkan pesanan satu per satu dengan kontrol penuh.
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="flex-shrink-0 flex justify-end gap-3 px-5 sm:px-6 py-4 border-t bg-white">
+        <button
+            @click="hideModal"
+            class="bg-slate-200 text-slate-800 font-bold py-2 px-5 rounded-lg hover:bg-slate-300"
+        >
+            Tutup
+        </button>
     </div>
 </div>
 
