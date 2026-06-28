@@ -4761,7 +4761,19 @@ const dashboardPremiumData = computed(() => {
     };
 });
 
+const uniqueDashboardSalesModels = computed(() => {
+    const modelMap = new Map();
 
+    (state.settings.modelProduk || []).forEach(model => {
+        if (model.namaModel && !modelMap.has(model.namaModel)) {
+            modelMap.set(model.namaModel, {
+                namaModel: model.namaModel
+            });
+        }
+    });
+
+    return Array.from(modelMap.values());
+});
 
 const dashboardSalesStats = computed(() => {
     const modelMap = {};
@@ -4788,15 +4800,18 @@ const dashboardSalesStats = computed(() => {
                 p.id === item.product_id
             );
 
-            const modelName =
-                item.modelName ||
-                productData?.namaModel ||
-                productData?.modelName ||
-                productData?.nama ||
-                productData?.product_name ||
-                item.nama ||
-                item.sku ||
-                'Tanpa Model';
+            const masterModel = (state.settings.modelProduk || []).find(m =>
+    m.id === productData?.model_id ||
+    m.id === productData?.modelId ||
+    m.namaModel === productData?.namaModel
+);
+
+const modelName =
+    item.modelName ||
+    masterModel?.namaModel ||
+    productData?.namaModel ||
+    productData?.modelName ||
+    'Tanpa Model';
 
             if (selectedModel !== 'all' && modelName !== selectedModel) {
                 return;
@@ -9321,12 +9336,12 @@ watch(activePage, (newPage, oldPage) => {
     <select v-model="uiState.dashboardSalesModelFilter" class="p-2 border rounded-lg text-sm">
         <option value="all">Semua Model</option>
         <option
-            v-for="model in state.settings.modelProduk"
-            :key="model.id"
-            :value="model.namaModel"
-        >
-            {{ model.namaModel }}
-        </option>
+    v-for="model in uniqueDashboardSalesModels"
+    :key="model.namaModel"
+    :value="model.namaModel"
+>
+    {{ model.namaModel }}
+</option>
     </select>
 
     <select v-model="uiState.dashboardSalesChannelFilter" class="p-2 border rounded-lg text-sm">
