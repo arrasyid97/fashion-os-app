@@ -4759,6 +4759,59 @@ const dashboardPremiumData = computed(() => {
     };
 });
 
+const dashboardInsights = computed(() => {
+
+    const insights = [];
+
+    if (dashboardPremiumData.value.produkHampirHabis.length > 0) {
+        insights.push({
+            type: "danger",
+            icon: "📦",
+            title: `${dashboardPremiumData.value.produkHampirHabis.length} produk hampir habis`,
+            description: "Segera lakukan produksi atau restock."
+        });
+    }
+
+    if (dashboardPremiumData.value.batchBelumSelesai > 0) {
+        insights.push({
+            type: "warning",
+            icon: "🏭",
+            title: `${dashboardPremiumData.value.batchBelumSelesai} batch produksi belum selesai`,
+            description: "Pastikan produksi selesai tepat waktu."
+        });
+    }
+
+    if (dashboardPremiumData.value.orderHariIni === 0) {
+        insights.push({
+            type: "info",
+            icon: "🛒",
+            title: "Belum ada order hari ini",
+            description: "Promosikan produk atau optimalkan iklan."
+        });
+    }
+
+    if (dashboardPremiumData.value.omsetHariIni > 0) {
+        insights.push({
+            type: "success",
+            icon: "💰",
+            title: "Penjualan hari ini sudah berjalan",
+            description: `Omset ${formatCurrency(dashboardPremiumData.value.omsetHariIni)}`
+        });
+    }
+
+    if (insights.length === 0) {
+        insights.push({
+            type: "success",
+            icon: "✅",
+            title: "Semua indikator dalam kondisi baik",
+            description: "Belum ada hal yang perlu perhatian khusus."
+        });
+    }
+
+    return insights;
+
+});
+
 const kpiExplanations = {
     'saldo-kas': { 
     title: 'Saldo Kas Saat Ini', 
@@ -9173,12 +9226,14 @@ watch(activePage, (newPage, oldPage) => {
 <!-- DASHBOARD PREMIUM HARI INI -->
 <div class="mb-8 space-y-6 animate-fade-in-up">
 
+    <!-- RINGKASAN HARI INI -->
     <div class="bg-slate-900 text-white rounded-2xl shadow-xl p-6 border border-slate-800">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
             <div>
                 <p class="text-sm text-slate-300">Ringkasan Hari Ini</p>
                 <h3 class="text-2xl font-bold">Kondisi Bisnis Sekarang</h3>
             </div>
+
             <span class="text-xs bg-white/10 px-3 py-1 rounded-full text-slate-200">
                 Update otomatis dari transaksi hari ini
             </span>
@@ -9186,29 +9241,34 @@ watch(activePage, (newPage, oldPage) => {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-white/10 rounded-xl p-4">
-                <p class="text-sm text-slate-300">Omset Hari Ini</p>
+                <p class="text-sm text-slate-300">💰 Omset Hari Ini</p>
                 <p class="text-2xl font-bold mt-2">
                     {{ formatCurrency(dashboardPremiumData.omsetHariIni) }}
                 </p>
             </div>
 
             <div class="bg-white/10 rounded-xl p-4">
-                <p class="text-sm text-slate-300">Estimasi Laba Hari Ini</p>
-                <p class="text-2xl font-bold mt-2"
-                    :class="dashboardPremiumData.profitBersihHariIni >= 0 ? 'text-emerald-300' : 'text-red-300'">
+                <p class="text-sm text-slate-300">📊 Estimasi Laba Hari Ini</p>
+                <p
+                    class="text-2xl font-bold mt-2"
+                    :class="dashboardPremiumData.profitBersihHariIni >= 0 ? 'text-emerald-300' : 'text-red-300'"
+                >
                     {{ formatCurrency(dashboardPremiumData.profitBersihHariIni) }}
+                </p>
+                <p class="text-xs text-slate-400 mt-2">
+                    Setelah HPP, biaya transaksi, dan pengeluaran yang sudah dicatat hari ini.
                 </p>
             </div>
 
             <div class="bg-white/10 rounded-xl p-4">
-                <p class="text-sm text-slate-300">Order Hari Ini</p>
+                <p class="text-sm text-slate-300">🛒 Order Hari Ini</p>
                 <p class="text-2xl font-bold mt-2">
                     {{ formatNumber(dashboardPremiumData.orderHariIni) }}
                 </p>
             </div>
 
             <div class="bg-white/10 rounded-xl p-4">
-                <p class="text-sm text-slate-300">Produk Terjual</p>
+                <p class="text-sm text-slate-300">📦 Produk Terjual</p>
                 <p class="text-2xl font-bold mt-2">
                     {{ formatNumber(dashboardPremiumData.produkTerjualHariIni) }} pcs
                 </p>
@@ -9216,10 +9276,53 @@ watch(activePage, (newPage, oldPage) => {
         </div>
     </div>
 
+    <!-- PRIORITAS HARI INI -->
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div>
+                <p class="text-sm text-slate-500">Ringkasan yang perlu diperhatikan</p>
+                <h3 class="text-xl font-bold text-slate-800">Prioritas Hari Ini</h3>
+            </div>
+
+            <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+                Update otomatis
+            </span>
+        </div>
+
+        <div class="space-y-4">
+            <div
+                v-for="(item,index) in dashboardInsights"
+                :key="index"
+                class="flex items-start gap-4 rounded-xl border border-slate-200 p-4 hover:bg-slate-50 transition-all duration-200"
+            >
+                <div class="text-3xl">
+                    {{ item.icon }}
+                </div>
+
+                <div class="flex-1">
+                    <div class="font-semibold text-slate-800">
+                        {{ item.title }}
+                    </div>
+
+                    <div class="text-sm text-slate-500 mt-1">
+                        {{ item.description }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DETAIL STOK & PRODUKSI -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- PRODUK HAMPIR HABIS -->
         <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-6">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-slate-800">Produk Hampir Habis</h3>
+                <div>
+                    <p class="text-sm text-slate-500">Kontrol stok</p>
+                    <h3 class="text-lg font-bold text-slate-800">Produk Hampir Habis</h3>
+                </div>
+
                 <span class="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full">
                     Min stok: {{ state.settings.minStok || 10 }}
                 </span>
@@ -9235,10 +9338,15 @@ watch(activePage, (newPage, oldPage) => {
                         <p class="font-semibold text-slate-800">
                             {{ produk.nama }} {{ produk.warna }} {{ produk.varian }}
                         </p>
-                        <p class="text-xs text-slate-500">Perlu dipantau / restock</p>
+                        <p class="text-xs text-slate-500">
+                            Perlu dipantau / restock
+                        </p>
                     </div>
+
                     <div class="text-right">
-                        <p class="text-lg font-bold text-red-600">{{ produk.stok }}</p>
+                        <p class="text-lg font-bold text-red-600">
+                            {{ produk.stok }}
+                        </p>
                         <p class="text-xs text-slate-500">pcs</p>
                     </div>
                 </div>
@@ -9249,14 +9357,21 @@ watch(activePage, (newPage, oldPage) => {
             </div>
         </div>
 
+        <!-- PRODUKSI -->
         <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-6">
-            <h3 class="text-lg font-bold text-slate-800 mb-4">Produksi</h3>
+            <div class="mb-4">
+                <p class="text-sm text-slate-500">Kontrol produksi</p>
+                <h3 class="text-lg font-bold text-slate-800">Produksi</h3>
+            </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
                     <p class="text-sm text-indigo-700">Batch Belum Selesai</p>
                     <p class="text-3xl font-bold text-indigo-700 mt-2">
                         {{ formatNumber(dashboardPremiumData.batchBelumSelesai) }}
+                    </p>
+                    <p class="text-xs text-indigo-600 mt-1">
+                        Produksi yang masih perlu dipantau.
                     </p>
                 </div>
 
@@ -9266,7 +9381,7 @@ watch(activePage, (newPage, oldPage) => {
                         {{ formatNumber(dashboardPremiumData.maklunTerlambat) }}
                     </p>
                     <p class="text-xs text-orange-600 mt-1">
-                        Patokan: lebih dari 14 hari
+                        Patokan: lebih dari 14 hari.
                     </p>
                 </div>
             </div>
