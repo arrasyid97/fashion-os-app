@@ -8202,45 +8202,7 @@ function deleteSpecialPrice(channelId, sku) {
     }
 }
 
-function addProductToSpecificBulkOrder(order, product) {
-    const specialPrice = state.specialPrices[uiState.activeCartChannel]?.[product.sku];
-    const regularPrice = product.hargaJual?.[uiState.activeCartChannel] ?? 0;
-    const finalPrice = specialPrice !== undefined ? specialPrice : regularPrice;
-    const commissionRate = product.commissions?.[uiState.activeCartChannel] || 0;
 
-    const existingItem = order.items.find(item => item.sku === product.sku);
-
-    if (existingItem) {
-        existingItem.qty++;
-        existingItem.commissionRate = commissionRate;
-    } else {
-        order.items.push({
-            ...product,
-            qty: 1,
-            hargaJualAktual: finalPrice,
-            commissionRate: commissionRate
-        });
-    }
-}
-
-function getOrCreateBulkOrderById(orderId) {
-    let existingOrder = uiState.bulk_order_queue.find(order => order.marketplaceOrderId === orderId);
-
-    if (existingOrder) {
-        return existingOrder;
-    }
-
-    const newOrder = {
-        id: orderId,
-        marketplaceOrderId: orderId,
-        items: [],
-        status: 'Mengantri'
-    };
-
-    uiState.bulk_order_queue.unshift(newOrder);
-
-    return newOrder;
-}
 
 function showBulkPasteInfo() {
     uiState.bulkPasteInfoVisible = !uiState.bulkPasteInfoVisible;
