@@ -11785,9 +11785,12 @@ watch(activePage, (newPage, oldPage) => {
                         <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.pajak) }}</strong>
                     </div>
                     <div class="flex justify-between pt-2 text-lg">
-                        <span class="font-bold">Laba Bersih</span>
+                        <span class="font-bold">Laba Setelah Iklan</span>
                         <strong :class="roasDashboardData.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">
                             {{ formatCurrency(roasDashboardData.labaBersih) }}
+                            <p class="text-xs text-slate-500 mt-1">
+    Belum termasuk biaya operasional.
+</p>
                         </strong>
                     </div>
                 </div>
