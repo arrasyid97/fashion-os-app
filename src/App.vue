@@ -9411,7 +9411,78 @@ watch(activePage, (newPage, oldPage) => {
             </div>
         </div>
     </div>
+<!-- STATISTIK PENJUALAN -->
+<div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+            <p class="text-sm text-slate-500">Ringkasan performa produk</p>
+            <h3 class="text-xl font-bold text-slate-800">Statistik Penjualan</h3>
+        </div>
 
+        <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+            Berdasarkan transaksi
+        </span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+
+        <div class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+            <h4 class="font-bold text-slate-800 mb-3">🏆 Model Terlaris</h4>
+
+            <div v-if="dashboardSalesStats.topModels.length > 0" class="space-y-2">
+                <div v-for="(item, index) in dashboardSalesStats.topModels" :key="item.name" class="flex justify-between text-sm">
+                    <span>{{ index + 1 }}. {{ item.name }}</span>
+                    <span class="font-semibold">{{ formatNumber(item.qty) }} pcs</span>
+                </div>
+            </div>
+
+            <p v-else class="text-sm text-slate-500">Belum ada data.</p>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+            <h4 class="font-bold text-slate-800 mb-3">🎨 Warna Terlaris</h4>
+
+            <div v-if="dashboardSalesStats.topColors.length > 0" class="space-y-2">
+                <div v-for="(item, index) in dashboardSalesStats.topColors" :key="item.name" class="flex justify-between text-sm">
+                    <span>{{ index + 1 }}. {{ item.name }}</span>
+                    <span class="font-semibold">{{ formatNumber(item.qty) }} pcs</span>
+                </div>
+            </div>
+
+            <p v-else class="text-sm text-slate-500">Belum ada data.</p>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+            <h4 class="font-bold text-slate-800 mb-3">📏 Ukuran Terlaris</h4>
+
+            <div v-if="dashboardSalesStats.topSizes.length > 0" class="space-y-2">
+                <div v-for="(item, index) in dashboardSalesStats.topSizes" :key="item.name" class="flex justify-between text-sm">
+                    <span>{{ index + 1 }}. {{ item.name }}</span>
+                    <span class="font-semibold">{{ formatNumber(item.qty) }} pcs</span>
+                </div>
+            </div>
+
+            <p v-else class="text-sm text-slate-500">Belum ada data.</p>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+            <h4 class="font-bold text-slate-800 mb-3">🏪 Marketplace Terbaik</h4>
+
+            <div v-if="dashboardSalesStats.topChannels.length > 0" class="space-y-2">
+                <div v-for="(item, index) in dashboardSalesStats.topChannels" :key="item.name" class="text-sm">
+                    <div class="flex justify-between">
+                        <span>{{ index + 1 }}. {{ item.name }}</span>
+                        <span class="font-semibold">{{ formatCurrency(item.omset) }}</span>
+                    </div>
+                    <p class="text-xs text-slate-500">{{ formatNumber(item.qty) }} pcs terjual</p>
+                </div>
+            </div>
+
+            <p v-else class="text-sm text-slate-500">Belum ada data.</p>
+        </div>
+
+    </div>
+</div>
     <!-- DETAIL STOK & PRODUKSI -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
