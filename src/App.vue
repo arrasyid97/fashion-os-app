@@ -9193,7 +9193,7 @@ watch(activePage, (newPage, oldPage) => {
             </div>
 
             <div class="bg-white/10 rounded-xl p-4">
-                <p class="text-sm text-slate-300">Profit Bersih Hari Ini</p>
+                <p class="text-sm text-slate-300">Estimasi Laba Hari Ini</p>
                 <p class="text-2xl font-bold mt-2"
                     :class="dashboardPremiumData.profitBersihHariIni >= 0 ? 'text-emerald-300' : 'text-red-300'">
                     {{ formatCurrency(dashboardPremiumData.profitBersihHariIni) }}
