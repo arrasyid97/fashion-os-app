@@ -9411,125 +9411,81 @@ watch(activePage, (newPage, oldPage) => {
             </div>
         </div>
     </div>
-<!-- STATISTIK PENJUALAN -->
-<div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div>
-            <p class="text-sm text-slate-500">Ringkasan performa produk</p>
-            <h3 class="text-xl font-bold text-slate-800">Statistik Penjualan</h3>
-        </div>
+<!-- STATISTIK PENJUALAN SIMPLE -->
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-        <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
-            Berdasarkan transaksi
-        </span>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-
-        <div class="rounded-xl border border-slate-200 p-4 bg-slate-50">
-            <h4 class="font-bold text-slate-800 mb-3">🏆 Model Terlaris</h4>
-
-            <div v-if="dashboardSalesStats.topModels.length > 0" class="space-y-2">
-                <div v-for="(item, index) in dashboardSalesStats.topModels" :key="item.name" class="flex justify-between text-sm">
-                    <span>{{ index + 1 }}. {{ item.name }}</span>
-                    <span class="font-semibold">{{ formatNumber(item.qty) }} pcs</span>
-                </div>
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <p class="text-sm text-slate-500">Ringkasan performa produk</p>
+                <h3 class="text-xl font-bold text-slate-800">Statistik Penjualan</h3>
             </div>
-
-            <p v-else class="text-sm text-slate-500">Belum ada data.</p>
         </div>
 
-        <div class="rounded-xl border border-slate-200 p-4 bg-slate-50">
-            <h4 class="font-bold text-slate-800 mb-3">🎨 Warna Terlaris</h4>
-
-            <div v-if="dashboardSalesStats.topColors.length > 0" class="space-y-2">
-                <div v-for="(item, index) in dashboardSalesStats.topColors" :key="item.name" class="flex justify-between text-sm">
-                    <span>{{ index + 1 }}. {{ item.name }}</span>
-                    <span class="font-semibold">{{ formatNumber(item.qty) }} pcs</span>
-                </div>
-            </div>
-
-            <p v-else class="text-sm text-slate-500">Belum ada data.</p>
-        </div>
-
-        <div class="rounded-xl border border-slate-200 p-4 bg-slate-50">
-            <h4 class="font-bold text-slate-800 mb-3">📏 Ukuran Terlaris</h4>
-
-            <div v-if="dashboardSalesStats.topSizes.length > 0" class="space-y-2">
-                <div v-for="(item, index) in dashboardSalesStats.topSizes" :key="item.name" class="flex justify-between text-sm">
-                    <span>{{ index + 1 }}. {{ item.name }}</span>
-                    <span class="font-semibold">{{ formatNumber(item.qty) }} pcs</span>
-                </div>
-            </div>
-
-            <p v-else class="text-sm text-slate-500">Belum ada data.</p>
-        </div>
-
-        <div class="rounded-xl border border-slate-200 p-4 bg-slate-50">
-            <h4 class="font-bold text-slate-800 mb-3">🏪 Marketplace Terbaik</h4>
-
-            <div v-if="dashboardSalesStats.topChannels.length > 0" class="space-y-2">
-                <div v-for="(item, index) in dashboardSalesStats.topChannels" :key="item.name" class="text-sm">
-                    <div class="flex justify-between">
-                        <span>{{ index + 1 }}. {{ item.name }}</span>
-                        <span class="font-semibold">{{ formatCurrency(item.omset) }}</span>
-                    </div>
-                    <p class="text-xs text-slate-500">{{ formatNumber(item.qty) }} pcs terjual</p>
-                </div>
-            </div>
-
-            <p v-else class="text-sm text-slate-500">Belum ada data.</p>
-        </div>
-
-    </div>
-</div>
-    <!-- DETAIL STOK & PRODUKSI -->
-    <div class="grid grid-cols-1 gap-6">
-
-        <!-- PRODUK HAMPIR HABIS -->
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <p class="text-sm text-slate-500">Kontrol stok</p>
-                    <h3 class="text-lg font-bold text-slate-800">Produk Hampir Habis</h3>
-                </div>
-
-                <span class="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full">
-                    Min stok: {{ state.settings.minStok || 10 }}
+        <div class="space-y-4">
+            <div class="flex justify-between border-b pb-3">
+                <span>🏆 Model Terlaris</span>
+                <span class="font-semibold">
+                    {{ dashboardSalesStats.topModels[0]?.name || 'Belum ada data' }}
                 </span>
             </div>
 
-            <div v-if="dashboardPremiumData.produkHampirHabis.length > 0" class="space-y-3">
-                <div
-                    v-for="produk in dashboardPremiumData.produkHampirHabis"
-                    :key="`${produk.nama}-${produk.warna}-${produk.varian}`"
-                    class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100"
-                >
-                    <div>
-                        <p class="font-semibold text-slate-800">
-                            {{ produk.nama }} {{ produk.warna }} {{ produk.varian }}
-                        </p>
-                        <p class="text-xs text-slate-500">
-                            Perlu dipantau / restock
-                        </p>
-                    </div>
-
-                    <div class="text-right">
-                        <p class="text-lg font-bold text-red-600">
-                            {{ produk.stok }}
-                        </p>
-                        <p class="text-xs text-slate-500">pcs</p>
-                    </div>
-                </div>
+            <div class="flex justify-between border-b pb-3">
+                <span>🎨 Warna Terlaris</span>
+                <span class="font-semibold">
+                    {{ dashboardSalesStats.topColors[0]?.name || 'Belum ada data' }}
+                </span>
             </div>
 
-            <div v-else class="p-4 rounded-xl bg-emerald-50 text-emerald-700 text-sm">
-                Semua stok masih aman.
+            <div class="flex justify-between border-b pb-3">
+                <span>📏 Ukuran Terlaris</span>
+                <span class="font-semibold">
+                    {{ dashboardSalesStats.topSizes[0]?.name || 'Belum ada data' }}
+                </span>
+            </div>
+
+            <div class="flex justify-between">
+                <span>🏪 Marketplace Terbaik</span>
+                <span class="font-semibold">
+                    {{ dashboardSalesStats.topChannels[0]?.name || 'Belum ada data' }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <p class="text-sm text-slate-500">Kontrol stok</p>
+                <h3 class="text-xl font-bold text-slate-800">Produk Hampir Habis</h3>
+            </div>
+
+            <span class="text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full">
+                Min stok: {{ state.settings.minStok || 10 }}
+            </span>
+        </div>
+
+        <div v-if="dashboardPremiumData.produkHampirHabis.length > 0" class="space-y-3">
+            <div
+                v-for="produk in dashboardPremiumData.produkHampirHabis"
+                :key="`${produk.nama}-${produk.warna}-${produk.varian}`"
+                class="flex items-center justify-between border-b pb-3"
+            >
+                <span class="font-medium">
+                    {{ produk.nama }} {{ produk.warna }} {{ produk.varian }}
+                </span>
+                <span class="font-bold text-red-600">
+                    {{ produk.stok }} pcs
+                </span>
             </div>
         </div>
 
-        
+        <div v-else class="rounded-xl bg-emerald-50 text-emerald-700 text-sm p-4">
+            Semua stok masih aman.
+        </div>
     </div>
+
+</div>
 
 </div>
 
