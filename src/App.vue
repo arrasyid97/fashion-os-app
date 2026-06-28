@@ -4761,19 +4761,7 @@ const dashboardPremiumData = computed(() => {
     };
 });
 
-const uniqueDashboardSalesModels = computed(() => {
-    const modelMap = new Map();
 
-    (state.settings.modelProduk || []).forEach(model => {
-        if (model.namaModel && !modelMap.has(model.namaModel)) {
-            modelMap.set(model.namaModel, {
-                namaModel: model.namaModel
-            });
-        }
-    });
-
-    return Array.from(modelMap.values());
-});
 
 const dashboardSalesStats = computed(() => {
     const modelMap = {};
