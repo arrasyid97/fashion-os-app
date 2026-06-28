@@ -9257,119 +9257,200 @@ watch(activePage, (newPage, oldPage) => {
 <!-- DASHBOARD PREMIUM HARI INI -->
 <div class="mb-8 space-y-6 animate-fade-in-up">
 
-    <!-- RINGKASAN HARI INI -->
-    <div class="bg-slate-900 text-white rounded-2xl shadow-xl p-6 border border-slate-800">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-            <div>
-                <p class="text-sm text-slate-300">Ringkasan Hari Ini</p>
-                <h3 class="text-2xl font-bold">Kondisi Bisnis Sekarang</h3>
-            </div>
+    <!-- RINGKASAN HARI INI PREMIUM -->
+<div class="bg-slate-950 text-white rounded-3xl shadow-xl p-6 border border-slate-800">
 
-            <span class="text-xs bg-white/10 px-3 py-1 rounded-full text-slate-200">
-                Update otomatis dari transaksi hari ini
-            </span>
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+        <div>
+            <p class="text-sm text-slate-400">Ringkasan Hari Ini</p>
+            <h3 class="text-2xl font-bold">Kondisi Bisnis Sekarang</h3>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white/10 rounded-xl p-4">
-                <p class="text-sm text-slate-300">💰 Omset Hari Ini</p>
-                <p class="text-2xl font-bold mt-2">
-                    {{ formatCurrency(dashboardPremiumData.omsetHariIni) }}
-                </p>
-            </div>
-
-            <div class="bg-white/10 rounded-xl p-4">
-                <p class="text-sm text-slate-300">📊 Estimasi Laba Hari Ini</p>
-                <p
-                    class="text-2xl font-bold mt-2"
-                    :class="dashboardPremiumData.profitBersihHariIni >= 0 ? 'text-emerald-300' : 'text-red-300'"
-                >
-                    {{ formatCurrency(dashboardPremiumData.profitBersihHariIni) }}
-                </p>
-                <p class="text-xs text-slate-400 mt-2">
-                    Setelah HPP, biaya transaksi, dan pengeluaran yang sudah dicatat hari ini.
-                </p>
-            </div>
-
-            <div class="bg-white/10 rounded-xl p-4">
-                <p class="text-sm text-slate-300">🛒 Order Hari Ini</p>
-                <p class="text-2xl font-bold mt-2">
-                    {{ formatNumber(dashboardPremiumData.orderHariIni) }}
-                </p>
-            </div>
-
-            <div class="bg-white/10 rounded-xl p-4">
-                <p class="text-sm text-slate-300">📦 Produk Terjual</p>
-                <p class="text-2xl font-bold mt-2">
-                    {{ formatNumber(dashboardPremiumData.produkTerjualHariIni) }} pcs
-                </p>
-            </div>
-        </div>
+        <span class="w-fit text-xs bg-white/10 px-3 py-1.5 rounded-full text-slate-300 border border-white/10">
+            Update otomatis dari transaksi hari ini
+        </span>
     </div>
 
-    <!-- STATISTIK PENJUALAN SIMPLE -->
-    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
-        <div class="flex items-center justify-between mb-5">
-            <div class="w-full">
-                <p class="text-sm text-slate-500">Ringkasan performa produk</p>
-                <h3 class="text-xl font-bold text-slate-800">Statistik Penjualan</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                    <select v-model="uiState.dashboardSalesModelFilter" class="p-2 border rounded-lg text-sm">
-                        <option value="all">Semua Model</option>
-                        <option
-                            v-for="model in uniqueRoasModels"
-                            :key="model.namaModel"
-                            :value="model.namaModel"
-                        >
-                            {{ model.namaModel }}
-                        </option>
-                    </select>
-
-                    <select v-model="uiState.dashboardSalesChannelFilter" class="p-2 border rounded-lg text-sm">
-                        <option value="all">Semua Channel</option>
-                        <option
-                            v-for="channel in state.settings.marketplaces"
-                            :key="channel.id"
-                            :value="channel.name"
-                        >
-                            {{ channel.name }}
-                        </option>
-                    </select>
+        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+            <div class="flex items-center justify-between mb-5">
+                <div class="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
+                    💰
                 </div>
+                <span class="text-xs text-slate-400">Omset</span>
             </div>
+
+            <p class="text-sm text-slate-300">Omset Hari Ini</p>
+            <p class="text-3xl font-bold mt-2">
+                {{ formatCurrency(dashboardPremiumData.omsetHariIni) }}
+            </p>
+            <p class="text-xs text-slate-400 mt-3">
+                Total penjualan dari transaksi hari ini.
+            </p>
         </div>
 
-        <div class="space-y-4">
-            <div class="flex justify-between border-b pb-3">
-                <span>🏆 Model Terlaris</span>
-                <span class="font-semibold">
-                    {{ dashboardSalesStats.topModels[0]?.name || 'Belum ada data' }}
-                </span>
+        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+            <div class="flex items-center justify-between mb-5">
+                <div class="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
+                    📊
+                </div>
+                <span class="text-xs text-slate-400">Estimasi</span>
             </div>
 
-            <div class="flex justify-between border-b pb-3">
-                <span>🎨 Warna Terlaris</span>
-                <span class="font-semibold">
-                    {{ dashboardSalesStats.topColors[0]?.name || 'Belum ada data' }}
-                </span>
+            <p class="text-sm text-slate-300">Estimasi Laba Hari Ini</p>
+            <p
+                class="text-3xl font-bold mt-2"
+                :class="dashboardPremiumData.profitBersihHariIni >= 0 ? 'text-emerald-300' : 'text-red-300'"
+            >
+                {{ formatCurrency(dashboardPremiumData.profitBersihHariIni) }}
+            </p>
+            <p class="text-xs text-slate-400 mt-3">
+                Setelah HPP, biaya transaksi, dan pengeluaran yang sudah dicatat.
+            </p>
+        </div>
+
+        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+            <div class="flex items-center justify-between mb-5">
+                <div class="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
+                    🛒
+                </div>
+                <span class="text-xs text-slate-400">Order</span>
             </div>
 
-            <div class="flex justify-between border-b pb-3">
-                <span>📏 Ukuran Terlaris</span>
-                <span class="font-semibold">
-                    {{ dashboardSalesStats.topSizes[0]?.name || 'Belum ada data' }}
-                </span>
+            <p class="text-sm text-slate-300">Order Hari Ini</p>
+            <p class="text-3xl font-bold mt-2">
+                {{ formatNumber(dashboardPremiumData.orderHariIni) }}
+            </p>
+            <p class="text-xs text-slate-400 mt-3">
+                Jumlah transaksi yang masuk hari ini.
+            </p>
+        </div>
+
+        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+            <div class="flex items-center justify-between mb-5">
+                <div class="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
+                    📦
+                </div>
+                <span class="text-xs text-slate-400">Produk</span>
             </div>
 
-            <div class="flex justify-between">
-                <span>🏪 Marketplace Terbaik</span>
-                <span class="font-semibold">
-                    {{ dashboardSalesStats.topChannels[0]?.name || 'Belum ada data' }}
-                </span>
+            <p class="text-sm text-slate-300">Produk Terjual</p>
+            <p class="text-3xl font-bold mt-2">
+                {{ formatNumber(dashboardPremiumData.produkTerjualHariIni) }} pcs
+            </p>
+            <p class="text-xs text-slate-400 mt-3">
+                Total item yang terjual hari ini.
+            </p>
+        </div>
+
+    </div>
+</div>
+
+    <!-- STATISTIK PENJUALAN PREMIUM -->
+<div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5 mb-6">
+        <div>
+            <p class="text-sm text-slate-500">Ringkasan performa produk</p>
+            <h3 class="text-xl font-bold text-slate-800">Statistik Penjualan</h3>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-[520px]">
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Model</label>
+                <select v-model="uiState.dashboardSalesModelFilter" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+                    <option value="all">Semua Model</option>
+                    <option
+                        v-for="model in uniqueRoasModels"
+                        :key="model.namaModel"
+                        :value="model.namaModel"
+                    >
+                        {{ model.namaModel }}
+                    </option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Channel</label>
+                <select v-model="uiState.dashboardSalesChannelFilter" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+                    <option value="all">Semua Channel</option>
+                    <option
+                        v-for="channel in state.settings.marketplaces"
+                        :key="channel.id"
+                        :value="channel.name"
+                    >
+                        {{ channel.name }}
+                    </option>
+                </select>
             </div>
         </div>
     </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-2xl">🏆</span>
+                <span class="text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-500">Model</span>
+            </div>
+
+            <p class="text-sm text-slate-500">Model Terlaris</p>
+            <p class="text-xl font-bold text-slate-800 mt-1">
+                {{ dashboardSalesStats.topModels[0]?.name || 'Belum ada data' }}
+            </p>
+            <p class="text-sm text-slate-500 mt-2">
+                {{ dashboardSalesStats.topModels[0] ? formatNumber(dashboardSalesStats.topModels[0].qty) + ' pcs terjual' : 'Belum ada transaksi untuk periode ini.' }}
+            </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-2xl">🎨</span>
+                <span class="text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-500">Warna</span>
+            </div>
+
+            <p class="text-sm text-slate-500">Warna Terlaris</p>
+            <p class="text-xl font-bold text-slate-800 mt-1">
+                {{ dashboardSalesStats.topColors[0]?.name || 'Belum ada data' }}
+            </p>
+            <p class="text-sm text-slate-500 mt-2">
+                {{ dashboardSalesStats.topColors[0] ? formatNumber(dashboardSalesStats.topColors[0].qty) + ' pcs terjual' : 'Belum ada transaksi untuk periode ini.' }}
+            </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-2xl">📏</span>
+                <span class="text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-500">Ukuran</span>
+            </div>
+
+            <p class="text-sm text-slate-500">Ukuran Terlaris</p>
+            <p class="text-xl font-bold text-slate-800 mt-1">
+                {{ dashboardSalesStats.topSizes[0]?.name || 'Belum ada data' }}
+            </p>
+            <p class="text-sm text-slate-500 mt-2">
+                {{ dashboardSalesStats.topSizes[0] ? formatNumber(dashboardSalesStats.topSizes[0].qty) + ' pcs terjual' : 'Belum ada transaksi untuk periode ini.' }}
+            </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-2xl">🏪</span>
+                <span class="text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-500">Channel</span>
+            </div>
+
+            <p class="text-sm text-slate-500">Marketplace Terbaik</p>
+            <p class="text-xl font-bold text-slate-800 mt-1">
+                {{ dashboardSalesStats.topChannels[0]?.name || 'Belum ada data' }}
+            </p>
+            <p class="text-sm text-slate-500 mt-2">
+                {{ dashboardSalesStats.topChannels[0] ? formatCurrency(dashboardSalesStats.topChannels[0].omset) : 'Belum ada transaksi untuk periode ini.' }}
+            </p>
+        </div>
+
+    </div>
+</div>
 
 </div>
 
