@@ -364,6 +364,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     bulk_manual_input: '',       // Untuk kolom input manual
     bulk_scan_input: '',         // Untuk kolom scanner lama
     bulk_paste_input: '',        // Untuk salin-tempel massal ID pesanan dan SKU
+    bulkPasteInfoVisible: false,
     bulk_recommendations: [],    // Rekomendasi untuk input manual
     last_processed_orders: [],
     bulk_order_queue: [],
@@ -8241,33 +8242,7 @@ function getOrCreateBulkOrderById(orderId) {
 }
 
 function showBulkPasteInfo() {
-    alert(
-`Alur kerja Salin & Tempel Massal ID Pesanan:
-
-1. Scan ID pesanan / resi terlebih dahulu.
-2. Setelah itu scan barcode SKU produk.
-3. Jika 1 pesanan berisi 2 baju, maka Scan 1 ID pesanan lalu 2 SKU produk di bawahnya.
-4. Ulangi pola yang sama untuk pesanan berikutnya.
-5. Semua hasil scan bisa kamu masukkan dulu ke Excel / Sheet.
-6. Setelah selesai, salin semua isi kolom Excel lalu tempel ke kolom ini.
-7. Klik tombol "Masukkan ke Antrian Pesanan".
-
-Contoh format:
-
-250628ABC001
-Baju-HITAM-M
-Baju-HITAM-L
-250628ABC002
-Baju-Putih-S
-250628ABC003
-Baju-merah-XS
-Baju-merah-M
-
-Keterangan:
-- Baris yang cocok dengan SKU produk akan dianggap sebagai produk.
-- Baris yang tidak cocok dengan SKU produk akan dianggap sebagai ID Pesanan.
-- Pastikan SKU hasil scan barcode sama persis dengan SKU di aplikasi.`
-    );
+    uiState.bulkPasteInfoVisible = !uiState.bulkPasteInfoVisible;
 }
 
 function processBulkPasteOrders() {
@@ -10030,7 +10005,42 @@ watch(activePage, (newPage, oldPage) => {
         ℹ️ Informasi
     </button>
 </div>
+<div
+    v-if="uiState.bulkPasteInfoVisible"
+    class="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-slate-700 leading-relaxed"
+>
+    <p class="font-bold text-blue-800 mb-2">
+        Alur kerja Salin & Tempel Massal ID Pesanan
+    </p>
 
+    <ol class="list-decimal ml-5 space-y-1">
+        <li>Scan ID pesanan / resi terlebih dahulu.</li>
+        <li>Setelah itu scan barcode SKU produk.</li>
+        <li>Jika 1 pesanan berisi 2 baju, maka urutannya: 1 ID pesanan lalu 2 SKU produk di bawahnya.</li>
+        <li>Ulangi pola yang sama untuk pesanan berikutnya.</li>
+        <li>Semua hasil scan bisa dimasukkan dulu ke Excel.</li>
+        <li>Setelah selesai, salin semua isi kolom Excel lalu tempel ke kolom ini.</li>
+        <li>Klik tombol <strong>Masukkan ke Antrian Pesanan</strong>.</li>
+    </ol>
+
+    <div class="mt-4 bg-white border border-blue-100 rounded-lg p-3 font-mono text-xs text-slate-700 whitespace-pre-line">
+250628ABC001
+Baju-Hitam-M
+Baju-Hitam-L
+250628ABC002
+Baju-Putih-S
+250628ABC003
+Baju-merah-XS
+Baju-merah-M
+    </div>
+
+    <div class="mt-4 space-y-1 text-xs text-slate-600">
+        <p><strong>Keterangan:</strong></p>
+        <p>- Baris yang cocok dengan SKU produk akan dianggap sebagai produk.</p>
+        <p>- Baris yang tidak cocok dengan SKU produk akan dianggap sebagai ID pesanan.</p>
+        <p>- Pastikan SKU hasil scan barcode sama persis dengan SKU yang ada di aplikasi.</p>
+    </div>
+</div>
     <textarea
         v-model="uiState.bulk_paste_input"
         :disabled="!uiState.activeCartChannel"
