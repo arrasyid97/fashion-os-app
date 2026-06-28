@@ -7409,29 +7409,33 @@ async function saveMarketplaceEdit() {
 
 async function saveSettingsData() {
     if (!currentUser.value) return alert("Anda harus login.");
+
     isSaving.value = true;
+    await nextTick();
+
     try {
         const userId = currentUser.value.uid;
         const settingsRef = doc(db, "settings", userId);
-        
-        // Cukup ambil data yang relevan dari state
+
         const settingsData = {
             brandName: state.settings.brandName,
             minStok: state.settings.minStok,
-            marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
-            modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk)),
-            pinProtection: state.settings.pinProtection,
-            dashboardPin: state.settings.dashboardPin,
+            marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces || [])),
+            modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk || [])),
+            categories: JSON.parse(JSON.stringify(state.settings.categories || [])),
+            inflowCategories: JSON.parse(JSON.stringify(state.settings.inflowCategories || [])),
+            pinProtection: state.settings.pinProtection || {},
+            dashboardPin: state.settings.dashboardPin || '',
             userId: userId
         };
-        
+
         await setDoc(settingsRef, settingsData, { merge: true });
-        
-        console.log('Pengaturan berhasil disimpan ke Firestore!');
-        
+
+        alert("Pengaturan berhasil disimpan.");
+
     } catch (error) {
         console.error("Gagal menyimpan pengaturan:", error);
-        throw new Error("Gagal menyimpan data ke Firebase.");
+        alert("Gagal menyimpan pengaturan. Coba lagi.");
     } finally {
         isSaving.value = false;
     }
