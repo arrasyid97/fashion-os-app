@@ -8224,14 +8224,11 @@ function findProductBySkuForBulkPaste(value) {
 }
 
 function looksLikeOrderId(value) {
-    const code = value.toString().trim();
+    const code = value?.toString().trim();
 
-    if (!code) return false;
-
-    // Patokan aman:
-    // ID pesanan biasanya panjang dan tidak pakai strip.
-    // SKU produk biasanya pakai strip seperti BAJU-HITAM-M.
-    return code.length >= 8 && !code.includes('-') && !code.includes('_');
+    // Semua teks dianggap ID Pesanan selama tidak kosong.
+    // Tidak ada syarat minimal karakter, strip, underscore, angka, atau huruf.
+    return !!code;
 }
 
 function buildBulkPasteValidation() {
