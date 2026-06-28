@@ -11648,7 +11648,7 @@ watch(activePage, (newPage, oldPage) => {
         <div class="bg-white p-6 rounded-2xl shadow border border-slate-200 mb-6">
             <h3 class="text-lg font-bold text-slate-800 mb-4">Filter & Anggaran</h3>
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Periode</label>
                     <select v-model="uiState.roasDashboard.dateFilter" class="mt-1 w-full p-2 border rounded-lg">
@@ -11691,11 +11691,6 @@ watch(activePage, (newPage, oldPage) => {
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Biaya Iklan</label>
                     <input type="number" v-model.number="uiState.roasDashboard.adSpend" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 100000">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Biaya Operasional</label>
-                    <input type="number" v-model.number="uiState.roasDashboard.operationalBudget" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 50000">
                 </div>
                 
                 <div>
