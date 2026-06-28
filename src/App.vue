@@ -7355,9 +7355,10 @@ async function removeMarketplace(marketplaceId) {
             const settingsRef = doc(db, "settings", userId);
             
             // Lakukan update dokumen yang sangat spesifik
-            await updateDoc(settingsRef, {
-                marketplaces: state.settings.marketplaces,
-            });
+            await setDoc(settingsRef, {
+    marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
+    userId: userId
+}, { merge: true });
             
             // Hapus juga data promosi yang mungkin ada di perChannel dan perModel
             // agar data tidak 'menggantung' di database.
@@ -7393,9 +7394,10 @@ async function saveMarketplaceEdit() {
         const settingsRef = doc(db, "settings", userId);
         
         // Cukup perbarui satu field 'marketplaces', tidak seluruh dokumen
-        await updateDoc(settingsRef, {
-            marketplaces: state.settings.marketplaces,
-        });
+        await setDoc(settingsRef, {
+    marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces)),
+    userId: userId
+}, { merge: true });
 
         hideModal();
         alert('Perubahan marketplace berhasil disimpan.');
