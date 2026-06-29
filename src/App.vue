@@ -90,6 +90,8 @@ const state = reactive({
 
 
 const uiState = reactive({
+    onboardingVisible: false,
+    onboardingStep: 0,
     activeAccordion: null,
     sidebarGroups: {
     produk: true,
@@ -399,6 +401,90 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     massPriceHppInput: null
 
 });
+
+const onboardingSteps = [
+    {
+        title: 'Isi Channel Penjualan',
+        subtitle: 'Langkah pertama adalah menambahkan channel tempat Anda berjualan.',
+        description: 'Contohnya Shopee, TikTok Shop, Offline, Website, atau marketplace lain. Data channel ini penting agar harga, biaya marketplace, transaksi, dan laporan bisa dipisahkan dengan rapi.',
+        pageName: 'pengaturan',
+        pageLabel: 'Buka Pengaturan'
+    },
+    {
+        title: 'Isi Model Produk',
+        subtitle: 'Tambahkan model produk fashion yang Anda jual.',
+        description: 'Contohnya Nama model produknya atau nama model lain. Model produk akan membantu aplikasi membaca performa penjualan, stok, produksi, dan ROAS per model.',
+        pageName: 'pengaturan',
+        pageLabel: 'Buka Pengaturan'
+    },
+    {
+        title: 'Tambah Produk / SKU',
+        subtitle: 'Masukkan produk lengkap dengan warna, ukuran, dan SKU.',
+        description: 'Contohnya Nama Model Salwa Warna Hitam Jadi SLW-HTM-M. SKU harus rapi Dan Singkat karena akan dipakai untuk stok, proses pesanan, scan barcode, retur, dan laporan.',
+        pageName: 'inventaris',
+        pageLabel: 'Buka Inventaris'
+    },
+    {
+        title: 'Isi Harga & HPP',
+        subtitle: 'Lengkapi harga jual dan modal produk.',
+        description: 'Harga jual dan HPP dibutuhkan agar aplikasi bisa menghitung laba, margin, ROAS, harga aman, dan laporan keuangan dengan benar.',
+        pageName: 'harga-hpp',
+        pageLabel: 'Buka Harga & HPP'
+    },
+    {
+        title: 'Mulai Input Penjualan',
+        subtitle: 'Setelah data dasar siap, Anda bisa mulai memproses penjualan.',
+        description: 'Anda bisa memakai Kasir POS, Proses Massal, Audit Pencairan Dana, dan Manajemen Retur sesuai kebutuhan operasional toko.',
+        pageName: 'bulk_process',
+        pageLabel: 'Buka Proses Massal'
+    }
+];
+
+function nextOnboardingStep() {
+    if (uiState.onboardingStep < onboardingSteps.length - 1) {
+        uiState.onboardingStep++;
+    } else {
+        finishOnboarding(false);
+    }
+}
+
+function prevOnboardingStep() {
+    if (uiState.onboardingStep > 0) {
+        uiState.onboardingStep--;
+    }
+}
+
+async function finishOnboarding(isSkipped = false) {
+    if (!currentUser.value) {
+        uiState.onboardingVisible = false;
+        return;
+    }
+
+    try {
+        await setDoc(doc(db, 'users', currentUser.value.uid), {
+            onboardingDone: true,
+            onboardingSkipped: isSkipped,
+            onboardingFinishedAt: new Date()
+        }, { merge: true });
+
+        userProfile.data = {
+            ...(userProfile.data || {}),
+            onboardingDone: true,
+            onboardingSkipped: isSkipped
+        };
+
+        uiState.onboardingVisible = false;
+        uiState.onboardingStep = 0;
+    } catch (error) {
+        console.error('Gagal menyimpan status onboarding:', error);
+        alert('Gagal menyimpan status panduan. Silakan coba lagi.');
+    }
+}
+
+function openOnboardingRelatedPage(pageName) {
+    uiState.onboardingVisible = false;
+    changePage(pageName);
+}
 
 function toggleSidebarGroup(group) {
     const isCurrentlyOpen = uiState.sidebarGroups[group];
@@ -9166,7 +9252,12 @@ onMounted(() => {
             userProfile.data = userDocSnap.exists() ? userDocSnap.data() : {};
 
             await setupListeners(user.uid, userProfile.data.isPartner);
-            changePage(activePage.value);
+changePage(activePage.value);
+
+if (userProfile.data.onboardingDone !== true) {
+    uiState.onboardingVisible = true;
+    uiState.onboardingStep = 0;
+}
         } else {
             currentUser.value = null;
             userProfile.data = null; // Kosongkan profil saat logout
@@ -9197,6 +9288,103 @@ watch(activePage, (newPage, oldPage) => {
 </script>
 
 <template>
+    <!-- ONBOARDING PENGGUNA BARU -->
+<div
+    v-if="currentUser && uiState.onboardingVisible"
+    class="fixed inset-0 z-[9999] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4"
+>
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden">
+        
+        <!-- Header -->
+        <div class="bg-slate-950 text-white p-6">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-sm text-indigo-300 font-semibold">
+                        Panduan Awal Fashion OS
+                    </p>
+                    <h2 class="text-2xl font-bold mt-1">
+                        Selamat datang di Fashion OS
+                    </h2>
+                    <p class="text-sm text-slate-300 mt-2">
+                        Ikuti langkah singkat ini agar aplikasi siap dipakai untuk operasional toko.
+                    </p>
+                </div>
+
+                <button
+                    @click="finishOnboarding(true)"
+                    class="text-slate-300 hover:text-white text-2xl leading-none"
+                    title="Lewati"
+                >
+                    ×
+                </button>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <p class="text-sm font-semibold text-indigo-600">
+                        Langkah {{ uiState.onboardingStep + 1 }} dari {{ onboardingSteps.length }}
+                    </p>
+                    <h3 class="text-2xl font-bold text-slate-800 mt-1">
+                        {{ onboardingSteps[uiState.onboardingStep].title }}
+                    </h3>
+                </div>
+
+                <div class="hidden sm:flex items-center gap-1">
+                    <span
+                        v-for="(step, index) in onboardingSteps"
+                        :key="step.title"
+                        class="h-2.5 rounded-full transition-all"
+                        :class="index === uiState.onboardingStep ? 'w-8 bg-indigo-600' : 'w-2.5 bg-slate-300'"
+                    ></span>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                <p class="text-lg font-semibold text-slate-800">
+                    {{ onboardingSteps[uiState.onboardingStep].subtitle }}
+                </p>
+
+                <p class="text-sm text-slate-600 leading-relaxed mt-3">
+                    {{ onboardingSteps[uiState.onboardingStep].description }}
+                </p>
+
+                <button
+                    @click="openOnboardingRelatedPage(onboardingSteps[uiState.onboardingStep].pageName)"
+                    class="mt-5 bg-indigo-100 text-indigo-700 font-bold px-4 py-2 rounded-xl hover:bg-indigo-200"
+                >
+                    {{ onboardingSteps[uiState.onboardingStep].pageLabel }}
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-5 gap-3 mt-6">
+                <button
+                    @click="finishOnboarding(true)"
+                    class="sm:col-span-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200"
+                >
+                    Lewati Dulu
+                </button>
+
+                <button
+                    @click="prevOnboardingStep"
+                    :disabled="uiState.onboardingStep === 0"
+                    class="sm:col-span-1 bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-50 disabled:opacity-40"
+                >
+                    Kembali
+                </button>
+
+                <button
+                    @click="nextOnboardingStep"
+                    class="sm:col-span-3 bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700"
+                >
+                    {{ uiState.onboardingStep === onboardingSteps.length - 1 ? 'Selesai & Masuk Dashboard' : 'Lanjutkan' }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
     <div v-if="!currentUser && !isLoading" class="relative min-h-screen flex items-center justify-center bg-slate-900 overflow-hidden">
     
     <video autoplay muted loop playsinline class="absolute inset-0 w-full h-full object-cover z-0 opacity-40">
