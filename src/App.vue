@@ -8995,46 +8995,123 @@ const fetchSupplierData = async (userId, loadMore = false) => {
 const bulkSettlementInput = ref(''); // State untuk menampung data paste dari Excel
 
 async function processBulkSettlement(targetStatus = 'Sudah Cair') {
-    if (!bulkSettlementInput.value.trim()) return alert("Tempelkan daftar ID Pesanan terlebih dahulu.");
-    
-    const rawIds = bulkSettlementInput.value.split(/[\n,]+/).map(id => id.trim()).filter(id => id !== "");
+    if (!bulkSettlementInput.value.trim()) {
+        return alert("Tempelkan daftar ID Pesanan terlebih dahulu.");
+    }
+
+    const rawIds = bulkSettlementInput.value
+        .split(/[\n,]+/)
+        .map(id => id.trim())
+        .filter(id => id !== "");
+
     const uniqueIds = [...new Set(rawIds)];
 
-    // Sesuaikan pesan konfirmasi berdasarkan aksi
-    const isGugur = targetStatus.includes('Gagal');
-    const confirmMsg = isGugur 
-        ? `Sistem mendeteksi ${uniqueIds.length} ID. GUGURKAN pesanan ini (Batal/Retur)?` 
-        : `Sistem mendeteksi ${uniqueIds.length} ID. Tandai sebagai 'Sudah Cair'?`;
+    let confirmMsg = '';
+
+    if (targetStatus === 'Sudah Cair') {
+        confirmMsg = `Sistem mendeteksi ${uniqueIds.length} ID. Tandai sebagai dana sudah cair?`;
+    } else if (targetStatus === 'Retur/Pengembalian') {
+        confirmMsg = `Sistem mendeteksi ${uniqueIds.length} ID. Masukkan pesanan ini ke Manajemen Retur?`;
+    } else if (targetStatus === 'Batal') {
+        confirmMsg = `Sistem mendeteksi ${uniqueIds.length} ID. Tandai pesanan ini sebagai batal dan hilangkan dari daftar gantung?`;
+    } else {
+        confirmMsg = `Sistem mendeteksi ${uniqueIds.length} ID. Lanjutkan proses?`;
+    }
 
     if (!confirm(confirmMsg)) return;
 
     isSaving.value = true;
+
     let countSuccess = 0;
+    let countReturnCreated = 0;
+    const notFoundIds = [];
+    const newReturnDocs = [];
 
     try {
         const batch = writeBatch(db);
-        
+
         uniqueIds.forEach(orderId => {
-            const foundTrx = state.transaksi.find(t => t.marketplaceOrderId === orderId);
-            
-            // Proses jika transaksi ditemukan dan statusnya belum sesuai target
-            if (foundTrx && foundTrx.statusPencairan !== targetStatus) {
-                const docRef = doc(db, "transactions", foundTrx.id);
-                batch.update(docRef, { statusPencairan: targetStatus });
-                
-                // Update tampilan lokal seketika
-                foundTrx.statusPencairan = targetStatus;
-                countSuccess++;
+            const foundTrx = state.transaksi.find(t => {
+                return (t.marketplaceOrderId || '').toString().toLowerCase() === orderId.toLowerCase();
+            });
+
+            if (!foundTrx) {
+                notFoundIds.push(orderId);
+                return;
+            }
+
+            if (foundTrx.statusPencairan === targetStatus) {
+                return;
+            }
+
+            const trxRef = doc(db, "transactions", foundTrx.id);
+
+            batch.update(trxRef, {
+                statusPencairan: targetStatus
+            });
+
+            foundTrx.statusPencairan = targetStatus;
+            countSuccess++;
+
+            if (targetStatus === 'Retur/Pengembalian') {
+                const returnRef = doc(collection(db, "returns"));
+
+                const returnData = {
+                    tanggal: new Date(),
+                    channelId: foundTrx.channelId || '',
+                    originalTransactionId: foundTrx.id,
+                    marketplaceOrderId: foundTrx.marketplaceOrderId || orderId,
+                    sumber: 'Audit & Pencairan Dana',
+                    statusRetur: 'Retur / Pengembalian',
+                    items: (foundTrx.items || []).map(item => {
+                        const qty = item.qty || 0;
+                        const hargaJual = item.hargaJualAktual || item.hargaJual || item.price || item.harga || 0;
+
+                        return {
+                            sku: item.sku || '',
+                            qty: qty,
+                            nilaiRetur: hargaJual * qty,
+                            nilaiDiskon: 0,
+                            biayaMarketplace: 0,
+                            alasan: 'Retur / Pengembalian dari audit pencairan dana'
+                        };
+                    }),
+                    userId: currentUser.value.uid,
+                    createdAt: new Date()
+                };
+
+                batch.set(returnRef, returnData);
+
+                newReturnDocs.push({
+                    id: returnRef.id,
+                    ...returnData
+                });
+
+                countReturnCreated++;
             }
         });
 
         if (countSuccess === 0) {
-            throw new Error("Tidak ada ID yang cocok dengan daftar 'Belum Cair'. Periksa kembali ID Pesanan Anda.");
+            throw new Error("Tidak ada ID yang cocok dengan daftar pesanan gantung. Periksa kembali ID Pesanan Anda.");
         }
 
         await batch.commit();
-        
-        alert(`Berhasil! ${countSuccess} pesanan diperbarui menjadi: ${targetStatus}.`);
+
+        if (newReturnDocs.length > 0) {
+            state.retur.unshift(...newReturnDocs);
+        }
+
+        let message = `Berhasil! ${countSuccess} pesanan diperbarui menjadi: ${targetStatus}.`;
+
+        if (countReturnCreated > 0) {
+            message += `\n${countReturnCreated} data retur masuk ke Manajemen Retur.`;
+        }
+
+        if (notFoundIds.length > 0) {
+            message += `\n\nID tidak ditemukan:\n${notFoundIds.slice(0, 10).join('\n')}`;
+        }
+
+        alert(message);
         bulkSettlementInput.value = '';
 
     } catch (error) {
@@ -10298,15 +10375,25 @@ SKU-BAJU-PUTIH-S"
                         <span v-else>Konfirmasi Dana Cair (Uang Masuk)</span>
                     </button>
 
-                    <!-- Tombol untuk Pesanan yang Retur/Batal (Menghilangkan dari Gantung) -->
-                    <button 
-                        @click="processBulkSettlement('Gagal Cair (Retur/Batal)')" 
-                        :disabled="isSaving || !isSubscriptionActive" 
-                        class="w-full bg-slate-200 text-slate-700 font-bold py-3 rounded-lg hover:bg-slate-300 border border-slate-300 transition-all disabled:bg-slate-100"
-                    >
-                        <span v-if="isSaving">...</span>
-                        <span v-else>Gugurkan Pesanan (Retur / Batal)</span>
-                    </button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <button 
+        @click="processBulkSettlement('Retur/Pengembalian')" 
+        :disabled="isSaving || !isSubscriptionActive" 
+        class="w-full bg-orange-500 text-white font-bold py-3 rounded-lg hover:bg-orange-600 transition-all disabled:bg-slate-400"
+    >
+        <span v-if="isSaving">Memproses...</span>
+        <span v-else>Retur / Pengembalian</span>
+    </button>
+
+    <button 
+        @click="processBulkSettlement('Batal')" 
+        :disabled="isSaving || !isSubscriptionActive" 
+        class="w-full bg-slate-200 text-slate-700 font-bold py-3 rounded-lg hover:bg-slate-300 border border-slate-300 transition-all disabled:bg-slate-100"
+    >
+        <span v-if="isSaving">Memproses...</span>
+        <span v-else>Batal</span>
+    </button>
+</div>
                 </div>
             </div>
 
