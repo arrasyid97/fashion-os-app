@@ -105,7 +105,7 @@ const uiState = reactive({
 
     massUpdateVariants: [],
     isMassUpdateLoading: false,
-massUpdateFilterSize: '', // <-- BARU: Untuk menyimpan input ukuran
+massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     massUpdateFilterColor: '',
 
     analisisModelLimit: 10,
