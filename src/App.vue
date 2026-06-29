@@ -9364,7 +9364,7 @@ watch(activePage, (newPage, oldPage) => {
                     @click="finishOnboarding(true)"
                     class="sm:col-span-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200"
                 >
-                    Lewati Dulu
+                    Skip Semua
                 </button>
 
                 <button
