@@ -7305,50 +7305,87 @@ function exportKeuangan(type) {
 // FUNGSI HAPUS RETUR (SEKARANG LEBIH SEDERHANA)
 
 async function deleteReturnItem(itemToDelete) {
-
     const yakin = confirm(
-        "Yakin ingin menghapus data retur?\n\nPenghapusan ini hanya menghapus riwayat retur.\nStok inventaris tidak akan berubah."
+        "Yakin ingin menghapus data retur ini?\n\nCatatan: Penghapusan ini hanya menghapus riwayat retur dan mengurangi Total Nilai Retur di dashboard. Stok inventaris tidak akan berubah."
     );
 
     if (!yakin) return;
 
     try {
-
         const returnDocRef = doc(db, "returns", itemToDelete.returnDocId);
-        const returnDocSnap = await getDoc(returnDocRef);
+        const summaryRef = doc(db, "user_summaries", currentUser.value.uid);
 
-        if (!returnDocSnap.exists()) {
-            throw new Error("Data retur tidak ditemukan.");
-        }
+        await runTransaction(db, async (transaction) => {
+            const returnDocSnap = await transaction.get(returnDocRef);
+            const summarySnap = await transaction.get(summaryRef);
 
-        const returnData = returnDocSnap.data();
+            if (!returnDocSnap.exists()) {
+                throw new Error("Data retur tidak ditemukan.");
+            }
 
-        const newItems = (returnData.items || []).filter(item =>
-            !(
+            const returnData = returnDocSnap.data();
+            const oldItems = returnData.items || [];
+
+            const itemYangDihapus = oldItems.find(item =>
                 item.sku === itemToDelete.sku &&
                 item.qty === itemToDelete.qty &&
                 item.alasan === itemToDelete.alasan
-            )
-        );
+            );
 
-        if (newItems.length === 0) {
-            await deleteDoc(returnDocRef);
-        } else {
-            await updateDoc(returnDocRef, {
-                items: newItems
+            if (!itemYangDihapus) {
+                throw new Error("Item retur yang ingin dihapus tidak ditemukan.");
+            }
+
+            const nilaiReturYangDihapus = Math.abs(
+                itemYangDihapus.nilaiRetur ||
+                (((itemYangDihapus.hargaJual || 0) - (itemYangDihapus.nilaiDiskon || 0)) * (itemYangDihapus.qty || 0))
+            );
+
+            const tanggalRetur = returnData.tanggal?.seconds
+                ? new Date(returnData.tanggal.seconds * 1000)
+                : new Date(returnData.tanggal || itemToDelete.tanggal || new Date());
+
+            const year = tanggalRetur.getFullYear();
+            const month = String(tanggalRetur.getMonth() + 1).padStart(2, "0");
+
+            const newItems = oldItems.filter(item => {
+                return !(
+                    item.sku === itemToDelete.sku &&
+                    item.qty === itemToDelete.qty &&
+                    item.alasan === itemToDelete.alasan
+                );
             });
-        }
 
-        alert("Data retur berhasil dihapus.");
+            if (newItems.length === 0) {
+                transaction.delete(returnDocRef);
+            } else {
+                transaction.update(returnDocRef, { items: newItems });
+            }
 
+            const summaryData = summarySnap.exists() ? summarySnap.data() : {};
+
+            const currentMonthNilaiRetur =
+                summaryData?.[`summary_${year}`]?.months?.[month]?.nilaiRetur || 0;
+
+            const currentYearNilaiRetur =
+                summaryData?.[`summary_${year}`]?.yearlyTotals?.nilaiRetur || 0;
+
+            const newMonthNilaiRetur = Math.max(0, currentMonthNilaiRetur - nilaiReturYangDihapus);
+            const newYearNilaiRetur = Math.max(0, currentYearNilaiRetur - nilaiReturYangDihapus);
+
+            transaction.set(summaryRef, {
+                [`summary_${year}.months.${month}.nilaiRetur`]: newMonthNilaiRetur,
+                [`summary_${year}.yearlyTotals.nilaiRetur`]: newYearNilaiRetur
+            }, { merge: true });
+        });
+
+        await fetchTransactionAndReturnData(currentUser.value.uid);
+
+        alert("Data retur berhasil dihapus. Stok inventaris tidak berubah.");
     } catch (error) {
-
-        console.error(error);
-
-        alert("Gagal menghapus data retur : " + error.message);
-
+        console.error("Gagal menghapus data retur:", error);
+        alert("Gagal menghapus data retur: " + error.message);
     }
-
 }
 
 async function submitReturForm() {
