@@ -1778,9 +1778,14 @@ const laporanKeuanganData = computed(() => {
         });
 
         const biayaBulanIni = dataKeuanganMentah.filter(k => {
-            const d = new Date(k.tanggal);
-            return d.getFullYear() === year && (d.getMonth() + 1) === i && k.jenis === 'pengeluaran';
-        });
+    const d = k.tanggal?.toDate
+        ? k.tanggal.toDate()
+        : (k.tanggal instanceof Date ? k.tanggal : new Date(k.tanggal));
+
+    return d.getFullYear() === year &&
+        (d.getMonth() + 1) === i &&
+        (k.jenis === 'pengeluaran' || k.jenis === 'biaya');
+});
 
         const biayaProduksi = biayaBulanIni
             .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) === 'produksi')
@@ -1804,10 +1809,9 @@ const laporanKeuanganData = computed(() => {
         }
 
         const labaBersihFinal =
-            (data.labaKotor || 0) -
-            (data.biayaTransaksi || 0) -
-            biayaProduksi -
-            biayaOperasional;
+    (data.labaKotor || 0) -
+    (data.biayaTransaksi || 0) -
+    biayaOperasional;
 
         months.push({
             monthName,
