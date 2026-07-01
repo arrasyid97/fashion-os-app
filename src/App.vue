@@ -3909,7 +3909,6 @@ const totalPemasukanLainAktif = keuanganUntukDashboard
 
 const totalBiayaOperasionalAktif = keuanganUntukDashboard
     .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
-    .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) !== 'produksi')
     .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
 
 kpis.pemasukanLain = totalPemasukanLainAktif;
