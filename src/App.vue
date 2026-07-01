@@ -7305,86 +7305,62 @@ function exportKeuangan(type) {
 // FUNGSI HAPUS RETUR (SEKARANG LEBIH SEDERHANA)
 
 async function deleteReturnItem(itemToDelete) {
-    const yakin = confirm(
-        "Yakin ingin menghapus data retur ini?\n\nCatatan: Penghapusan ini hanya menghapus riwayat retur dan mengurangi Total Nilai Retur di dashboard. Stok inventaris tidak akan berubah."
-    );
-
-    if (!yakin) return;
+    if (!confirm(`Anda yakin ingin menghapus item retur ini? Stok akan disesuaikan kembali.`)) {
+        return;
+    }
 
     try {
         const returnDocRef = doc(db, "returns", itemToDelete.returnDocId);
-        const summaryRef = doc(db, "user_summaries", currentUser.value.uid);
+        const productInState = state.produk.find(p => p.sku === itemToDelete.sku);
+        if (!productInState) {
+            throw new Error(`Produk dengan SKU ${itemToDelete.sku} tidak ditemukan di inventaris.`);
+        }
+        const productRef = doc(db, "products", productInState.docId);
+        const allocationRef = doc(db, "stock_allocations", productInState.docId);
 
         await runTransaction(db, async (transaction) => {
-            const returnDocSnap = await transaction.get(returnDocRef);
-            const summarySnap = await transaction.get(summaryRef);
+            const returnDoc = await transaction.get(returnDocRef);
+            const productDoc = await transaction.get(productRef);
+            const allocationDoc = await transaction.get(allocationRef);
 
-            if (!returnDocSnap.exists()) {
-                throw new Error("Data retur tidak ditemukan.");
+            if (!returnDoc.exists() || !productDoc.exists() || !allocationDoc.exists()) {
+                throw new Error("Salah satu dokumen (retur, produk, atau alokasi) tidak ditemukan.");
             }
 
-            const returnData = returnDocSnap.data();
-            const oldItems = returnData.items || [];
+            const currentStock = productDoc.data().physical_stock || 0;
+            const newStock = currentStock - itemToDelete.qty;
+            const currentAllocations = allocationDoc.data() || {};
+            const newChannelStock = (currentAllocations[itemToDelete.channelId] || 0) - itemToDelete.qty;
 
-            const itemYangDihapus = oldItems.find(item =>
-                item.sku === itemToDelete.sku &&
-                item.qty === itemToDelete.qty &&
-                item.alasan === itemToDelete.alasan
-            );
-
-            if (!itemYangDihapus) {
-                throw new Error("Item retur yang ingin dihapus tidak ditemukan.");
+            if (newStock < 0 || newChannelStock < 0) {
+                throw new Error(`Gagal menghapus retur karena akan membuat stok produk (${itemToDelete.sku}) menjadi minus.`);
             }
 
-            const nilaiReturYangDihapus = Math.abs(
-                itemYangDihapus.nilaiRetur ||
-                (((itemYangDihapus.hargaJual || 0) - (itemYangDihapus.nilaiDiskon || 0)) * (itemYangDihapus.qty || 0))
+            transaction.update(productRef, { physical_stock: newStock });
+            const updatedAllocations = { ...currentAllocations, [itemToDelete.channelId]: newChannelStock };
+            transaction.set(allocationRef, updatedAllocations, { merge: true });
+
+            const newItems = (returnDoc.data().items || []).filter(item => 
+                !(item.sku === itemToDelete.sku && item.alasan === itemToDelete.alasan && item.tindakLanjut === itemToDelete.tindakLanjut)
             );
-
-            const tanggalRetur = returnData.tanggal?.seconds
-                ? new Date(returnData.tanggal.seconds * 1000)
-                : new Date(returnData.tanggal || itemToDelete.tanggal || new Date());
-
-            const year = tanggalRetur.getFullYear();
-            const month = String(tanggalRetur.getMonth() + 1).padStart(2, "0");
-
-            const newItems = oldItems.filter(item => {
-                return !(
-                    item.sku === itemToDelete.sku &&
-                    item.qty === itemToDelete.qty &&
-                    item.alasan === itemToDelete.alasan
-                );
-            });
 
             if (newItems.length === 0) {
                 transaction.delete(returnDocRef);
             } else {
                 transaction.update(returnDocRef, { items: newItems });
             }
-
-            const summaryData = summarySnap.exists() ? summarySnap.data() : {};
-
-            const currentMonthNilaiRetur =
-                summaryData?.[`summary_${year}`]?.months?.[month]?.nilaiRetur || 0;
-
-            const currentYearNilaiRetur =
-                summaryData?.[`summary_${year}`]?.yearlyTotals?.nilaiRetur || 0;
-
-            const newMonthNilaiRetur = Math.max(0, currentMonthNilaiRetur - nilaiReturYangDihapus);
-            const newYearNilaiRetur = Math.max(0, currentYearNilaiRetur - nilaiReturYangDihapus);
-
-            transaction.set(summaryRef, {
-                [`summary_${year}.months.${month}.nilaiRetur`]: newMonthNilaiRetur,
-                [`summary_${year}.yearlyTotals.nilaiRetur`]: newYearNilaiRetur
-            }, { merge: true });
         });
 
-        await fetchTransactionAndReturnData(currentUser.value.uid);
+        // Perbarui state lokal secara langsung
+        productInState.stokFisik -= itemToDelete.qty;
+        productInState.stokAlokasi[itemToDelete.channelId] -= itemToDelete.qty;
+        state.retur = state.retur.filter(r => r.id !== itemToDelete.returnDocId || (r.id === itemToDelete.returnDocId && r.items.length > 1));
 
-        alert("Data retur berhasil dihapus. Stok inventaris tidak berubah.");
+        alert('Item retur berhasil dihapus dan stok inventaris telah disesuaikan.');
+
     } catch (error) {
-        console.error("Gagal menghapus data retur:", error);
-        alert("Gagal menghapus data retur: " + error.message);
+        console.error("Error menghapus item retur:", error);
+        alert(`Gagal menghapus item retur: ${error.message}`);
     }
 }
 
