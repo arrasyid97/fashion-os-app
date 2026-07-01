@@ -3883,7 +3883,41 @@ const dashboardKpis = computed(() => {
                 }
             }
         }
-        kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
+        const keuanganUntukDashboard = filterDataByDate(
+    (state.keuangan || []).map(k => {
+        const tanggalAman = k.tanggal?.toDate
+            ? k.tanggal.toDate()
+            : (k.tanggal instanceof Date ? k.tanggal : new Date(k.tanggal));
+
+        return {
+            ...k,
+            tanggal: tanggalAman
+        };
+    }),
+    uiState.dashboardDateFilter,
+    uiState.dashboardStartDate,
+    uiState.dashboardEndDate,
+    uiState.dashboardStartMonth,
+    uiState.dashboardStartYear,
+    uiState.dashboardEndMonth,
+    uiState.dashboardEndYear
+);
+
+const totalPemasukanLainAktif = keuanganUntukDashboard
+    .filter(k => k.jenis === 'pemasukan_lain')
+    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+
+const totalBiayaOperasionalAktif = keuanganUntukDashboard
+    .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
+    .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) !== 'produksi')
+    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+
+kpis.pemasukanLain = totalPemasukanLainAktif;
+kpis.totalBiayaOperasional = totalBiayaOperasionalAktif;
+
+kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
+
+kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
 
     } else {
         // --- LOGIKA JANGKA PENDEK (Real-time dari transaksi mentah) ---
