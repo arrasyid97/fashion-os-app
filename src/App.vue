@@ -3907,8 +3907,13 @@ const totalPemasukanLainAktif = keuanganUntukDashboard
     .filter(k => k.jenis === 'pemasukan_lain')
     .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
 
+const totalPengeluaranKasAktif = keuanganUntukDashboard
+    .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
+    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+
 const totalBiayaOperasionalAktif = keuanganUntukDashboard
     .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
+    .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) !== 'produksi')
     .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
 
 kpis.pemasukanLain = totalPemasukanLainAktif;
@@ -3916,7 +3921,7 @@ kpis.totalBiayaOperasional = totalBiayaOperasionalAktif;
 
 kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
 
-kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
+kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransaksi + totalPengeluaranKasAktif);
 
     } else {
         // --- LOGIKA JANGKA PENDEK (Real-time dari transaksi mentah) ---
@@ -3982,8 +3987,18 @@ kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransa
             });
         });
 
-        kpis.totalBiayaOperasional = (keuangan || []).filter(i => i.jenis === 'pengeluaran').reduce((sum, i) => sum + (i.jumlah || 0), 0);
-        const pemasukanLain = (keuangan || []).filter(i => i.jenis === 'pemasukan_lain').reduce((sum, i) => sum + (i.jumlah || 0), 0);
+        const pemasukanLain = (keuangan || [])
+    .filter(i => i.jenis === 'pemasukan_lain')
+    .reduce((sum, i) => sum + (Number(i.jumlah) || 0), 0);
+
+const totalPengeluaranKas = (keuangan || [])
+    .filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya')
+    .reduce((sum, i) => sum + (Number(i.jumlah) || 0), 0);
+
+kpis.totalBiayaOperasional = (keuangan || [])
+    .filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya')
+    .filter(i => (i.tipeBiaya || getExpenseTypeByCategory(i.kategori)) !== 'produksi')
+    .reduce((sum, i) => sum + (Number(i.jumlah) || 0), 0);
 
         kpis.omsetKotor = omsetKotorAwal - totalNilaiReturGross;
         kpis.totalDiskon = totalDiskonAwal - totalDiskonBatal;
@@ -3994,7 +4009,7 @@ kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransa
         kpis.omsetBersih = kpis.omsetKotor - kpis.totalDiskon;
         kpis.labaKotor = kpis.omsetBersih - kpis.totalHppTerjual;
         kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
-        kpis.saldoKas = (kpis.omsetBersih + pemasukanLain) - (kpis.totalBiayaTransaksi + kpis.totalBiayaOperasional);
+        kpis.saldoKas = (kpis.omsetBersih + pemasukanLain) - (kpis.totalBiayaTransaksi + totalPengeluaranKas);
     }
     
     kpis.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
