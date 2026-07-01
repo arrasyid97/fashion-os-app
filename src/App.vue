@@ -7305,46 +7305,62 @@ function exportKeuangan(type) {
 // FUNGSI HAPUS RETUR (SEKARANG LEBIH SEDERHANA)
 
 async function deleteReturnItem(itemToDelete) {
-    const yakin = confirm(
-        "Yakin ingin menghapus data retur ini?\n\nCatatan: Penghapusan ini hanya menghapus riwayat retur. Stok inventaris tidak akan berubah."
-    );
-
-    if (!yakin) return;
+    if (!confirm(`Anda yakin ingin menghapus item retur ini? Stok akan disesuaikan kembali.`)) {
+        return;
+    }
 
     try {
         const returnDocRef = doc(db, "returns", itemToDelete.returnDocId);
-        const returnDocSnap = await getDoc(returnDocRef);
-
-        if (!returnDocSnap.exists()) {
-            throw new Error("Data retur tidak ditemukan.");
+        const productInState = state.produk.find(p => p.sku === itemToDelete.sku);
+        if (!productInState) {
+            throw new Error(`Produk dengan SKU ${itemToDelete.sku} tidak ditemukan di inventaris.`);
         }
+        const productRef = doc(db, "products", productInState.docId);
+        const allocationRef = doc(db, "stock_allocations", productInState.docId);
 
-        const returnData = returnDocSnap.data();
-        const oldItems = returnData.items || [];
+        await runTransaction(db, async (transaction) => {
+            const returnDoc = await transaction.get(returnDocRef);
+            const productDoc = await transaction.get(productRef);
+            const allocationDoc = await transaction.get(allocationRef);
 
-        const newItems = oldItems.filter(item => {
-            return !(
-                item.sku === itemToDelete.sku &&
-                item.qty === itemToDelete.qty &&
-                item.alasan === itemToDelete.alasan
+            if (!returnDoc.exists() || !productDoc.exists() || !allocationDoc.exists()) {
+                throw new Error("Salah satu dokumen (retur, produk, atau alokasi) tidak ditemukan.");
+            }
+
+            const currentStock = productDoc.data().physical_stock || 0;
+            const newStock = currentStock - itemToDelete.qty;
+            const currentAllocations = allocationDoc.data() || {};
+            const newChannelStock = (currentAllocations[itemToDelete.channelId] || 0) - itemToDelete.qty;
+
+            if (newStock < 0 || newChannelStock < 0) {
+                throw new Error(`Gagal menghapus retur karena akan membuat stok produk (${itemToDelete.sku}) menjadi minus.`);
+            }
+
+            transaction.update(productRef, { physical_stock: newStock });
+            const updatedAllocations = { ...currentAllocations, [itemToDelete.channelId]: newChannelStock };
+            transaction.set(allocationRef, updatedAllocations, { merge: true });
+
+            const newItems = (returnDoc.data().items || []).filter(item => 
+                !(item.sku === itemToDelete.sku && item.alasan === itemToDelete.alasan && item.tindakLanjut === itemToDelete.tindakLanjut)
             );
+
+            if (newItems.length === 0) {
+                transaction.delete(returnDocRef);
+            } else {
+                transaction.update(returnDocRef, { items: newItems });
+            }
         });
 
-        if (newItems.length === 0) {
-            await deleteDoc(returnDocRef);
-        } else {
-            await updateDoc(returnDocRef, { items: newItems });
-        }
+        // Perbarui state lokal secara langsung
+        productInState.stokFisik -= itemToDelete.qty;
+        productInState.stokAlokasi[itemToDelete.channelId] -= itemToDelete.qty;
+        state.retur = state.retur.filter(r => r.id !== itemToDelete.returnDocId || (r.id === itemToDelete.returnDocId && r.items.length > 1));
 
-        state.retur = state.retur.filter(r => {
-            if (r.id !== itemToDelete.returnDocId) return true;
-            return newItems.length > 0;
-        });
+        alert('Item retur berhasil dihapus dan stok inventaris telah disesuaikan.');
 
-        alert("Data retur berhasil dihapus. Stok inventaris tidak berubah.");
     } catch (error) {
-        console.error("Gagal menghapus data retur:", error);
-        alert("Gagal menghapus data retur: " + error.message);
+        console.error("Error menghapus item retur:", error);
+        alert(`Gagal menghapus item retur: ${error.message}`);
     }
 }
 
