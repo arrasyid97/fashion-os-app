@@ -4981,26 +4981,163 @@ const dashboardSalesStats = computed(() => {
 });
 
 const kpiExplanations = {
-    'saldo-kas': { 
-    title: 'Saldo Kas Saat Ini', 
-    description: `Ini adalah **estimasi** posisi kas bersih Anda dari semua aktivitas yang tercatat di aplikasi, dihitung dengan rumus: 
-    
-    (Omset Bersih + Pemasukan Lain) - Biaya Transaksi - Biaya Operasional.
-    
-    **Penting:** Angka ini mengasumsikan uang dari penjualan marketplace sudah masuk ke kas Anda. Pada praktiknya, ada jeda waktu pencairan. Anggaplah ini sebagai **indikator potensi kas** Anda.` 
-},
-    'omset-kotor': { title: 'Omset Kotor', description: 'Total pendapatan dari penjualan produk sebelum dikurangi diskon, biaya transaksi, atau retur. Ini adalah total harga jual semua produk yang laku.' },
-    'omset-bersih': { title: 'Omset Bersih', description: 'Total pendapatan dari penjualan setelah dikurangi diskon, voucher, dan nilai produk yang diretur. Ini adalah nilai bersih uang yang masuk dari penjualan.' },
-    'diskon': { title: 'Diskon', description: 'Total nilai semua diskon dan voucher yang diberikan kepada pelanggan pada periode ini. Angka ini mengurangi omset kotor.' },
-    'laba-kotor': { title: 'Laba Kotor', description: 'Keuntungan yang didapatkan dari penjualan setelah dikurangi harga pokok produksi (HPP) produk yang terjual. Angka ini belum termasuk biaya operasional.' },
-    'hpp-terjual': { title: 'Total HPP Terjual', description: 'Total biaya modal dari semua produk yang berhasil terjual. Nilai ini menjadi komponen utama untuk menghitung Laba Kotor.' },
-    'biaya-transaksi': { title: 'Biaya Transaksi Marketplace', description: 'Total biaya yang dikenakan oleh platform e-commerce untuk setiap transaksi, seperti biaya admin, komisi, dan biaya program promosi. Nilai ini juga disesuaikan dengan retur.' },
-    'biaya-operasional': { title: 'Biaya Operasional', description: 'Total semua biaya rutin bisnis yang tidak terkait langsung dengan transaksi, seperti gaji, sewa, listrik, dan biaya pemasaran. Data diambil dari pencatatan di halaman Manajemen Keuangan.' },
-    'laba-bersih-operasional': { title: 'Laba Bersih', description: 'Angka ini adalah indikator keuntungan final. Dihitung dari Laba Kotor dikurangi semua Biaya Operasional dan Biaya Transaksi Marketplace.' },
-    'total-unit-stok': { title: 'Total Unit Stok', description: 'Jumlah total fisik semua produk yang tersedia di gudang Anda.' },
-    'nilai-stok': { title: 'Total Nilai Stok (HPP)', description: 'Total nilai moneter dari semua stok yang tersisa di gudang, dihitung berdasarkan Harga Pokok Produksi (HPP) per unit.' },
-    // BARIS BARU DITAMBAHKANN
-    'nilai-retur': { title: 'Total Nilai Retur', description: 'Jumlah total moneter dari semua produk yang dikembalikan oleh pelanggan. Nilai ini mengurangi Omset Kotor dan secara otomatis disesuaikan dari laporan keuangan.' },
+    'saldo-kas': {
+        title: 'Saldo Kas',
+        description: `Saldo Kas adalah perkiraan uang kas bersih dari data yang tercatat di aplikasi.
+
+Rumus sederhananya:
+
+(Omset Bersih + Pemasukan Lain) - Biaya Transaksi - Semua Pengeluaran Kas
+
+Catatan penting:
+- Semua pengeluaran kas akan mengurangi Saldo Kas.
+- Termasuk beli kain, bahan, maklun, listrik, admin, iklan, dan pengeluaran lain.
+- Jadi beli kain memang membuat Saldo Kas turun, karena uang keluar.
+- Angka ini adalah estimasi dari data yang dicatat, bukan mutasi rekening bank asli.`
+    },
+
+    'omset-kotor': {
+        title: 'Omset Kotor',
+        description: `Omset Kotor adalah total nilai penjualan sebelum dikurangi apa pun.
+
+Contoh:
+Jika produk terjual Rp120.000, maka Omset Kotor = Rp120.000.
+
+Omset Kotor belum dikurangi:
+- diskon,
+- retur,
+- biaya marketplace,
+- HPP,
+- biaya operasional.`
+    },
+
+    'omset-bersih': {
+        title: 'Omset Bersih',
+        description: `Omset Bersih adalah nilai penjualan setelah dikurangi diskon dan retur.
+
+Rumus sederhananya:
+
+Omset Kotor - Diskon - Total Nilai Retur
+
+Angka ini membantu melihat nilai penjualan yang lebih bersih sebelum dikurangi HPP, biaya marketplace, dan biaya operasional.`
+    },
+
+    'diskon': {
+        title: 'Diskon',
+        description: `Diskon adalah total potongan harga yang diberikan ke pembeli.
+
+Contohnya:
+- voucher seller,
+- diskon produk,
+- potongan harga manual,
+- promo yang mengurangi nilai penjualan.
+
+Diskon akan mengurangi Omset Kotor.`
+    },
+
+    'laba-kotor': {
+        title: 'Laba Kotor',
+        description: `Laba Kotor adalah keuntungan awal dari penjualan produk.
+
+Rumus sederhananya:
+
+Omset Bersih - Total HPP Terjual
+
+Catatan:
+Laba Kotor belum dikurangi biaya marketplace, biaya transaksi, listrik, iklan, gaji, sewa, dan biaya operasional lain.`
+    },
+
+    'hpp-terjual': {
+        title: 'Total HPP Terjual',
+        description: `Total HPP Terjual adalah total modal produk yang sudah terjual.
+
+Contoh:
+Jika 1 produk HPP-nya Rp50.000 dan terjual 2 pcs, maka HPP Terjual = Rp100.000.
+
+Catatan penting:
+- HPP dihitung saat barang terjual.
+- Beli kain atau bahan tidak langsung masuk ke HPP Terjual.
+- Beli kain masuk ke stok/persediaan dulu, lalu baru menjadi HPP saat produknya terjual.`
+    },
+
+    'biaya-transaksi': {
+        title: 'Biaya Transaksi',
+        description: `Biaya Transaksi adalah biaya yang muncul dari proses penjualan.
+
+Contohnya:
+- biaya admin marketplace,
+- komisi marketplace,
+- biaya layanan,
+- biaya program marketplace,
+- potongan transaksi lain.
+
+Biaya ini mengurangi Laba Bersih karena langsung terkait dengan transaksi penjualan.`
+    },
+
+    'biaya-operasional': {
+        title: 'Biaya Operasional',
+        description: `Biaya Operasional adalah pengeluaran harian bisnis yang bukan untuk membeli stok atau produksi barang.
+
+Contoh yang masuk Biaya Operasional:
+- listrik,
+- internet,
+- sewa,
+- gaji admin,
+- iklan,
+- biaya packing operasional,
+- kebutuhan toko.
+
+Catatan penting:
+Beli kain, bahan, maklun, supplier, atau produksi tidak dimasukkan ke Biaya Operasional.
+
+Beli kain tetap mengurangi Saldo Kas, tapi tidak langsung mengurangi Laba Bersih, karena kain berubah menjadi stok/persediaan.`
+    },
+
+    'laba-bersih-operasional': {
+        title: 'Laba Bersih',
+        description: `Laba Bersih adalah estimasi keuntungan setelah penjualan dikurangi biaya utama.
+
+Rumus sederhananya:
+
+Laba Kotor - Biaya Transaksi - Biaya Operasional
+
+Catatan penting:
+- Beli kain, bahan, maklun, dan produksi tidak langsung memotong Laba Bersih.
+- Biaya produksi baru terasa sebagai HPP saat barangnya terjual.
+- Jadi Laba Bersih lebih fokus menunjukkan hasil penjualan, bukan sekadar uang kas yang keluar untuk tambah stok.`
+    },
+
+    'total-unit-stok': {
+        title: 'Total Unit Stok',
+        description: `Total Unit Stok adalah jumlah semua stok fisik produk yang masih tersedia.
+
+Contoh:
+Jika stok Aurelia 50 pcs dan Amara 30 pcs, maka Total Unit Stok = 80 pcs.
+
+Angka ini membantu melihat jumlah barang yang masih bisa dijual.`
+    },
+
+    'nilai-stok': {
+        title: 'Total Nilai Stok (HPP)',
+        description: `Total Nilai Stok adalah nilai modal dari stok yang masih tersisa.
+
+Rumus sederhananya:
+
+Jumlah Stok × HPP per Produk
+
+Catatan:
+Ini bukan harga jual stok, tapi nilai modal/HPP stok yang masih ada di gudang.`
+    },
+
+    'nilai-retur': {
+        title: 'Total Nilai Retur',
+        description: `Total Nilai Retur adalah nilai produk yang dikembalikan oleh pembeli dan masih tercatat sebagai retur.
+
+Retur akan mengurangi Omset Bersih.
+
+Catatan:
+Jika data retur dihapus dari Manajemen Retur, maka nilai retur juga seharusnya tidak lagi dihitung di dashboard.`
+    },
 };
 
 
