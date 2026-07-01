@@ -4836,20 +4836,24 @@ const dashboardPremiumData = computed(() => {
         return sum + (t.biaya?.total || 0);
     }, 0);
 
-    const pengeluaranHariIni = (state.keuangan || [])
-        .filter(k => {
-            const d = new Date(k.tanggal);
-            return d >= today &&
-                d < tomorrow &&
-                (k.jenis === 'pengeluaran' || k.jenis === 'biaya');
-        })
-        .reduce((sum, k) => sum + (k.jumlah || 0), 0);
+    const biayaOperasionalHariIni = (state.keuangan || [])
+    .filter(k => {
+        const d = k.tanggal?.toDate
+            ? k.tanggal.toDate()
+            : (k.tanggal instanceof Date ? k.tanggal : new Date(k.tanggal));
+
+        return d >= today &&
+            d < tomorrow &&
+            (k.jenis === 'pengeluaran' || k.jenis === 'biaya') &&
+            (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) !== 'produksi';
+    })
+    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
 
     const profitBersihHariIni =
-        omsetHariIni -
-        hppHariIni -
-        biayaTransaksiHariIni -
-        pengeluaranHariIni;
+    omsetHariIni -
+    hppHariIni -
+    biayaTransaksiHariIni -
+    biayaOperasionalHariIni;
 
     const produkTerjualHariIni = transaksiHariIni.reduce((sum, t) => {
         return sum + (t.items || []).reduce((s, item) => {
@@ -5130,14 +5134,19 @@ Ini bukan harga jual stok, tapi nilai modal/HPP stok yang masih ada di gudang.`
     },
 
     'nilai-retur': {
-        title: 'Total Nilai Retur',
-        description: `Total Nilai Retur adalah nilai produk yang dikembalikan oleh pembeli dan masih tercatat sebagai retur.
+    title: 'Total Nilai Retur',
+    description: `Total Nilai Retur adalah nilai produk yang dikembalikan oleh pembeli dan masih tercatat sebagai retur.
+
+Angka ini diambil dari harga jual produk yang diretur, bukan dari HPP/modal produk.
+
+Contoh:
+Jika pembeli mengembalikan 1 produk dengan harga jual Rp120.000, maka Total Nilai Retur bertambah Rp120.000.
 
 Retur akan mengurangi Omset Bersih.
 
 Catatan:
 Jika data retur dihapus dari Manajemen Retur, maka nilai retur juga seharusnya tidak lagi dihitung di dashboard.`
-    },
+},
 };
 
 
@@ -9885,7 +9894,7 @@ watch(activePage, (newPage, oldPage) => {
                 {{ formatCurrency(dashboardPremiumData.profitBersihHariIni) }}
             </p>
             <p class="text-xs text-slate-400 mt-3">
-                Setelah HPP, biaya transaksi, dan pengeluaran yang sudah dicatat.
+                Setelah HPP, biaya transaksi, dan biaya operasional hari ini.
             </p>
         </div>
 
