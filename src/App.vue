@@ -528,6 +528,11 @@ const loadDataForPage = async (pageName) => {
     dataPromises.push(fetchAllProductData(userId));
     break;
 }
+            case 'audit-data':
+    dataPromises.push(fetchAllProductData(userId));
+    dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
+    dataPromises.push(fetchKeuanganData());
+    break;
             case 'statistik-penjualan':
     dataPromises.push(fetchAllProductData(userId));
     dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
@@ -715,6 +720,24 @@ const parsePercentageInput = (value) => {
     const cleaned = value.replace(',', '.').replace(/[^0-9.]/g, '');
     return parseFloat(cleaned) || 0;
 };
+
+async function writeAuditLog(action, entityType, entityId, details = {}) {
+    if (!currentUser.value) return;
+
+    try {
+        await addDoc(collection(db, "audit_logs"), {
+            userId: currentUser.value.uid,
+            userEmail: currentUser.value.email || '',
+            action,
+            entityType,
+            entityId: entityId || '',
+            details,
+            createdAt: new Date()
+        });
+    } catch (error) {
+        console.error("Gagal mencatat audit log:", error);
+    }
+}
 
 const getExpenseTypeByCategory = (kategori) => {
     const category = (state.settings.categories || []).find(cat => cat.name === kategori);
@@ -3865,8 +3888,15 @@ const transaksiCairKeys = new Set();
 
 (transaksi || []).forEach(trx => {
     if (trx.statusPencairan === 'Sudah Cair') {
-        if (trx.id) transaksiCairKeys.add(String(trx.id).toLowerCase());
-        if (trx.marketplaceOrderId) transaksiCairKeys.add(String(trx.marketplaceOrderId).toLowerCase());
+        [
+            trx.id,
+            trx.marketplaceOrderId,
+            trx.orderId,
+            trx.idPesanan,
+            trx.nomorPesanan
+        ]
+            .filter(Boolean)
+            .forEach(key => transaksiCairKeys.add(String(key).toLowerCase()));
     }
 });
 
@@ -4038,6 +4068,158 @@ const transaksiCairKeys = new Set();
         .reduce((sum, p) => sum + ((Number(p.stokFisik) || 0) * (Number(p.hpp) || 0)), 0);
 
     return kpis;
+});
+
+const dataHealthAudit = computed(() => {
+    const issues = [];
+
+    const addIssue = (level, title, description, location) => {
+        issues.push({
+            id: `${level}-${title}-${issues.length}`,
+            level,
+            title,
+            description,
+            location
+        });
+    };
+
+    (state.produk || []).forEach(product => {
+        if (!product.sku) {
+            addIssue(
+                'danger',
+                'Produk tanpa SKU',
+                'Produk ini belum memiliki SKU. SKU dibutuhkan untuk stok, transaksi, retur, dan laporan.',
+                product.nama || product.product_name || 'Produk'
+            );
+        }
+
+        if (!product.hpp || Number(product.hpp) <= 0) {
+            addIssue(
+                'warning',
+                'Produk belum punya HPP',
+                'HPP kosong bisa membuat laba kotor dan laba bersih tidak akurat.',
+                product.sku || product.nama || product.product_name || 'Produk'
+            );
+        }
+
+        if ((Number(product.stokFisik) || 0) < 0) {
+            addIssue(
+                'danger',
+                'Stok produk minus',
+                'Stok minus menandakan ada transaksi, retur, atau penyesuaian stok yang perlu dicek.',
+                product.sku || product.nama || product.product_name || 'Produk'
+            );
+        }
+    });
+
+    const skuMap = {};
+
+    (state.produk || []).forEach(product => {
+        if (!product.sku) return;
+
+        const sku = String(product.sku).toLowerCase();
+        skuMap[sku] = (skuMap[sku] || 0) + 1;
+    });
+
+    Object.keys(skuMap).forEach(sku => {
+        if (skuMap[sku] > 1) {
+            addIssue(
+                'danger',
+                'SKU duplikat',
+                `SKU ini dipakai ${skuMap[sku]} kali. SKU duplikat bisa membuat transaksi dan stok salah baca.`,
+                sku.toUpperCase()
+            );
+        }
+    });
+
+    (state.transaksi || []).forEach(trx => {
+        if (!trx.statusPencairan) {
+            addIssue(
+                'warning',
+                'Transaksi belum punya status pencairan',
+                'Status pencairan kosong bisa membuat dashboard dana cair tidak akurat.',
+                trx.id || trx.marketplaceOrderId || 'Transaksi'
+            );
+        }
+
+        (trx.items || []).forEach(item => {
+            if (!item.sku) {
+                addIssue(
+                    'danger',
+                    'Item transaksi tanpa SKU',
+                    'Ada item transaksi yang tidak memiliki SKU, sehingga stok dan laporan bisa salah.',
+                    trx.id || trx.marketplaceOrderId || 'Transaksi'
+                );
+            }
+
+            if (!item.hpp || Number(item.hpp) <= 0) {
+                addIssue(
+                    'warning',
+                    'Item transaksi tanpa HPP',
+                    'HPP pada item transaksi kosong. Laba transaksi bisa tidak akurat.',
+                    item.sku || trx.id || 'Transaksi'
+                );
+            }
+        });
+    });
+
+    const transaksiKeys = new Set();
+
+    (state.transaksi || []).forEach(trx => {
+        [
+            trx.id,
+            trx.marketplaceOrderId,
+            trx.orderId,
+            trx.idPesanan,
+            trx.nomorPesanan
+        ]
+            .filter(Boolean)
+            .forEach(key => transaksiKeys.add(String(key).toLowerCase()));
+    });
+
+    (state.retur || []).forEach(retur => {
+        const returKeys = [
+            retur.originalTransactionId,
+            retur.transactionId,
+            retur.marketplaceOrderId,
+            retur.orderId,
+            retur.idPesanan,
+            retur.nomorPesanan
+        ]
+            .filter(Boolean)
+            .map(key => String(key).toLowerCase());
+
+        const punyaTransaksiAsal = returKeys.some(key => transaksiKeys.has(key));
+
+        if (!punyaTransaksiAsal) {
+            addIssue(
+                'warning',
+                'Retur tanpa transaksi asal',
+                'Data retur ini tidak menemukan transaksi asal. Jika transaksi sudah dihapus, retur ini bisa membuat laporan terlihat minus.',
+                retur.id || 'Retur'
+            );
+        }
+    });
+
+    (state.keuangan || []).forEach(item => {
+        if (!item.kategori) {
+            addIssue(
+                'warning',
+                'Data keuangan tanpa kategori',
+                'Kategori kosong membuat laporan biaya operasional atau produksi sulit dibaca.',
+                item.id || item.jenis || 'Keuangan'
+            );
+        }
+    });
+
+    return {
+        issues,
+        summary: {
+            total: issues.length,
+            danger: issues.filter(i => i.level === 'danger').length,
+            warning: issues.filter(i => i.level === 'warning').length
+        }
+    };
 });
 
 const namaKainHistory = computed(() => {
@@ -7743,15 +7925,14 @@ function exportKeuangan(type) {
 // FUNGSI HAPUS RETUR (SEKARANG LEBIH SEDERHANA)
 
 async function deleteReturnItem(itemToDelete) {
-    if (!confirm(
+    const yakin = confirm(
         "Yakin ingin menghapus data retur ini?\n\nCatatan: penghapusan ini hanya menghapus riwayat retur. Stok inventaris tidak akan berubah."
-    )) {
-        return;
-    }
+    );
+
+    if (!yakin) return;
 
     try {
         const returnDocRef = doc(db, "returns", itemToDelete.returnDocId);
-
         const returnSnap = await getDoc(returnDocRef);
 
         if (!returnSnap.exists()) {
@@ -7771,6 +7952,7 @@ async function deleteReturnItem(itemToDelete) {
 
         if (newItems.length === 0) {
             await deleteDoc(returnDocRef);
+
             state.retur = state.retur.filter(r => r.id !== itemToDelete.returnDocId);
         } else {
             await updateDoc(returnDocRef, {
@@ -7778,10 +7960,18 @@ async function deleteReturnItem(itemToDelete) {
             });
 
             const returInState = state.retur.find(r => r.id === itemToDelete.returnDocId);
+
             if (returInState) {
                 returInState.items = newItems;
             }
         }
+
+        await writeAuditLog("delete_return_item", "return", itemToDelete.returnDocId, {
+            sku: itemToDelete.sku,
+            qty: itemToDelete.qty,
+            alasan: itemToDelete.alasan,
+            tanggalHapus: new Date()
+        });
 
         alert("Data retur berhasil dihapus. Stok inventaris tidak berubah.");
 
@@ -9960,6 +10150,7 @@ watch(activePage, (newPage, oldPage) => {
     <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Proses Massal</a>
     <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">Cek Pencairan Dana</a>
     <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
+    <a href="#" @click.prevent="changePage('audit-data')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'audit-data' }">Cek Kesehatan Data</a>
     <a href="#" @click.prevent="changePage('statistik-penjualan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'statistik-penjualan' }">Statistik Penjualan</a>
 </div>
 
@@ -13105,6 +13296,83 @@ SKU-BAJU-PUTIH-S"
         </div>
     </div>
   </div>
+</div>
+
+<div v-if="activePage === 'audit-data'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+            <p class="text-sm text-slate-500">Audit Data</p>
+            <h2 class="text-3xl font-bold text-slate-800 mt-1">Cek Kesehatan Data</h2>
+            <p class="text-slate-500 mt-2 max-w-3xl">
+                Halaman ini membantu mendeteksi data yang berpotensi membuat dashboard, stok, retur, dan laporan menjadi tidak akurat.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Total Masalah</p>
+                <p class="text-4xl font-bold text-slate-800 mt-2">{{ dataHealthAudit.summary.total }}</p>
+                <p class="text-xs text-slate-400 mt-2">Jumlah temuan dari data yang sedang dimuat.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-red-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Masalah Serius</p>
+                <p class="text-4xl font-bold text-red-600 mt-2">{{ dataHealthAudit.summary.danger }}</p>
+                <p class="text-xs text-slate-400 mt-2">Sebaiknya dicek lebih dulu.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-yellow-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Peringatan</p>
+                <p class="text-4xl font-bold text-yellow-600 mt-2">{{ dataHealthAudit.summary.warning }}</p>
+                <p class="text-xs text-slate-400 mt-2">Data masih bisa jalan, tapi perlu dirapikan.</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <p class="text-sm text-slate-500">Daftar temuan</p>
+                    <h3 class="text-xl font-bold text-slate-800">Masalah yang perlu dicek</h3>
+                </div>
+            </div>
+
+            <div v-if="dataHealthAudit.issues.length === 0" class="p-8 text-center bg-green-50 border border-green-200 rounded-2xl">
+                <p class="text-2xl">✅</p>
+                <h3 class="font-bold text-green-700 mt-2">Data terlihat sehat</h3>
+                <p class="text-green-600 text-sm mt-1">Belum ada masalah besar yang terdeteksi dari data yang dimuat.</p>
+            </div>
+
+            <div v-else class="space-y-3">
+                <div
+                    v-for="issue in dataHealthAudit.issues"
+                    :key="issue.id"
+                    class="p-4 rounded-2xl border flex flex-col md:flex-row md:items-start md:justify-between gap-4"
+                    :class="issue.level === 'danger' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'"
+                >
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span>{{ issue.level === 'danger' ? '🚨' : '⚠️' }}</span>
+                            <h4 class="font-bold text-slate-800">{{ issue.title }}</h4>
+                        </div>
+
+                        <p class="text-sm text-slate-600 mt-1">{{ issue.description }}</p>
+                        <p class="text-xs text-slate-500 mt-2">
+                            Lokasi data: <strong>{{ issue.location }}</strong>
+                        </p>
+                    </div>
+
+                    <span
+                        class="text-xs font-bold px-3 py-1 rounded-full self-start"
+                        :class="issue.level === 'danger' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'"
+                    >
+                        {{ issue.level === 'danger' ? 'Serius' : 'Peringatan' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
 </div>
 
 <div v-if="activePage === 'statistik-penjualan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
