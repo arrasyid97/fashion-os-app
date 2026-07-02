@@ -534,7 +534,7 @@ const loadDataForPage = async (pageName) => {
                         startDate.setHours(0, 0, 0, 0);
                     }
                     dataPromises.push(fetchTransactionAndReturnData(userId, false, startDate, endDate));
-                    dataPromises.push(fetchKeuanganData(startDate, endDate));
+                    dataPromises.push(fetchKeuanganData());
                 } else {
                     dataPromises.push(fetchTransactionAndReturnData(userId));
                     dataPromises.push(fetchKeuanganData());
@@ -4015,6 +4015,34 @@ kpis.totalBiayaOperasional = (keuangan || [])
         kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
         kpis.saldoKas = (kpis.omsetBersih + pemasukanLain) - (kpis.totalBiayaTransaksi + totalPengeluaranKas);
     }
+    
+    // SALDO KAS BERJALAN
+// Saldo Kas tidak mengikuti filter dashboard.
+// Tujuannya agar jika hari ini tidak ada transaksi, saldo kas tetap menarik saldo sebelumnya.
+let saldoOmsetBersihAllTime = 0;
+let saldoBiayaTransaksiAllTime = 0;
+
+if (state.summaryData && Object.keys(state.summaryData).length > 0) {
+    for (const key in state.summaryData) {
+        if (key.startsWith('summary_') && state.summaryData[key]?.yearlyTotals) {
+            const yearly = state.summaryData[key].yearlyTotals;
+            saldoOmsetBersihAllTime += yearly.omsetBersih || 0;
+            saldoBiayaTransaksiAllTime += yearly.biayaTransaksi || 0;
+        }
+    }
+}
+
+const saldoPemasukanLainAllTime = (state.keuangan || [])
+    .filter(k => k.jenis === 'pemasukan_lain')
+    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+
+const saldoPengeluaranKasAllTime = (state.keuangan || [])
+    .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
+    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+
+kpis.saldoKas =
+    (saldoOmsetBersihAllTime + saldoPemasukanLainAllTime)
+    - (saldoBiayaTransaksiAllTime + saldoPengeluaranKasAllTime);
     
     kpis.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     kpis.totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
