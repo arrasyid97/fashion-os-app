@@ -5018,7 +5018,7 @@ const dashboardSalesStats = computed(() => {
 
 const kpiExplanations = {
     'saldo-kas': {
-        title: 'Saldo Kas',
+        title: 'Saldo Kas Berjalan',
         description: `Saldo Kas adalah perkiraan uang kas bersih dari data yang tercatat di aplikasi.
 
 Rumus sederhananya:
