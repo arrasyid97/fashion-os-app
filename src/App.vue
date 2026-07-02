@@ -112,6 +112,9 @@ massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     dashboardDateFilter: 'today',
     dashboardSalesModelFilter: 'all',
     dashboardSalesChannelFilter: 'all',
+    salesStatsDateFilter: 'all_time',
+    salesStatsModelFilter: 'all',
+    salesStatsChannelFilter: 'all',
     dashboardStartDate: '',
     dashboardEndDate: '',
     dashboardStartMonth: new Date().getMonth() + 1,
@@ -525,7 +528,10 @@ const loadDataForPage = async (pageName) => {
     dataPromises.push(fetchAllProductData(userId));
     break;
 }
-            
+            case 'statistik-penjualan':
+    dataPromises.push(fetchAllProductData(userId));
+    dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
+    break;
             case 'transaksi':
             case 'bulk_process':
                 dataPromises.push(fetchAllProductData(userId));
@@ -4997,6 +5003,225 @@ const dashboardSalesStats = computed(() => {
         topColors: sortByQty(colorMap),
         topSizes: sortByQty(sizeMap),
         topChannels: sortByOmset(channelMap)
+    };
+});
+
+const salesPerformanceStats = computed(() => {
+    const selectedDate = uiState.salesStatsDateFilter;
+    const selectedModel = uiState.salesStatsModelFilter;
+    const selectedChannel = uiState.salesStatsChannelFilter;
+
+    const modelMap = {};
+    const colorMap = {};
+    const sizeMap = {};
+    const channelMap = {};
+    const productMap = {};
+
+    let totalOrder = 0;
+    let totalQty = 0;
+    let totalOmset = 0;
+    let totalHpp = 0;
+
+    const toDate = (value) => {
+        if (!value) return null;
+        const date = value?.toDate
+            ? value.toDate()
+            : value?.seconds
+                ? new Date(value.seconds * 1000)
+                : new Date(value);
+
+        return isNaN(date.getTime()) ? null : date;
+    };
+
+    const isDateIncluded = (dateValue) => {
+        if (selectedDate === 'all_time') return true;
+
+        const date = toDate(dateValue);
+        if (!date) return false;
+
+        const now = new Date();
+
+        const startToday = new Date();
+        startToday.setHours(0, 0, 0, 0);
+
+        const endToday = new Date();
+        endToday.setHours(23, 59, 59, 999);
+
+        if (selectedDate === 'today') {
+            return date >= startToday && date <= endToday;
+        }
+
+        if (selectedDate === 'last_7_days') {
+            const start = new Date();
+            start.setDate(now.getDate() - 7);
+            start.setHours(0, 0, 0, 0);
+            return date >= start && date <= now;
+        }
+
+        if (selectedDate === 'last_30_days') {
+            const start = new Date();
+            start.setDate(now.getDate() - 30);
+            start.setHours(0, 0, 0, 0);
+            return date >= start && date <= now;
+        }
+
+        if (selectedDate === 'this_month') {
+            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        }
+
+        return true;
+    };
+
+    (state.transaksi || []).forEach(trx => {
+        if (!isDateIncluded(trx.tanggal)) return;
+
+        const channelName = trx.channel || trx.channelId || 'Tanpa Channel';
+
+        if (selectedChannel !== 'all' && channelName !== selectedChannel) {
+            return;
+        }
+
+        let trxIncluded = false;
+
+        (trx.items || []).forEach(item => {
+            const qty = Number(item.qty) || 0;
+            if (qty <= 0) return;
+
+            const productData = (state.produk || []).find(p =>
+                p.sku === item.sku ||
+                p.docId === item.product_id ||
+                p.id === item.product_id
+            );
+
+            const masterModel = (state.settings.modelProduk || []).find(m =>
+                m.id === productData?.model_id ||
+                m.id === productData?.modelId ||
+                m.id === item.modelProdukId ||
+                m.id === item.model_id
+            );
+
+            const modelName =
+                item.modelName ||
+                masterModel?.namaModel ||
+                productData?.nama ||
+                productData?.product_name ||
+                'Tanpa Model';
+
+            if (selectedModel !== 'all' && modelName !== selectedModel) {
+                return;
+            }
+
+            trxIncluded = true;
+
+            const colorName =
+                item.warna ||
+                item.color ||
+                productData?.warna ||
+                productData?.color ||
+                'Tanpa Warna';
+
+            const sizeName =
+                item.varian ||
+                item.size ||
+                item.ukuran ||
+                productData?.varian ||
+                productData?.variant ||
+                productData?.ukuran ||
+                'Tanpa Ukuran';
+
+            const productName =
+                productData?.nama ||
+                productData?.product_name ||
+                modelName;
+
+            const sku = item.sku || productData?.sku || '-';
+
+            const hargaJual = Number(item.hargaJual || item.price || item.harga || 0);
+            const hpp = Number(item.hpp || productData?.hpp || 0);
+
+            const itemOmset = hargaJual * qty;
+            const itemHpp = hpp * qty;
+            const itemProfit = itemOmset - itemHpp;
+
+            totalQty += qty;
+            totalOmset += itemOmset;
+            totalHpp += itemHpp;
+
+            if (!modelMap[modelName]) {
+                modelMap[modelName] = { name: modelName, qty: 0, omset: 0, profit: 0 };
+            }
+
+            if (!colorMap[colorName]) {
+                colorMap[colorName] = { name: colorName, qty: 0, omset: 0 };
+            }
+
+            if (!sizeMap[sizeName]) {
+                sizeMap[sizeName] = { name: sizeName, qty: 0, omset: 0 };
+            }
+
+            if (!channelMap[channelName]) {
+                channelMap[channelName] = { name: channelName, qty: 0, omset: 0, order: 0 };
+            }
+
+            if (!productMap[sku]) {
+                productMap[sku] = {
+                    sku,
+                    name: productName,
+                    model: modelName,
+                    color: colorName,
+                    size: sizeName,
+                    qty: 0,
+                    omset: 0,
+                    hpp: 0,
+                    profit: 0
+                };
+            }
+
+            modelMap[modelName].qty += qty;
+            modelMap[modelName].omset += itemOmset;
+            modelMap[modelName].profit += itemProfit;
+
+            colorMap[colorName].qty += qty;
+            colorMap[colorName].omset += itemOmset;
+
+            sizeMap[sizeName].qty += qty;
+            sizeMap[sizeName].omset += itemOmset;
+
+            channelMap[channelName].qty += qty;
+            channelMap[channelName].omset += itemOmset;
+
+            productMap[sku].qty += qty;
+            productMap[sku].omset += itemOmset;
+            productMap[sku].hpp += itemHpp;
+            productMap[sku].profit += itemProfit;
+        });
+
+        if (trxIncluded) {
+            totalOrder += 1;
+            if (channelMap[channelName]) {
+                channelMap[channelName].order += 1;
+            }
+        }
+    });
+
+    const sortByQty = (data) => Object.values(data).sort((a, b) => b.qty - a.qty);
+    const sortByOmset = (data) => Object.values(data).sort((a, b) => b.omset - a.omset);
+
+    const grossProfit = totalOmset - totalHpp;
+
+    return {
+        totalOrder,
+        totalQty,
+        totalOmset,
+        totalHpp,
+        grossProfit,
+        averageOrderValue: totalOrder > 0 ? totalOmset / totalOrder : 0,
+
+        topModels: sortByQty(modelMap).slice(0, 10),
+        topColors: sortByQty(colorMap).slice(0, 10),
+        topSizes: sortByQty(sizeMap).slice(0, 10),
+        topChannels: sortByOmset(channelMap).slice(0, 10),
+        topProducts: sortByOmset(productMap).slice(0, 20)
     };
 });
 
@@ -9735,6 +9960,7 @@ watch(activePage, (newPage, oldPage) => {
     <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Proses Massal</a>
     <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">Cek Pencairan Dana</a>
     <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
+    <a href="#" @click.prevent="changePage('statistik-penjualan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'statistik-penjualan' }">Statistik Penjualan</a>
 </div>
 
 <button type="button" @click="toggleSidebarGroup('produk')" class="w-full sidebar-link justify-between">
@@ -10003,7 +10229,7 @@ watch(activePage, (newPage, oldPage) => {
 </div>
 
     <!-- STATISTIK PENJUALAN PREMIUM -->
-<div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+<div v-if="false" class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
 
     <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5 mb-6">
         <div>
@@ -12879,6 +13105,177 @@ SKU-BAJU-PUTIH-S"
         </div>
     </div>
   </div>
+</div>
+
+<div v-if="activePage === 'statistik-penjualan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <div class="bg-white/90 backdrop-blur-sm rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                <div>
+                    <p class="text-sm text-slate-500">Analisis performa produk</p>
+                    <h2 class="text-3xl font-bold text-slate-800 mt-1">Statistik Penjualan</h2>
+                    <p class="text-slate-500 mt-2 max-w-2xl">
+                        Pantau produk, model, warna, ukuran, dan channel yang paling berkontribusi terhadap penjualan.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-[720px]">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Periode</label>
+                        <select v-model="uiState.salesStatsDateFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                            <option value="all_time">Semua</option>
+                            <option value="today">Hari Ini</option>
+                            <option value="last_7_days">7 Hari Terakhir</option>
+                            <option value="last_30_days">30 Hari Terakhir</option>
+                            <option value="this_month">Bulan Ini</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Model</label>
+                        <select v-model="uiState.salesStatsModelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                            <option value="all">Semua Model</option>
+                            <option
+                                v-for="model in uniqueRoasModels"
+                                :key="model.namaModel"
+                                :value="model.namaModel"
+                            >
+                                {{ model.namaModel }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">Channel</label>
+                        <select v-model="uiState.salesStatsChannelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                            <option value="all">Semua Channel</option>
+                            <option
+                                v-for="channel in state.settings.marketplaces"
+                                :key="channel.id"
+                                :value="channel.name"
+                            >
+                                {{ channel.name }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Total Order</p>
+                <p class="text-3xl font-bold text-slate-800 mt-2">{{ formatNumber(salesPerformanceStats.totalOrder) }}</p>
+                <p class="text-xs text-slate-400 mt-2">Jumlah transaksi sesuai filter.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Total Produk Terjual</p>
+                <p class="text-3xl font-bold text-cyan-600 mt-2">{{ formatNumber(salesPerformanceStats.totalQty) }} pcs</p>
+                <p class="text-xs text-slate-400 mt-2">Total qty produk yang terjual.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Total Omset</p>
+                <p class="text-3xl font-bold text-blue-600 mt-2">{{ formatCurrency(salesPerformanceStats.totalOmset) }}</p>
+                <p class="text-xs text-slate-400 mt-2">Perkiraan omset dari item terjual.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Estimasi Laba Kotor</p>
+                <p class="text-3xl font-bold mt-2" :class="salesPerformanceStats.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'">
+                    {{ formatCurrency(salesPerformanceStats.grossProfit) }}
+                </p>
+                <p class="text-xs text-slate-400 mt-2">Omset dikurangi HPP produk.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Model Terlaris</p>
+                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topModels[0]?.name || 'Belum ada data' }}</p>
+                <p class="text-sm text-slate-500 mt-2">
+                    {{ salesPerformanceStats.topModels[0] ? formatNumber(salesPerformanceStats.topModels[0].qty) + ' pcs terjual' : '-' }}
+                </p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Warna Terlaris</p>
+                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topColors[0]?.name || 'Belum ada data' }}</p>
+                <p class="text-sm text-slate-500 mt-2">
+                    {{ salesPerformanceStats.topColors[0] ? formatNumber(salesPerformanceStats.topColors[0].qty) + ' pcs terjual' : '-' }}
+                </p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Ukuran Terlaris</p>
+                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topSizes[0]?.name || 'Belum ada data' }}</p>
+                <p class="text-sm text-slate-500 mt-2">
+                    {{ salesPerformanceStats.topSizes[0] ? formatNumber(salesPerformanceStats.topSizes[0].qty) + ' pcs terjual' : '-' }}
+                </p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Channel Terbaik</p>
+                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topChannels[0]?.name || 'Belum ada data' }}</p>
+                <p class="text-sm text-slate-500 mt-2">
+                    {{ salesPerformanceStats.topChannels[0] ? formatCurrency(salesPerformanceStats.topChannels[0].omset) : '-' }}
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="flex items-center justify-between gap-4 mb-5">
+                <div>
+                    <p class="text-sm text-slate-500">Ranking produk</p>
+                    <h3 class="text-xl font-bold text-slate-800">Performa Produk per SKU</h3>
+                </div>
+                <p class="text-sm text-slate-400">Top 20 berdasarkan omset</p>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-left">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">Produk</th>
+                            <th class="px-4 py-3 font-semibold">SKU</th>
+                            <th class="px-4 py-3 font-semibold">Model</th>
+                            <th class="px-4 py-3 font-semibold">Warna</th>
+                            <th class="px-4 py-3 font-semibold">Ukuran</th>
+                            <th class="px-4 py-3 font-semibold text-right">Qty</th>
+                            <th class="px-4 py-3 font-semibold text-right">Omset</th>
+                            <th class="px-4 py-3 font-semibold text-right">HPP</th>
+                            <th class="px-4 py-3 font-semibold text-right">Laba Kotor</th>
+                        </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-slate-100">
+                        <tr v-if="salesPerformanceStats.topProducts.length === 0">
+                            <td colspan="9" class="px-4 py-6 text-center text-slate-500">
+                                Belum ada data penjualan untuk filter ini.
+                            </td>
+                        </tr>
+
+                        <tr v-for="item in salesPerformanceStats.topProducts" :key="item.sku" class="hover:bg-slate-50">
+                            <td class="px-4 py-3 font-semibold text-slate-800">{{ item.name }}</td>
+                            <td class="px-4 py-3 text-blue-600 font-mono">{{ item.sku }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ item.model }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ item.color }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ item.size }}</td>
+                            <td class="px-4 py-3 text-right font-bold">{{ formatNumber(item.qty) }}</td>
+                            <td class="px-4 py-3 text-right font-bold text-blue-600">{{ formatCurrency(item.omset) }}</td>
+                            <td class="px-4 py-3 text-right text-orange-600">{{ formatCurrency(item.hpp) }}</td>
+                            <td class="px-4 py-3 text-right font-bold" :class="item.profit >= 0 ? 'text-green-600' : 'text-red-600'">
+                                {{ formatCurrency(item.profit) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
 </div>
 
 <div v-if="activePage === 'pengaturan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
