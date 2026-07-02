@@ -78,7 +78,7 @@ const state = reactive({
     voucherNotes: [],
     investor: [],
     bankAccounts: [],
-    // --- END: KODE BARU UNTUK STOK KAIN ---
+    // --- END: KODE BARU UNTUKK STOK KAIN ---
     transactionCounter: 0,
     pinProtection: {
             dashboard: true,
