@@ -3855,7 +3855,28 @@ const dashboardKpis = computed(() => {
     let danaBelumCair = 0;
     let qtyBelumCair = 0;
 
+const transaksiCairKeys = new Set();
+
+(transaksi || []).forEach(trx => {
+    if (trx.statusPencairan === 'Sudah Cair') {
+        if (trx.id) transaksiCairKeys.add(String(trx.id).toLowerCase());
+        if (trx.marketplaceOrderId) transaksiCairKeys.add(String(trx.marketplaceOrderId).toLowerCase());
+    }
+});
+
     (transaksi || []).forEach(trx => {
+        const returKeys = [
+    r.originalTransactionId,
+    r.marketplaceOrderId
+]
+    .filter(Boolean)
+    .map(key => String(key).toLowerCase());
+
+const returPunyaTransaksiAsal = returKeys.some(key => transaksiCairKeys.has(key));
+
+if (!returPunyaTransaksiAsal) {
+    return;
+}
         const totalHppTrx = (trx.items || []).reduce((sum, item) => {
             return sum + ((Number(item.hpp) || 0) * (Number(item.qty) || 0));
         }, 0);
@@ -3925,15 +3946,16 @@ const dashboardKpis = computed(() => {
     kpis.labaKotor = kpis.omsetBersih - kpis.totalHppTerjual;
     kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
 
-    // SALDO KAS BERJALAN
-    // Ini tidak mengikuti filter waktu dashboard.
-    // Tujuannya agar saldo kas tetap menampilkan posisi kas bisnis saat ini.
+        // SALDO KAS BERJALAN
+    // Saldo Kas Berjalan tidak mengikuti filter waktu dashboard.
+    // Angka ini dihitung dari semua transaksi yang sudah cair + pemasukan lain - pengeluaran kas.
+    // Retur hanya dihitung jika transaksi asalnya masih ada, supaya retur yatim tidak membuat saldo kas ngaco.
+
     let saldoOmsetKotorAllTime = 0;
     let saldoDiskonAllTime = 0;
     let saldoBiayaTransaksiAllTime = 0;
-    let saldoNilaiReturGrossAllTime = 0;
-    let saldoDiskonBatalAllTime = 0;
-    let saldoBiayaMarketplaceBatalAllTime = 0;
+
+    const saldoTransaksiCairKeys = new Set();
 
     (state.transaksi || []).forEach(trx => {
         if (trx.statusPencairan !== 'Sudah Cair') return;
@@ -3941,9 +3963,36 @@ const dashboardKpis = computed(() => {
         saldoOmsetKotorAllTime += Number(trx.subtotal) || 0;
         saldoDiskonAllTime += Number(trx.diskon?.totalDiscount) || 0;
         saldoBiayaTransaksiAllTime += Number(trx.biaya?.total) || 0;
+
+        if (trx.id) saldoTransaksiCairKeys.add(String(trx.id).toLowerCase());
+        if (trx.marketplaceOrderId) saldoTransaksiCairKeys.add(String(trx.marketplaceOrderId).toLowerCase());
+        if (trx.orderId) saldoTransaksiCairKeys.add(String(trx.orderId).toLowerCase());
+        if (trx.idPesanan) saldoTransaksiCairKeys.add(String(trx.idPesanan).toLowerCase());
+        if (trx.nomorPesanan) saldoTransaksiCairKeys.add(String(trx.nomorPesanan).toLowerCase());
     });
 
+    let saldoNilaiReturGrossAllTime = 0;
+    let saldoDiskonBatalAllTime = 0;
+    let saldoBiayaMarketplaceBatalAllTime = 0;
+
     (state.retur || []).forEach(r => {
+        const returKeys = [
+            r.originalTransactionId,
+            r.transactionId,
+            r.marketplaceOrderId,
+            r.orderId,
+            r.idPesanan,
+            r.nomorPesanan
+        ]
+            .filter(Boolean)
+            .map(key => String(key).toLowerCase());
+
+        const returPunyaTransaksiAsal = returKeys.some(key => saldoTransaksiCairKeys.has(key));
+
+        if (!returPunyaTransaksiAsal) {
+            return;
+        }
+
         (r.items || []).forEach(item => {
             saldoNilaiReturGrossAllTime += (Number(item.nilaiRetur) || 0) + (Number(item.nilaiDiskon) || 0);
             saldoDiskonBatalAllTime += Number(item.nilaiDiskon) || 0;
@@ -3952,8 +4001,8 @@ const dashboardKpis = computed(() => {
     });
 
     const saldoOmsetBersihAllTime =
-        (saldoOmsetKotorAllTime - saldoNilaiReturGrossAllTime) -
-        (saldoDiskonAllTime - saldoDiskonBatalAllTime);
+        (saldoOmsetKotorAllTime - saldoNilaiReturGrossAllTime)
+        - (saldoDiskonAllTime - saldoDiskonBatalAllTime);
 
     const saldoBiayaTransaksiFinalAllTime =
         saldoBiayaTransaksiAllTime - saldoBiayaMarketplaceBatalAllTime;
@@ -3967,8 +4016,8 @@ const dashboardKpis = computed(() => {
         .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
 
     kpis.saldoKas =
-        (saldoOmsetBersihAllTime + saldoPemasukanLainAllTime) -
-        (saldoBiayaTransaksiFinalAllTime + saldoPengeluaranKasAllTime);
+        (saldoOmsetBersihAllTime + saldoPemasukanLainAllTime)
+        - (saldoBiayaTransaksiFinalAllTime + saldoPengeluaranKasAllTime);
 
     kpis.totalUnitStok = (state.produk || [])
         .reduce((sum, p) => sum + (Number(p.stokFisik) || 0), 0);
@@ -7463,62 +7512,51 @@ function exportKeuangan(type) {
 // FUNGSI HAPUS RETUR (SEKARANG LEBIH SEDERHANA)
 
 async function deleteReturnItem(itemToDelete) {
-    if (!confirm(`Anda yakin ingin menghapus item retur ini? Stok akan disesuaikan kembali.`)) {
+    if (!confirm(
+        "Yakin ingin menghapus data retur ini?\n\nCatatan: penghapusan ini hanya menghapus riwayat retur. Stok inventaris tidak akan berubah."
+    )) {
         return;
     }
 
     try {
         const returnDocRef = doc(db, "returns", itemToDelete.returnDocId);
-        const productInState = state.produk.find(p => p.sku === itemToDelete.sku);
-        if (!productInState) {
-            throw new Error(`Produk dengan SKU ${itemToDelete.sku} tidak ditemukan di inventaris.`);
+
+        const returnSnap = await getDoc(returnDocRef);
+
+        if (!returnSnap.exists()) {
+            throw new Error("Data retur tidak ditemukan.");
         }
-        const productRef = doc(db, "products", productInState.docId);
-        const allocationRef = doc(db, "stock_allocations", productInState.docId);
 
-        await runTransaction(db, async (transaction) => {
-            const returnDoc = await transaction.get(returnDocRef);
-            const productDoc = await transaction.get(productRef);
-            const allocationDoc = await transaction.get(allocationRef);
+        const returnData = returnSnap.data();
+        const oldItems = returnData.items || [];
 
-            if (!returnDoc.exists() || !productDoc.exists() || !allocationDoc.exists()) {
-                throw new Error("Salah satu dokumen (retur, produk, atau alokasi) tidak ditemukan.");
-            }
-
-            const currentStock = productDoc.data().physical_stock || 0;
-            const newStock = currentStock - itemToDelete.qty;
-            const currentAllocations = allocationDoc.data() || {};
-            const newChannelStock = (currentAllocations[itemToDelete.channelId] || 0) - itemToDelete.qty;
-
-            if (newStock < 0 || newChannelStock < 0) {
-                throw new Error(`Gagal menghapus retur karena akan membuat stok produk (${itemToDelete.sku}) menjadi minus.`);
-            }
-
-            transaction.update(productRef, { physical_stock: newStock });
-            const updatedAllocations = { ...currentAllocations, [itemToDelete.channelId]: newChannelStock };
-            transaction.set(allocationRef, updatedAllocations, { merge: true });
-
-            const newItems = (returnDoc.data().items || []).filter(item => 
-                !(item.sku === itemToDelete.sku && item.alasan === itemToDelete.alasan && item.tindakLanjut === itemToDelete.tindakLanjut)
+        const newItems = oldItems.filter(item => {
+            return !(
+                item.sku === itemToDelete.sku &&
+                item.qty === itemToDelete.qty &&
+                item.alasan === itemToDelete.alasan
             );
-
-            if (newItems.length === 0) {
-                transaction.delete(returnDocRef);
-            } else {
-                transaction.update(returnDocRef, { items: newItems });
-            }
         });
 
-        // Perbarui state lokal secara langsung
-        productInState.stokFisik -= itemToDelete.qty;
-        productInState.stokAlokasi[itemToDelete.channelId] -= itemToDelete.qty;
-        state.retur = state.retur.filter(r => r.id !== itemToDelete.returnDocId || (r.id === itemToDelete.returnDocId && r.items.length > 1));
+        if (newItems.length === 0) {
+            await deleteDoc(returnDocRef);
+            state.retur = state.retur.filter(r => r.id !== itemToDelete.returnDocId);
+        } else {
+            await updateDoc(returnDocRef, {
+                items: newItems
+            });
 
-        alert('Item retur berhasil dihapus dan stok inventaris telah disesuaikan.');
+            const returInState = state.retur.find(r => r.id === itemToDelete.returnDocId);
+            if (returInState) {
+                returInState.items = newItems;
+            }
+        }
+
+        alert("Data retur berhasil dihapus. Stok inventaris tidak berubah.");
 
     } catch (error) {
-        console.error("Error menghapus item retur:", error);
-        alert(`Gagal menghapus item retur: ${error.message}`);
+        console.error("Gagal menghapus data retur:", error);
+        alert("Gagal menghapus data retur: " + error.message);
     }
 }
 
