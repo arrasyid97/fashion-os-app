@@ -3907,9 +3907,7 @@ const dashboardKpis = computed(() => {
         .filter(k => k.jenis === 'pemasukan_lain')
         .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
 
-    const totalPengeluaranKas = (keuangan || [])
-        .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
-        .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+    
 
     kpis.totalBiayaOperasional = (keuangan || [])
         .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
