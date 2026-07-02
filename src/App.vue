@@ -3865,18 +3865,7 @@ const transaksiCairKeys = new Set();
 });
 
     (transaksi || []).forEach(trx => {
-        const returKeys = [
-    r.originalTransactionId,
-    r.marketplaceOrderId
-]
-    .filter(Boolean)
-    .map(key => String(key).toLowerCase());
-
-const returPunyaTransaksiAsal = returKeys.some(key => transaksiCairKeys.has(key));
-
-if (!returPunyaTransaksiAsal) {
-    return;
-}
+        
         const totalHppTrx = (trx.items || []).reduce((sum, item) => {
             return sum + ((Number(item.hpp) || 0) * (Number(item.qty) || 0));
         }, 0);
@@ -3911,18 +3900,35 @@ if (!returPunyaTransaksiAsal) {
     let biayaMarketplaceBatal = 0;
 
     (retur || []).forEach(r => {
-        (r.items || []).forEach(item => {
-            totalNilaiReturGross += (Number(item.nilaiRetur) || 0) + (Number(item.nilaiDiskon) || 0);
-            totalDiskonBatal += Number(item.nilaiDiskon) || 0;
-            biayaMarketplaceBatal += Number(item.biayaMarketplace) || 0;
+    const returKeys = [
+        r.originalTransactionId,
+        r.transactionId,
+        r.marketplaceOrderId,
+        r.orderId,
+        r.idPesanan,
+        r.nomorPesanan
+    ]
+        .filter(Boolean)
+        .map(key => String(key).toLowerCase());
 
-            const product = getProductBySku(item.sku);
+    const returPunyaTransaksiAsal = returKeys.some(key => transaksiCairKeys.has(key));
 
-            if (product) {
-                totalHppRetur += (Number(product.hpp) || 0) * (Number(item.qty) || 0);
-            }
-        });
+    if (!returPunyaTransaksiAsal) {
+        return;
+    }
+
+    (r.items || []).forEach(item => {
+        totalNilaiReturGross += (Number(item.nilaiRetur) || 0) + (Number(item.nilaiDiskon) || 0);
+        totalDiskonBatal += Number(item.nilaiDiskon) || 0;
+        biayaMarketplaceBatal += Number(item.biayaMarketplace) || 0;
+
+        const product = getProductBySku(item.sku);
+
+        if (product) {
+            totalHppRetur += (Number(product.hpp) || 0) * (Number(item.qty) || 0);
+        }
     });
+});
 
     const pemasukanLain = (keuangan || [])
         .filter(k => k.jenis === 'pemasukan_lain')
