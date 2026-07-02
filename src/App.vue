@@ -3123,7 +3123,7 @@ async function handleRegister() {
             trialEndDate: null,
             dashboardPin: authForm.dashboardPin || null,
             
-            // --- BARIS BARU UNTUK PROGRAM KEMITRAAN ---
+            // --- BARISS BARU UNTUK PROGRAM KEMITRAAN ---
             isPartner: false, // Default: pengguna baru bukan mitra
             referralCode: null,
             referredBy: authForm.referredBy || null // <-- Ambil kode rujukan dari form jika ada
