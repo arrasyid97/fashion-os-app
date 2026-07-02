@@ -78,6 +78,7 @@ const state = reactive({
     voucherNotes: [],
     investor: [],
     bankAccounts: [],
+    auditLogs: [],
     // --- END: KODE BARU UNTUKK STOK KAIN ---
     transactionCounter: 0,
     pinProtection: {
@@ -115,6 +116,8 @@ massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     salesStatsDateFilter: 'all_time',
     salesStatsModelFilter: 'all',
     salesStatsChannelFilter: 'all',
+    auditLogFilter: 'all',
+    auditLogSearch: '',
     dashboardStartDate: '',
     dashboardEndDate: '',
     dashboardStartMonth: new Date().getMonth() + 1,
@@ -578,6 +581,9 @@ const loadDataForPage = async (pageName) => {
       await fetchInvestorsAndBanksData(userId);
       break;
     // --- TAMBAHKAN KODE DI BAWAH INI ---
+    case 'riwayat-aktivitas':
+    dataPromises.push(fetchAuditLogs(userId));
+    break;
     case 'pengaturan':
       // Kita panggil fungsi ini karena data Bank ada di dalamnya
       await fetchInvestorsAndBanksData(userId); 
@@ -737,6 +743,116 @@ async function writeAuditLog(action, entityType, entityId, details = {}) {
     } catch (error) {
         console.error("Gagal mencatat audit log:", error);
     }
+}
+
+async function fetchAuditLogs(userId) {
+    if (!userId) return;
+
+    try {
+        const q = query(
+            collection(db, "audit_logs"),
+            where("userId", "==", userId),
+            limit(100)
+        );
+
+        const snapshot = await getDocs(q);
+
+        state.auditLogs = snapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+
+            return {
+                id: docSnap.id,
+                ...data,
+                createdAt: data.createdAt?.toDate
+                    ? data.createdAt.toDate()
+                    : (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000) : new Date(data.createdAt))
+            };
+        }).sort((a, b) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+
+    } catch (error) {
+        console.error("Gagal mengambil riwayat aktivitas:", error);
+        state.auditLogs = [];
+    }
+}
+
+const filteredAuditLogs = computed(() => {
+    let logs = state.auditLogs || [];
+
+    if (uiState.auditLogFilter !== 'all') {
+        logs = logs.filter(log => log.action === uiState.auditLogFilter);
+    }
+
+    const search = (uiState.auditLogSearch || '').toLowerCase().trim();
+
+    if (search) {
+        logs = logs.filter(log => {
+            return (
+                String(log.userEmail || '').toLowerCase().includes(search) ||
+                String(log.action || '').toLowerCase().includes(search) ||
+                String(log.entityType || '').toLowerCase().includes(search) ||
+                String(log.entityId || '').toLowerCase().includes(search) ||
+                String(log.details?.sku || '').toLowerCase().includes(search) ||
+                String(log.details?.alasan || '').toLowerCase().includes(search)
+            );
+        });
+    }
+
+    return logs;
+});
+
+function formatAuditDate(value) {
+    if (!value) return '-';
+
+    const date = value instanceof Date ? value : new Date(value);
+
+    if (isNaN(date.getTime())) return '-';
+
+    return date.toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function getAuditActionLabel(action) {
+    const labels = {
+        delete_return_item: 'Hapus Item Retur',
+        update_return_item: 'Ubah Retur',
+        delete_transaction: 'Hapus Transaksi',
+        update_transaction: 'Ubah Transaksi',
+        update_stock: 'Ubah Stok',
+        update_hpp: 'Ubah HPP'
+    };
+
+    return labels[action] || action || 'Aktivitas';
+}
+
+function getAuditActionBadgeClass(action) {
+    if (String(action || '').includes('delete')) {
+        return 'bg-red-100 text-red-700';
+    }
+
+    if (String(action || '').includes('update')) {
+        return 'bg-blue-100 text-blue-700';
+    }
+
+    return 'bg-slate-100 text-slate-700';
+}
+
+function getAuditDetailsText(log) {
+    const details = log.details || {};
+
+    if (log.action === 'delete_return_item') {
+        return `SKU: ${details.sku || '-'} | Qty: ${details.qty || '-'} | Alasan: ${details.alasan || '-'}`;
+    }
+
+    return Object.keys(details).length > 0
+        ? JSON.stringify(details)
+        : 'Tidak ada detail tambahan.';
 }
 
 const getExpenseTypeByCategory = (kategori) => {
@@ -10209,6 +10325,7 @@ watch(activePage, (newPage, oldPage) => {
 
     <div v-show="uiState.sidebarGroups.sistem" class="ml-4 space-y-1">
         <a v-if="userProfile.data?.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">Dashboard Mitra</a>
+        <a href="#" @click.prevent="changePage('riwayat-aktivitas')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'riwayat-aktivitas' }">Riwayat Aktivitas</a>
         <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'pengaturan' }">Pengaturan</a>
     </div>
 
@@ -13541,6 +13658,138 @@ SKU-BAJU-PUTIH-S"
                     </tbody>
                 </table>
             </div>
+        </div>
+
+    </div>
+</div>
+
+<div v-if="activePage === 'riwayat-aktivitas'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                <div>
+                    <p class="text-sm text-slate-500">Sistem</p>
+                    <h2 class="text-3xl font-bold text-slate-800 mt-1">Riwayat Aktivitas</h2>
+                    <p class="text-slate-500 mt-2 max-w-3xl">
+                        Halaman ini menampilkan aktivitas penting yang tercatat di sistem, seperti penghapusan retur,
+                        perubahan data penting, dan aktivitas lain yang perlu dipantau oleh owner.
+                    </p>
+                </div>
+
+                <button
+                    @click="fetchAuditLogs(currentUser.uid)"
+                    class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition"
+                >
+                    Refresh Data
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                    <p class="text-sm text-slate-500">Total Aktivitas</p>
+                    <p class="text-3xl font-bold text-slate-800 mt-2">{{ state.auditLogs.length }}</p>
+                    <p class="text-xs text-slate-400 mt-2">100 aktivitas terbaru.</p>
+                </div>
+
+                <div class="bg-red-50 border border-red-200 rounded-2xl p-5">
+                    <p class="text-sm text-red-600">Aktivitas Hapus</p>
+                    <p class="text-3xl font-bold text-red-700 mt-2">
+                        {{ state.auditLogs.filter(log => String(log.action || '').includes('delete')).length }}
+                    </p>
+                    <p class="text-xs text-red-500 mt-2">Aktivitas yang menghapus data.</p>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+                    <p class="text-sm text-blue-600">Aktivitas Ubah</p>
+                    <p class="text-3xl font-bold text-blue-700 mt-2">
+                        {{ state.auditLogs.filter(log => String(log.action || '').includes('update')).length }}
+                    </p>
+                    <p class="text-xs text-blue-500 mt-2">Aktivitas perubahan data.</p>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Cari Aktivitas</label>
+                    <input
+                        v-model="uiState.auditLogSearch"
+                        type="text"
+                        placeholder="Cari email, SKU, alasan, atau ID data..."
+                        class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white"
+                    >
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Filter Aktivitas</label>
+                    <select v-model="uiState.auditLogFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                        <option value="all">Semua Aktivitas</option>
+                        <option value="delete_return_item">Hapus Item Retur</option>
+                        <option value="update_return_item">Ubah Retur</option>
+                        <option value="delete_transaction">Hapus Transaksi</option>
+                        <option value="update_transaction">Ubah Transaksi</option>
+                        <option value="update_stock">Ubah Stok</option>
+                        <option value="update_hpp">Ubah HPP</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div v-if="filteredAuditLogs.length === 0" class="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl">
+                <p class="text-2xl">📭</p>
+                <h3 class="font-bold text-slate-700 mt-2">Belum ada riwayat aktivitas</h3>
+                <p class="text-slate-500 text-sm mt-1">
+                    Aktivitas baru akan muncul setelah sistem mencatat aksi seperti hapus retur.
+                </p>
+            </div>
+
+            <div v-else class="space-y-3">
+                <div
+                    v-for="log in filteredAuditLogs"
+                    :key="log.id"
+                    class="p-5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition"
+                >
+                    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+
+                        <div class="space-y-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span
+                                    class="text-xs font-bold px-3 py-1 rounded-full"
+                                    :class="getAuditActionBadgeClass(log.action)"
+                                >
+                                    {{ getAuditActionLabel(log.action) }}
+                                </span>
+
+                                <span class="text-xs text-slate-400">
+                                    {{ formatAuditDate(log.createdAt) }}
+                                </span>
+                            </div>
+
+                            <h3 class="font-bold text-slate-800">
+                                {{ log.entityType || 'Data' }} · {{ log.entityId || '-' }}
+                            </h3>
+
+                            <p class="text-sm text-slate-600">
+                                {{ getAuditDetailsText(log) }}
+                            </p>
+                        </div>
+
+                        <div class="text-sm text-slate-500 md:text-right">
+                            <p class="font-semibold text-slate-700">Dilakukan oleh:</p>
+                            <p>{{ log.userEmail || 'User' }}</p>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
         </div>
 
     </div>
