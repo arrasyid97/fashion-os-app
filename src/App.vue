@@ -517,34 +517,14 @@ const loadDataForPage = async (pageName) => {
 
         switch(pageName) {
             case 'dashboard': {
-                let startDate = new Date();
-                let endDate = new Date();
-                const now = new Date();
-                const isShortTermFilter = ['today', 'last_7_days', 'last_30_days'].includes(uiState.dashboardDateFilter);
-
-                if (isShortTermFilter) {
-                    if (uiState.dashboardDateFilter === 'today') {
-                        startDate.setHours(0, 0, 0, 0);
-                        endDate.setHours(23, 59, 59, 999);
-                    } else if (uiState.dashboardDateFilter === 'last_7_days') {
-                        startDate.setDate(now.getDate() - 7);
-                        startDate.setHours(0, 0, 0, 0);
-                    } else if (uiState.dashboardDateFilter === 'last_30_days') {
-                        startDate.setDate(now.getDate() - 30);
-                        startDate.setHours(0, 0, 0, 0);
-                    }
-                    dataPromises.push(fetchTransactionAndReturnData(userId, false, startDate, endDate));
-                    dataPromises.push(fetchKeuanganData());
-                } else {
-                    dataPromises.push(fetchTransactionAndReturnData(userId));
-                    dataPromises.push(fetchKeuanganData());
-                }
-
-                dataPromises.push(fetchSummaryData(userId));
-                // Memuat SEMUA data produk agar kalkulasi KPI di dashboard akurat saat refresh
-                dataPromises.push(fetchAllProductData(userId)); 
-                break;
-            }
+    // Dashboard KPI final harus mengambil semua transaksi dan semua data keuangan
+    // agar filter Hari Ini, Semua, dan rentang waktu bisa dihitung ulang secara akurat dari data mentah.
+    dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
+    dataPromises.push(fetchKeuanganData());
+    dataPromises.push(fetchSummaryData(userId));
+    dataPromises.push(fetchAllProductData(userId));
+    break;
+}
             
             case 'transaksi':
             case 'bulk_process':
@@ -3711,22 +3691,47 @@ return {
 });
 
 const dashboardFilteredData = computed(() => {
-    // Memastikan konversi ke objek Date agar filter berfungsi dengan benar
-    const mapToDateObject = (dataArray) => {
-        return (dataArray || []).map(item => {
-            const itemDate = (item.tanggal && item.tanggal.toDate) ? item.tanggal.toDate() : (item.tanggal instanceof Date ? item.tanggal : new Date(item.tanggal));
-            return { ...item, tanggal: itemDate };
-        });
+    const toSafeDate = (value) => {
+        if (!value) return null;
+
+        const d = value?.toDate
+            ? value.toDate()
+            : (value?.seconds ? new Date(value.seconds * 1000) : new Date(value));
+
+        return isNaN(d.getTime()) ? null : d;
     };
 
-    // Menggunakan mapToDateObject untuk memastikan semua tanggal valid
+    const mapToDateObject = (dataArray, type = 'default') => {
+        return (dataArray || [])
+            .map(item => {
+                const tanggalTransaksi = toSafeDate(item.tanggal);
+                const tanggalPencairan = toSafeDate(item.tanggalPencairan);
+
+                let tanggalUntukFilter = tanggalTransaksi;
+
+                // Untuk Dashboard Dana Cair:
+                // Kalau transaksi sudah cair, filter waktunya pakai tanggal dana cair.
+                if (type === 'transaksi' && item.statusPencairan === 'Sudah Cair') {
+                    tanggalUntukFilter = tanggalPencairan || tanggalTransaksi;
+                }
+
+                return {
+                    ...item,
+                    tanggal: tanggalUntukFilter,
+                    tanggalTransaksi,
+                    tanggalPencairan
+                };
+            })
+            .filter(item => item.tanggal);
+    };
+
     const keuanganData = mapToDateObject(state.keuangan);
-    const transaksiData = mapToDateObject(state.transaksi);
+    const transaksiData = mapToDateObject(state.transaksi, 'transaksi');
     const returData = mapToDateObject(state.retur);
 
     const filterOptions = [
-        uiState.dashboardDateFilter, 
-        uiState.dashboardStartDate, 
+        uiState.dashboardDateFilter,
+        uiState.dashboardStartDate,
         uiState.dashboardEndDate,
         uiState.dashboardStartMonth,
         uiState.dashboardStartYear,
@@ -3734,14 +3739,10 @@ const dashboardFilteredData = computed(() => {
         uiState.dashboardEndYear
     ];
 
-    const filteredKeuangan = filterDataByDate(keuanganData, ...filterOptions);
-    const filteredTransaksi = filterDataByDate(transaksiData, ...filterOptions);
-    const filteredRetur = filterDataByDate(returData, ...filterOptions);
-
     return {
-        transaksi: filteredTransaksi,
-        keuangan: filteredKeuangan,
-        retur: filteredRetur
+        transaksi: filterDataByDate(transaksiData, ...filterOptions),
+        keuangan: filterDataByDate(keuanganData, ...filterOptions),
+        retur: filterDataByDate(returData, ...filterOptions)
     };
 });
 
@@ -3827,225 +3828,155 @@ const investorLedger = computed(() => {
 
 // GANTI SELURUH COMPUTED PROPERTY INI
 const dashboardKpis = computed(() => {
-    const isLongTermFilter = ['by_month_range', 'this_year', 'all_time', 'by_year_range'].includes(uiState.dashboardDateFilter);
-
     let kpis = {
-        saldoKas: 0, 
-        omsetBersih: 0, 
-        labaKotor: 0, 
-        labaBersih: 0, 
+        saldoKas: 0,
+        omsetBersih: 0,
+        labaKotor: 0,
+        labaBersih: 0,
         omsetKotor: 0,
-        totalDiskon: 0, 
-        totalHppTerjual: 0, 
+        totalDiskon: 0,
+        totalHppTerjual: 0,
         totalBiayaTransaksi: 0,
-        totalBiayaOperasional: 0, 
+        totalBiayaOperasional: 0,
         totalNilaiRetur: 0,
         pemasukanLain: 0,
-        danaBelumCair: 0, // Nilai payout (HPP + Laba Bersih)
-        qtyBelumCair: 0  // Total QTY barang gantung
+        danaBelumCair: 0,
+        qtyBelumCair: 0,
+        totalUnitStok: 0,
+        totalNilaiStokHPP: 0
     };
 
-    if (isLongTermFilter && state.summaryData && Object.keys(state.summaryData).length > 0) {
-        // --- LOGIKA JANGKA PANJANG (Data dari Cloud Functions) ---
-        const processSummary = (summary) => {
-            if (!summary) return;
-            kpis.omsetKotor += summary.omsetKotor || 0;
-            kpis.totalDiskon += summary.totalDiskon || 0;
-            kpis.omsetBersih += summary.omsetBersih || 0;
-            kpis.totalHppTerjual += summary.hppTerjual || 0;
-            kpis.labaKotor += summary.labaKotor || 0;
-            kpis.totalBiayaTransaksi += summary.biayaTransaksi || 0;
-            kpis.totalBiayaOperasional += summary.biayaOperasional || 0;
-            kpis.labaBersih += summary.labaBersihOperasional || 0;
-            kpis.totalNilaiRetur += summary.nilaiRetur || 0;
-            kpis.pemasukanLain += summary.pemasukanLain || 0;
-        };
+    const { transaksi, keuangan, retur } = dashboardFilteredData.value;
 
-        if (uiState.dashboardDateFilter === 'by_month_range') {
-            for (let y = uiState.dashboardStartYear; y <= uiState.dashboardEndYear; y++) {
-                const startMonth = (y === uiState.dashboardStartYear) ? uiState.dashboardStartMonth : 1;
-                const endMonth = (y === uiState.dashboardEndYear) ? uiState.dashboardEndMonth : 12;
-                for (let m = startMonth; m <= endMonth; m++) {
-                    const monthStr = m.toString().padStart(2, '0');
-                    const summary = state.summaryData?.[`summary_${y}`]?.months?.[monthStr];
-                    processSummary(summary);
-                }
-            }
-        } else if (uiState.dashboardDateFilter === 'this_year') {
-            const year = new Date().getFullYear();
-            const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
-            processSummary(summary);
-        } else if (uiState.dashboardDateFilter === 'by_year_range') {
-            for (let year = uiState.dashboardStartYear; year <= uiState.dashboardEndYear; year++) {
-                const summary = state.summaryData?.[`summary_${year}`]?.yearlyTotals;
-                processSummary(summary);
-            }
-        } else if (uiState.dashboardDateFilter === 'all_time') {
-            for (const key in state.summaryData) {
-                if (key.startsWith('summary_') && state.summaryData[key]?.yearlyTotals) {
-                    processSummary(state.summaryData[key].yearlyTotals);
-                }
-            }
+    let omsetKotorAwal = 0;
+    let totalDiskonAwal = 0;
+    let totalHppTerjualAwal = 0;
+    let totalBiayaTransaksiAwal = 0;
+    let danaBelumCair = 0;
+    let qtyBelumCair = 0;
+
+    (transaksi || []).forEach(trx => {
+        const totalHppTrx = (trx.items || []).reduce((sum, item) => {
+            return sum + ((Number(item.hpp) || 0) * (Number(item.qty) || 0));
+        }, 0);
+
+        const totalBiayaTrx = Number(trx.biaya?.total) || 0;
+
+        const trxQty = (trx.items || []).reduce((sum, item) => {
+            return sum + (Number(item.qty) || 0);
+        }, 0);
+
+        const isCair = trx.statusPencairan === 'Sudah Cair';
+        const isPending = !trx.statusPencairan || trx.statusPencairan === 'Belum Cair' || trx.statusPencairan === 'Waiting';
+
+        if (isCair) {
+            omsetKotorAwal += Number(trx.subtotal) || 0;
+            totalDiskonAwal += Number(trx.diskon?.totalDiscount) || 0;
+            totalHppTerjualAwal += totalHppTrx;
+            totalBiayaTransaksiAwal += totalBiayaTrx;
+        } else if (isPending) {
+            const payout = (Number(trx.total) || 0) - totalBiayaTrx;
+            danaBelumCair += payout;
+            qtyBelumCair += trxQty;
         }
-        const keuanganUntukDashboard = filterDataByDate(
-    (state.keuangan || []).map(k => {
-        const tanggalAman = k.tanggal?.toDate
-            ? k.tanggal.toDate()
-            : (k.tanggal instanceof Date ? k.tanggal : new Date(k.tanggal));
+    });
 
-        return {
-            ...k,
-            tanggal: tanggalAman
-        };
-    }),
-    uiState.dashboardDateFilter,
-    uiState.dashboardStartDate,
-    uiState.dashboardEndDate,
-    uiState.dashboardStartMonth,
-    uiState.dashboardStartYear,
-    uiState.dashboardEndMonth,
-    uiState.dashboardEndYear
-);
+    kpis.danaBelumCair = danaBelumCair;
+    kpis.qtyBelumCair = qtyBelumCair;
 
-const totalPemasukanLainAktif = keuanganUntukDashboard
-    .filter(k => k.jenis === 'pemasukan_lain')
-    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+    let totalNilaiReturGross = 0;
+    let totalDiskonBatal = 0;
+    let totalHppRetur = 0;
+    let biayaMarketplaceBatal = 0;
 
-const totalPengeluaranKasAktif = keuanganUntukDashboard
-    .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
-    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+    (retur || []).forEach(r => {
+        (r.items || []).forEach(item => {
+            totalNilaiReturGross += (Number(item.nilaiRetur) || 0) + (Number(item.nilaiDiskon) || 0);
+            totalDiskonBatal += Number(item.nilaiDiskon) || 0;
+            biayaMarketplaceBatal += Number(item.biayaMarketplace) || 0;
 
-const totalBiayaOperasionalAktif = keuanganUntukDashboard
-    .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
-    .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) !== 'produksi')
-    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+            const product = getProductBySku(item.sku);
 
-kpis.pemasukanLain = totalPemasukanLainAktif;
-kpis.totalBiayaOperasional = totalBiayaOperasionalAktif;
-
-kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
-
-kpis.saldoKas = (kpis.omsetBersih + kpis.pemasukanLain) - (kpis.totalBiayaTransaksi + totalPengeluaranKasAktif);
-
-    } else {
-        // --- LOGIKA JANGKA PENDEK (Real-time dari transaksi mentah) ---
-        const { transaksi, keuangan, retur } = dashboardFilteredData.value;
-        
-        let omsetKotorAwal = 0;
-        let totalDiskonAwal = 0;
-        let totalHppTerjualAwal = 0;
-        let totalBiayaTransaksiAwal = 0;
-        let danaBelumCair = 0;
-        let qtyBelumCair = 0;
-
-        // --- PROSES SETIAP TRANSAKSI DENGAN LOGIKA FILTER BARU ---
-        (transaksi || []).forEach(trx => {
-            const totalHppTrx = (trx.items || []).reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
-            const totalBiayaTrx = trx.biaya?.total || 0;
-            const trxQty = (trx.items || []).reduce((s, i) => s + i.qty, 0);
-            
-            // 1. Tentukan status transaksi
-            // Hanya transaksi yang sudah dikonfirmasi cair yang masuk ke laporan pendapatan
-            const isCair = trx.statusPencairan === 'Sudah Cair';
-            
-            // Transaksi baru (kosong), 'Belum Cair', atau 'Waiting' dianggap masih menggantung
-            const isPending = !trx.statusPencairan || trx.statusPencairan === 'Belum Cair' || trx.statusPencairan === 'Waiting';
-
-            if (isCair) {
-                // A. JIKA SUDAH CAIR: Masuk ke perhitungan Omset, HPP, dan Laba
-                omsetKotorAwal += (trx.subtotal || 0);
-                totalDiskonAwal += (trx.diskon?.totalDiscount || 0);
-                totalHppTerjualAwal += totalHppTrx;
-                totalBiayaTransaksiAwal += totalBiayaTrx;
-            } else if (isPending) {
-                // B. JIKA MASIH GANTUNG: Masuk ke KPI "Dana Gantung"
-                // Dana Belum Cair = Omset Bersih - Biaya Marketplace (HPP + Laba Bersih yang akan diterima)
-                const payout = (trx.total || 0) - totalBiayaTrx;
-                danaBelumCair += payout;
-                qtyBelumCair += trxQty;
+            if (product) {
+                totalHppRetur += (Number(product.hpp) || 0) * (Number(item.qty) || 0);
             }
-
-            // C. JIKA STATUS LAIN (Misal: 'Gagal Cair / Retur'):
-            // Sistem akan otomatis melewatinya. 
-            // Pesanannya hilang dari daftar gantung, tapi TIDAK menambah angka laba.
         });
+    });
 
-        kpis.danaBelumCair = danaBelumCair;
-        kpis.qtyBelumCair = qtyBelumCair;
+    const pemasukanLain = (keuangan || [])
+        .filter(k => k.jenis === 'pemasukan_lain')
+        .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
 
-        // Hitung Retur (Sesuai kode asli Anda)
-        let totalNilaiReturGross = 0;
-        let totalDiskonBatal = 0;
-        let totalHppRetur = 0;
-        let biayaMarketplaceBatal = 0;
+    const totalPengeluaranKas = (keuangan || [])
+        .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
+        .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
 
-        (retur || []).forEach(r => {
-            (r.items || []).forEach(item => {
-                totalNilaiReturGross += (item.nilaiRetur || 0) + (item.nilaiDiskon || 0);
-                totalDiskonBatal += (item.nilaiDiskon || 0);
-                biayaMarketplaceBatal += (item.biayaMarketplace || 0);
-                const product = getProductBySku(item.sku);
-                if (product) {
-                    totalHppRetur += (product.hpp || 0) * (item.qty || 0);
-                }
-            });
-        });
+    kpis.totalBiayaOperasional = (keuangan || [])
+        .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
+        .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) !== 'produksi')
+        .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
 
-        const pemasukanLain = (keuangan || [])
-    .filter(i => i.jenis === 'pemasukan_lain')
-    .reduce((sum, i) => sum + (Number(i.jumlah) || 0), 0);
+    kpis.omsetKotor = omsetKotorAwal - totalNilaiReturGross;
+    kpis.totalDiskon = totalDiskonAwal - totalDiskonBatal;
+    kpis.totalHppTerjual = totalHppTerjualAwal - totalHppRetur;
+    kpis.totalBiayaTransaksi = totalBiayaTransaksiAwal - biayaMarketplaceBatal;
+    kpis.totalNilaiRetur = totalNilaiReturGross;
+    kpis.pemasukanLain = pemasukanLain;
 
-const totalPengeluaranKas = (keuangan || [])
-    .filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya')
-    .reduce((sum, i) => sum + (Number(i.jumlah) || 0), 0);
+    kpis.omsetBersih = kpis.omsetKotor - kpis.totalDiskon;
+    kpis.labaKotor = kpis.omsetBersih - kpis.totalHppTerjual;
+    kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
 
-kpis.totalBiayaOperasional = (keuangan || [])
-    .filter(i => i.jenis === 'pengeluaran' || i.jenis === 'biaya')
-    .filter(i => (i.tipeBiaya || getExpenseTypeByCategory(i.kategori)) !== 'produksi')
-    .reduce((sum, i) => sum + (Number(i.jumlah) || 0), 0);
-
-        kpis.omsetKotor = omsetKotorAwal - totalNilaiReturGross;
-        kpis.totalDiskon = totalDiskonAwal - totalDiskonBatal;
-        kpis.totalHppTerjual = totalHppTerjualAwal - totalHppRetur;
-        kpis.totalBiayaTransaksi = totalBiayaTransaksiAwal - biayaMarketplaceBatal;
-        kpis.totalNilaiRetur = totalNilaiReturGross;
-        
-        kpis.omsetBersih = kpis.omsetKotor - kpis.totalDiskon;
-        kpis.labaKotor = kpis.omsetBersih - kpis.totalHppTerjual;
-        kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
-        kpis.saldoKas = (kpis.omsetBersih + pemasukanLain) - (kpis.totalBiayaTransaksi + totalPengeluaranKas);
-    }
-    
     // SALDO KAS BERJALAN
-// Saldo Kas tidak mengikuti filter dashboard.
-// Tujuannya agar jika hari ini tidakk ada transaksi, saldo kas tetap menarik saldo sebelumnya.
-let saldoOmsetBersihAllTime = 0;
-let saldoBiayaTransaksiAllTime = 0;
+    // Ini tidak mengikuti filter waktu dashboard.
+    // Tujuannya agar saldo kas tetap menampilkan posisi kas bisnis saat ini.
+    let saldoOmsetKotorAllTime = 0;
+    let saldoDiskonAllTime = 0;
+    let saldoBiayaTransaksiAllTime = 0;
+    let saldoNilaiReturGrossAllTime = 0;
+    let saldoDiskonBatalAllTime = 0;
+    let saldoBiayaMarketplaceBatalAllTime = 0;
 
-if (state.summaryData && Object.keys(state.summaryData).length > 0) {
-    for (const key in state.summaryData) {
-        if (key.startsWith('summary_') && state.summaryData[key]?.yearlyTotals) {
-            const yearly = state.summaryData[key].yearlyTotals;
-            saldoOmsetBersihAllTime += yearly.omsetBersih || 0;
-            saldoBiayaTransaksiAllTime += yearly.biayaTransaksi || 0;
-        }
-    }
-}
+    (state.transaksi || []).forEach(trx => {
+        if (trx.statusPencairan !== 'Sudah Cair') return;
 
-const saldoPemasukanLainAllTime = (state.keuangan || [])
-    .filter(k => k.jenis === 'pemasukan_lain')
-    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+        saldoOmsetKotorAllTime += Number(trx.subtotal) || 0;
+        saldoDiskonAllTime += Number(trx.diskon?.totalDiscount) || 0;
+        saldoBiayaTransaksiAllTime += Number(trx.biaya?.total) || 0;
+    });
 
-const saldoPengeluaranKasAllTime = (state.keuangan || [])
-    .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
-    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+    (state.retur || []).forEach(r => {
+        (r.items || []).forEach(item => {
+            saldoNilaiReturGrossAllTime += (Number(item.nilaiRetur) || 0) + (Number(item.nilaiDiskon) || 0);
+            saldoDiskonBatalAllTime += Number(item.nilaiDiskon) || 0;
+            saldoBiayaMarketplaceBatalAllTime += Number(item.biayaMarketplace) || 0;
+        });
+    });
 
-kpis.saldoKas =
-    (saldoOmsetBersihAllTime + saldoPemasukanLainAllTime)
-    - (saldoBiayaTransaksiAllTime + saldoPengeluaranKasAllTime);
+    const saldoOmsetBersihAllTime =
+        (saldoOmsetKotorAllTime - saldoNilaiReturGrossAllTime) -
+        (saldoDiskonAllTime - saldoDiskonBatalAllTime);
 
-    kpis.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
-    kpis.totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
+    const saldoBiayaTransaksiFinalAllTime =
+        saldoBiayaTransaksiAllTime - saldoBiayaMarketplaceBatalAllTime;
+
+    const saldoPemasukanLainAllTime = (state.keuangan || [])
+        .filter(k => k.jenis === 'pemasukan_lain')
+        .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+
+    const saldoPengeluaranKasAllTime = (state.keuangan || [])
+        .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
+        .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+
+    kpis.saldoKas =
+        (saldoOmsetBersihAllTime + saldoPemasukanLainAllTime) -
+        (saldoBiayaTransaksiFinalAllTime + saldoPengeluaranKasAllTime);
+
+    kpis.totalUnitStok = (state.produk || [])
+        .reduce((sum, p) => sum + (Number(p.stokFisik) || 0), 0);
+
+    kpis.totalNilaiStokHPP = (state.produk || [])
+        .reduce((sum, p) => sum + ((Number(p.stokFisik) || 0) * (Number(p.hpp) || 0)), 0);
 
     return kpis;
 });
@@ -9053,14 +8984,16 @@ const fetchAllProductData = async (userId) => {
     }
 };
 
-const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate = null, endDate = null) => {
+const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate = null, endDate = null, forceAll = false) => {
     const ITEMS_PER_PAGE = 15;
 
-    // --- Logika untuk Transaksi ---
-    if (loadMore && !uiState.transaksiHasMore && !startDate) return;
+    // --- TRANSAKSI ---
+    if (loadMore && !uiState.transaksiHasMore && !startDate && !forceAll) return;
+
     try {
         let q_trx;
-        if (startDate && endDate) {
+
+        if (startDate && endDate && !forceAll) {
             q_trx = query(
                 collection(db, "transactions"),
                 where("userId", "==", userId),
@@ -9068,65 +9001,115 @@ const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate
                 where("tanggal", "<=", endDate),
                 orderBy("tanggal", "desc")
             );
-            state.transaksi = []; 
+
+            state.transaksi = [];
         } else {
-            q_trx = query(
-                collection(db, "transactions"),
-                where("userId", "==", userId),
-                orderBy("tanggal", "desc"),
-                limit(ITEMS_PER_PAGE)
-            );
-            if (loadMore && uiState.transaksiLastVisible) {
-                q_trx = query(q_trx, startAfter(uiState.transaksiLastVisible));
-            } else if (!loadMore) {
+            if (forceAll) {
+                q_trx = query(
+                    collection(db, "transactions"),
+                    where("userId", "==", userId),
+                    orderBy("tanggal", "desc")
+                );
+            } else {
+                q_trx = query(
+                    collection(db, "transactions"),
+                    where("userId", "==", userId),
+                    orderBy("tanggal", "desc"),
+                    limit(ITEMS_PER_PAGE)
+                );
+
+                if (loadMore && uiState.transaksiLastVisible) {
+                    q_trx = query(q_trx, startAfter(uiState.transaksiLastVisible));
+                }
+            }
+
+            if (!loadMore) {
                 state.transaksi = [];
                 uiState.transaksiHasMore = true;
             }
         }
+
         const transactionSnap = await getDocs(q_trx);
+
         if (!transactionSnap.empty) {
             uiState.transaksiLastVisible = transactionSnap.docs[transactionSnap.docs.length - 1];
-            transactionSnap.forEach(doc => {
-                state.transaksi.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
+
+            transactionSnap.forEach(docSnap => {
+                const data = docSnap.data();
+
+                state.transaksi.push({
+                    id: docSnap.id,
+                    ...data,
+                    tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : data.tanggal,
+                    tanggalPencairan: data.tanggalPencairan?.toDate ? data.tanggalPencairan.toDate() : data.tanggalPencairan
+                });
             });
         }
-        if (!startDate && transactionSnap.docs.length < ITEMS_PER_PAGE) {
+
+        if (forceAll) {
+            uiState.transaksiHasMore = false;
+        } else if (!startDate && transactionSnap.docs.length < ITEMS_PER_PAGE) {
             uiState.transaksiHasMore = false;
         }
+
         dataFetched.transactions = true;
     } catch (error) {
         console.error("Error fetching transaction data:", error);
     }
 
-    // --- PERBAIKAN: LOGIKA UNTUK MENGAMBIL DATA RETUR ---
-    if (loadMore && !uiState.returHasMore) return;
-    try {
-        let q_retur = query(
-            collection(db, "returns"),
-            where("userId", "==", userId),
-            orderBy("tanggal", "desc"),
-            limit(ITEMS_PER_PAGE)
-        );
+    // --- RETUR ---
+    if (loadMore && !uiState.returHasMore && !forceAll) return;
 
-        if (loadMore && uiState.returLastVisible) {
-            q_retur = query(q_retur, startAfter(uiState.returLastVisible));
-        } else if (!loadMore) {
-            state.retur = []; // Selalu reset saat load awal
+    try {
+        let q_retur;
+
+        if (forceAll) {
+            q_retur = query(
+                collection(db, "returns"),
+                where("userId", "==", userId),
+                orderBy("tanggal", "desc")
+            );
+        } else {
+            q_retur = query(
+                collection(db, "returns"),
+                where("userId", "==", userId),
+                orderBy("tanggal", "desc"),
+                limit(ITEMS_PER_PAGE)
+            );
+
+            if (loadMore && uiState.returLastVisible) {
+                q_retur = query(q_retur, startAfter(uiState.returLastVisible));
+            }
+        }
+
+        if (!loadMore) {
+            state.retur = [];
             uiState.returHasMore = true;
         }
 
         const returnSnap = await getDocs(q_retur);
+
         if (!returnSnap.empty) {
             uiState.returLastVisible = returnSnap.docs[returnSnap.docs.length - 1];
-            returnSnap.forEach(doc => {
-                state.retur.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
+
+            returnSnap.forEach(docSnap => {
+                const data = docSnap.data();
+
+                state.retur.push({
+                    id: docSnap.id,
+                    ...data,
+                    tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : data.tanggal
+                });
             });
         }
-        if (returnSnap.docs.length < ITEMS_PER_PAGE) {
+
+        if (forceAll) {
+            uiState.returHasMore = false;
+        } else if (returnSnap.docs.length < ITEMS_PER_PAGE) {
             uiState.returHasMore = false;
         }
-        dataFetched.returns = true;
 
+        dataFetched.returns = true;
     } catch (error) {
         console.error("Error fetching return data:", error);
     }
@@ -9361,11 +9344,18 @@ async function processBulkSettlement(targetStatus = 'Sudah Cair') {
 
             const trxRef = doc(db, "transactions", foundTrx.id);
 
-            batch.update(trxRef, {
-                statusPencairan: targetStatus
-            });
+            const updatePayload = {
+    statusPencairan: targetStatus
+};
 
-            foundTrx.statusPencairan = targetStatus;
+if (targetStatus === 'Sudah Cair') {
+    updatePayload.tanggalPencairan = new Date();
+    foundTrx.tanggalPencairan = updatePayload.tanggalPencairan;
+}
+
+batch.update(trxRef, updatePayload);
+
+foundTrx.statusPencairan = targetStatus;
             countSuccess++;
 
             if (targetStatus === 'Retur/Pengembalian') {
