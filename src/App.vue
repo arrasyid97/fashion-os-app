@@ -4018,7 +4018,7 @@ kpis.totalBiayaOperasional = (keuangan || [])
     
     // SALDO KAS BERJALAN
 // Saldo Kas tidak mengikuti filter dashboard.
-// Tujuannya agar jika hari ini tidak ada transaksi, saldo kas tetap menarik saldo sebelumnya.
+// Tujuannya agar jika hari ini tidakk ada transaksi, saldo kas tetap menarik saldo sebelumnya.
 let saldoOmsetBersihAllTime = 0;
 let saldoBiayaTransaksiAllTime = 0;
 
@@ -4043,7 +4043,7 @@ const saldoPengeluaranKasAllTime = (state.keuangan || [])
 kpis.saldoKas =
     (saldoOmsetBersihAllTime + saldoPemasukanLainAllTime)
     - (saldoBiayaTransaksiAllTime + saldoPengeluaranKasAllTime);
-    
+
     kpis.totalUnitStok = (state.produk || []).reduce((sum, p) => sum + (p.stokFisik || 0), 0);
     kpis.totalNilaiStokHPP = (state.produk || []).reduce((sum, p) => sum + ((p.stokFisik || 0) * (p.hpp || 0)), 0);
 
