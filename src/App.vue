@@ -5018,19 +5018,22 @@ const dashboardSalesStats = computed(() => {
 
 const kpiExplanations = {
     'saldo-kas': {
-        title: 'Saldo Kas Berjalan',
-        description: `Saldo Kas adalah perkiraan uang kas bersih dari data yang tercatat di aplikasi.
+    title: 'Saldo Kas Berjalan',
+    description: `
+Saldo Kas Berjalan menunjukkan total uang kas yang dimiliki bisnis saat ini berdasarkan seluruh transaksi yang telah tercatat.
 
-Rumus sederhananya:
+Perhitungan Saldo Kas Berjalan meliputi:
 
-(Omset Bersih + Pemasukan Lain) - Biaya Transaksi - Semua Pengeluaran Kas
+• Omset Bersih
++ Pemasukan Lain
+− Biaya Transaksi
+− Seluruh Pengeluaran Kas
 
-Catatan penting:
-- Semua pengeluaran kas akan mengurangi Saldo Kas.
-- Termasuk beli kain, bahan, maklun, listrik, admin, iklan, dan pengeluaran lain.
-- Jadi beli kain memang membuat Saldo Kas turun, karena uang keluar.
-- Angka ini adalah estimasi dari data yang dicatat, bukan mutasi rekening bank asli.`
-    },
+Saldo Kas Berjalan tidak mengikuti filter waktu pada Dashboard, sehingga meskipun tidak ada transaksi hari ini, nilai saldo tetap menampilkan posisi kas terbaru.
+
+KPI ini membantu Anda mengetahui jumlah kas yang tersedia secara keseluruhan untuk operasional bisnis.
+`
+},
 
     'omset-kotor': {
         title: 'Omset Kotor',
@@ -10151,8 +10154,9 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Saldo Kas</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Saldo Kas Berjalan</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
+                            <p class="text-xs text-slate-400 mt-1">Posisi kas bisnis saat ini</p>
                         </div>
                     </div>
                     <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="help-icon-button">?</button>
