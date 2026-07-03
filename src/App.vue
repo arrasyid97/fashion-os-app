@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, orderBy, limit, startAfter, documentId, increment } from 'firebase/firestore'; 
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, getDocFromServer, orderBy, limit, startAfter, documentId, increment } from 'firebase/firestore';
 let bulkSearchDebounceTimer = null;
 let bulkScanTimer = null;
 let posScanTimer = null;
@@ -947,6 +947,40 @@ function dedupeRowsByDocId(rows) {
     return [...map.values()];
 }
 
+function parseMarketplaceNumber(value) {
+    if (value === null || value === undefined || value === '') return 0;
+
+    if (typeof value === 'number') return value;
+
+    const cleaned = String(value)
+        .replace('%', '')
+        .replace('Rp', '')
+        .replace(/\./g, '')
+        .replace(',', '.')
+        .trim();
+
+    const number = Number(cleaned);
+
+    return isNaN(number) ? 0 : number;
+}
+
+function formatMarketplaceProgramForExport(programs = []) {
+    return (programs || [])
+        .filter(program => program && (program.name || program.nama || program.rate || program.value || program.amount || program.nominal))
+        .map(program => {
+            const name = program.name || program.nama || program.programName || 'Program';
+            const type = program.type || program.jenis || program.satuan || program.unit || '%';
+            const rawValue = program.rate ?? program.value ?? program.amount ?? program.nominal ?? program.biaya ?? 0;
+            const value = parseMarketplaceNumber(rawValue);
+
+            if (String(type).toLowerCase().includes('rp')) {
+                return `${name} (Rp ${new Intl.NumberFormat('id-ID').format(value)})`;
+            }
+
+            return `${name} (${String(value).replace('.', ',')}%)`;
+        })
+        .join('; ');
+}
 const getExpenseTypeByCategory = (kategori) => {
     const category = (state.settings.categories || []).find(cat => cat.name === kategori);
 
@@ -1673,7 +1707,7 @@ async function exportAllDataForUser(
             investorPaymentsSnap,
             categoriesSnap
         ] = await Promise.all([
-            getDoc(doc(db, "settings", userId)),
+            getDocFromServer(doc(db, "settings", userId)),
             getDocs(query(collection(db, "products"), where("userId", "==", userId))),
             getDocs(query(collection(db, "product_prices"), where("userId", "==", userId))),
             getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
@@ -1804,25 +1838,25 @@ activeModels.forEach(model => {
         ], [24, 80]);
 
         // =========================
+// =========================
 // 01. MARKETPLACE / CHANNEL
 // =========================
-const marketplaceRows = activeMarketplaces.map(channel => {
-    const activePrograms = getActiveArray(channel.programs || []);
+const marketplaceRows = (userSettings.marketplaces || []).map(channel => {
+    const programs = channel.programs || channel.program || [];
 
     return {
+        'Sumber Settings': `settings/${userId}`,
         'ID Channel': channel.id || '',
-        'Nama Channel': channel.name || '',
-        'Biaya Admin (%)': exportNumber(channel.adm),
-        'Biaya Layanan (%)': exportNumber(channel.layanan),
-        'Biaya Per Pesanan': exportNumber(channel.perPesanan),
-        'Program Tambahan Aktif': activePrograms
-            .filter(program => program.name || program.rate)
-            .map(program => `${program.name || '-'} (${exportNumber(program.rate)}%)`)
-            .join('; ')
+        'Nama Channel': channel.name || channel.nama || '',
+        'Biaya Admin (%)': parseMarketplaceNumber(channel.adm ?? channel.admin),
+        'Biaya Layanan (%)': parseMarketplaceNumber(channel.layanan ?? channel.serviceFee),
+        'Biaya Per Pesanan': parseMarketplaceNumber(channel.perPesanan ?? channel.biayaPerPesanan),
+        'Jumlah Program': programs.length,
+        'Program Tambahan': formatMarketplaceProgramForExport(programs)
     };
 });
 
-appendExportSheet(workbook, '01 Marketplace', marketplaceRows, [24, 28, 18, 18, 20, 45]);
+appendExportSheet(workbook, '01 Marketplace', marketplaceRows, [32, 28, 34, 18, 18, 20, 18, 60]);
         // =========================
         // 02. MODEL PRODUK
         // =========================
