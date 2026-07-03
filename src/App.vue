@@ -841,9 +841,6 @@ function isInsideAdminExportRange(value, range) {
     return date >= range.start && date <= range.end;
 }
 
-function exportNumber(value) {
-    return Number(value) || 0;
-}
 
 function safeSheetName(name) {
     let cleanName = String(name || 'Sheet');
@@ -8096,7 +8093,8 @@ function printPurchaseInvoice(order) {
     if (sisa <= 0) statusBayar = 'LUNAS';
     else if (sudahDibayar > 0) statusBayar = 'DICICIL';
 
-    const closingScript = '<' + '/script>';
+    const openingScript = '<' + 'script>';
+const closingScript = '<' + '/script>';
 
     const printContent = `
         <html>
@@ -8316,7 +8314,7 @@ function printPurchaseInvoice(order) {
                     <p>Waktu Cetak: ${new Date().toLocaleString('id-ID')}</p>
                 </div>
             </div>
-            <script>
+            ${openingScript}
                 window.onload = function() { 
                     window.print(); 
                     setTimeout(function() { window.close(); }, 1000); 
