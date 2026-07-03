@@ -947,40 +947,7 @@ function dedupeRowsByDocId(rows) {
     return [...map.values()];
 }
 
-function parseMarketplaceNumber(value) {
-    if (value === null || value === undefined || value === '') return 0;
 
-    if (typeof value === 'number') return value;
-
-    const cleaned = String(value)
-        .replace('%', '')
-        .replace('Rp', '')
-        .replace(/\./g, '')
-        .replace(',', '.')
-        .trim();
-
-    const number = Number(cleaned);
-
-    return isNaN(number) ? 0 : number;
-}
-
-function formatMarketplaceProgramForExport(programs = []) {
-    return (programs || [])
-        .filter(program => program && (program.name || program.nama || program.rate || program.value || program.amount || program.nominal))
-        .map(program => {
-            const name = program.name || program.nama || program.programName || 'Program';
-            const type = program.type || program.jenis || program.satuan || program.unit || '%';
-            const rawValue = program.rate ?? program.value ?? program.amount ?? program.nominal ?? program.biaya ?? 0;
-            const value = parseMarketplaceNumber(rawValue);
-
-            if (String(type).toLowerCase().includes('rp')) {
-                return `${name} (Rp ${new Intl.NumberFormat('id-ID').format(value)})`;
-            }
-
-            return `${name} (${String(value).replace('.', ',')}%)`;
-        })
-        .join('; ');
-}
 
 function buildMarketplaceRowsForExport(marketplaces = [], sourceLabel = 'Data aplikasi yang sedang tampil') {
     return JSON.parse(JSON.stringify(marketplaces || [])).map((mp, index) => {
