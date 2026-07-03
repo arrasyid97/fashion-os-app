@@ -63,10 +63,7 @@ const state = reactive({
     inventoryPaginated: [],
     transaksi: [],
     keuangan: [],
-    retur: [
-    { id: 'RET-001', tanggal: '2025-07-21', sku: 'FSH-TSH-BL-M', qty: 1, alasan: 'Ukuran tidak sesuai', tindakLanjut: 'Tukar Ukuran', channelId: 'shopee-a' },
-    { id: 'RET-002', tanggal: '2025-07-22', sku: 'FSH-KJM-NV-L', qty: 1, alasan: 'Cacat produksi', tindakLanjut: 'Refund', channelId: 'tiktok-shop' },
-],
+    
     carts: {},
     promotions: { perChannel: {}, perModel: {} },
     commissions: { perModel: {} },
