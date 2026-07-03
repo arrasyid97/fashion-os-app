@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDoc, getDocFromServer, orderBy, limit, startAfter, documentId, increment } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDocsFromServer, getDoc, getDocFromServer, orderBy, limit, startAfter, documentId, increment } from 'firebase/firestore';
 let bulkSearchDebounceTimer = null;
 let bulkScanTimer = null;
 let posScanTimer = null;
@@ -913,7 +913,7 @@ function getActiveArray(items) {
     return (items || []).filter(isActiveExportRecord);
 }
 
-async function getDocsByProductIds(collectionName, productIds) {
+async function getDocsByProductIds(collectionName, productIds, ownerUserId = null) {
     const results = [];
     const cleanIds = [...new Set((productIds || []).filter(Boolean))];
 
@@ -922,14 +922,22 @@ async function getDocsByProductIds(collectionName, productIds) {
 
         if (chunk.length === 0) continue;
 
-        const snap = await getDocs(
+        const snap = await getDocsFromServer(
             query(
                 collection(db, collectionName),
                 where("product_id", "in", chunk)
             )
         );
 
-        results.push(...snapshotToRows(snap));
+        const rows = snapshotToRows(snap).filter(row => {
+            // Kalau data harga lama belum punya userId, tetap boleh ikut
+            // selama product_id-nya memang milik produk user yang sedang diexport.
+            if (!ownerUserId) return true;
+            if (!row.userId) return true;
+            return row.userId === ownerUserId;
+        });
+
+        results.push(...rows);
     }
 
     return results;
@@ -1752,20 +1760,20 @@ async function exportAllDataForUser(
             investorPaymentsSnap,
             categoriesSnap
         ] = await Promise.all([
-            getDocFromServer(doc(db, "settings", userId)),
-            getDocs(query(collection(db, "products"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "product_prices"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "suppliers"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "purchase_orders"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "categories"), where("userId", "==", userId)))
-        ]);
+    getDocFromServer(doc(db, "settings", userId)),
+    getDocsFromServer(query(collection(db, "products"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "product_prices"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "keuangan"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "transactions"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "returns"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "production_batches"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "suppliers"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "purchase_orders"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "investors"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "investor_payments"), where("userId", "==", userId))),
+    getDocsFromServer(query(collection(db, "categories"), where("userId", "==", userId)))
+]);
 
         const userSettings = userSettingsSnap.exists()
             ? userSettingsSnap.data()
@@ -1816,8 +1824,7 @@ productsRaw.forEach(product => {
 // 1. by userId
 // 2. by product_id, untuk data lama yang mungkin belum punya userId
 const productPricesByUser = getActiveArray(snapshotToRows(productPricesSnap));
-const productPricesByProduct = await getDocsByProductIds("product_prices", [...activeProductIds]);
-
+const productPricesByProduct = await getDocsByProductIds("product_prices", [...activeProductIds], userId);
 const productPricesRaw = dedupeRowsByDocId([
     ...productPricesByUser,
     ...productPricesByProduct
@@ -1833,8 +1840,9 @@ const productPricesRaw = dedupeRowsByDocId([
         activeProductSkus.has(sku);
 
     const marketplaceStillExists =
-        !marketplaceId ||
-        activeMarketplaceIds.has(marketplaceId);
+    !marketplaceId ||
+    activeMarketplaceIds.size === 0 ||
+    activeMarketplaceIds.has(marketplaceId);
 
     return productStillExists && marketplaceStillExists;
 });
@@ -14696,7 +14704,7 @@ SKU-BAJU-PUTIH-S"
     <div><label class="block text-xs font-medium mb-1">Sampai Tahun</label><input type="number" v-model.number="uiState.exportEndYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
 </div>
                 <button @click="exportAllDataForUser(
-    uiState.selectedUserForExport?.uid, 
+    uiState.selectedUserForExport?.uid || uiState.selectedUserForExport?.id, 
     uiState.selectedUserForExport?.email, 
     uiState.exportFilter, 
     uiState.exportStartDate, 
@@ -14705,7 +14713,8 @@ SKU-BAJU-PUTIH-S"
     uiState.exportEndMonth, 
     uiState.exportStartYear, 
     uiState.exportEndYear
-)" :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
+)"
+ :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
                     <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
                     <span v-else>Export Data Pelanggan</span>
                 </button>
