@@ -880,8 +880,78 @@ function appendExportSheet(workbook, sheetName, rows, columnWidths = []) {
 function snapshotToRows(snapshot) {
     return snapshot.docs.map(docSnap => ({
         docId: docSnap.id,
+        id: docSnap.id,
         ...docSnap.data()
     }));
+}
+
+function isActiveExportRecord(item) {
+    if (!item) return false;
+
+    const status = String(item.status || item.statusData || item.statusProses || '').toLowerCase();
+
+    if (item.isDeleted === true) return false;
+    if (item.deleted === true) return false;
+    if (item.archived === true) return false;
+    if (item.deletedAt) return false;
+    if (status === 'deleted') return false;
+    if (status === 'dihapus') return false;
+    if (status === 'arsip') return false;
+    if (status === 'archived') return false;
+
+    return true;
+}
+
+function cleanTextForExport(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+}
+
+function isValidNumberForExport(value) {
+    return value !== null && value !== undefined && value !== '' && !isNaN(Number(value));
+}
+
+function exportNumber(value) {
+    return isValidNumberForExport(value) ? Number(value) : 0;
+}
+
+function getActiveArray(items) {
+    return (items || []).filter(isActiveExportRecord);
+}
+
+async function getDocsByProductIds(collectionName, productIds) {
+    const results = [];
+    const cleanIds = [...new Set((productIds || []).filter(Boolean))];
+
+    for (let i = 0; i < cleanIds.length; i += 10) {
+        const chunk = cleanIds.slice(i, i + 10);
+
+        if (chunk.length === 0) continue;
+
+        const snap = await getDocs(
+            query(
+                collection(db, collectionName),
+                where("product_id", "in", chunk)
+            )
+        );
+
+        results.push(...snapshotToRows(snap));
+    }
+
+    return results;
+}
+
+function dedupeRowsByDocId(rows) {
+    const map = new Map();
+
+    (rows || []).forEach(row => {
+        const key = row.docId || row.id;
+        if (!key) return;
+        map.set(key, row);
+    });
+
+    return [...map.values()];
 }
 
 const getExpenseTypeByCategory = (kategori) => {
@@ -1629,28 +1699,83 @@ async function exportAllDataForUser(
             ? userSettingsSnap.data()
             : { marketplaces: [], modelProduk: [], categories: [], inflowCategories: [] };
 
-        const productsRaw = snapshotToRows(productsSnap);
-        const productPricesRaw = snapshotToRows(productPricesSnap);
-        const bankAccountsRaw = snapshotToRows(bankAccountsSnap);
-        const keuanganRaw = snapshotToRows(keuanganSnap);
-        const transactionsRaw = snapshotToRows(transactionsSnap);
-        const returnsRaw = snapshotToRows(returnsSnap);
-        const productionRaw = snapshotToRows(productionSnap);
-        const suppliersRaw = snapshotToRows(suppliersSnap);
-        const purchaseOrdersRaw = snapshotToRows(purchaseOrdersSnap);
-        const investorsRaw = snapshotToRows(investorsSnap);
-        const investorPaymentsRaw = snapshotToRows(investorPaymentsSnap);
-        const categoriesRaw = snapshotToRows(categoriesSnap);
+        const productsRawAll = getActiveArray(snapshotToRows(productsSnap));
+const bankAccountsRaw = getActiveArray(snapshotToRows(bankAccountsSnap));
+const keuanganRaw = getActiveArray(snapshotToRows(keuanganSnap));
+const transactionsRaw = getActiveArray(snapshotToRows(transactionsSnap));
+const returnsRaw = getActiveArray(snapshotToRows(returnsSnap));
+const productionRaw = getActiveArray(snapshotToRows(productionSnap));
+const suppliersRaw = getActiveArray(snapshotToRows(suppliersSnap));
+const purchaseOrdersRaw = getActiveArray(snapshotToRows(purchaseOrdersSnap));
+const investorsRaw = getActiveArray(snapshotToRows(investorsSnap));
+const investorPaymentsRaw = getActiveArray(snapshotToRows(investorPaymentsSnap));
+const categoriesRaw = getActiveArray(snapshotToRows(categoriesSnap));
+
+const activeMarketplaces = getActiveArray(userSettings.marketplaces || []);
+const activeModels = getActiveArray(userSettings.modelProduk || []);
+const activeCategories = getActiveArray(userSettings.categories || []);
+const activeInflowCategories = getActiveArray(userSettings.inflowCategories || []);
+
+const activeMarketplaceIds = new Set(activeMarketplaces.map(channel => channel.id).filter(Boolean));
+const activeModelIds = new Set(activeModels.map(model => model.id).filter(Boolean));
+
+const productsRaw = productsRawAll.filter(product => {
+    if (!isActiveExportRecord(product)) return false;
+
+    // Kalau produk punya model_id, pastikan modelnya masih aktif.
+    // Kalau model_id kosong, tetap export karena bisa jadi data lama.
+    if (product.model_id && activeModelIds.size > 0 && !activeModelIds.has(product.model_id)) {
+        return false;
+    }
+
+    return true;
+});
+
+const activeProductIds = new Set();
+const activeProductSkus = new Set();
+
+productsRaw.forEach(product => {
+    if (product.docId) activeProductIds.add(product.docId);
+    if (product.id) activeProductIds.add(product.id);
+    if (product.sku) activeProductSkus.add(product.sku);
+});
+
+// Ambil harga dari 2 jalur:
+// 1. by userId
+// 2. by product_id, untuk data lama yang mungkin belum punya userId
+const productPricesByUser = getActiveArray(snapshotToRows(productPricesSnap));
+const productPricesByProduct = await getDocsByProductIds("product_prices", [...activeProductIds]);
+
+const productPricesRaw = dedupeRowsByDocId([
+    ...productPricesByUser,
+    ...productPricesByProduct
+]).filter(price => {
+    if (!isActiveExportRecord(price)) return false;
+
+    const productId = price.product_id || '';
+    const sku = price.product_sku || '';
+    const marketplaceId = price.marketplace_id || '';
+
+    const productStillExists =
+        activeProductIds.has(productId) ||
+        activeProductSkus.has(sku);
+
+    const marketplaceStillExists =
+        !marketplaceId ||
+        activeMarketplaceIds.has(marketplaceId);
+
+    return productStillExists && marketplaceStillExists;
+});
 
         const marketplaceMap = {};
-        (userSettings.marketplaces || []).forEach(channel => {
-            marketplaceMap[channel.id] = channel.name;
-        });
+activeMarketplaces.forEach(channel => {
+    marketplaceMap[channel.id] = channel.name;
+});
 
-        const modelMap = {};
-        (userSettings.modelProduk || []).forEach(model => {
-            modelMap[model.id] = model.namaModel;
-        });
+const modelMap = {};
+activeModels.forEach(model => {
+    modelMap[model.id] = model.namaModel;
+});
 
         const productBySku = {};
         const productById = {};
@@ -1686,31 +1811,37 @@ async function exportAllDataForUser(
         ], [24, 80]);
 
         // =========================
-        // 01. MARKETPLACE / CHANNEL
-        // =========================
-        const marketplaceRows = (userSettings.marketplaces || []).map(channel => ({
-            'ID Channel': channel.id || '',
-            'Nama Channel': channel.name || '',
-            'Biaya Admin (%)': exportNumber(channel.adm),
-            'Biaya Layanan (%)': exportNumber(channel.layanan),
-            'Biaya Per Pesanan': exportNumber(channel.perPesanan),
-            'Program Tambahan': (channel.programs || []).map(program => `${program.name || '-'} (${exportNumber(program.rate)}%)`).join('; ')
-        }));
+// 01. MARKETPLACE / CHANNEL
+// =========================
+const marketplaceRows = activeMarketplaces.map(channel => {
+    const activePrograms = getActiveArray(channel.programs || []);
 
-        appendExportSheet(workbook, '01 Marketplace', marketplaceRows, [24, 28, 18, 18, 20, 45]);
+    return {
+        'ID Channel': channel.id || '',
+        'Nama Channel': channel.name || '',
+        'Biaya Admin (%)': exportNumber(channel.adm),
+        'Biaya Layanan (%)': exportNumber(channel.layanan),
+        'Biaya Per Pesanan': exportNumber(channel.perPesanan),
+        'Program Tambahan Aktif': activePrograms
+            .filter(program => program.name || program.rate)
+            .map(program => `${program.name || '-'} (${exportNumber(program.rate)}%)`)
+            .join('; ')
+    };
+});
 
+appendExportSheet(workbook, '01 Marketplace', marketplaceRows, [24, 28, 18, 18, 20, 45]);
         // =========================
         // 02. MODEL PRODUK
         // =========================
-        const modelRows = (userSettings.modelProduk || []).map(model => ({
-            'ID Model': model.id || '',
-            'Nama Model': model.namaModel || '',
-            'Warna Default': model.warna || '',
-            'Ukuran Default': model.ukuran || '',
-            'Yard Per Model': exportNumber(model.yardPerModel),
-            'Harga Maklun': exportNumber(model.hargaMaklun),
-            'Harga Jahit': exportNumber(model.hargaJahit)
-        }));
+        const modelRows = activeModels.map(model => ({
+    'ID Model': model.id || '',
+    'Nama Model': model.namaModel || '',
+    'Warna Default': model.warna || '',
+    'Ukuran Default': model.ukuran || '',
+    'Yard Per Model': exportNumber(model.yardPerModel),
+    'Harga Maklun': exportNumber(model.hargaMaklun),
+    'Harga Jahit': exportNumber(model.hargaJahit)
+}));
 
         appendExportSheet(workbook, '02 Model Produk', modelRows, [24, 30, 22, 18, 18, 18, 18]);
 
@@ -1718,28 +1849,28 @@ async function exportAllDataForUser(
         // 03. KATEGORI BIAYA
         // =========================
         const settingCategoryRows = [
-            ...(userSettings.categories || []).map(category => ({
-                'Sumber': 'settings.categories',
-                'ID Kategori': category.id || '',
-                'Nama Kategori': category.name || '',
-                'Tipe': category.type || '',
-                'Deskripsi': category.description || ''
-            })),
-            ...(userSettings.inflowCategories || []).map(category => ({
-                'Sumber': 'settings.inflowCategories',
-                'ID Kategori': category.id || '',
-                'Nama Kategori': category.name || '',
-                'Tipe': 'pemasukan',
-                'Deskripsi': category.description || ''
-            })),
-            ...categoriesRaw.map(category => ({
-                'Sumber': 'collection.categories',
-                'ID Kategori': category.docId || '',
-                'Nama Kategori': category.name || category.nama || '',
-                'Tipe': category.type || '',
-                'Deskripsi': category.description || ''
-            }))
-        ];
+    ...activeCategories.map(category => ({
+        'Sumber': 'settings.categories',
+        'ID Kategori': category.id || '',
+        'Nama Kategori': category.name || '',
+        'Tipe': category.type || '',
+        'Deskripsi': category.description || ''
+    })),
+    ...activeInflowCategories.map(category => ({
+        'Sumber': 'settings.inflowCategories',
+        'ID Kategori': category.id || '',
+        'Nama Kategori': category.name || '',
+        'Tipe': 'pemasukan',
+        'Deskripsi': category.description || ''
+    })),
+    ...categoriesRaw.map(category => ({
+        'Sumber': 'collection.categories',
+        'ID Kategori': category.docId || '',
+        'Nama Kategori': category.name || category.nama || '',
+        'Tipe': category.type || '',
+        'Deskripsi': category.description || ''
+    }))
+];
 
         appendExportSheet(workbook, '03 Kategori', settingCategoryRows, [28, 24, 32, 18, 50]);
 
@@ -1809,7 +1940,8 @@ async function exportAllDataForUser(
             });
 
         const filteredReturns = returnsRaw
-            .filter(retur => isInsideAdminExportRange(retur.tanggal || retur.createdAt, exportRange))
+    .filter(retur => (retur.items || []).length > 0)
+    .filter(retur => isInsideAdminExportRange(retur.tanggal || retur.createdAt, exportRange))
             .sort((a, b) => {
                 const dateA = toExportDate(a.tanggal || a.createdAt)?.getTime() || 0;
                 const dateB = toExportDate(b.tanggal || b.createdAt)?.getTime() || 0;
@@ -2140,6 +2272,52 @@ async function exportAllDataForUser(
             { Metrik: 'Total Pengeluaran / Biaya', Nilai: totalKeuanganKeluar },
             { Metrik: 'Estimasi Laba Sebelum Pengeluaran Operasional', Nilai: totalOmset - totalHpp - totalBiayaMarketplace - totalNilaiRetur }
         ], [42, 28]);
+
+const rejectedRows = [];
+
+productsRawAll.forEach(product => {
+    if (!productsRaw.find(activeProduct => activeProduct.docId === product.docId)) {
+        rejectedRows.push({
+            'Tipe Data': 'Produk',
+            'ID': product.docId || product.id || '',
+            'Alasan Tidak Diexport': 'Produk tidak aktif / model produk sudah tidak aktif / terhapus',
+            'Nama / SKU': product.product_name || product.nama || product.sku || ''
+        });
+    }
+});
+
+productPricesByUser.forEach(price => {
+    const productId = price.product_id || '';
+    const sku = price.product_sku || '';
+    const marketplaceId = price.marketplace_id || '';
+
+    const productStillExists = activeProductIds.has(productId) || activeProductSkus.has(sku);
+    const marketplaceStillExists = !marketplaceId || activeMarketplaceIds.has(marketplaceId);
+
+    if (!productStillExists || !marketplaceStillExists || !isActiveExportRecord(price)) {
+        rejectedRows.push({
+            'Tipe Data': 'Harga Jual',
+            'ID': price.docId || price.id || '',
+            'Alasan Tidak Diexport': !productStillExists
+                ? 'Produk sudah tidak ada / orphan price'
+                : (!marketplaceStillExists ? 'Channel marketplace sudah tidak ada' : 'Data harga tidak aktif / terhapus'),
+            'Nama / SKU': sku || productId || ''
+        });
+    }
+});
+
+returnsRaw.forEach(retur => {
+    if (!retur.items || retur.items.length === 0) {
+        rejectedRows.push({
+            'Tipe Data': 'Retur',
+            'ID': retur.docId || retur.id || '',
+            'Alasan Tidak Diexport': 'Retur tidak punya item',
+            'Nama / SKU': retur.originalTransactionId || ''
+        });
+    }
+});
+
+appendExportSheet(workbook, '99 Data Dibuang', rejectedRows, [22, 32, 60, 36]);
 
         const safeEmail = String(userEmail || 'user')
             .replace(/[^a-zA-Z0-9@._-]/g, '_')
