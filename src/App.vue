@@ -981,6 +981,84 @@ function formatMarketplaceProgramForExport(programs = []) {
         })
         .join('; ');
 }
+
+function buildMarketplaceRowsForExport(marketplaces = [], sourceLabel = 'Data aplikasi yang sedang tampil') {
+    return JSON.parse(JSON.stringify(marketplaces || [])).map((mp, index) => {
+        const programs = Array.isArray(mp.programs)
+            ? mp.programs
+            : (Array.isArray(mp.program) ? mp.program : []);
+
+        const programText = programs.length > 0
+            ? programs.map(program => {
+                const name = program.name || program.nama || program.programName || 'Program';
+                const type = program.type || program.jenis || program.satuan || program.unit || '%';
+                const value = program.rate ?? program.value ?? program.amount ?? program.nominal ?? program.biaya ?? '';
+
+                if (String(type).toLowerCase().includes('rp')) {
+                    return `${name} (Rp ${new Intl.NumberFormat('id-ID').format(Number(value) || 0)})`;
+                }
+
+                return `${name} (${value}%)`;
+            }).join('; ')
+            : '';
+
+        return {
+            'No': index + 1,
+            'Sumber Data': sourceLabel,
+            'ID Channel': mp.id || '',
+            'Nama Channel': mp.name || mp.nama || '',
+            'Biaya Admin (%)': mp.adm ?? mp.admin ?? 0,
+            'Biaya Layanan G Xtra (%)': mp.layanan ?? mp.serviceFee ?? 0,
+            'Biaya Per Pesanan': mp.perPesanan ?? mp.biayaPerPesanan ?? 0,
+            'Jumlah Program': programs.length,
+            'Program Tambahan': programText
+        };
+    });
+}
+
+function exportMarketplaceYangTampil() {
+    const marketplaces = state.settings.marketplaces || [];
+
+    if (marketplaces.length === 0) {
+        alert('Tidak ada data marketplace untuk diexport.');
+        return;
+    }
+
+    const dataToExport = buildMarketplaceRowsForExport(
+        marketplaces,
+        'state.settings.marketplaces - data yang tampil di aplikasi'
+    );
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+
+    worksheet['!cols'] = [
+        { wch: 8 },
+        { wch: 45 },
+        { wch: 30 },
+        { wch: 34 },
+        { wch: 18 },
+        { wch: 24 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 60 }
+    ];
+
+    if (worksheet['!ref']) {
+        worksheet['!autofilter'] = { ref: worksheet['!ref'] };
+    }
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Marketplace');
+
+    const safeEmail = String(currentUser.value?.email || 'user')
+        .replace(/[^a-zA-Z0-9@._-]/g, '_');
+
+    XLSX.writeFile(
+        workbook,
+        `Marketplace_Yang_Tampil_${safeEmail}_${new Date().toISOString().split('T')[0]}.xlsx`
+    );
+}
+
 const getExpenseTypeByCategory = (kategori) => {
     const category = (state.settings.categories || []).find(cat => cat.name === kategori);
 
@@ -1837,26 +1915,20 @@ activeModels.forEach(model => {
             { Info: 'Catatan', Nilai: 'Data transaksi, retur, keuangan, produksi, purchase order, dan pembayaran investor mengikuti filter waktu. Data master tetap lengkap agar referensi SKU, produk, channel, model, dan supplier tidak hilang.' }
         ], [24, 80]);
 
-        // =========================
-// =========================
-// 01. MARKETPLACE / CHANNEL
-// =========================
-const marketplaceRows = (userSettings.marketplaces || []).map(channel => {
-    const programs = channel.programs || channel.program || [];
+const marketplaceSource = currentUser.value?.uid === userId
+    ? JSON.parse(JSON.stringify(state.settings.marketplaces || []))
+    : JSON.parse(JSON.stringify(userSettings.marketplaces || []));
 
-    return {
-        'Sumber Settings': `settings/${userId}`,
-        'ID Channel': channel.id || '',
-        'Nama Channel': channel.name || channel.nama || '',
-        'Biaya Admin (%)': parseMarketplaceNumber(channel.adm ?? channel.admin),
-        'Biaya Layanan (%)': parseMarketplaceNumber(channel.layanan ?? channel.serviceFee),
-        'Biaya Per Pesanan': parseMarketplaceNumber(channel.perPesanan ?? channel.biayaPerPesanan),
-        'Jumlah Program': programs.length,
-        'Program Tambahan': formatMarketplaceProgramForExport(programs)
-    };
-});
+const marketplaceSourceLabel = currentUser.value?.uid === userId
+    ? 'state.settings.marketplaces - data yang tampil di aplikasi'
+    : `settings/${userId} - data Firestore`;
 
-appendExportSheet(workbook, '01 Marketplace', marketplaceRows, [32, 28, 34, 18, 18, 20, 18, 60]);
+const marketplaceRows = buildMarketplaceRowsForExport(
+    marketplaceSource,
+    marketplaceSourceLabel
+);
+
+appendExportSheet(workbook, '01 Marketplace', marketplaceRows, [8, 45, 30, 34, 18, 24, 20, 18, 60]);
         // =========================
         // 02. MODEL PRODUK
         // =========================
@@ -14417,9 +14489,23 @@ SKU-BAJU-PUTIH-S"
 
                     <div v-if="uiState.pengaturanTab === 'marketplace'" class="animate-fade-in">
     <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-bold text-slate-800">Daftar Marketplace</h3>
-        <button @click="addMarketplace" class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm" :disabled="!isSubscriptionActive">Tambah</button>
+    <h3 class="text-xl font-bold text-slate-800">Daftar Marketplace</h3>
+
+    <div class="flex gap-2">
+        <button 
+            @click="exportMarketplaceYangTampil" 
+            class="bg-blue-600 text-white font-bold py-1 px-3 rounded-md hover:bg-blue-700 text-sm">
+            Export
+        </button>
+
+        <button 
+            @click="addMarketplace" 
+            class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm" 
+            :disabled="!isSubscriptionActive">
+            Tambah
+        </button>
     </div>
+</div>
     <div class="mb-4">
         <input type="text" v-model="uiState.pengaturanMarketplaceSearch" placeholder="Cari nama marketplace..." class="w-full p-2 border border-slate-300 rounded-md">
     </div>
