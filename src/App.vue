@@ -899,11 +899,7 @@ function isActiveExportRecord(item) {
     return true;
 }
 
-function cleanTextForExport(value) {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
-}
+
 
 function isValidNumberForExport(value) {
     return value !== null && value !== undefined && value !== '' && !isNaN(Number(value));
