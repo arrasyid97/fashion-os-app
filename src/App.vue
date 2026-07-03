@@ -846,9 +846,17 @@ function exportNumber(value) {
 }
 
 function safeSheetName(name) {
-    return String(name || 'Sheet')
-        .replace(/[:\\/?*\[\]]/g, ' ')
-        .substring(0, 31);
+    let cleanName = String(name || 'Sheet');
+
+    const forbiddenChars = [':', '\\', '/', '?', '*', '[', ']'];
+
+    forbiddenChars.forEach(char => {
+        cleanName = cleanName.split(char).join(' ');
+    });
+
+    cleanName = cleanName.trim().substring(0, 31);
+
+    return cleanName || 'Sheet';
 }
 
 function appendExportSheet(workbook, sheetName, rows, columnWidths = []) {
