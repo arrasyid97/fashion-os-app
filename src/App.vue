@@ -1153,15 +1153,54 @@ const fetchSummaryData = (userId) => {
 };
 // Fungsi untuk mengambil daftar semua pengguna (hanya untuk Admin)
 async function fetchAllUsers() {
-    if (!isAdmin.value) return; // Hanya jalankan jika admin
+    if (!isAdmin.value) return;
+
     try {
         const usersCollection = collection(db, 'users');
-        const userSnapshots = await getDocs(usersCollection);
-        uiState.allUsers = userSnapshots.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+        const userSnapshots = await getDocsFromServer(usersCollection);
+
+        uiState.allUsers = userSnapshots.docs.map(docSnap => {
+            const data = docSnap.data() || {};
+
+            return {
+                ...data,
+
+                // INI YANG PALING PENTING:
+                // UID export admin harus pakai ID dokumen users/{docId},
+                // bukan field uid di dalam data karena field itu bisa lama/salah.
+                id: docSnap.id,
+                uid: docSnap.id,
+                firestoreDocId: docSnap.id,
+
+                // Simpan uid lama hanya untuk cek/debug, jangan dipakai export.
+                oldUidField: data.uid || '',
+
+                email: data.email || data.userEmail || data.ownerEmail || ''
+            };
+        }).sort((a, b) => {
+            return String(a.email || '').localeCompare(String(b.email || ''));
+        });
+
+        // Reset pilihan supaya user wajib pilih ulang dari data terbaru.
+        uiState.selectedUserForExport = null;
+
     } catch (error) {
         console.error("Gagal mengambil daftar pengguna:", error);
         alert("Gagal mengambil daftar pengguna.");
     }
+}
+
+function getAdminExportUserId(user) {
+    if (!user) return '';
+
+    // Prioritas utama harus ID dokumen Firestore users/{docId}
+    return user.firestoreDocId || user.id || user.docId || user.uid || '';
+}
+
+function getAdminExportUserEmail(user) {
+    if (!user) return '';
+
+    return user.email || user.userEmail || user.ownerEmail || '';
 }
 
 async function fetchCommissionPayouts() {
@@ -1716,9 +1755,17 @@ async function exportAllDataForUser(
     exportStartYear = uiState.exportStartYear,
     exportEndYear = uiState.exportEndYear
 ) {
-    if (!isAdmin.value || !userId) {
-        return alert("Aksi tidak diizinkan atau pelanggan belum dipilih.");
-    }
+    const selectedExportUser = uiState.selectedUserForExport;
+
+const fixedUserId = getAdminExportUserId(selectedExportUser) || userId;
+const fixedUserEmail = getAdminExportUserEmail(selectedExportUser) || userEmail;
+
+userId = fixedUserId;
+userEmail = fixedUserEmail;
+
+if (!isAdmin.value || !userId) {
+    return alert("Aksi tidak diizinkan atau pelanggan belum dipilih.");
+}
 
     let exportRange;
 
@@ -14675,6 +14722,22 @@ SKU-BAJU-PUTIH-S"
                             {{ user.email }}
                         </option>
                     </select>
+                    <div v-if="uiState.selectedUserForExport" class="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+    <p>
+        <b>Email dipilih:</b>
+        {{ getAdminExportUserEmail(uiState.selectedUserForExport) }}
+    </p>
+
+    <p>
+        <b>User ID yang akan diexport:</b>
+        {{ getAdminExportUserId(uiState.selectedUserForExport) }}
+    </p>
+
+    <p v-if="uiState.selectedUserForExport.oldUidField">
+        <b>UID lama di field data:</b>
+        {{ uiState.selectedUserForExport.oldUidField }}
+    </p>
+</div>
                 </div>
                 <div>
     <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
