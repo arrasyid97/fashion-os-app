@@ -78,7 +78,7 @@ const state = reactive({
     voucherNotes: [],
     investor: [],
     bankAccounts: [],
-    auditLogs: [],
+    
     // --- END: KODE BARU UNTUKK STOK KAIN ---
     transactionCounter: 0,
     pinProtection: {
@@ -116,9 +116,6 @@ massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     salesStatsDateFilter: 'all_time',
     salesStatsModelFilter: 'all',
     salesStatsChannelFilter: 'all',
-    auditLogCategoryFilter: 'all',
-    auditLogFilter: 'all',
-    auditLogSearch: '',
     dashboardStartDate: '',
     dashboardEndDate: '',
     dashboardStartMonth: new Date().getMonth() + 1,
@@ -581,10 +578,7 @@ const loadDataForPage = async (pageName) => {
             case 'investasi':
       await fetchInvestorsAndBanksData(userId);
       break;
-    // --- TAMBAHKAN KODE DI BAWAH INI ---
-    case 'riwayat-aktivitas':
-    dataPromises.push(fetchAuditLogs(userId));
-    break;
+    
     case 'pengaturan':
       // Kita panggil fungsi ini karena data Bank ada di dalamnya
       await fetchInvestorsAndBanksData(userId); 
@@ -728,281 +722,7 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
-async function writeAuditLog(action, entityType, entityId, details = {}) {
-    if (!currentUser.value) return;
 
-    try {
-        const config = getAuditActionConfig(action);
-
-        await addDoc(collection(db, "audit_logs"), {
-            userId: currentUser.value.uid,
-            userEmail: currentUser.value.email || '',
-            action,
-            actionLabel: config.label,
-            category: config.category,
-            categoryLabel: getAuditCategoryLabel(config.category),
-            entityType,
-            entityId: entityId || '',
-            details,
-            createdAt: new Date()
-        });
-    } catch (error) {
-        console.error("Gagal mencatat audit log:", error);
-    }
-}
-
-async function fetchAuditLogs(userId) {
-    if (!userId) return;
-
-    try {
-        const q = query(
-            collection(db, "audit_logs"),
-            where("userId", "==", userId),
-            limit(100)
-        );
-
-        const snapshot = await getDocs(q);
-
-        state.auditLogs = snapshot.docs.map(docSnap => {
-            const data = docSnap.data();
-
-            return {
-                id: docSnap.id,
-                ...data,
-                createdAt: data.createdAt?.toDate
-                    ? data.createdAt.toDate()
-                    : (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000) : new Date(data.createdAt))
-            };
-        }).sort((a, b) => {
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
-
-    } catch (error) {
-        console.error("Gagal mengambil riwayat aktivitas:", error);
-        state.auditLogs = [];
-    }
-}
-
-const auditActionCatalog = [
-    // TRANSAKSI
-    { action: 'create_transaction', label: 'Tambah Transaksi', category: 'transaksi' },
-    { action: 'update_transaction', label: 'Edit Transaksi', category: 'transaksi' },
-    { action: 'delete_transaction', label: 'Hapus Transaksi', category: 'transaksi' },
-    { action: 'settle_transaction', label: 'Konfirmasi Dana Cair', category: 'transaksi' },
-    { action: 'update_settlement_status', label: 'Ubah Status Dana Cair', category: 'transaksi' },
-
-    // RETUR
-    { action: 'create_return', label: 'Tambah Retur', category: 'retur' },
-    { action: 'update_return', label: 'Edit Retur', category: 'retur' },
-    { action: 'delete_return_item', label: 'Hapus Item Retur', category: 'retur' },
-    { action: 'delete_return', label: 'Hapus Retur', category: 'retur' },
-
-    // KEUANGAN
-    { action: 'create_finance', label: 'Tambah Data Keuangan', category: 'keuangan' },
-    { action: 'update_finance', label: 'Edit Data Keuangan', category: 'keuangan' },
-    { action: 'delete_finance', label: 'Hapus Data Keuangan', category: 'keuangan' },
-
-    // PRODUK & STOK
-    { action: 'create_product', label: 'Tambah Produk', category: 'produk_stok' },
-    { action: 'update_product', label: 'Edit Produk / SKU', category: 'produk_stok' },
-    { action: 'delete_product', label: 'Hapus Produk', category: 'produk_stok' },
-    { action: 'update_stock', label: 'Ubah Stok Produk', category: 'produk_stok' },
-    { action: 'update_hpp', label: 'Ubah HPP', category: 'produk_stok' },
-    { action: 'update_price', label: 'Ubah Harga Jual', category: 'produk_stok' },
-
-    // PRODUKSI
-    { action: 'create_production_batch', label: 'Tambah Batch Produksi', category: 'produksi' },
-    { action: 'update_production_batch', label: 'Edit Batch Produksi', category: 'produksi' },
-    { action: 'delete_production_batch', label: 'Hapus Batch Produksi', category: 'produksi' },
-    { action: 'update_production_status', label: 'Ubah Status Produksi', category: 'produksi' },
-    { action: 'update_production_fabric', label: 'Ubah Data Kain Produksi', category: 'produksi' },
-    { action: 'update_production_yard', label: 'Ubah Total Yard Kain', category: 'produksi' },
-    { action: 'update_production_cost', label: 'Ubah Biaya Produksi', category: 'produksi' },
-    { action: 'update_actual_finished', label: 'Ubah Aktual Jadi', category: 'produksi' },
-    { action: 'update_production_payment', label: 'Ubah Pembayaran Produksi', category: 'produksi' },
-    { action: 'complete_production_stock', label: 'Selesaikan Produksi Masuk Stok', category: 'produksi' },
-    { action: 'cancel_production', label: 'Batalkan Produksi', category: 'produksi' },
-
-    // GUDANG KAIN & SUPPLIER
-    { action: 'create_fabric_stock', label: 'Tambah Stok Kain', category: 'supplier_gudang' },
-    { action: 'update_fabric_stock', label: 'Edit Stok Kain', category: 'supplier_gudang' },
-    { action: 'delete_fabric_stock', label: 'Hapus Stok Kain', category: 'supplier_gudang' },
-    { action: 'create_supplier', label: 'Tambah Supplier', category: 'supplier_gudang' },
-    { action: 'update_supplier', label: 'Edit Supplier', category: 'supplier_gudang' },
-    { action: 'delete_supplier', label: 'Hapus Supplier', category: 'supplier_gudang' },
-    { action: 'create_purchase_order', label: 'Tambah Purchase Order', category: 'supplier_gudang' },
-    { action: 'update_purchase_order', label: 'Edit Purchase Order', category: 'supplier_gudang' },
-    { action: 'delete_purchase_order', label: 'Hapus Purchase Order', category: 'supplier_gudang' },
-    { action: 'receive_supplier_items', label: 'Terima Barang Supplier', category: 'supplier_gudang' },
-
-    // SISTEM
-    { action: 'export_data', label: 'Export Data', category: 'sistem' },
-    { action: 'update_settings', label: 'Ubah Pengaturan', category: 'sistem' },
-    { action: 'update_pin', label: 'Ubah PIN / Proteksi', category: 'sistem' }
-];
-
-function getAuditActionConfig(action) {
-    return auditActionCatalog.find(item => item.action === action) || {
-        action,
-        label: action || 'Aktivitas',
-        category: 'lainnya'
-    };
-}
-
-function getAuditCategoryLabel(category) {
-    const labels = {
-        all: 'Semua Kategori',
-        transaksi: 'Transaksi & Dana Cair',
-        retur: 'Retur',
-        keuangan: 'Keuangan',
-        produk_stok: 'Produk & Stok',
-        produksi: 'Produksi',
-        supplier_gudang: 'Gudang Kain & Supplier',
-        sistem: 'Sistem',
-        lainnya: 'Lainnya'
-    };
-
-    return labels[category] || category || 'Lainnya';
-}
-
-const auditActionOptions = computed(() => {
-    const selectedCategory = uiState.auditLogCategoryFilter;
-
-    if (selectedCategory === 'all') {
-        return auditActionCatalog;
-    }
-
-    return auditActionCatalog.filter(item => item.category === selectedCategory);
-});
-
-const filteredAuditLogs = computed(() => {
-    let logs = state.auditLogs || [];
-
-    if (uiState.auditLogCategoryFilter !== 'all') {
-        logs = logs.filter(log => {
-            const config = getAuditActionConfig(log.action);
-            return config.category === uiState.auditLogCategoryFilter;
-        });
-    }
-
-    if (uiState.auditLogFilter !== 'all') {
-        logs = logs.filter(log => log.action === uiState.auditLogFilter);
-    }
-
-    const search = (uiState.auditLogSearch || '').toLowerCase().trim();
-
-    if (search) {
-        logs = logs.filter(log => {
-            const detailsText = JSON.stringify(log.details || {}).toLowerCase();
-
-            return (
-                String(log.userEmail || '').toLowerCase().includes(search) ||
-                String(log.action || '').toLowerCase().includes(search) ||
-                String(getAuditActionLabel(log.action) || '').toLowerCase().includes(search) ||
-                String(log.entityType || '').toLowerCase().includes(search) ||
-                String(log.entityId || '').toLowerCase().includes(search) ||
-                detailsText.includes(search)
-            );
-        });
-    }
-
-    return logs;
-});
-
-function formatAuditDate(value) {
-    if (!value) return '-';
-
-    const date = value instanceof Date ? value : new Date(value);
-
-    if (isNaN(date.getTime())) return '-';
-
-    return date.toLocaleString('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-function getAuditActionLabel(action) {
-    return getAuditActionConfig(action).label;
-}
-
-function getAuditCategoryFromAction(action) {
-    return getAuditActionConfig(action).category;
-}
-
-function getAuditActionBadgeClass(action) {
-    const category = getAuditCategoryFromAction(action);
-
-    const classes = {
-        transaksi: 'bg-blue-100 text-blue-700',
-        retur: 'bg-red-100 text-red-700',
-        keuangan: 'bg-green-100 text-green-700',
-        produk_stok: 'bg-indigo-100 text-indigo-700',
-        produksi: 'bg-purple-100 text-purple-700',
-        supplier_gudang: 'bg-orange-100 text-orange-700',
-        sistem: 'bg-slate-100 text-slate-700',
-        lainnya: 'bg-slate-100 text-slate-700'
-    };
-
-    return classes[category] || classes.lainnya;
-}
-
-function getAuditDetailsText(log) {
-    const details = log.details || {};
-
-    if (log.action === 'delete_return_item') {
-        return `SKU: ${details.sku || '-'} | Qty: ${details.qty || '-'} | Alasan: ${details.alasan || '-'}`;
-    }
-
-    if (log.action === 'settle_transaction' || log.action === 'update_settlement_status') {
-        return `Status: ${details.statusLama || '-'} → ${details.statusBaru || '-'} | Total: ${formatCurrency(details.total || 0)}`;
-    }
-
-    if (log.action === 'update_hpp') {
-        return `SKU: ${details.sku || '-'} | HPP Lama: ${formatCurrency(details.hppLama || 0)} → HPP Baru: ${formatCurrency(details.hppBaru || 0)}`;
-    }
-
-    if (log.action === 'update_price') {
-        return `SKU: ${details.sku || '-'} | Harga Lama: ${formatCurrency(details.hargaLama || 0)} → Harga Baru: ${formatCurrency(details.hargaBaru || 0)}`;
-    }
-
-    if (log.action === 'update_stock') {
-        return `SKU: ${details.sku || '-'} | Stok Lama: ${details.stokLama ?? '-'} → Stok Baru: ${details.stokBaru ?? '-'}`;
-    }
-
-    if (
-        log.action === 'create_production_batch' ||
-        log.action === 'update_production_batch' ||
-        log.action === 'delete_production_batch'
-    ) {
-        return `Batch: ${details.batchName || details.namaStatus || '-'} | Status: ${details.statusProses || '-'}`;
-    }
-
-    if (log.action === 'complete_production_stock') {
-        return `Batch: ${details.batchName || details.namaStatus || '-'} | Masuk stok: ${details.totalQty || 0} pcs`;
-    }
-
-    if (log.action === 'update_production_cost') {
-        return `Batch: ${details.batchName || '-'} | Biaya Lama: ${formatCurrency(details.biayaLama || 0)} → Biaya Baru: ${formatCurrency(details.biayaBaru || 0)}`;
-    }
-
-    if (log.action === 'update_actual_finished') {
-        return `Batch: ${details.batchName || '-'} | Aktual Jadi Lama: ${details.aktualLama ?? '-'} → Aktual Jadi Baru: ${details.aktualBaru ?? '-'}`;
-    }
-
-    if (log.action === 'create_finance' || log.action === 'update_finance' || log.action === 'delete_finance') {
-        return `Kategori: ${details.kategori || '-'} | Jumlah: ${formatCurrency(details.jumlah || 0)} | Catatan: ${details.catatan || '-'}`;
-    }
-
-    if (Object.keys(details).length > 0) {
-        return JSON.stringify(details);
-    }
-
-    return 'Tidak ada detail tambahan.';
-}
 
 const getExpenseTypeByCategory = (kategori) => {
     const category = (state.settings.categories || []).find(cat => cat.name === kategori);
@@ -8231,12 +7951,7 @@ async function deleteReturnItem(itemToDelete) {
             }
         }
 
-        await writeAuditLog("delete_return_item", "return", itemToDelete.returnDocId, {
-            sku: itemToDelete.sku,
-            qty: itemToDelete.qty,
-            alasan: itemToDelete.alasan,
-            tanggalHapus: new Date()
-        });
+        
 
         alert("Data retur berhasil dihapus. Stok inventaris tidak berubah.");
 
@@ -10474,7 +10189,6 @@ watch(activePage, (newPage, oldPage) => {
 
     <div v-show="uiState.sidebarGroups.sistem" class="ml-4 space-y-1">
         <a v-if="userProfile.data?.isPartner" href="#" @click.prevent="changePage('mitra')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'mitra' }">Dashboard Mitra</a>
-        <a href="#" @click.prevent="changePage('riwayat-aktivitas')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'riwayat-aktivitas' }">Riwayat Aktivitas</a>
         <a href="#" @click.prevent="changePage('pengaturan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'pengaturan' }">Pengaturan</a>
     </div>
 
@@ -13812,172 +13526,7 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
 
-<div v-if="activePage === 'riwayat-aktivitas'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto space-y-6">
 
-        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
-            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-                <div>
-                    <p class="text-sm text-slate-500">Sistem</p>
-                    <h2 class="text-3xl font-bold text-slate-800 mt-1">Riwayat Aktivitas</h2>
-                    <p class="text-slate-500 mt-2 max-w-3xl">
-                        Halaman ini menampilkan aktivitas penting yang tercatat di sistem, seperti transaksi,
-                        retur, keuangan, produk, stok, produksi, gudang kain, supplier, dan pengaturan.
-                    </p>
-                </div>
-
-                <button
-                    @click="fetchAuditLogs(currentUser.uid)"
-                    class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition"
-                >
-                    Refresh Data
-                </button>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-
-                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5">
-                    <p class="text-sm text-slate-500">Total Aktivitas</p>
-                    <p class="text-3xl font-bold text-slate-800 mt-2">{{ state.auditLogs.length }}</p>
-                    <p class="text-xs text-slate-400 mt-2">100 aktivitas terbaru.</p>
-                </div>
-
-                <div class="bg-red-50 border border-red-200 rounded-2xl p-5">
-                    <p class="text-sm text-red-600">Aktivitas Hapus</p>
-                    <p class="text-3xl font-bold text-red-700 mt-2">
-                        {{ state.auditLogs.filter(log => String(log.action || '').includes('delete')).length }}
-                    </p>
-                    <p class="text-xs text-red-500 mt-2">Aktivitas yang menghapus data.</p>
-                </div>
-
-                <div class="bg-purple-50 border border-purple-200 rounded-2xl p-5">
-                    <p class="text-sm text-purple-600">Aktivitas Produksi</p>
-                    <p class="text-3xl font-bold text-purple-700 mt-2">
-                        {{ state.auditLogs.filter(log => getAuditCategoryFromAction(log.action) === 'produksi').length }}
-                    </p>
-                    <p class="text-xs text-purple-500 mt-2">Perubahan terkait produksi.</p>
-                </div>
-
-                <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-5">
-                    <p class="text-sm text-indigo-600">Produk & Stok</p>
-                    <p class="text-3xl font-bold text-indigo-700 mt-2">
-                        {{ state.auditLogs.filter(log => getAuditCategoryFromAction(log.action) === 'produk_stok').length }}
-                    </p>
-                    <p class="text-xs text-indigo-500 mt-2">Perubahan produk, HPP, harga, stok.</p>
-                </div>
-
-            </div>
-        </div>
-
-        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">Cari Aktivitas</label>
-                    <input
-                        v-model="uiState.auditLogSearch"
-                        type="text"
-                        placeholder="Cari email, SKU, ID, alasan, batch produksi..."
-                        class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white"
-                    >
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">Kategori Aktivitas</label>
-                    <select
-                        v-model="uiState.auditLogCategoryFilter"
-                        @change="uiState.auditLogFilter = 'all'"
-                        class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white"
-                    >
-                        <option value="all">Semua Kategori</option>
-                        <option value="transaksi">Transaksi & Dana Cair</option>
-                        <option value="retur">Retur</option>
-                        <option value="keuangan">Keuangan</option>
-                        <option value="produk_stok">Produk & Stok</option>
-                        <option value="produksi">Produksi</option>
-                        <option value="supplier_gudang">Gudang Kain & Supplier</option>
-                        <option value="sistem">Sistem</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-500 mb-1">Jenis Aktivitas</label>
-                    <select
-                        v-model="uiState.auditLogFilter"
-                        class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white"
-                    >
-                        <option value="all">Semua Jenis Aktivitas</option>
-                        <option
-                            v-for="item in auditActionOptions"
-                            :key="item.action"
-                            :value="item.action"
-                        >
-                            {{ item.label }}
-                        </option>
-                    </select>
-                </div>
-
-            </div>
-
-            <div v-if="filteredAuditLogs.length === 0" class="p-8 text-center bg-slate-50 border border-slate-200 rounded-2xl">
-                <p class="text-2xl">📭</p>
-                <h3 class="font-bold text-slate-700 mt-2">Belum ada riwayat aktivitas</h3>
-                <p class="text-slate-500 text-sm mt-1">
-                    Aktivitas baru akan muncul setelah sistem mencatat aksi seperti hapus retur, edit stok, edit HPP, atau produksi.
-                </p>
-            </div>
-
-            <div v-else class="space-y-3">
-                <div
-                    v-for="log in filteredAuditLogs"
-                    :key="log.id"
-                    class="p-5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition"
-                >
-                    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-
-                        <div class="space-y-2">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span
-                                    class="text-xs font-bold px-3 py-1 rounded-full"
-                                    :class="getAuditActionBadgeClass(log.action)"
-                                >
-                                    {{ getAuditActionLabel(log.action) }}
-                                </span>
-
-                                <span class="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-600">
-                                    {{ getAuditCategoryLabel(getAuditCategoryFromAction(log.action)) }}
-                                </span>
-
-                                <span class="text-xs text-slate-400">
-                                    {{ formatAuditDate(log.createdAt) }}
-                                </span>
-                            </div>
-
-                            <h3 class="font-bold text-slate-800">
-                                {{ log.entityType || 'Data' }} · {{ log.entityId || '-' }}
-                            </h3>
-
-                            <p class="text-sm text-slate-600">
-                                {{ getAuditDetailsText(log) }}
-                            </p>
-                        </div>
-
-                        <div class="text-sm text-slate-500 md:text-right">
-                            <p class="font-semibold text-slate-700">Dilakukan oleh:</p>
-                            <p>{{ log.userEmail || 'User' }}</p>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
-    </div>
-</div>
 
 <div v-if="activePage === 'pengaturan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
     <div class="max-w-7xl mx-auto">
