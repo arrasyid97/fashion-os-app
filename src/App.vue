@@ -719,7 +719,162 @@ const parsePercentageInput = (value) => {
     return parseFloat(cleaned) || 0;
 };
 
+function toExportDate(value) {
+    if (!value) return null;
 
+    if (value instanceof Date) {
+        return isNaN(value.getTime()) ? null : value;
+    }
+
+    if (value?.toDate && typeof value.toDate === 'function') {
+        const date = value.toDate();
+        return isNaN(date.getTime()) ? null : date;
+    }
+
+    if (value?.seconds) {
+        const date = new Date(value.seconds * 1000);
+        return isNaN(date.getTime()) ? null : date;
+    }
+
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+}
+
+function formatExportDate(value, withTime = true) {
+    const date = toExportDate(value);
+    if (!date) return '';
+
+    const pad = (num) => String(num).padStart(2, '0');
+
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hour = pad(date.getHours());
+    const minute = pad(date.getMinutes());
+
+    if (!withTime) {
+        return `${year}-${month}-${day}`;
+    }
+
+    return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+function getAdminExportDateRange(
+    exportFilter = 'all_time',
+    exportStartDate = '',
+    exportEndDate = '',
+    exportStartMonth = new Date().getMonth() + 1,
+    exportEndMonth = new Date().getMonth() + 1,
+    exportStartYear = new Date().getFullYear(),
+    exportEndYear = new Date().getFullYear()
+) {
+    const now = new Date();
+
+    let start = null;
+    let end = null;
+    let label = 'Semua Data';
+
+    const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+    const endOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+
+    if (exportFilter === 'today') {
+        start = startOfDay(now);
+        end = endOfDay(now);
+        label = 'Hari Ini';
+    }
+
+    if (exportFilter === 'last_7_days') {
+        start = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6));
+        end = endOfDay(now);
+        label = '7 Hari Terakhir';
+    }
+
+    if (exportFilter === 'last_30_days') {
+        start = startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
+        end = endOfDay(now);
+        label = '30 Hari Terakhir';
+    }
+
+    if (exportFilter === 'this_year') {
+        start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+        end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        label = `Tahun Ini ${now.getFullYear()}`;
+    }
+
+    if (exportFilter === 'by_date_range') {
+        if (!exportStartDate || !exportEndDate) {
+            throw new Error('Tanggal awal dan tanggal akhir export wajib diisi.');
+        }
+
+        start = startOfDay(new Date(exportStartDate));
+        end = endOfDay(new Date(exportEndDate));
+        label = `${formatExportDate(start, false)} s/d ${formatExportDate(end, false)}`;
+    }
+
+    if (exportFilter === 'by_month_range') {
+        start = new Date(Number(exportStartYear), Number(exportStartMonth) - 1, 1, 0, 0, 0, 0);
+        end = new Date(Number(exportEndYear), Number(exportEndMonth), 0, 23, 59, 59, 999);
+        label = `${String(exportStartMonth).padStart(2, '0')}-${exportStartYear} s/d ${String(exportEndMonth).padStart(2, '0')}-${exportEndYear}`;
+    }
+
+    if (exportFilter === 'by_year_range') {
+        start = new Date(Number(exportStartYear), 0, 1, 0, 0, 0, 0);
+        end = new Date(Number(exportEndYear), 11, 31, 23, 59, 59, 999);
+        label = `${exportStartYear} s/d ${exportEndYear}`;
+    }
+
+    return {
+        filter: exportFilter,
+        start,
+        end,
+        label,
+        isAllTime: exportFilter === 'all_time'
+    };
+}
+
+function isInsideAdminExportRange(value, range) {
+    if (range.isAllTime) return true;
+
+    const date = toExportDate(value);
+    if (!date) return false;
+
+    return date >= range.start && date <= range.end;
+}
+
+function exportNumber(value) {
+    return Number(value) || 0;
+}
+
+function safeSheetName(name) {
+    return String(name || 'Sheet')
+        .replace(/[:\\/?*\[\]]/g, ' ')
+        .substring(0, 31);
+}
+
+function appendExportSheet(workbook, sheetName, rows, columnWidths = []) {
+    const safeRows = rows && rows.length > 0
+        ? rows
+        : [{ Keterangan: 'Tidak ada data pada periode export ini.' }];
+
+    const worksheet = XLSX.utils.json_to_sheet(safeRows, { cellDates: true });
+
+    if (worksheet['!ref']) {
+        worksheet['!autofilter'] = { ref: worksheet['!ref'] };
+    }
+
+    worksheet['!cols'] = columnWidths.length > 0
+        ? columnWidths.map(width => ({ wch: width }))
+        : Object.keys(safeRows[0] || {}).map(key => ({ wch: Math.min(Math.max(key.length + 6, 16), 40) }));
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName(sheetName));
+}
+
+function snapshotToRows(snapshot) {
+    return snapshot.docs.map(docSnap => ({
+        docId: docSnap.id,
+        ...docSnap.data()
+    }));
+}
 
 const getExpenseTypeByCategory = (kategori) => {
     const category = (state.settings.categories || []).find(cat => cat.name === kategori);
@@ -1392,218 +1547,605 @@ async function toggleInvestorStatus(investor) {
     }
 }
 
-// Fungsi untuk mengekspor semua data milik satu pengguna
-async function exportAllDataForUser(userId, userEmail) {
+async function exportAllDataForUser(
+    userId,
+    userEmail,
+    exportFilter = uiState.exportFilter,
+    exportStartDate = uiState.exportStartDate,
+    exportEndDate = uiState.exportEndDate,
+    exportStartMonth = uiState.exportStartMonth,
+    exportEndMonth = uiState.exportEndMonth,
+    exportStartYear = uiState.exportStartYear,
+    exportEndYear = uiState.exportEndYear
+) {
     if (!isAdmin.value || !userId) {
         return alert("Aksi tidak diizinkan atau pelanggan belum dipilih.");
     }
-    if (!confirm(`Anda akan mengunduh semua data untuk ${userEmail}. Lanjutkan?`)) {
+
+    let exportRange;
+
+    try {
+        exportRange = getAdminExportDateRange(
+            exportFilter,
+            exportStartDate,
+            exportEndDate,
+            exportStartMonth,
+            exportEndMonth,
+            exportStartYear,
+            exportEndYear
+        );
+    } catch (error) {
+        return alert(error.message);
+    }
+
+    if (!confirm(`Anda akan mengunduh data untuk ${userEmail}.\n\nPeriode: ${exportRange.label}\n\nLanjutkan?`)) {
         return;
     }
 
     uiState.isExportingUserData = true;
+
     try {
         const workbook = XLSX.utils.book_new();
 
-        // 1. Ambil data settings & summary milik PENGGUNA terlebih dahulu
-        const [userSettingsSnap, userSummarySnap] = await Promise.all([
+        const [
+            userSettingsSnap,
+            productsSnap,
+            productPricesSnap,
+            bankAccountsSnap,
+            keuanganSnap,
+            transactionsSnap,
+            returnsSnap,
+            productionSnap,
+            suppliersSnap,
+            purchaseOrdersSnap,
+            investorsSnap,
+            investorPaymentsSnap,
+            categoriesSnap
+        ] = await Promise.all([
             getDoc(doc(db, "settings", userId)),
-            getDoc(doc(db, "user_summaries", userId))
+            getDocs(query(collection(db, "products"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "product_prices"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "keuangan"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "transactions"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "returns"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "production_batches"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "suppliers"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "purchase_orders"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
+            getDocs(query(collection(db, "categories"), where("userId", "==", userId)))
         ]);
-        const userSettings = userSettingsSnap.exists() ? userSettingsSnap.data() : { marketplaces: [], modelProduk: [] };
-        const userSummary = userSummarySnap.exists() ? userSummarySnap.data() : {};
-        
-        // --- MEMBUAT SHEET PENGATURAN YANG RAPI ---
-        const marketplaceData = (userSettings.marketplaces || []).map(mp => ({
-            "Nama Marketplace": mp.name, "Biaya Admin (%)": mp.adm || 0, "Biaya Layanan (%)": mp.layanan || 0,
-            "Biaya Per Pesanan (Rp)": mp.perPesanan || 0, "Program Tambahan": (mp.programs || []).map(p => `${p.name} (${p.rate}%)`).join('; ')
-        }));
-        if (marketplaceData.length > 0) {
-            const marketplaceSheet = XLSX.utils.json_to_sheet(marketplaceData);
-            marketplaceSheet['!cols'] = Array(5).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, marketplaceSheet, "Marketplaces");
-        }
 
-        const modelProdukData = (userSettings.modelProduk || []).map(m => ({
-            "Nama Model": m.namaModel, "Warna Default": m.warna, "Ukuran Default": m.ukuran,
-            "Kebutuhan Kain (Yard)": m.yardPerModel, "Harga Maklun (Rp)": m.hargaMaklun, "Harga Jahit (Rp)": m.hargaJahit
+        const userSettings = userSettingsSnap.exists()
+            ? userSettingsSnap.data()
+            : { marketplaces: [], modelProduk: [], categories: [], inflowCategories: [] };
+
+        const productsRaw = snapshotToRows(productsSnap);
+        const productPricesRaw = snapshotToRows(productPricesSnap);
+        const bankAccountsRaw = snapshotToRows(bankAccountsSnap);
+        const keuanganRaw = snapshotToRows(keuanganSnap);
+        const transactionsRaw = snapshotToRows(transactionsSnap);
+        const returnsRaw = snapshotToRows(returnsSnap);
+        const productionRaw = snapshotToRows(productionSnap);
+        const suppliersRaw = snapshotToRows(suppliersSnap);
+        const purchaseOrdersRaw = snapshotToRows(purchaseOrdersSnap);
+        const investorsRaw = snapshotToRows(investorsSnap);
+        const investorPaymentsRaw = snapshotToRows(investorPaymentsSnap);
+        const categoriesRaw = snapshotToRows(categoriesSnap);
+
+        const marketplaceMap = {};
+        (userSettings.marketplaces || []).forEach(channel => {
+            marketplaceMap[channel.id] = channel.name;
+        });
+
+        const modelMap = {};
+        (userSettings.modelProduk || []).forEach(model => {
+            modelMap[model.id] = model.namaModel;
+        });
+
+        const productBySku = {};
+        const productById = {};
+
+        productsRaw.forEach(product => {
+            if (product.sku) productBySku[product.sku] = product;
+            productById[product.docId] = product;
+            if (product.id) productById[product.id] = product;
+        });
+
+        const getProductName = (sku) => {
+            const product = productBySku[sku];
+            return product?.product_name || product?.nama || '';
+        };
+
+        const getChannelName = (channelId, fallback = '') => {
+            return marketplaceMap[channelId] || fallback || channelId || '';
+        };
+
+        // =========================
+        // 00. INFO EXPORT
+        // =========================
+        appendExportSheet(workbook, '00 Info Export', [
+            { Info: 'Nama Aplikasi', Nilai: 'Fashion OS' },
+            { Info: 'Jenis Export', Nilai: 'Export Admin Developer' },
+            { Info: 'Email User', Nilai: userEmail || '' },
+            { Info: 'User ID', Nilai: userId },
+            { Info: 'Filter Export', Nilai: exportRange.label },
+            { Info: 'Tanggal Mulai Filter', Nilai: exportRange.start ? formatExportDate(exportRange.start) : 'Semua Data' },
+            { Info: 'Tanggal Akhir Filter', Nilai: exportRange.end ? formatExportDate(exportRange.end) : 'Semua Data' },
+            { Info: 'Dibuat Pada', Nilai: formatExportDate(new Date()) },
+            { Info: 'Catatan', Nilai: 'Data transaksi, retur, keuangan, produksi, purchase order, dan pembayaran investor mengikuti filter waktu. Data master tetap lengkap agar referensi SKU, produk, channel, model, dan supplier tidak hilang.' }
+        ], [24, 80]);
+
+        // =========================
+        // 01. MARKETPLACE / CHANNEL
+        // =========================
+        const marketplaceRows = (userSettings.marketplaces || []).map(channel => ({
+            'ID Channel': channel.id || '',
+            'Nama Channel': channel.name || '',
+            'Biaya Admin (%)': exportNumber(channel.adm),
+            'Biaya Layanan (%)': exportNumber(channel.layanan),
+            'Biaya Per Pesanan': exportNumber(channel.perPesanan),
+            'Program Tambahan': (channel.programs || []).map(program => `${program.name || '-'} (${exportNumber(program.rate)}%)`).join('; ')
         }));
-        if (modelProdukData.length > 0) {
-            const modelProdukSheet = XLSX.utils.json_to_sheet(modelProdukData);
-            modelProdukSheet['!cols'] = Array(6).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, modelProdukSheet, "Model Produk");
-        }
-        
-        const bankAccountsSnap = await getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId)));
-        if (!bankAccountsSnap.empty) {
-            const bankAccountsData = bankAccountsSnap.docs.map(doc => {
-                const data = doc.data();
-                return { "Nama Bank": data.bankName, "Nomor Rekening": data.accountNumber, "Atas Nama": data.accountName };
-            });
-            const bankAccountSheet = XLSX.utils.json_to_sheet(bankAccountsData);
-            bankAccountSheet['!cols'] = Array(3).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, bankAccountSheet, "Rekening Bank");
-        }
-        
-        // --- MEMBUAT SHEET KEUANGAN TERPISAH (VERSI AMAN DARI ERROR) ---
-        const keuanganSnap = await getDocs(query(collection(db, "keuangan"), where("userId", "==", userId)));
-        const allKeuangan = keuanganSnap.docs.map(doc => {
-            const data = doc.data();
+
+        appendExportSheet(workbook, '01 Marketplace', marketplaceRows, [24, 28, 18, 18, 20, 45]);
+
+        // =========================
+        // 02. MODEL PRODUK
+        // =========================
+        const modelRows = (userSettings.modelProduk || []).map(model => ({
+            'ID Model': model.id || '',
+            'Nama Model': model.namaModel || '',
+            'Warna Default': model.warna || '',
+            'Ukuran Default': model.ukuran || '',
+            'Yard Per Model': exportNumber(model.yardPerModel),
+            'Harga Maklun': exportNumber(model.hargaMaklun),
+            'Harga Jahit': exportNumber(model.hargaJahit)
+        }));
+
+        appendExportSheet(workbook, '02 Model Produk', modelRows, [24, 30, 22, 18, 18, 18, 18]);
+
+        // =========================
+        // 03. KATEGORI BIAYA
+        // =========================
+        const settingCategoryRows = [
+            ...(userSettings.categories || []).map(category => ({
+                'Sumber': 'settings.categories',
+                'ID Kategori': category.id || '',
+                'Nama Kategori': category.name || '',
+                'Tipe': category.type || '',
+                'Deskripsi': category.description || ''
+            })),
+            ...(userSettings.inflowCategories || []).map(category => ({
+                'Sumber': 'settings.inflowCategories',
+                'ID Kategori': category.id || '',
+                'Nama Kategori': category.name || '',
+                'Tipe': 'pemasukan',
+                'Deskripsi': category.description || ''
+            })),
+            ...categoriesRaw.map(category => ({
+                'Sumber': 'collection.categories',
+                'ID Kategori': category.docId || '',
+                'Nama Kategori': category.name || category.nama || '',
+                'Tipe': category.type || '',
+                'Deskripsi': category.description || ''
+            }))
+        ];
+
+        appendExportSheet(workbook, '03 Kategori', settingCategoryRows, [28, 24, 32, 18, 50]);
+
+        // =========================
+        // 04. PRODUK MASTER
+        // =========================
+        const productRows = productsRaw.map(product => ({
+            'ID Produk': product.docId || '',
+            'SKU': product.sku || '',
+            'Nama Produk': product.product_name || product.nama || '',
+            'ID Model': product.model_id || '',
+            'Nama Model': modelMap[product.model_id] || '',
+            'Warna': product.color || product.warna || '',
+            'Ukuran': product.variant || product.varian || '',
+            'Stok Fisik': exportNumber(product.physical_stock ?? product.stokFisik),
+            'HPP': exportNumber(product.hpp),
+            'Harga Beli Supplier': exportNumber(product.hargaBeli),
+            'Tanggal Dibuat': formatExportDate(product.createdAt),
+            'Tanggal Update': formatExportDate(product.updatedAt)
+        }));
+
+        appendExportSheet(workbook, '04 Produk Master', productRows, [28, 24, 36, 24, 28, 18, 14, 14, 16, 18, 22, 22]);
+
+        // =========================
+        // 05. HARGA JUAL
+        // =========================
+        const priceRows = productPricesRaw.map(price => {
+            const product = productById[price.product_id] || productBySku[price.product_sku] || {};
+
             return {
-                ID: doc.id, Tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : new Date(data.tanggal),
-                Jenis: data.jenis, Kategori: data.kategori, Jumlah: data.jumlah, Catatan: data.catatan
+                'ID Harga': price.docId || '',
+                'ID Produk': price.product_id || '',
+                'SKU': price.product_sku || product.sku || '',
+                'Nama Produk': product.product_name || product.nama || '',
+                'ID Channel': price.marketplace_id || '',
+                'Nama Channel': getChannelName(price.marketplace_id),
+                'Harga Jual': exportNumber(price.price),
+                'Tanggal Dibuat': formatExportDate(price.createdAt),
+                'Tanggal Update': formatExportDate(price.updatedAt)
             };
         });
-        
-        // eslint-disable-next-line no-unused-vars
-        const pemasukanData = allKeuangan.filter(item => item.Jenis === 'pemasukan_lain').map(({ Jenis, ...rest }) => rest);
-        // eslint-disable-next-line no-unused-vars
-        const pengeluaranData = allKeuangan.filter(item => item.Jenis === 'pengeluaran').map(({ Jenis, ...rest }) => rest);
 
-        if (pemasukanData.length > 0) {
-            const pemasukanSheet = XLSX.utils.json_to_sheet(pemasukanData);
-            pemasukanSheet['!cols'] = Array(5).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, pemasukanSheet, "Pemasukan Lain");
-        }
-        if (pengeluaranData.length > 0) {
-            const pengeluaranSheet = XLSX.utils.json_to_sheet(pengeluaranData);
-            pengeluaranSheet['!cols'] = Array(5).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, pengeluaranSheet, "Pengeluaran");
-        }
+        appendExportSheet(workbook, '05 Harga Jual', priceRows, [28, 28, 22, 36, 24, 28, 18, 22, 22]);
 
-        // --- MEMBUAT SHEET TRANSAKSI LENGKAP ---
-        const transactionsSnap = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
-        if (!transactionsSnap.empty) {
-            const transactionsData = transactionsSnap.docs.map(doc => {
-                const trx = doc.data();
-                const totalHPP = (trx.items || []).reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
-                const totalBiayaMarketplace = trx.biaya?.total || 0;
-                const labaBersih = trx.total - totalHPP - totalBiayaMarketplace;
+        // =========================
+        // 06. REKENING BANK
+        // =========================
+        const bankRows = bankAccountsRaw.map(bank => ({
+            'ID Rekening': bank.docId || '',
+            'Nama Bank': bank.bankName || '',
+            'Nomor Rekening': bank.accountNumber || '',
+            'Atas Nama': bank.accountName || '',
+            'Tanggal Dibuat': formatExportDate(bank.createdAt)
+        }));
+
+        appendExportSheet(workbook, '06 Rekening Bank', bankRows, [28, 24, 28, 30, 22]);
+
+        // =========================
+        // FILTERED DATA
+        // =========================
+        const filteredTransactions = transactionsRaw
+            .filter(trx => isInsideAdminExportRange(trx.tanggal || trx.createdAt, exportRange))
+            .sort((a, b) => {
+                const dateA = toExportDate(a.tanggal || a.createdAt)?.getTime() || 0;
+                const dateB = toExportDate(b.tanggal || b.createdAt)?.getTime() || 0;
+                return dateA - dateB;
+            });
+
+        const filteredReturns = returnsRaw
+            .filter(retur => isInsideAdminExportRange(retur.tanggal || retur.createdAt, exportRange))
+            .sort((a, b) => {
+                const dateA = toExportDate(a.tanggal || a.createdAt)?.getTime() || 0;
+                const dateB = toExportDate(b.tanggal || b.createdAt)?.getTime() || 0;
+                return dateA - dateB;
+            });
+
+        const filteredKeuangan = keuanganRaw
+            .filter(item => isInsideAdminExportRange(item.tanggal || item.createdAt, exportRange))
+            .sort((a, b) => {
+                const dateA = toExportDate(a.tanggal || a.createdAt)?.getTime() || 0;
+                const dateB = toExportDate(b.tanggal || b.createdAt)?.getTime() || 0;
+                return dateA - dateB;
+            });
+
+        const filteredProduction = productionRaw
+            .filter(batch => isInsideAdminExportRange(batch.tanggal || batch.createdAt, exportRange))
+            .sort((a, b) => {
+                const dateA = toExportDate(a.tanggal || a.createdAt)?.getTime() || 0;
+                const dateB = toExportDate(b.tanggal || b.createdAt)?.getTime() || 0;
+                return dateA - dateB;
+            });
+
+        const filteredPurchaseOrders = purchaseOrdersRaw
+            .filter(order => isInsideAdminExportRange(order.tanggal || order.createdAt, exportRange))
+            .sort((a, b) => {
+                const dateA = toExportDate(a.tanggal || a.createdAt)?.getTime() || 0;
+                const dateB = toExportDate(b.tanggal || b.createdAt)?.getTime() || 0;
+                return dateA - dateB;
+            });
+
+        const filteredInvestorPayments = investorPaymentsRaw
+            .filter(payment => isInsideAdminExportRange(payment.paymentDate || payment.tanggal || payment.createdAt, exportRange))
+            .sort((a, b) => {
+                const dateA = toExportDate(a.paymentDate || a.tanggal || a.createdAt)?.getTime() || 0;
+                const dateB = toExportDate(b.paymentDate || b.tanggal || b.createdAt)?.getTime() || 0;
+                return dateA - dateB;
+            });
+
+        // =========================
+        // 07. TRANSAKSI RINGKAS
+        // =========================
+        const transactionSummaryRows = filteredTransactions.map(trx => {
+            const totalHpp = (trx.items || []).reduce((sum, item) => {
+                return sum + (exportNumber(item.hpp) * exportNumber(item.qty));
+            }, 0);
+
+            const totalQty = (trx.items || []).reduce((sum, item) => {
+                return sum + exportNumber(item.qty);
+            }, 0);
+
+            const biayaMarketplace = exportNumber(trx.biaya?.total);
+            const totalAkhir = exportNumber(trx.total);
+            const estimasiLaba = totalAkhir - totalHpp - biayaMarketplace;
+
+            return {
+                'ID Transaksi': trx.docId || trx.id || '',
+                'ID Pesanan Marketplace': trx.marketplaceOrderId || trx.orderId || '',
+                'Tanggal Transaksi': formatExportDate(trx.tanggal || trx.createdAt),
+                'Tanggal Pencairan': formatExportDate(trx.tanggalPencairan),
+                'Channel': trx.channel || getChannelName(trx.channelId),
+                'Status Pencairan': trx.statusPencairan || '',
+                'Jumlah SKU': (trx.items || []).length,
+                'Total Qty': totalQty,
+                'Subtotal': exportNumber(trx.subtotal),
+                'Total Diskon': exportNumber(trx.diskon?.totalDiscount),
+                'Total Akhir': totalAkhir,
+                'Total HPP': totalHpp,
+                'Biaya Marketplace': biayaMarketplace,
+                'Estimasi Laba': estimasiLaba
+            };
+        });
+
+        appendExportSheet(workbook, '07 Transaksi Ringkas', transactionSummaryRows, [30, 28, 22, 22, 22, 20, 14, 14, 18, 18, 18, 18, 20, 18]);
+
+        // =========================
+        // 08. TRANSAKSI DETAIL
+        // =========================
+        const transactionDetailRows = filteredTransactions.flatMap(trx => {
+            return (trx.items || []).map((item, index) => {
+                const product = productBySku[item.sku] || {};
+                const qty = exportNumber(item.qty);
+                const hargaJual = exportNumber(item.hargaJual);
+                const hpp = exportNumber(item.hpp);
+
                 return {
-                    'ID Transaksi': doc.id, 'Tanggal': trx.tanggal?.toDate ? trx.tanggal.toDate() : new Date(trx.tanggal), 'Channel': trx.channel,
-                    'Item Terjual': (trx.items || []).map(item => `${item.qty}x ${item.sku}`).join('; '), 'Subtotal': trx.subtotal,
-                    'Total Diskon': trx.diskon?.totalDiscount || 0, 'Total Akhir (Omset Bersih)': trx.total, 'Total HPP': totalHPP,
-                    'Total Biaya Marketplace': totalBiayaMarketplace,
-                    'Rincian Biaya': (trx.biaya?.rincian || []).map(b => `${b.name}: ${b.value.toFixed(0)}`).join('; '),
-                    'Estimasi Laba Bersih': labaBersih
+                    'ID Transaksi': trx.docId || trx.id || '',
+                    'No Item': index + 1,
+                    'ID Pesanan Marketplace': trx.marketplaceOrderId || trx.orderId || '',
+                    'Tanggal Transaksi': formatExportDate(trx.tanggal || trx.createdAt),
+                    'Channel': trx.channel || getChannelName(trx.channelId),
+                    'SKU': item.sku || '',
+                    'Nama Produk': product.product_name || product.nama || getProductName(item.sku),
+                    'Warna': product.color || product.warna || '',
+                    'Ukuran': product.variant || product.varian || '',
+                    'Qty': qty,
+                    'Harga Jual / Pcs': hargaJual,
+                    'HPP / Pcs': hpp,
+                    'Subtotal Item': hargaJual * qty,
+                    'HPP Item': hpp * qty,
+                    'Status Pencairan': trx.statusPencairan || ''
                 };
             });
-            const transactionsSheet = XLSX.utils.json_to_sheet(transactionsData);
-            transactionsSheet['!cols'] = Array(11).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, transactionsSheet, "Transactions");
-        }
-        
-        // --- MEMBUAT SHEET PRODUKSI LENGKAP ---
-        const productionSnap = await getDocs(query(collection(db, "production_batches"), where("userId", "==", userId)));
-        if (!productionSnap.empty) {
-            const productionData = productionSnap.docs.flatMap(doc => {
-                const batch = doc.data();
-                return (batch.kainBahan || []).map(item => {
-                    const modelInfo = userSettings.modelProduk.find(m => m.id === item.modelProdukId) || {};
-                    const yardPerModel = item.yardPerModel || modelInfo.yardPerModel || 1;
-                    const targetQty = yardPerModel > 0 ? Math.floor((item.totalYard || 0) / yardPerModel) : 0;
-                    const aktualFinal = (item.aktualJadi || 0) + (item.aktualJadiKombinasi || 0);
-                    const selisih = aktualFinal - targetQty;
-                    const totalBiayaKain = (item.totalYard || 0) * (item.hargaKainPerYard || 0);
-                    const hargaJasa = batch.produksiType === 'penjahit' ? (item.hargaJahitPerPcs || 0) : (item.hargaMaklunPerPcs || 0);
-                    const totalBiayaJasa = (item.aktualJadi || 0) * hargaJasa;
-                    const totalBiayaAlat = (item.aktualJadi || 0) > 0 ? (item.biayaAlat || 0) : 0;
-                    const totalBiayaProduksi = totalBiayaKain + totalBiayaJasa + totalBiayaAlat;
-                    const hppFinal = aktualFinal > 0 ? totalBiayaProduksi / aktualFinal : 0;
-                    const hppIdeal = targetQty > 0 ? totalBiayaProduksi / targetQty : hppFinal;
-                    return {
-                        'ID Batch': doc.id, 'Tanggal Produksi': batch.tanggal?.toDate ? batch.tanggal.toDate() : new Date(batch.tanggal), 'Nama Pekerja': batch.namaStatus,
-                        'Jenis Pekerja': batch.produksiType, 'Model Produk': modelInfo.namaModel || 'N/A', 'Nama Kain': item.namaKain,
-                        'Total Yard': item.totalYard, 'Target Qty': targetQty, 'Aktual Jadi': item.aktualJadi, 'Selisih (Aktual - Target)': selisih,
-                        'Total Biaya Kain': totalBiayaKain, 'Total Biaya Jasa': totalBiayaJasa, 'Total Biaya Alat': totalBiayaAlat,
-                        'Total Biaya Produksi': totalBiayaProduksi, 'HPP Ideal/Pcs': hppIdeal, 'HPP Final/Pcs': hppFinal,
-                    };
-                });
+        });
+
+        appendExportSheet(workbook, '08 Transaksi Detail', transactionDetailRows, [30, 12, 28, 22, 22, 22, 36, 18, 14, 12, 18, 18, 18, 18, 20]);
+
+        // =========================
+        // 09. RETUR DETAIL
+        // =========================
+        const returnRows = filteredReturns.flatMap(retur => {
+            return (retur.items || []).map((item, index) => {
+                const product = productBySku[item.sku] || {};
+
+                return {
+                    'ID Retur': retur.docId || retur.id || '',
+                    'No Item': index + 1,
+                    'Tanggal Retur': formatExportDate(retur.tanggal || retur.createdAt),
+                    'ID Transaksi Asal': retur.originalTransactionId || '',
+                    'Channel': getChannelName(retur.channelId),
+                    'SKU': item.sku || '',
+                    'Nama Produk': product.product_name || product.nama || getProductName(item.sku),
+                    'Warna': product.color || product.warna || '',
+                    'Ukuran': product.variant || product.varian || '',
+                    'Qty Retur': exportNumber(item.qty),
+                    'Nilai Retur': exportNumber(item.nilaiRetur),
+                    'Nilai Diskon Retur': exportNumber(item.nilaiDiskon),
+                    'Biaya Marketplace Batal': exportNumber(item.biayaMarketplace),
+                    'Alasan': item.alasan || ''
+                };
             });
-            const productionSheet = XLSX.utils.json_to_sheet(productionData);
-            productionSheet['!cols'] = Array(16).fill({ wch: 25 });
-            XLSX.utils.book_append_sheet(workbook, productionSheet, "Production Batches");
-        }
+        });
 
-        // --- Menambahkan Laporan Ringkasan Tahunan ---
-        for (const yearKey in userSummary) {
-            if (yearKey.startsWith('summary_')) {
-                const year = yearKey.split('_')[1];
-                const summaryForYear = userSummary[yearKey];
-                if (summaryForYear) {
-                    // Laporan Transaksi (Sudah Lengkap)
-                    const trxReportData = [];
-                    for (let i = 1; i <= 12; i++) {
-                        const monthStr = i.toString().padStart(2, '0');
-                        const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
-                        const data = summaryForYear.months?.[monthStr] || {};
-                        trxReportData.push({'Bulan': monthName, 'QTY Terjual': data.totalQty || 0, 'Omset Kotor': data.omsetKotor || 0, 'Total Diskon': data.totalDiskon || 0, 'Total Nilai Retur': data.nilaiRetur || 0, 'Omset Bersih': data.omsetBersih || 0, 'Total HPP Terjual': data.hppTerjual || 0, 'Total Biaya Transaksi': data.biayaTransaksi || 0, 'Laba Kotor': data.labaKotor || 0});
-                    }
-                    const trxYearly = summaryForYear.yearlyTotals || {};
-                    trxReportData.push({'Bulan': `TOTAL ${year}`, 'QTY Terjual': trxYearly.totalQty || 0, 'Omset Kotor': trxYearly.omsetKotor || 0, 'Total Diskon': trxYearly.totalDiskon || 0, 'Total Nilai Retur': trxYearly.nilaiRetur || 0, 'Omset Bersih': trxYearly.omsetBersih || 0, 'Total HPP Terjual': trxYearly.hppTerjual || 0, 'Total Biaya Transaksi': trxYearly.biayaTransaksi || 0, 'Laba Kotor': trxYearly.labaKotor || 0});
-                    const trxSheet = XLSX.utils.json_to_sheet(trxReportData);
-                    trxSheet['!cols'] = Array(9).fill({ wch: 20 });
-                    XLSX.utils.book_append_sheet(workbook, trxSheet, `Lap Transaksi ${year}`);
+        appendExportSheet(workbook, '09 Retur Detail', returnRows, [30, 12, 22, 30, 22, 22, 36, 18, 14, 14, 18, 20, 22, 40]);
 
-                    // --- PERBAIKAN DI SINI: Laporan Keuangan ---
-                    const finReportData = [];
-                    for (let i = 1; i <= 12; i++) {
-                        const monthStr = i.toString().padStart(2, '0');
-                        const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
-                        const data = summaryForYear.months?.[monthStr] || {};
-                        finReportData.push({
-                            'Bulan': monthName,
-                            'Omset Kotor': data.omsetKotor || 0, // <-- Kolom yang hilang
-                            'Omset Bersih': data.omsetBersih || 0,
-                            'Laba Kotor': data.labaKotor || 0,
-                            'Biaya Transaksi': data.biayaTransaksi || 0,
-                            'Biaya Operasional': data.biayaOperasional || 0,
-                            'Laba Bersih': data.labaBersihOperasional || 0
-                        });
-                    }
-                    const finYearly = summaryForYear.yearlyTotals || {};
-                    finReportData.push({
-                        'Bulan': `TOTAL ${year}`,
-                        'Omset Kotor': finYearly.omsetKotor || 0, // <-- Kolom yang hilang
-                        'Omset Bersih': finYearly.omsetBersih || 0,
-                        'Laba Kotor': finYearly.labaKotor || 0,
-                        'Biaya Transaksi': finYearly.biayaTransaksi || 0,
-                        'Biaya Operasional': finYearly.biayaOperasional || 0,
-                        'Laba Bersih': finYearly.labaBersihOperasional || 0
-                    });
-                    const finSheet = XLSX.utils.json_to_sheet(finReportData);
-                    finSheet['!cols'] = Array(7).fill({ wch: 20 }); // <-- Jumlah kolom disesuaikan
-                    XLSX.utils.book_append_sheet(workbook, finSheet, `Lap Keuangan ${year}`);
-                }
-            }
-        }
-        
-        const otherCollections = ['products', 'categories', 'investors', 'investor_payments'];
-        for (const collName of otherCollections) {
-            const q = query(collection(db, collName), where("userId", "==", userId));
-            const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-                 let data = snapshot.docs.map(doc => {
-                    const item = {id: doc.id, ...doc.data()};
-                    // eslint-disable-next-line no-unused-vars
-                    for (const key in item) {
-                        if (item[key] && typeof item[key].toDate === 'function') {
-                            item[key] = item[key].toDate();
-                        }
-                    }
-                    delete item.userId;
-                    return item;
-                });
-                const worksheet = XLSX.utils.json_to_sheet(data);
-                // eslint-disable-next-line no-unused-vars
-                worksheet['!cols'] = Object.keys(data[0] || {}).map(key => ({ wch: 20 }));
-                XLSX.utils.book_append_sheet(workbook, worksheet, collName);
-            }
-        }
-        
-        const fileName = `Export_Data_${userEmail}_${new Date().toISOString().split('T')[0]}.xlsx`;
-        XLSX.writeFile(workbook, fileName);
-        alert('Data berhasil diekspor!');
+        // =========================
+        // 10. KEUANGAN
+        // =========================
+        const financeRows = filteredKeuangan.map(item => ({
+            'ID Keuangan': item.docId || item.id || '',
+            'Tanggal': formatExportDate(item.tanggal || item.createdAt),
+            'Jenis': item.jenis || '',
+            'Kategori': item.kategori || '',
+            'Jumlah': exportNumber(item.jumlah),
+            'Metode Bayar': item.paymentMethod || item.metodeBayar || '',
+            'Bank / Rekening': item.bankName || item.bankAccountName || '',
+            'Catatan': item.catatan || ''
+        }));
+
+        appendExportSheet(workbook, '10 Keuangan', financeRows, [30, 22, 20, 30, 18, 22, 28, 50]);
+
+        // =========================
+        // 11. PRODUKSI DETAIL
+        // =========================
+        const productionRows = filteredProduction.flatMap(batch => {
+            return (batch.kainBahan || []).map((item, index) => {
+                const modelInfo = (userSettings.modelProduk || []).find(model => model.id === item.modelProdukId) || {};
+                const yardPerModel = exportNumber(item.yardPermodel || item.yardPerModel || modelInfo.yardPerModel || 1);
+                const totalYard = exportNumber(item.totalYard);
+                const targetQty = yardPerModel > 0 ? Math.floor(totalYard / yardPerModel) : 0;
+                const aktualJadi = exportNumber(item.aktualJadi);
+                const aktualJadiKombinasi = exportNumber(item.aktualJadiKombinasi);
+                const aktualFinal = aktualJadi + aktualJadiKombinasi;
+                const selisih = aktualFinal - targetQty;
+                const hargaKainPerYard = exportNumber(item.hargaKainPerYard);
+                const totalBiayaKain = totalYard * hargaKainPerYard;
+                const hargaJasa = batch.produksiType === 'penjahit'
+                    ? exportNumber(item.hargaJahitPerPcs)
+                    : exportNumber(item.hargaMaklunPerPcs);
+                const totalBiayaJasa = aktualJadi * hargaJasa;
+                const totalBiayaAlat = aktualFinal > 0 ? exportNumber(item.biayaAlat) : 0;
+                const totalBiayaProduksi = totalBiayaKain + totalBiayaJasa + totalBiayaAlat;
+                const hppFinal = aktualFinal > 0 ? totalBiayaProduksi / aktualFinal : 0;
+                const hppIdeal = targetQty > 0 ? totalBiayaProduksi / targetQty : hppFinal;
+
+                return {
+                    'ID Batch': batch.docId || batch.id || '',
+                    'No Item': index + 1,
+                    'Tanggal Produksi': formatExportDate(batch.tanggal || batch.createdAt),
+                    'Tipe Produksi': batch.produksiType || '',
+                    'Nama Pekerja / Status': batch.namaStatus || batch.namastatus || batch.orangMemproses || '',
+                    'Status Proses': batch.statusProses || '',
+                    'Status Pembayaran': batch.statusPembayaran || '',
+                    'Tanggal Pembayaran': formatExportDate(batch.tanggalPembayaran),
+                    'Model Produk': modelInfo.namaModel || modelMap[item.modelProdukId] || '',
+                    'SKU Hasil': item.sku || '',
+                    'Nama Kain': item.namaKain || '',
+                    'Toko Kain': item.tokoKain || '',
+                    'Warna Kain': item.warnaKain || '',
+                    'Ukuran': item.ukuran || '',
+                    'Total Yard': totalYard,
+                    'Yard Per Model': yardPerModel,
+                    'Target Qty': targetQty,
+                    'Aktual Jadi': aktualJadi,
+                    'Aktual Jadi Kombinasi': aktualJadiKombinasi,
+                    'Aktual Final': aktualFinal,
+                    'Selisih': selisih,
+                    'Harga Kain / Yard': hargaKainPerYard,
+                    'Total Biaya Kain': totalBiayaKain,
+                    'Harga Jasa / Pcs': hargaJasa,
+                    'Total Biaya Jasa': totalBiayaJasa,
+                    'Biaya Alat': totalBiayaAlat,
+                    'Total Biaya Produksi': totalBiayaProduksi,
+                    'HPP Ideal / Pcs': hppIdeal,
+                    'HPP Final / Pcs': hppFinal,
+                    'Sudah Masuk Stok': item.isInventoried ? 'Ya' : 'Belum'
+                };
+            });
+        });
+
+        appendExportSheet(workbook, '11 Produksi Detail', productionRows, [30, 12, 22, 18, 28, 20, 20, 22, 28, 22, 24, 24, 20, 14, 14, 16, 14, 14, 22, 14, 14, 18, 20, 18, 20, 18, 22, 18, 18, 18]);
+
+        // =========================
+        // 12. SUPPLIER
+        // =========================
+        const supplierRows = suppliersRaw.map(supplier => ({
+            'ID Supplier': supplier.docId || supplier.id || '',
+            'Nama Supplier': supplier.name || supplier.nama || '',
+            'Kontak': supplier.contact || supplier.kontak || '',
+            'Alamat': supplier.address || supplier.alamat || '',
+            'Catatan': supplier.notes || supplier.catatan || '',
+            'Tanggal Dibuat': formatExportDate(supplier.createdAt)
+        }));
+
+        appendExportSheet(workbook, '12 Supplier', supplierRows, [30, 30, 24, 45, 45, 22]);
+
+        // =========================
+        // 13. PURCHASE ORDER DETAIL
+        // =========================
+        const purchaseOrderRows = filteredPurchaseOrders.flatMap(order => {
+            return (order.produk || order.items || []).map((item, index) => {
+                const qty = exportNumber(item.qty);
+                const hargaBeli = exportNumber(item.hargaBeli || item.price || item.harga);
+
+                return {
+                    'ID Purchase Order': order.docId || order.id || '',
+                    'No Item': index + 1,
+                    'Tanggal': formatExportDate(order.tanggal || order.createdAt),
+                    'ID Supplier': order.supplierId || '',
+                    'Nama Supplier': order.supplierName || '',
+                    'SKU': item.sku || '',
+                    'Nama Produk': item.modelName || item.productName || item.nama || '',
+                    'Warna': item.color || item.warna || '',
+                    'Ukuran': item.size || item.ukuran || '',
+                    'Qty': qty,
+                    'Harga Beli / Pcs': hargaBeli,
+                    'Subtotal': qty * hargaBeli,
+                    'Status Proses Item': item.statusProses || order.statusProses || '',
+                    'Status Pembayaran Item': item.statusPembayaran || '',
+                    'Status Pembayaran PO': order.statusPembayaran || '',
+                    'Dibayarkan': exportNumber(order.dibayarkan),
+                    'Total Qty PO': exportNumber(order.totalQtyValue),
+                    'Catatan': order.catatan || ''
+                };
+            });
+        });
+
+        appendExportSheet(workbook, '13 Purchase Order', purchaseOrderRows, [30, 12, 22, 26, 30, 22, 36, 18, 14, 12, 18, 18, 22, 24, 24, 18, 16, 45]);
+
+        // =========================
+        // 14. INVESTOR
+        // =========================
+        const investorRows = investorsRaw.map(investor => ({
+            'ID Investor': investor.docId || investor.id || '',
+            'Nama Investor': investor.name || '',
+            'Nominal Investasi': exportNumber(investor.amount),
+            'Bagi Hasil (%)': exportNumber(investor.profitShare),
+            'Tanggal Mulai': formatExportDate(investor.startDate, false),
+            'Status': investor.status || '',
+            'Tanggal Dibuat': formatExportDate(investor.createdAt)
+        }));
+
+        appendExportSheet(workbook, '14 Investor', investorRows, [30, 30, 20, 18, 18, 16, 22]);
+
+        // =========================
+        // 15. PEMBAYARAN INVESTOR
+        // =========================
+        const investorPaymentRows = filteredInvestorPayments.map(payment => ({
+            'ID Pembayaran': payment.docId || payment.id || '',
+            'Tanggal Bayar': formatExportDate(payment.paymentDate || payment.tanggal || payment.createdAt),
+            'Nama Investor': payment.investorName || '',
+            'Periode Laporan': payment.period || '',
+            'Laba Bersih Periode': exportNumber(payment.labaBersihPeriode),
+            'Persentase Bagi Hasil (%)': exportNumber(payment.profitSharePercentage),
+            'Bagian Investor': exportNumber(payment.investorShare),
+            'Bagian Perusahaan': exportNumber(payment.companyShare),
+            'Metode Bayar': payment.paymentMethod || '',
+            'Biaya Admin': exportNumber(payment.adminFee),
+            'Total Dibayar': exportNumber(payment.totalPayment),
+            'Bank Tujuan': payment.bankDetails?.bankName || '',
+            'Nomor Rekening': payment.bankDetails?.accountNumber || '',
+            'Atas Nama': payment.bankDetails?.accountName || ''
+        }));
+
+        appendExportSheet(workbook, '15 Bayar Investor', investorPaymentRows, [30, 22, 30, 22, 22, 24, 20, 20, 18, 18, 18, 24, 28, 30]);
+
+        // =========================
+        // 16. RINGKASAN PERIODE
+        // =========================
+        const totalOmset = transactionSummaryRows.reduce((sum, row) => sum + exportNumber(row['Total Akhir']), 0);
+        const totalSubtotal = transactionSummaryRows.reduce((sum, row) => sum + exportNumber(row['Subtotal']), 0);
+        const totalDiskon = transactionSummaryRows.reduce((sum, row) => sum + exportNumber(row['Total Diskon']), 0);
+        const totalHpp = transactionSummaryRows.reduce((sum, row) => sum + exportNumber(row['Total HPP']), 0);
+        const totalBiayaMarketplace = transactionSummaryRows.reduce((sum, row) => sum + exportNumber(row['Biaya Marketplace']), 0);
+        const totalNilaiRetur = returnRows.reduce((sum, row) => sum + exportNumber(row['Nilai Retur']), 0);
+        const totalKeuanganMasuk = financeRows
+            .filter(row => String(row['Jenis']).includes('pemasukan'))
+            .reduce((sum, row) => sum + exportNumber(row['Jumlah']), 0);
+        const totalKeuanganKeluar = financeRows
+            .filter(row => String(row['Jenis']).includes('pengeluaran') || String(row['Jenis']).includes('biaya'))
+            .reduce((sum, row) => sum + exportNumber(row['Jumlah']), 0);
+
+        appendExportSheet(workbook, '16 Ringkasan Periode', [
+            { Metrik: 'Periode Export', Nilai: exportRange.label },
+            { Metrik: 'Jumlah Transaksi', Nilai: transactionSummaryRows.length },
+            { Metrik: 'Jumlah Item Transaksi', Nilai: transactionDetailRows.length },
+            { Metrik: 'Jumlah Retur Item', Nilai: returnRows.length },
+            { Metrik: 'Jumlah Data Keuangan', Nilai: financeRows.length },
+            { Metrik: 'Jumlah Batch Produksi', Nilai: filteredProduction.length },
+            { Metrik: 'Jumlah Item Produksi', Nilai: productionRows.length },
+            { Metrik: 'Jumlah Purchase Order Item', Nilai: purchaseOrderRows.length },
+            { Metrik: 'Total Subtotal Transaksi', Nilai: totalSubtotal },
+            { Metrik: 'Total Diskon', Nilai: totalDiskon },
+            { Metrik: 'Total Omset Bersih Transaksi', Nilai: totalOmset },
+            { Metrik: 'Total HPP Transaksi', Nilai: totalHpp },
+            { Metrik: 'Total Biaya Marketplace', Nilai: totalBiayaMarketplace },
+            { Metrik: 'Total Nilai Retur', Nilai: totalNilaiRetur },
+            { Metrik: 'Total Pemasukan Lain', Nilai: totalKeuanganMasuk },
+            { Metrik: 'Total Pengeluaran / Biaya', Nilai: totalKeuanganKeluar },
+            { Metrik: 'Estimasi Laba Sebelum Pengeluaran Operasional', Nilai: totalOmset - totalHpp - totalBiayaMarketplace - totalNilaiRetur }
+        ], [42, 28]);
+
+        const safeEmail = String(userEmail || 'user')
+            .replace(/[^a-zA-Z0-9@._-]/g, '_')
+            .substring(0, 80);
+
+        const safePeriod = String(exportRange.label)
+            .replace(/[^a-zA-Z0-9_-]/g, '_')
+            .substring(0, 40);
+
+        const fileName = `Fashion_OS_Admin_Export_${safeEmail}_${safePeriod}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+        XLSX.writeFile(workbook, fileName, { cellDates: true });
+
+        alert('Data berhasil diekspor dengan format rapi.');
 
     } catch (error) {
         console.error("Gagal mengekspor data pelanggan:", error);
