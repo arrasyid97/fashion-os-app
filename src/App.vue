@@ -2601,14 +2601,14 @@ async function submitAddProduct() {
 
 const laporanKeuanganData = computed(() => {
     const year = uiState.laporanKeuanganTahun;
-    const summaryForYear = state.summaryData?.[`summary_${year}`];
+    
     const months = [];
 
     const dataTransaksiMentah = state.transaksi || [];
     const dataKeuanganMentah = state.keuangan || [];
 
     for (let i = 1; i <= 12; i++) {
-        const monthStr = i.toString().padStart(2, '0');
+        
         const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
 
         let data = null;
@@ -2681,12 +2681,12 @@ const laporanKeuanganData = computed(() => {
 
 const laporanTransaksiData = computed(() => {
     const year = uiState.laporanTransaksiTahun;
-    const summaryForYear = state.summaryData?.[`summary_${year}`];
+    
     const months = [];
     const dataTransaksiMentah = state.transaksi || [];
 
     for (let i = 1; i <= 12; i++) {
-        const monthStr = i.toString().padStart(2, '0');
+        
         const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
         
         let data = null;
