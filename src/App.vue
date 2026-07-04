@@ -563,12 +563,13 @@ const loadDataForPage = async (pageName) => {
                 dataPromises.push(fetchProductionData(userId));
                 break;
             case 'laporan-transaksi':
-            case 'laporan-keuangan': {
-                dataPromises.push(fetchSummaryData(userId));
-                // Ambil juga data transaksi mentah sebagai fallback jika cloud function belum merangkum
-                dataPromises.push(fetchTransactionAndReturnData(userId));
-                break;
-            }
+case 'laporan-keuangan': {
+    // Laporan harus pakai data mentah terbaru, bukan summary lama.
+    // Summary lama bisa masih menyimpan transaksi yang sudah dihapus.
+    dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
+    dataPromises.push(fetchKeuanganData());
+    break;
+}
             case 'keuangan':
                 dataPromises.push(fetchKeuanganData());
                 break;
@@ -2610,7 +2611,7 @@ const laporanKeuanganData = computed(() => {
         const monthStr = i.toString().padStart(2, '0');
         const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
 
-        let data = summaryForYear?.months?.[monthStr] || null;
+        let data = null;
 
         const trxBulanIni = dataTransaksiMentah.filter(t => {
             const d = new Date(t.tanggal);
@@ -2688,7 +2689,7 @@ const laporanTransaksiData = computed(() => {
         const monthStr = i.toString().padStart(2, '0');
         const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
         
-        let data = summaryForYear?.months?.[monthStr] || null;
+        let data = null;
 
         // Jika data dari server kosong, hitung manual secara real-time di lokal
         if (!data) {
@@ -10319,15 +10320,20 @@ const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate
             uiState.transaksiLastVisible = transactionSnap.docs[transactionSnap.docs.length - 1];
 
             transactionSnap.forEach(docSnap => {
-                const data = docSnap.data();
+    const data = docSnap.data();
 
-                state.transaksi.push({
-                    id: docSnap.id,
-                    ...data,
-                    tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : data.tanggal,
-                    tanggalPencairan: data.tanggalPencairan?.toDate ? data.tanggalPencairan.toDate() : data.tanggalPencairan
-                });
-            });
+    const normalizedTransaction = {
+        id: docSnap.id,
+        ...data,
+        tanggal: data.tanggal?.toDate ? data.tanggal.toDate() : data.tanggal,
+        tanggalPencairan: data.tanggalPencairan?.toDate ? data.tanggalPencairan.toDate() : data.tanggalPencairan
+    };
+
+    // Jangan tampilkan transaksi yang sudah dihapus / diarsipkan.
+    if (!isActiveExportRecord(normalizedTransaction)) return;
+
+    state.transaksi.push(normalizedTransaction);
+});
         }
 
         if (forceAll) {
@@ -10486,21 +10492,22 @@ const fetchKeuanganData = async () => {
     try {
         const keuanganSnap = await getDocs(q);
         
-        const fetchedKeuangan = keuanganSnap.docs.map(doc => {
-            const data = doc.data();
-            const docId = doc.id;
+        const fetchedKeuangan = keuanganSnap.docs
+    .map(doc => {
+        const data = doc.data();
+        const docId = doc.id;
 
-            // Konversi Firestore Timestamp ke JavaScript Date
-            const dateObject = (data.tanggal && typeof data.tanggal.toDate === 'function') 
-                               ? data.tanggal.toDate() 
-                               : data.tanggal; 
-            
-            return { 
-                id: docId, 
-                ...data, 
-                tanggal: dateObject
-            };
-        });
+        const dateObject = (data.tanggal && typeof data.tanggal.toDate === 'function') 
+                           ? data.tanggal.toDate() 
+                           : data.tanggal; 
+        
+        return { 
+            id: docId, 
+            ...data, 
+            tanggal: dateObject
+        };
+    })
+    .filter(isActiveExportRecord);
         
         // Update State dengan data yang sudah terurut stabil
         state.keuangan = fetchedKeuangan; 
