@@ -3948,14 +3948,7 @@ async function deleteCategory(categoryId) {
         alert("Gagal menghapus kategori. Silakan coba lagi.");
     }
 }
-function trackCompleteRegistration(method = 'email') {
-    if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
-        window.fbq('track', 'CompleteRegistration', {
-            content_name: 'Fashion OS Account Registration',
-            method: method
-        });
-    }
-}
+
 // GANTI SELURUH FUNGSI handleRegister INI
 async function handleRegister() {
     try {
@@ -4000,10 +3993,7 @@ async function handleRegister() {
         }
 
         await setDoc(userDocRef, newUserData, { merge: true });
-
-trackCompleteRegistration(authForm.activationCode ? 'email_activation_code' : 'email_trial');
-
-authForm.error = '';
+        authForm.error = '';
     } catch (error) {
         if (error.code === 'auth/email-already-in-use') {
             authForm.error = 'Alamat email ini sudah terdaftar. Silakan gunakan email lain atau login.';
@@ -4123,11 +4113,8 @@ async function signInWithGoogle() {
                 trialEndDate: threeDaysLater,
             };
             await setDoc(userDocRef, newUserData);
-
-trackCompleteRegistration('google_trial');
-
-// Perubahan teks notifikasi di sini
-alert('Selamat datang! Anda mendapatkan free trial selama 3 hari.');
+            // Perubahan teks notifikasi di sini
+            alert('Selamat datang! Anda mendapatkan free trial selama 3 hari.');
         } else {
             // Jika pengguna lama, tidak perlu melakukan apa-apa
             alert('Selamat datang kembali!');

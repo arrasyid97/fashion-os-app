@@ -20,19 +20,8 @@ export default {
   methods: {
     async login() {
       const auth = getAuth();
-
       try {
-        await signInWithEmailAndPassword(
-          auth,
-          this.email,
-          this.password
-        );
-
-        // Meta Pixel - Login Success
-        if (typeof window !== "undefined" && typeof window.fbq === "function") {
-          window.fbq("trackCustom", "LoginSuccess");
-        }
-
+        await signInWithEmailAndPassword(auth, this.email, this.password);
         alert("Login berhasil!");
         this.$router.push("/"); // arahkan ke halaman utama
       } catch (error) {
@@ -50,12 +39,10 @@ export default {
   width: 300px;
   margin: 100px auto;
 }
-
 .login input {
   margin-bottom: 10px;
   padding: 8px;
 }
-
 .login button {
   padding: 10px;
 }
