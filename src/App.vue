@@ -9396,180 +9396,242 @@ const transactionDetails = computed(() => {
 
 const panduanData = [
     {
-        icon: '📊',
-        title: 'Dashboard Analitik',
-        subtitle: 'Pusat Komando dan Visi Strategis Bisnis Anda.',
-        content: `
-            <p>Dashboard adalah kokpit utama operasional Anda. Halaman ini menyajikan denyut nadi bisnis secara visual dan intuitif untuk pengambilan keputusan yang cepat dan berbasis data.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Indikator Kinerja Utama (KPI):</strong> Pantau metrik fundamental seperti Omset Bersih, Laba Kotor, Biaya Operasional, dan Laba Bersih.</li>
-                <li><strong>Analisis Periodik:</strong> Gunakan filter waktu yang fleksibel (harian, bulanan, tahunan) untuk mengevaluasi kinerja dan menemukan tren bisnis Anda.</li>
-                <li><strong>Cepat & Akurat:</strong> Sistem dirancang untuk menampilkan data laporan jangka panjang secara instan tanpa membuat aplikasi menjadi lambat.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '🛒',
-        title: 'Kasir (Point of Sale)',
-        subtitle: 'Akurasi dan Kontrol Penuh untuk Setiap Transaksi.',
-        content: `
-            <p>Halaman Kasir dirancang untuk memproses <strong>satu pesanan per satu waktu</strong> dengan tingkat akurasi dan kontrol tertinggi. Alur ini ideal untuk memverifikasi setiap detail pesanan sebelum finalisasi atau untuk penjualan langsung.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Prinsip "Satu Resi = Satu Keranjang":</strong> Setelah ID Pesanan (resi) di-scan atau dimasukkan, keranjang akan terkunci untuk memastikan tidak ada produk yang salah masuk ke pesanan yang salah.</li>
-                <li><strong>Input Fleksibel:</strong> Mendukung input via barcode scanner atau pencarian manual dengan rekomendasi otomatis.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '⚡️',
-        title: 'Proses Massal (Smart Scan)',
-        subtitle: 'Efisiensi Maksimal untuk Volume Pesanan Tinggi.',
-        content: `
-            <p>Halaman ini adalah solusi untuk efisiensi tertinggi saat volume pesanan sedang melonjak. Tujuannya adalah memproses banyak pesanan dengan interaksi minimal, baik menggunakan scanner (otomatis) maupun input manual.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Alur Scanner Otomatis:</strong> Scan produk, lalu scan resi. Sistem akan otomatis memfinalisasi pesanan dan siap untuk pesanan berikutnya tanpa klik.</li>
-                <li><strong>Alur Input Manual:</strong> Ketik produk, lalu ketik ID Pesanan, dan klik tombol "Jadikan ID Pesanan" untuk memfinalisasi.</li>
-                <li><strong>Proses Antrian:</strong> Setelah semua pesanan terkumpul, klik "Proses Semua Antrian" untuk menyimpan semua transaksi dan memotong stok secara serentak.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '📦',
-        title: 'Manajemen Inventaris',
-        subtitle: 'Kendalikan Stok Fisik dan Alokasi Digital Secara Terpusat.',
-        content: `
-            <p>Modul ini memisahkan dua konsep kunci untuk kontrol stok yang superior dan mencegah <i>overselling</i>.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Stok Fisik:</strong> Jumlah total produk yang secara nyata ada di gudang Anda.</li>
-                <li><strong>Alokasi Stok:</strong> "Jatah" stok yang Anda putuskan untuk ditampilkan di setiap marketplace, yang tidak bisa melebihi Stok Fisik.</li>
-                <li><strong>Manajemen Stok:</strong> Lakukan penyesuaian stok (stok opname, barang rusak) atau catat stok masuk dari halaman ini.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '💲',
-        title: 'Harga, HPP & Promosi',
-        subtitle: 'Arsitektur Profitabilitas untuk Setiap Produk Anda.',
-        content: `
-            <p>Di sinilah Anda merancang fondasi keuntungan untuk setiap item yang Anda jual.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Input HPP & Harga Jual:</strong> Masukkan Harga Pokok Penjualan (HPP) dan atur harga jual yang berbeda untuk setiap marketplace.</li>
-                <li><strong>Manajemen Promosi:</strong> Atur promosi berlapis, mulai dari <strong>Voucher Toko</strong> (berlaku umum) hingga <strong>Diskon Bertingkat</strong> yang spesifik untuk model produk tertentu.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '🏭',
-        title: 'Manajemen Produksi',
-        subtitle: 'Visibilitas Penuh dari Bahan Baku hingga Produk Jadi.',
-        content: `
-            <p>Ubah proses produksi yang kompleks menjadi alur kerja yang transparan dan terukur. Lacak setiap perintah kerja sebagai sebuah <strong>Batch Produksi</strong>.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Pencatatan Detail:</strong> Catat setiap bahan kain yang digunakan, biaya jasa (maklun/jahit), dan kuantitas hasil produksi (Aktual Jadi).</li>
-                <li><strong>Analisis Efisiensi:</strong> Gunakan fitur laporan seperti "Analisis Model" untuk mengevaluasi kinerja pemaklun atau penjahit berdasarkan selisih antara target dan hasil.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '🧵',
-        title: 'Gudang Stok Kain',
-        subtitle: 'Manajemen Aset Bahan Baku sebagai Fondasi Produksi.',
-        content: `
-            <p>Setiap produksi yang hebat dimulai dari bahan baku yang terkelola dengan baik. Catat setiap pembelian kain baru, lengkap dengan nama, warna, sisa yard, asal toko, dan harga beli per yard.</p>
-        `
-    },
-    {
-        icon: '💰',
-        title: 'Manajemen Keuangan',
-        subtitle: 'Pencatatan Arus Kas Operasional untuk Laba Bersih Akurat.',
-        content: `
-            <p>Halaman ini berfungsi sebagai buku kas digital untuk semua arus uang di luar transaksi produk.</p>
-             <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Catat Pengeluaran:</strong> Dokumentasikan setiap <strong>biaya operasional</strong>—mulai dari gaji, listrik, hingga pemasaran.</li>
-                <li><strong>Catat Pemasukan Lain:</strong> Lacak <strong>pemasukan non-penjualan</strong> seperti suntikan modal dari investor.</li>
-                <li><strong>Akurasi Laba Bersih:</strong> Data dari modul ini menyempurnakan kalkulasi Laba Bersih di Dashboard.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '🤝',
-        title: 'Manajemen Investor',
-        subtitle: 'Transparansi dan Pertumbuhan Melalui Permodalan Eksternal.',
-        content: `
-            <p>Kelola semua aktivitas yang berkaitan dengan permodalan dari investor secara profesional dan transparan.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Pencatatan Terpusat:</strong> Catat setiap investor, jumlah modal, dan persentase bagi hasil.</li>
-                <li><strong>Laporan Otomatis:</strong> Buat laporan bagi hasil yang detail dan akurat untuk periode manapun hanya dengan beberapa klik.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '🧾',
-        title: 'Laporan Transaksi',
-        subtitle: 'Rincian Performa Penjualan dari Bulan ke Bulan.',
-        content: `
-            <p>Halaman ini memberikan rincian performa penjualan Anda, dipecah per bulan untuk tahun yang dipilih. Laporan ini berfokus pada metrik yang berhubungan langsung dengan transaksi.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Super Cepat:</strong> Laporan ini dirancang untuk dapat menampilkan data tahunan secara instan tanpa membuat aplikasi lambat.</li>
-                <li><strong>Metrik Utama:</strong> Anda bisa melihat perbandingan bulanan untuk QTY Terjual, Omset Kotor, Diskon, Retur, Omset Bersih, HPP Terjual, Biaya Transaksi, dan Laba Kotor.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '📈',
-        title: 'Laporan Keuangan',
-        subtitle: 'Analisis Laba Rugi Tahunan & Bulanan Secara Instan.',
-        content: `
-            <p>Berbeda dengan Laporan Transaksi, halaman ini memberikan gambaran laba-rugi bisnis secara menyeluruh dengan memasukkan biaya operasional.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Performa Finansial:</strong> Ini adalah tempat untuk melihat gambaran besar kesehatan finansial bisnis Anda dari bulan ke bulan.</li>
-                <li><strong>Laba Bersih Akurat:</strong> Metrik kunci di sini adalah <strong>Laba Bersih</strong>, yang dihitung dari Laba Kotor dikurangi semua biaya, termasuk biaya operasional.</li>
-                <li><strong>Sangat Efisien:</strong> Halaman ini juga dirancang agar dapat menampilkan data setahun penuh secara instan.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '🎯',
-        title: 'Kalkulator Target ROAS',
-        subtitle: 'Alat Bantu untuk Merencanakan & Mengoptimalkan Budget Iklan.',
-        content: `
-            <p>Halaman ini adalah alat bantu strategis yang tidak terhubung ke data transaksi Anda, berfungsi sebagai kalkulator mandiri untuk merencanakan kampanye iklan.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Hitung Titik Impas:</strong> Secara otomatis menghitung <strong>ROAS Impas (BEP)</strong>, yaitu target ROAS minimum agar biaya iklan Anda kembali modal.</li>
-                <li><strong>Tentukan Target Profit:</strong> Menunjukkan target ROAS yang harus Anda capai untuk mendapatkan margin keuntungan tertentu (misal 10%, 20%, dst.) setelah dikurangi biaya iklan.</li>
-                <li><strong>Simulasi Budget:</strong> Lakukan simulasi untuk melihat perkiraan jumlah order, omset, dan laba bersih yang bisa Anda dapatkan dengan budget iklan dan target ROAS tertentu.</li>
-            </ul>
-        `
-    },
-    {
-        icon: '↩️',
-        title: 'Manajemen Retur',
-        subtitle: 'Mengubah Keluhan Menjadi Peningkatan Kualitas dan Loyalitas.',
-        content: `
-            <p>Kelola setiap pengembalian produk bukan sebagai masalah, tetapi sebagai kesempatan untuk meningkatkan kualitas layanan Anda.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Penyesuaian Otomatis:</strong> Saat retur disimpan, stok fisik akan otomatis bertambah. Seluruh metrik di dasbor (omset, HPP, biaya, laba) juga akan disesuaikan secara otomatis.</li>
-            </ul>
-        `
-    },
-    {
+        id: 'pengaturan',
         icon: '⚙️',
-        title: 'Pengaturan',
-        subtitle: 'Cetak Biru dan Fondasi Digital untuk Operasional Bisnis.',
-        content: `
-            <p>Halaman ini adalah "ruang mesin" dari aplikasi Anda. Ketepatan data di sini akan menentukan akurasi kalkulasi di seluruh sistem.</p>
-            <ul class="list-disc list-inside mt-2 space-y-1">
-                <li><strong>Struktur Biaya Marketplace:</strong> Definisikan semua kanal penjualan beserta struktur biayanya.</li>
-                <li><strong>Model Produk Default:</strong> Tetapkan "resep" standar produksi untuk setiap model produk Anda.</li>
-                <li><strong>Keamanan PIN:</strong> Atur PIN utama dan aktifkan kunci keamanan untuk setiap halaman sensitif sesuai kebutuhan Anda.</li>
-            </ul>
-        `
+        title: '1. Pengaturan',
+        badge: 'Fondasi',
+        subtitle: 'Tempat mengatur aturan utama sebelum aplikasi dipakai.',
+        description: 'Halaman Pengaturan adalah pondasi Fashion OS. Bagian ini wajib dirapikan lebih dulu karena data marketplace, model produk, kategori, rekening, dan PIN akan dipakai oleh halaman lain.',
+        steps: [
+            'Isi Aturan Marketplace untuk Shopee, TikTok Shop, Offline, Website, atau channel lain.',
+            'Isi Model Produk agar produk, produksi, stok, laporan, dan ROAS bisa terbaca per model.',
+            'Isi kategori biaya dan kategori pemasukan supaya laporan keuangan rapi.',
+            'Isi rekening bank jika memakai fitur investasi, pembayaran, atau pencatatan rekening.',
+            'Atur PIN keamanan untuk halaman sensitif seperti dashboard, laporan, dan HPP.'
+        ],
+        tips: [
+            'Aturan Marketplace dan Model Produk wajib diisi sebelum tambah produk.',
+            'Jangan hapus model produk yang sudah dipakai transaksi.',
+            'Pastikan biaya marketplace sesuai channel agar profit tidak salah.'
+        ],
+        links: [
+            { label: 'Aturan Marketplace', page: 'pengaturan', tab: 'marketplace', primary: true },
+            { label: 'Model Produk', page: 'pengaturan', tab: 'modelproduk', primary: true },
+            { label: 'Rekening Bank', page: 'pengaturan', tab: 'rekening', primary: false }
+        ]
     },
+    {
+        id: 'produk',
+        icon: '📦',
+        title: '2. Inventaris Produk',
+        badge: 'Produk & Stok',
+        subtitle: 'Tempat membuat produk, SKU, warna, ukuran, dan stok.',
+        description: 'Inventaris dipakai untuk menyimpan semua data produk per varian. Data ini akan terhubung ke penjualan, retur, barcode, produksi, harga, HPP, dan laporan.',
+        steps: [
+            'Tambahkan produk berdasarkan model produk yang sudah dibuat.',
+            'Isi SKU yang rapi dan singkat untuk setiap warna dan ukuran.',
+            'Isi warna, ukuran, stok fisik, dan data varian lain.',
+            'Gunakan fitur stok untuk memantau produk yang aman, menipis, atau habis.',
+            'Gunakan barcode agar proses scan produk lebih cepat.'
+        ],
+        tips: [
+            'Gunakan pola SKU yang konsisten, contoh ARL-HTM-M.',
+            'Satu varian sebaiknya satu SKU.',
+            'Jangan membuat SKU terlalu panjang agar mudah discan dan dicari.'
+        ],
+        links: [
+            { label: 'Buka Inventaris', page: 'inventaris', primary: true },
+            { label: 'Panduan Barcode', page: 'barcode-generator', primary: false }
+        ]
+    },
+    {
+        id: 'harga',
+        icon: '🏷️',
+        title: '3. Harga & HPP',
+        badge: 'Profit',
+        subtitle: 'Tempat mengisi modal produk dan harga jual per channel.',
+        description: 'Halaman Harga & HPP sangat penting karena menjadi dasar perhitungan laba, margin, laporan keuangan, dashboard, dan ROAS.',
+        steps: [
+            'Isi HPP atau modal produk untuk setiap SKU.',
+            'Isi harga jual per channel marketplace.',
+            'Pastikan harga jual sesuai biaya tiap marketplace.',
+            'Gunakan data ini untuk membaca laba dan harga aman.',
+            'Update HPP jika ada perubahan biaya produksi atau pembelian.'
+        ],
+        tips: [
+            'Jangan mulai iklan sebelum HPP dan harga jual lengkap.',
+            'HPP kosong bisa membuat laporan profit tidak akurat.',
+            'Harga per marketplace bisa berbeda karena potongan biaya berbeda.'
+        ],
+        links: [
+            { label: 'Buka Harga & HPP', page: 'harga-hpp', primary: true },
+            { label: 'Kalkulator ROAS', page: 'roas-calculator', primary: false }
+        ]
+    },
+    {
+        id: 'produksi',
+        icon: '🏭',
+        title: '4. Produksi, Gudang Kain, dan Supplier',
+        badge: 'Produksi',
+        subtitle: 'Untuk mencatat kain, maklun, supplier, aktual jadi, dan pembelian barang.',
+        description: 'Modul produksi membantu bisnis fashion mencatat proses dari bahan sampai barang jadi. Cocok untuk brand yang produksi sendiri, maklun, atau mengambil barang dari supplier.',
+        steps: [
+            'Catat batch produksi berdasarkan model produk.',
+            'Isi kain, warna kain, yard, aktual jadi, biaya maklun, dan status pembayaran.',
+            'Pantau Gudang Kain untuk melihat penggunaan dan kebutuhan bahan.',
+            'Gunakan Supplier untuk mencatat penerimaan barang atau pembelian produk.',
+            'Pantau status proses dan status pembayaran supaya produksi tidak tercecer.'
+        ],
+        tips: [
+            'Isi model produk dulu sebelum mencatat produksi.',
+            'Aktual jadi harus dicatat agar stok produksi lebih jelas.',
+            'Supplier cocok dipakai jika barang masuk bukan dari produksi sendiri.'
+        ],
+        links: [
+            { label: 'Buka Produksi', page: 'produksi', primary: true },
+            { label: 'Gudang Kain', page: 'gudang-kain', primary: false },
+            { label: 'Supplier', page: 'supplier', primary: false }
+        ]
+    },
+    {
+        id: 'penjualan',
+        icon: '🛒',
+        title: '5. Penjualan',
+        badge: 'Transaksi',
+        subtitle: 'Untuk input transaksi harian dari offline, marketplace, atau toko sendiri.',
+        description: 'Modul penjualan dipakai untuk mencatat order masuk, mengurangi stok, membaca omset, dan menyiapkan data laporan.',
+        steps: [
+            'Gunakan Kasir POS untuk input transaksi satuan.',
+            'Gunakan Proses Massal untuk memproses banyak pesanan sekaligus.',
+            'Scan SKU atau cari produk agar input lebih cepat.',
+            'Isi channel penjualan supaya biaya marketplace terbaca.',
+            'Pantau transaksi agar stok dan laporan tetap sinkron.'
+        ],
+        tips: [
+            'Untuk pesanan banyak, gunakan Proses Massal agar lebih cepat.',
+            'Pastikan SKU sudah benar sebelum transaksi disimpan.',
+            'Pisahkan channel Shopee, TikTok, Offline, dan Website supaya laporan rapi.'
+        ],
+        links: [
+            { label: 'Kasir POS', page: 'transaksi', primary: true },
+            { label: 'Proses Massal', page: 'bulk_process', primary: true },
+            { label: 'Audit Data', page: 'audit-data', primary: false }
+        ]
+    },
+    {
+        id: 'retur',
+        icon: '↩️',
+        title: '6. Retur',
+        badge: 'Pengembalian',
+        subtitle: 'Untuk mencatat produk yang kembali dan menjaga laporan tetap akurat.',
+        description: 'Retur dipakai saat ada pesanan kembali, batal, gagal kirim, atau pengembalian produk. Data retur penting agar stok, omset, HPP, dan profit tidak salah.',
+        steps: [
+            'Cari transaksi atau produk yang mengalami retur.',
+            'Isi alasan retur dan jumlah produk yang kembali.',
+            'Pastikan stok kembali sesuai kondisi barang.',
+            'Pantau dampak retur ke laporan dan profit.',
+            'Gunakan catatan retur untuk evaluasi kualitas produk atau pengiriman.'
+        ],
+        tips: [
+            'Retur jangan dicatat manual di luar sistem agar laporan tetap sinkron.',
+            'Pisahkan retur karena pembeli, seller, gagal kirim, atau alasan lain.',
+            'Cek kembali stok setelah retur disimpan.'
+        ],
+        links: [
+            { label: 'Buka Retur', page: 'retur', primary: true },
+            { label: 'Laporan Transaksi', page: 'laporan-transaksi', primary: false }
+        ]
+    },
+    {
+        id: 'keuangan',
+        icon: '💰',
+        title: '7. Keuangan dan Laporan',
+        badge: 'Kontrol Profit',
+        subtitle: 'Untuk mencatat pemasukan, pengeluaran, transaksi, dan profit.',
+        description: 'Modul keuangan membantu membaca kondisi bisnis secara lebih jelas. Dari sini pengguna bisa melihat uang masuk, uang keluar, laba, dan laporan transaksi.',
+        steps: [
+            'Catat pemasukan lain di luar penjualan jika ada.',
+            'Catat pengeluaran operasional dan produksi.',
+            'Cek Laporan Transaksi untuk melihat data order.',
+            'Cek Laporan Keuangan untuk melihat laba dan biaya.',
+            'Gunakan Dashboard untuk ringkasan performa bisnis.'
+        ],
+        tips: [
+            'Pisahkan biaya produksi dan biaya operasional.',
+            'Catat pengeluaran rutin agar laba bersih tidak terlihat terlalu besar.',
+            'Gunakan filter tanggal untuk membaca performa harian, bulanan, atau custom.'
+        ],
+        links: [
+            { label: 'Keuangan', page: 'keuangan', primary: true },
+            { label: 'Laporan Keuangan', page: 'laporan-keuangan', primary: true },
+            { label: 'Laporan Transaksi', page: 'laporan-transaksi', primary: false },
+            { label: 'Dashboard', page: 'dashboard', primary: false }
+        ]
+    },
+    {
+        id: 'roas',
+        icon: '📊',
+        title: '8. Dashboard ROAS dan Kalkulator ROAS',
+        badge: 'Iklan',
+        subtitle: 'Untuk membaca performa iklan, BEP, profit, dan target ROAS.',
+        description: 'Modul ROAS dipakai untuk membantu mengambil keputusan iklan. Pengguna bisa membaca omset, HPP, diskon, biaya marketplace, biaya iklan, laba, dan target ROAS.',
+        steps: [
+            'Pilih periode tanggal yang ingin dianalisis.',
+            'Pilih channel penjualan atau semua channel.',
+            'Pilih model produk atau semua model.',
+            'Isi biaya iklan, diskon, pajak, dan biaya operasional jika dibutuhkan.',
+            'Baca ROAS, profit, dan target iklan sebelum scale budget.'
+        ],
+        tips: [
+            'ROAS akan lebih akurat jika transaksi, HPP, dan biaya marketplace sudah lengkap.',
+            'Analisis per model lebih aman daripada hanya melihat semua produk.',
+            'Gunakan Kalkulator ROAS untuk simulasi sebelum menjalankan iklan.'
+        ],
+        links: [
+            { label: 'Dashboard ROAS', page: 'roas-dashboard', primary: true },
+            { label: 'Kalkulator ROAS', page: 'roas-calculator', primary: true },
+            { label: 'Statistik Penjualan', page: 'statistik-penjualan', primary: false }
+        ]
+    },
+    {
+        id: 'promosi',
+        icon: '🎁',
+        title: '9. Promosi dan Catatan',
+        badge: 'Marketing',
+        subtitle: 'Untuk mengatur promo, voucher, komisi, dan catatan penting.',
+        description: 'Halaman promosi membantu mencatat aturan promo atau strategi penjualan agar tidak tercecer. Cocok untuk mencatat voucher, promosi per channel, promosi per model, atau catatan campaign.',
+        steps: [
+            'Catat promo yang sedang berjalan.',
+            'Pisahkan promo berdasarkan channel atau model produk.',
+            'Gunakan catatan agar strategi diskon tidak lupa.',
+            'Evaluasi promo dari hasil penjualan dan ROAS.',
+            'Pastikan promo tidak membuat harga jual menjadi boncos.'
+        ],
+        tips: [
+            'Setiap promo sebaiknya punya tanggal mulai dan tanggal selesai.',
+            'Jangan hanya lihat omset, cek juga profit setelah diskon.',
+            'Promo yang bagus harus tetap aman terhadap HPP dan biaya marketplace.'
+        ],
+        links: [
+            { label: 'Buka Promosi', page: 'promosi', primary: true },
+            { label: 'Dashboard ROAS', page: 'roas-dashboard', primary: false }
+        ]
+    }
 ];
 
-// [KODE BARUu] State untuk mengelola accordion di halaman panduan
-const panduanAccordion = ref(null);
+const panduanAccordion = ref('pengaturan');
 
+function openPanduanLink(link) {
+    if (!link) return;
+
+    if (link.tab) {
+        uiState.pengaturanTab = link.tab;
+    }
+
+    if (link.page) {
+        changePage(link.page);
+    }
+}
 
 async function deleteTransaction(transactionId) {
     if (!confirm(`Anda yakin ingin menghapus transaksi ID: ${transactionId}? Stok produk akan dikembalikan.`)) {
@@ -14937,44 +14999,270 @@ SKU-BAJU-PUTIH-S"
     </div>
 
 
-<div v-if="activePage === 'panduan'">
-    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-        <div class="max-w-5xl mx-auto">
-            
-            <div class="text-center mb-12 animate-fade-in-up">
-                <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800">
-                    <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Pusat Panduan Aplikasi</span>
-                </h2>
-                <p class="text-lg text-slate-600 mt-4 max-w-3xl mx-auto">
-                    Panduan komprehensif untuk membantu Anda menguasai setiap fitur dan memaksimalkan potensi bisnis Anda.
-                </p>
-            </div>
+<div v-if="activePage === 'panduan'" class="min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto space-y-8">
 
-            <div class="space-y-4">
-                <div v-for="(panduan, index) in panduanData" :key="panduan.title" 
-                     class="bg-white/70 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl animate-fade-in-up"
-                     :style="{ animationDelay: `${200 + index * 100}ms` }">
-                    
-                    <div @click="panduanAccordion = panduanAccordion === panduan.title ? null : panduan.title" 
-                         class="flex items-center gap-4 p-5 cursor-pointer">
-                        <div class="text-3xl flex-shrink-0">{{ panduan.icon }}</div>
-                        <div class="flex-1">
-                            <h3 class="text-lg font-semibold text-slate-800">{{ panduan.title }}</h3>
-                            <p class="text-sm text-slate-500">{{ panduan.subtitle }}</p>
+        <!-- HERO -->
+        <div class="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl shadow-2xl">
+            <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/20 via-purple-500/10 to-cyan-500/10"></div>
+
+            <div class="relative p-6 sm:p-10 lg:p-12">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+                    <div>
+                        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/10 text-indigo-100 text-sm font-bold mb-5">
+                            <span>📖</span>
+                            <span>Pusat Panduan Fashion OS</span>
                         </div>
-                        <svg class="w-6 h-6 text-slate-400 flex-shrink-0 transition-transform duration-300" 
-                             :class="{ 'rotate-180': panduanAccordion === panduan.title }" 
-                             fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
+
+                        <h2 class="text-4xl md:text-6xl font-black text-white leading-tight">
+                            Panduan Lengkap<br>
+                            <span class="bg-gradient-to-r from-indigo-300 via-white to-cyan-200 bg-clip-text text-transparent">
+                                Semua Fitur Aplikasi
+                            </span>
+                        </h2>
+
+                        <p class="text-slate-300 text-lg mt-5 max-w-3xl leading-relaxed">
+                            Pelajari fungsi setiap halaman Fashion OS dengan alur yang rapi. Mulai dari pengaturan,
+                            produk, stok, produksi, penjualan, retur, keuangan, laporan, sampai analisis ROAS.
+                        </p>
+
+                        <div class="flex flex-wrap gap-3 mt-7">
+                            <button @click="panduanAccordion = 'pengaturan'" class="bg-white text-slate-900 font-bold py-3 px-5 rounded-xl hover:bg-slate-100 transition shadow-lg">
+                                Mulai dari Pengaturan
+                            </button>
+
+                            <button @click="panduanAccordion = 'penjualan'" class="bg-indigo-600 text-white font-bold py-3 px-5 rounded-xl hover:bg-indigo-700 transition shadow-lg">
+                                Lihat Alur Penjualan
+                            </button>
+
+                            <a :href="'https://wa.me/' + nomorWhatsAppAdmin" target="_blank" class="bg-green-500 text-white font-bold py-3 px-5 rounded-xl hover:bg-green-600 transition shadow-lg">
+                                Chat Admin
+                            </a>
+                        </div>
                     </div>
 
-                    <div class="accordion-content" :class="{ 'open': panduanAccordion === panduan.title }">
-                        <div class="panduan-content p-5 pt-0 pl-16 text-slate-600 leading-relaxed prose prose-sm max-w-none" v-html="panduan.content"></div>
+                    <div class="grid grid-cols-2 gap-4 min-w-full lg:min-w-[380px]">
+                        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+                            <p class="text-3xl font-black text-white">01</p>
+                            <p class="text-sm text-slate-300 mt-1">Pengaturan</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+                            <p class="text-3xl font-black text-white">02</p>
+                            <p class="text-sm text-slate-300 mt-1">Produk & Stok</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+                            <p class="text-3xl font-black text-white">03</p>
+                            <p class="text-sm text-slate-300 mt-1">Penjualan</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+                            <p class="text-3xl font-black text-white">04</p>
+                            <p class="text-sm text-slate-300 mt-1">Laporan & ROAS</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- QUICK FLOW -->
+        <div class="bg-white rounded-3xl shadow-xl border border-slate-200 p-6 sm:p-8">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 mb-6">
+                <div>
+                    <p class="text-sm font-black text-indigo-600 uppercase tracking-wide">Alur Kerja Harian</p>
+                    <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
+                        Urutan paling aman saat memakai Fashion OS
+                    </h3>
+                    <p class="text-slate-600 mt-2">
+                        Jangan loncat langsung ke transaksi. Pastikan data dasar sudah rapi supaya laporan tidak salah hitung.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div class="rounded-2xl bg-indigo-50 border border-indigo-100 p-4">
+                    <div class="text-2xl mb-2">⚙️</div>
+                    <h4 class="font-black text-slate-900">Pengaturan</h4>
+                    <p class="text-sm text-slate-600 mt-1">Marketplace, model produk, kategori, rekening, PIN.</p>
+                </div>
+
+                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                    <div class="text-2xl mb-2">📦</div>
+                    <h4 class="font-black text-slate-900">Produk</h4>
+                    <p class="text-sm text-slate-600 mt-1">SKU, warna, ukuran, stok, harga, HPP.</p>
+                </div>
+
+                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                    <div class="text-2xl mb-2">🏭</div>
+                    <h4 class="font-black text-slate-900">Produksi</h4>
+                    <p class="text-sm text-slate-600 mt-1">Kain, maklun, supplier, aktual jadi.</p>
+                </div>
+
+                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                    <div class="text-2xl mb-2">🛒</div>
+                    <h4 class="font-black text-slate-900">Penjualan</h4>
+                    <p class="text-sm text-slate-600 mt-1">POS, proses massal, retur, audit data.</p>
+                </div>
+
+                <div class="rounded-2xl bg-green-50 border border-green-100 p-4">
+                    <div class="text-2xl mb-2">📊</div>
+                    <h4 class="font-black text-slate-900">Laporan</h4>
+                    <p class="text-sm text-slate-600 mt-1">Profit, keuangan, ROAS, statistik.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- GUIDE ACCORDION -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- LEFT HELP BOX -->
+            <div class="space-y-6">
+                <div class="bg-white rounded-3xl shadow-xl border border-slate-200 p-6">
+                    <h3 class="text-xl font-black text-slate-900">Cara baca panduan</h3>
+                    <p class="text-slate-600 text-sm mt-2 leading-relaxed">
+                        Klik salah satu modul, baca fungsi utamanya, lalu gunakan tombol di bawahnya untuk langsung masuk ke halaman terkait.
+                    </p>
+
+                    <div class="mt-5 space-y-3 text-sm">
+                        <div class="flex gap-3">
+                            <span class="text-green-600 font-black">✓</span>
+                            <span class="text-slate-700">Cocok untuk pengguna baru.</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-600 font-black">✓</span>
+                            <span class="text-slate-700">Menjelaskan kapan fitur dipakai.</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-600 font-black">✓</span>
+                            <span class="text-slate-700">Tombol langsung menuju halaman.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-br from-indigo-600 to-slate-900 rounded-3xl shadow-xl p-6 text-white">
+                    <p class="text-sm font-bold text-indigo-200 uppercase tracking-wide">Catatan Penting</p>
+                    <h3 class="text-xl font-black mt-2">Akurasi laporan bergantung dari data awal.</h3>
+                    <p class="text-indigo-100 mt-3 text-sm leading-relaxed">
+                        Marketplace, model produk, HPP, harga jual, dan stok harus rapi dulu sebelum transaksi mulai dicatat.
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-3xl shadow-xl border border-slate-200 p-6">
+                    <h3 class="text-xl font-black text-slate-900">Bantuan cepat</h3>
+                    <p class="text-slate-600 text-sm mt-2">
+                        Hubungi admin kalau ada bagian yang masih membingungkan.
+                    </p>
+                    <a :href="'https://wa.me/' + nomorWhatsAppAdmin" target="_blank" class="mt-5 inline-flex w-full justify-center bg-green-500 text-white font-bold py-3 px-5 rounded-xl hover:bg-green-600 transition">
+                        Chat Admin WhatsApp
+                    </a>
+                </div>
+            </div>
+
+            <!-- RIGHT ACCORDION -->
+            <div class="lg:col-span-2 space-y-4">
+                <div 
+                    v-for="panduan in panduanData" 
+                    :key="panduan.id"
+                    class="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden transition hover:shadow-2xl"
+                >
+                    <button 
+                        type="button"
+                        @click="panduanAccordion = panduanAccordion === panduan.id ? null : panduan.id"
+                        class="w-full flex items-start gap-4 p-5 sm:p-6 text-left hover:bg-slate-50 transition"
+                    >
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-2xl flex-shrink-0">
+                            {{ panduan.icon }}
+                        </div>
+
+                        <div class="flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="text-lg sm:text-xl font-black text-slate-900">
+                                    {{ panduan.title }}
+                                </h3>
+                                <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-black">
+                                    {{ panduan.badge }}
+                                </span>
+                            </div>
+                            <p class="text-sm text-slate-600 mt-1">
+                                {{ panduan.subtitle }}
+                            </p>
+                        </div>
+
+                        <span class="text-slate-400 text-2xl transition" :class="{ 'rotate-180': panduanAccordion === panduan.id }">
+                           ⌄
+                        </span>
+                    </button>
+
+                    <div v-show="panduanAccordion === panduan.id" class="px-5 sm:px-6 pb-6">
+                        <div class="border-t border-slate-100 pt-5">
+                            <p class="text-slate-700 leading-relaxed">
+                                {{ panduan.description }}
+                            </p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
+                                <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
+                                    <h4 class="font-black text-slate-900 mb-3">Yang dilakukan di halaman ini:</h4>
+                                    <ul class="space-y-2 text-sm text-slate-700">
+                                        <li v-for="step in panduan.steps" :key="step" class="flex gap-2">
+                                            <span class="text-indigo-600 font-black">•</span>
+                                            <span>{{ step }}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <div class="rounded-2xl bg-amber-50 border border-amber-200 p-4">
+                                    <h4 class="font-black text-amber-900 mb-3">Tips pemakaian:</h4>
+                                    <ul class="space-y-2 text-sm text-amber-800">
+                                        <li v-for="tip in panduan.tips" :key="tip" class="flex gap-2">
+                                            <span class="font-black">✓</span>
+                                            <span>{{ tip }}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap gap-3 mt-5">
+                                <button
+                                    v-for="link in panduan.links"
+                                    :key="link.label"
+                                    @click="openPanduanLink(link)"
+                                    class="font-bold py-2.5 px-4 rounded-xl transition"
+                                    :class="link.primary 
+                                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg' 
+                                        : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'"
+                                >
+                                    {{ link.label }} →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- FINAL CTA -->
+        <div class="bg-white rounded-3xl shadow-xl border border-slate-200 p-6 sm:p-8">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                <div>
+                    <p class="text-sm font-black text-green-600 uppercase tracking-wide">Panduan selesai</p>
+                    <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
+                        Gunakan Fashion OS dari data dasar sampai laporan profit.
+                    </h3>
+                    <p class="text-slate-600 mt-2">
+                        Mulai dari pengaturan, lanjut produk, stok, penjualan, lalu cek laporan dan ROAS.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <button @click="changePage('panduan-baru')" class="bg-indigo-600 text-white font-bold py-3 px-5 rounded-xl hover:bg-indigo-700">
+                        Panduan Pengguna Baru
+                    </button>
+                    <button @click="changePage('dashboard')" class="bg-slate-900 text-white font-bold py-3 px-5 rounded-xl hover:bg-slate-800">
+                        Buka Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
