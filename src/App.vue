@@ -15058,26 +15058,101 @@ SKU-BAJU-PUTIH-S"
                 <div class="space-y-4">
 
                     <!-- STEP 1 -->
-                    <div class="group rounded-2xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-lg transition">
-                        <div class="flex gap-4">
-                            <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0">1</div>
-                            <div class="flex-1">
-                                <h4 class="font-black text-slate-900 text-lg">Isi Pengaturan Dasar</h4>
-                                <p class="text-slate-600 mt-1">
-                                    Tambahkan channel penjualan, model produk, kategori biaya, kategori pemasukan, rekening, dan PIN keamanan.
-                                </p>
-                                <div class="flex flex-wrap gap-2 mt-4">
-                                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">Channel</span>
-                                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">Model Produk</span>
-                                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">Kategori</span>
-                                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">PIN</span>
-                                </div>
-                                <button @click="changePage('pengaturan')" class="mt-4 text-indigo-700 font-bold hover:text-indigo-900">
-                                    Buka Pengaturan →
-                                </button>
+<div class="group rounded-2xl border-2 border-indigo-200 bg-indigo-50/60 p-5 hover:border-indigo-400 hover:shadow-lg transition">
+    <div class="flex gap-4">
+        <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0">1</div>
+
+        <div class="flex-1">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+                <h4 class="font-black text-slate-900 text-lg">Wajib Isi Pengaturan Awal</h4>
+                <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-black">
+                    WAJIB PERTAMA
+                </span>
+            </div>
+
+            <p class="text-slate-700 mt-1 leading-relaxed">
+                Sebelum menambahkan produk, transaksi, produksi, atau laporan, pengguna baru wajib mengisi
+                <strong>Aturan Marketplace</strong> dan <strong>Model Produk</strong> terlebih dahulu.
+                Dua bagian ini adalah fondasi utama agar harga, HPP, stok, laporan, dan ROAS bisa terbaca dengan benar.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+
+                <!-- MARKETPLACE -->
+                <div class="rounded-2xl bg-white border border-indigo-200 p-4 shadow-sm">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-xl flex-shrink-0">
+                            🛒
+                        </div>
+                        <div>
+                            <h5 class="font-black text-slate-900">A. Isi Aturan Marketplace</h5>
+                            <p class="text-sm text-slate-600 mt-1">
+                                Tambahkan semua channel jualan seperti Shopee, TikTok Shop, Offline, Website, atau marketplace lain.
+                            </p>
+
+                            <div class="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                <p class="text-xs font-bold text-slate-500 uppercase mb-1">Yang perlu diisi:</p>
+                                <ul class="text-sm text-slate-700 space-y-1">
+                                    <li>• Nama channel penjualan</li>
+                                    <li>• Biaya admin marketplace</li>
+                                    <li>• Biaya layanan / program tambahan</li>
+                                    <li>• Biaya per pesanan jika ada</li>
+                                </ul>
                             </div>
+
+                            <button 
+                                @click="uiState.pengaturanTab = 'marketplace'; changePage('pengaturan')" 
+                                class="mt-4 w-full bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 transition">
+                                Buka Aturan Marketplace →
+                            </button>
                         </div>
                     </div>
+                </div>
+
+                <!-- MODEL PRODUK -->
+                <div class="rounded-2xl bg-white border border-indigo-200 p-4 shadow-sm">
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl flex-shrink-0">
+                            👗
+                        </div>
+                        <div>
+                            <h5 class="font-black text-slate-900">B. Isi Model Produk</h5>
+                            <p class="text-sm text-slate-600 mt-1">
+                                Tambahkan nama model produk utama, misalnya Aurelia, Amara, Elara, atau model lain yang kamu jual.
+                            </p>
+
+                            <div class="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                <p class="text-xs font-bold text-slate-500 uppercase mb-1">Kenapa wajib?</p>
+                                <ul class="text-sm text-slate-700 space-y-1">
+                                    <li>• Produk akan mengambil data dari model</li>
+                                    <li>• Laporan bisa dibaca per model</li>
+                                    <li>• Produksi dan stok lebih rapi</li>
+                                    <li>• ROAS bisa dianalisis per model</li>
+                                </ul>
+                            </div>
+
+                            <button 
+                                @click="uiState.pengaturanTab = 'modelproduk'; changePage('pengaturan')" 
+                                class="mt-4 w-full bg-purple-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-purple-700 transition">
+                                Buka Model Produk →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="mt-5 rounded-2xl bg-amber-50 border border-amber-200 p-4">
+                <p class="font-black text-amber-800 mb-1">Urutan yang benar:</p>
+                <p class="text-sm text-amber-800 leading-relaxed">
+                    1. Isi <strong>Aturan Marketplace</strong> → 
+                    2. Isi <strong>Model Produk</strong> → 
+                    3. Baru masuk ke <strong>Inventaris</strong> untuk tambah produk/SKU.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
 
                     <!-- STEP 2 -->
                     <div class="group rounded-2xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-lg transition">
