@@ -405,39 +405,60 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
 
 const onboardingSteps = [
     {
-        title: 'Isi Channel Penjualan',
-        subtitle: 'Langkah pertama adalah menambahkan channel tempat Anda berjualan.',
-        description: 'Contohnya Shopee, TikTok Shop, Offline, Website, atau marketplace lain. Data channel ini penting agar harga, biaya marketplace, transaksi, dan laporan bisa dipisahkan dengan rapi.',
+        title: 'Isi Pengaturan Dasar',
+        subtitle: 'Mulai dari fondasi aplikasi terlebih dahulu.',
+        description: 'Tambahkan channel penjualan, model produk, kategori biaya, kategori pemasukan, rekening, dan PIN keamanan. Data ini menjadi dasar untuk stok, harga, transaksi, laporan, dan ROAS.',
         pageName: 'pengaturan',
         pageLabel: 'Buka Pengaturan'
     },
     {
-        title: 'Isi Model Produk',
-        subtitle: 'Tambahkan model produk fashion yang Anda jual.',
-        description: 'Contohnya Nama model produknya atau nama model lain. Model produk akan membantu aplikasi membaca performa penjualan, stok, produksi, dan ROAS per model.',
-        pageName: 'pengaturan',
-        pageLabel: 'Buka Pengaturan'
-    },
-    {
-        title: 'Tambah Produk / SKU',
-        subtitle: 'Masukkan produk lengkap dengan warna, ukuran, dan SKU.',
-        description: 'Contohnya Nama Model Salwa Warna Hitam Jadi SLW-HTM-M. SKU harus rapi Dan Singkat karena akan dipakai untuk stok, proses pesanan, scan barcode, retur, dan laporan.',
+        title: 'Tambah Produk dan SKU',
+        subtitle: 'Masukkan produk lengkap per warna dan ukuran.',
+        description: 'Buat produk dengan SKU yang rapi agar stok, barcode, proses pesanan, retur, dan laporan bisa terbaca dengan benar.',
         pageName: 'inventaris',
         pageLabel: 'Buka Inventaris'
     },
     {
-        title: 'Isi Harga & HPP',
-        subtitle: 'Lengkapi harga jual dan modal produk.',
-        description: 'Harga jual dan HPP dibutuhkan agar aplikasi bisa menghitung laba, margin, ROAS, harga aman, dan laporan keuangan dengan benar.',
+        title: 'Isi Harga Jual dan HPP',
+        subtitle: 'Lengkapi modal dan harga jual produk.',
+        description: 'Harga jual dan HPP wajib diisi agar aplikasi bisa menghitung margin, laba, laporan profit, dan target ROAS dengan akurat.',
         pageName: 'harga-hpp',
         pageLabel: 'Buka Harga & HPP'
     },
     {
+        title: 'Atur Stok Awal',
+        subtitle: 'Pastikan stok fisik dan alokasi stok sudah sesuai.',
+        description: 'Setelah produk dibuat, masukkan stok awal setiap varian. Ini penting agar penjualan, retur, dan laporan stok tidak berantakan.',
+        pageName: 'inventaris',
+        pageLabel: 'Buka Inventaris'
+    },
+    {
+        title: 'Kelola Produksi dan Supplier',
+        subtitle: 'Gunakan jika bisnis Anda mencatat produksi, kain, atau pembelian supplier.',
+        description: 'Di halaman produksi, supplier, dan gudang kain, Anda bisa mencatat proses produksi, kebutuhan bahan, aktual jadi, pembayaran maklun, dan penerimaan barang.',
+        pageName: 'produksi',
+        pageLabel: 'Buka Produksi'
+    },
+    {
         title: 'Mulai Input Penjualan',
-        subtitle: 'Setelah data dasar siap, Anda bisa mulai memproses penjualan.',
-        description: 'Anda bisa memakai Kasir POS, Proses Massal, Audit Pencairan Dana, dan Manajemen Retur sesuai kebutuhan operasional toko.',
+        subtitle: 'Gunakan Kasir POS atau Proses Massal.',
+        description: 'Untuk input satuan gunakan Kasir POS. Untuk pesanan banyak gunakan Proses Massal. Setelah itu, pantau audit pencairan dan retur agar data tetap rapi.',
         pageName: 'bulk_process',
         pageLabel: 'Buka Proses Massal'
+    },
+    {
+        title: 'Pantau Keuangan dan Laporan',
+        subtitle: 'Cek arus uang, laporan transaksi, dan laporan keuangan.',
+        description: 'Gunakan halaman keuangan dan laporan untuk memantau pemasukan, pengeluaran, transaksi, profit, dan kondisi bisnis secara lebih terukur.',
+        pageName: 'laporan-keuangan',
+        pageLabel: 'Buka Laporan Keuangan'
+    },
+    {
+        title: 'Analisis ROAS dan Profit Iklan',
+        subtitle: 'Gunakan Dashboard ROAS dan Kalkulator ROAS.',
+        description: 'Setelah data penjualan dan biaya lengkap, Anda bisa membaca performa iklan, target ROAS, BEP, profit, dan evaluasi per model produk.',
+        pageName: 'roas-dashboard',
+        pageLabel: 'Buka Dashboard ROAS'
     }
 ];
 
@@ -14957,89 +14978,336 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
 
-<div v-if="activePage === 'panduan-baru'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-    <div class="max-w-4xl mx-auto">
-        
-        <div class="text-center mb-12 animate-fade-in-up">
-            <div class="flex flex-wrap justify-between items-center gap-4">
-                <div class="text-left">
-                    <h2 class="text-4xl md:text-5xl font-extrabold text-slate-800">
-                        <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Selamat Datang di Fashion OS!</span>
-                    </h2>
-                    <p class="text-lg text-slate-600 mt-4 max-w-2xl">
-                        Ikuti 4 langkah sederhana ini untuk memulai dan membuat aplikasi siap digunakan untuk bisnis Anda.
+<div v-if="activePage === 'panduan-baru'" class="min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto">
+
+        <!-- HERO -->
+        <div class="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl shadow-2xl mb-8">
+            <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/20 via-purple-500/10 to-cyan-500/10"></div>
+
+            <div class="relative p-6 sm:p-10 lg:p-12">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+                    <div>
+                        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/10 text-indigo-100 text-sm font-semibold mb-5">
+                            <span>🚀</span>
+                            <span>Panduan Setup Awal Fashion OS</span>
+                        </div>
+
+                        <h2 class="text-4xl md:text-6xl font-black text-white leading-tight">
+                            Mulai dari Nol,<br>
+                            <span class="bg-gradient-to-r from-indigo-300 via-white to-cyan-200 bg-clip-text text-transparent">
+                                Sampai Siap Dipakai
+                            </span>
+                        </h2>
+
+                        <p class="text-slate-300 text-lg mt-5 max-w-3xl leading-relaxed">
+                            Ikuti alur ini agar data produk, stok, harga, penjualan, produksi, keuangan, dan ROAS
+                            tersusun rapi sejak awal. Panduan ini dibuat untuk pengguna baru supaya tidak bingung harus mulai dari mana.
+                        </p>
+
+                        <div class="flex flex-wrap gap-3 mt-7">
+                            <button @click="changePage('pengaturan')" class="bg-white text-slate-900 font-bold py-3 px-5 rounded-xl hover:bg-slate-100 transition shadow-lg">
+                                Mulai dari Pengaturan
+                            </button>
+
+                            <button @click="changePage('inventaris')" class="bg-indigo-600 text-white font-bold py-3 px-5 rounded-xl hover:bg-indigo-700 transition shadow-lg">
+                                Lanjut ke Produk
+                            </button>
+
+                            <a :href="'https://wa.me/' + nomorWhatsAppAdmin" target="_blank" class="bg-green-500 text-white font-bold py-3 px-5 rounded-xl hover:bg-green-600 transition shadow-lg">
+                                Hubungi Admin
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 min-w-full lg:min-w-[360px]">
+                        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+                            <p class="text-3xl font-black text-white">01</p>
+                            <p class="text-sm text-slate-300 mt-1">Data dasar</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+                            <p class="text-3xl font-black text-white">02</p>
+                            <p class="text-sm text-slate-300 mt-1">Produk & stok</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+                            <p class="text-3xl font-black text-white">03</p>
+                            <p class="text-sm text-slate-300 mt-1">Penjualan</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
+                            <p class="text-3xl font-black text-white">04</p>
+                            <p class="text-sm text-slate-300 mt-1">Laporan & ROAS</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QUICK START -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-xl p-6 sm:p-8">
+                <div class="flex items-center justify-between gap-4 mb-6">
+                    <div>
+                        <p class="text-sm font-bold text-indigo-600 uppercase tracking-wide">Alur Paling Aman</p>
+                        <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">Ikuti urutan ini dulu</h3>
+                    </div>
+                    <div class="hidden sm:flex w-14 h-14 rounded-2xl bg-indigo-100 text-indigo-700 items-center justify-center text-2xl">
+                        ✅
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+
+                    <!-- STEP 1 -->
+                    <div class="group rounded-2xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-lg transition">
+                        <div class="flex gap-4">
+                            <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0">1</div>
+                            <div class="flex-1">
+                                <h4 class="font-black text-slate-900 text-lg">Isi Pengaturan Dasar</h4>
+                                <p class="text-slate-600 mt-1">
+                                    Tambahkan channel penjualan, model produk, kategori biaya, kategori pemasukan, rekening, dan PIN keamanan.
+                                </p>
+                                <div class="flex flex-wrap gap-2 mt-4">
+                                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">Channel</span>
+                                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">Model Produk</span>
+                                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">Kategori</span>
+                                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">PIN</span>
+                                </div>
+                                <button @click="changePage('pengaturan')" class="mt-4 text-indigo-700 font-bold hover:text-indigo-900">
+                                    Buka Pengaturan →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2 -->
+                    <div class="group rounded-2xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-lg transition">
+                        <div class="flex gap-4">
+                            <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0">2</div>
+                            <div class="flex-1">
+                                <h4 class="font-black text-slate-900 text-lg">Masukkan Produk, SKU, Warna, Ukuran, dan Stok</h4>
+                                <p class="text-slate-600 mt-1">
+                                    Buat produk per varian agar stok, barcode, retur, penjualan, dan laporan bisa terbaca rapi.
+                                </p>
+                                <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 mt-4 text-sm">
+                                    Contoh SKU yang rapi: <strong>ARL-HTM-M</strong> untuk Aurelia Hitam ukuran M.
+                                </div>
+                                <button @click="changePage('inventaris')" class="mt-4 text-indigo-700 font-bold hover:text-indigo-900">
+                                    Buka Inventaris →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3 -->
+                    <div class="group rounded-2xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-lg transition">
+                        <div class="flex gap-4">
+                            <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0">3</div>
+                            <div class="flex-1">
+                                <h4 class="font-black text-slate-900 text-lg">Isi Harga Jual dan HPP</h4>
+                                <p class="text-slate-600 mt-1">
+                                    Lengkapi modal produk dan harga jual per channel supaya laba, margin, laporan, dan ROAS tidak salah hitung.
+                                </p>
+                                <button @click="changePage('harga-hpp')" class="mt-4 text-indigo-700 font-bold hover:text-indigo-900">
+                                    Buka Harga & HPP →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 4 -->
+                    <div class="group rounded-2xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-lg transition">
+                        <div class="flex gap-4">
+                            <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0">4</div>
+                            <div class="flex-1">
+                                <h4 class="font-black text-slate-900 text-lg">Mulai Proses Penjualan</h4>
+                                <p class="text-slate-600 mt-1">
+                                    Gunakan Kasir POS untuk input manual, Proses Massal untuk pesanan banyak, lalu pantau retur dan audit pencairan.
+                                </p>
+                                <div class="flex flex-wrap gap-3 mt-4">
+                                    <button @click="changePage('transaksi')" class="bg-slate-900 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-800">
+                                        Kasir POS
+                                    </button>
+                                    <button @click="changePage('bulk_process')" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">
+                                        Proses Massal
+                                    </button>
+                                    <button @click="changePage('retur')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">
+                                        Retur
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 5 -->
+                    <div class="group rounded-2xl border border-slate-200 p-5 hover:border-green-300 hover:shadow-lg transition">
+                        <div class="flex gap-4">
+                            <div class="w-11 h-11 rounded-xl bg-green-600 text-white flex items-center justify-center font-black flex-shrink-0">5</div>
+                            <div class="flex-1">
+                                <h4 class="font-black text-slate-900 text-lg">Pantau Laporan, Profit, dan ROAS</h4>
+                                <p class="text-slate-600 mt-1">
+                                    Setelah transaksi masuk, cek Dashboard, Laporan Keuangan, Laporan Transaksi, Dashboard ROAS, dan Kalkulator ROAS.
+                                </p>
+                                <div class="flex flex-wrap gap-3 mt-4">
+                                    <button @click="changePage('dashboard')" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">
+                                        Dashboard
+                                    </button>
+                                    <button @click="changePage('roas-dashboard')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">
+                                        Dashboard ROAS
+                                    </button>
+                                    <button @click="changePage('laporan-keuangan')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">
+                                        Laporan Keuangan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- SIDE PANEL -->
+            <div class="space-y-6">
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+                    <h3 class="text-xl font-black text-slate-900">Checklist Sebelum Jualan</h3>
+                    <div class="space-y-3 mt-5 text-sm text-slate-700">
+                        <div class="flex gap-3">
+                            <span class="text-green-600 font-black">✓</span>
+                            <span>Channel penjualan sudah dibuat.</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-600 font-black">✓</span>
+                            <span>Model produk sudah diisi.</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-600 font-black">✓</span>
+                            <span>Produk dan SKU sudah rapi.</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-600 font-black">✓</span>
+                            <span>Stok awal sudah masuk.</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-600 font-black">✓</span>
+                            <span>HPP dan harga jual sudah lengkap.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-br from-indigo-600 to-slate-900 rounded-3xl shadow-xl p-6 text-white">
+                    <p class="text-sm font-bold text-indigo-200 uppercase tracking-wide">Tips Penting</p>
+                    <h3 class="text-xl font-black mt-2">Jangan langsung input penjualan kalau data dasar belum rapi.</h3>
+                    <p class="text-indigo-100 mt-3 text-sm leading-relaxed">
+                        Kalau SKU, HPP, channel, atau stok belum lengkap, laporan profit dan ROAS bisa tidak akurat.
                     </p>
                 </div>
 
-                <a href="https://wa.me/6285691803476" target="_blank" class="bg-green-500 text-white font-bold py-3 px-5 rounded-lg hover:bg-green-600 transition-colors shadow-lg flex items-center gap-2 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.487 5.235 3.487 8.413 0 6.557-5.338 11.892-11.894 11.892-1.99 0-3.903-.52-5.687-1.475L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.886-.001 2.267.655 4.398 1.905 6.344l-1.332 4.869 4.869-1.332z"/></svg>
-                    Hubungi Admin
-                </a>
-            </div>
-        </div>
-
-        <div class="space-y-8">
-            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-                <div class="flex items-start gap-6">
-                    <div class="text-4xl font-black text-indigo-200">01</div>
-                    <div>
-                        <h3 class="text-2xl font-bold text-indigo-700 mb-2">Lakukan Pengaturan Awal</h3>
-                        <p class="text-slate-700 mb-4">Ini adalah fondasi dari seluruh aplikasi. Pastikan Anda mengisinya terlebih dahulu sebelum melanjutkan ke langkah lain.</p>
-                        <div class="space-y-3">
-                            <p><strong>A. Atur Marketplace:</strong> Daftarkan semua toko online Anda (Shopee, Tokopedia, dll) beserta biaya adminnya.</p>
-                            <p><strong>B. Atur Model Produk:</strong> Buat "cetakan" untuk setiap model produk Anda (misal: Gamis Salwa Hitam M), lengkap dengan kebutuhan kain dan harga jasa maklun/jahit.</p>
-                        </div>
-                        <button @click="changePage('pengaturan')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
-                            Buka Halaman Pengaturan &raquo;
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                <div class="flex items-start gap-6">
-                    <div class="text-4xl font-black text-indigo-200">02</div>
-                    <div>
-                        <h3 class="text-2xl font-bold text-indigo-700 mb-2">Tambahkan Semua Produk Anda</h3>
-                        <p class="text-slate-700 mb-4">Setelah pengaturan selesai, daftarkan semua varian produk Anda yang ada di gudang ke dalam sistem.</p>
-                        <ul class="list-disc list-inside space-y-2 text-slate-700">
-                            <li>Klik tombol <strong>"+ Tambah Produk Baru"</strong>.</li>
-                            <li>Pilih **Model Produk** yang sudah Anda buat di Langkah 1, maka beberapa kolom akan terisi otomatis.</li>
-                            <li>Setelah produk ditambahkan, gunakan tombol <strong>"Penyesuaian Stok"</strong> untuk memasukkan jumlah stok awal setiap produk.</li>
-                        </ul>
-                        <button @click="changePage('inventaris')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
-                            Buka Halaman Inventaris &raquo;
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 300ms;">
-                <div class="flex items-start gap-6">
-                    <div class="text-4xl font-black text-indigo-200">03</div>
-                    <div>
-                        <h3 class="text-2xl font-bold text-indigo-700 mb-2">Atur Harga Jual & HPP</h3>
-                        <p class="text-slate-700 mb-4">Produk Anda perlu harga. Di halaman ini, Anda bisa mengatur HPP (modal) dan harga jual yang berbeda untuk setiap marketplace.</p>
-                        <button @click="changePage('harga-hpp')" class="mt-6 bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 transition-colors">
-                            Buka Halaman Harga & HPP &raquo;
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 400ms;">
-                <div class="flex items-start gap-6">
-                    <div class="text-4xl font-black text-green-300">04</div>
-                    <div>
-                        <h3 class="text-2xl font-bold text-green-700 mb-2">Aplikasi Siap Digunakan!</h3>
-                        <p class="text-slate-700 mb-4">Selamat! Anda sekarang siap untuk mencatat setiap transaksi penjualan menggunakan halaman **Kasir (POS)** atau **Proses Massal**.</p>
-                        <button @click="changePage('transaksi')" class="mt-6 bg-green-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-green-700 transition-colors">
-                            Mulai Gunakan Kasir &raquo;
-                        </button>
-                    </div>
+                <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+                    <h3 class="text-xl font-black text-slate-900">Butuh bantuan?</h3>
+                    <p class="text-slate-600 text-sm mt-2">
+                        Hubungi admin kalau bingung saat setup awal.
+                    </p>
+                    <a :href="'https://wa.me/' + nomorWhatsAppAdmin" target="_blank" class="mt-5 inline-flex w-full justify-center bg-green-500 text-white font-bold py-3 px-5 rounded-xl hover:bg-green-600 transition">
+                        Chat Admin WhatsApp
+                    </a>
                 </div>
             </div>
         </div>
+
+        <!-- FEATURE GUIDE -->
+        <div class="mt-8">
+            <div class="text-center mb-8">
+                <p class="text-indigo-200 font-bold uppercase tracking-wide text-sm">Setelah Data Dasar Siap</p>
+                <h3 class="text-3xl sm:text-4xl font-black text-white mt-2">Kenali Modul Utama Fashion OS</h3>
+                <p class="text-slate-300 mt-3 max-w-3xl mx-auto">
+                    Bagian ini membantu pengguna baru memahami fungsi setiap halaman tanpa harus menebak-nebak.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+
+                <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+                    <div class="text-3xl mb-4">📦</div>
+                    <h4 class="font-black text-slate-900 text-lg">Inventaris</h4>
+                    <p class="text-slate-600 text-sm mt-2">Tempat mengatur produk, SKU, warna, ukuran, stok fisik, dan alokasi stok.</p>
+                    <button @click="changePage('inventaris')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                </div>
+
+                <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+                    <div class="text-3xl mb-4">🏷️</div>
+                    <h4 class="font-black text-slate-900 text-lg">Harga & HPP</h4>
+                    <p class="text-slate-600 text-sm mt-2">Tempat mengisi modal produk dan harga jual per channel penjualan.</p>
+                    <button @click="changePage('harga-hpp')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                </div>
+
+                <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+                    <div class="text-3xl mb-4">🏭</div>
+                    <h4 class="font-black text-slate-900 text-lg">Produksi</h4>
+                    <p class="text-slate-600 text-sm mt-2">Catat proses produksi, kain, maklun, aktual jadi, dan status pembayaran.</p>
+                    <button @click="changePage('produksi')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                </div>
+
+                <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+                    <div class="text-3xl mb-4">🧵</div>
+                    <h4 class="font-black text-slate-900 text-lg">Gudang Kain</h4>
+                    <p class="text-slate-600 text-sm mt-2">Pantau kain yang dipakai untuk produksi dan sisa kebutuhan bahan.</p>
+                    <button @click="changePage('gudang-kain')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                </div>
+
+                <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+                    <div class="text-3xl mb-4">🛒</div>
+                    <h4 class="font-black text-slate-900 text-lg">Kasir POS</h4>
+                    <p class="text-slate-600 text-sm mt-2">Input penjualan manual, offline, marketplace, atau toko sendiri.</p>
+                    <button @click="changePage('transaksi')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                </div>
+
+                <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+                    <div class="text-3xl mb-4">⚡</div>
+                    <h4 class="font-black text-slate-900 text-lg">Proses Massal</h4>
+                    <p class="text-slate-600 text-sm mt-2">Proses banyak pesanan dengan input massal agar kerja lebih cepat.</p>
+                    <button @click="changePage('bulk_process')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                </div>
+
+                <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+                    <div class="text-3xl mb-4">↩️</div>
+                    <h4 class="font-black text-slate-900 text-lg">Retur</h4>
+                    <p class="text-slate-600 text-sm mt-2">Catat produk kembali, alasan retur, dan dampaknya ke stok serta laporan.</p>
+                    <button @click="changePage('retur')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                </div>
+
+                <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+                    <div class="text-3xl mb-4">📊</div>
+                    <h4 class="font-black text-slate-900 text-lg">ROAS</h4>
+                    <p class="text-slate-600 text-sm mt-2">Pantau omset, HPP, diskon, biaya iklan, profit, dan target ROAS per model.</p>
+                    <button @click="changePage('roas-dashboard')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- FINAL CTA -->
+        <div class="mt-8 bg-white rounded-3xl shadow-xl border border-slate-200 p-6 sm:p-8">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                <div>
+                    <p class="text-sm font-bold text-green-600 uppercase tracking-wide">Siap digunakan</p>
+                    <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
+                        Setelah semua langkah selesai, aplikasi sudah siap dipakai harian.
+                    </h3>
+                    <p class="text-slate-600 mt-2">
+                        Mulai dari input penjualan, pantau stok, produksi, retur, keuangan, sampai analisis ROAS.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <button @click="changePage('dashboard')" class="bg-slate-900 text-white font-bold py-3 px-5 rounded-xl hover:bg-slate-800">
+                        Buka Dashboard
+                    </button>
+                    <button @click="changePage('panduan')" class="bg-white border border-slate-300 text-slate-800 font-bold py-3 px-5 rounded-xl hover:bg-slate-50">
+                        Panduan Lengkap
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
