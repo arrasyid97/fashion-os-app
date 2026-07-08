@@ -3949,7 +3949,7 @@ async function deleteCategory(categoryId) {
     }
 }
 
-// GANTI SELURUH FUNGSI handleRegister INI
+// GANTII SELURUH FUNGSI handleRegister INI
 async function handleRegister() {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, authForm.email, authForm.password);
