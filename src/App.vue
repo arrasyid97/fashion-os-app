@@ -4114,6 +4114,12 @@ async function handleActivation() {
 // Metode untuk login dengan Google
 async function signInWithGoogle() {
     const provider = new GoogleAuthProvider();
+
+    // Selalu tampilkan pilihan akun Google
+    provider.setCustomParameters({
+        prompt: 'select_account'
+    });
+
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
@@ -4125,24 +4131,32 @@ async function signInWithGoogle() {
         if (!userDocSnap.exists()) {
             // Jika pengguna baru, inisialisasi data dan berikan trial
             const now = new Date();
-            // Perubahan di sini: dari 7 hari menjadi 3 hari
-            const threeDaysLater = new Date(now.setDate(now.getDate() + 3));
+            const threeDaysLater = new Date(
+                now.setDate(now.getDate() + 3)
+            );
+
             const newUserData = {
                 email: user.email,
                 subscriptionStatus: 'trial',
                 subscriptionEndDate: null,
                 trialEndDate: threeDaysLater,
             };
+
             await setDoc(userDocRef, newUserData);
-            // Perubahan teks notifikasi di sini
-            alert('Selamat datang! Anda mendapatkan free trial selama 3 hari.');
+
+            alert(
+                'Selamat datang! Anda mendapatkan free trial selama 3 hari.'
+            );
         } else {
-            // Jika pengguna lama, tidak perlu melakukan apa-apa
             alert('Selamat datang kembali!');
         }
     } catch (error) {
         console.error("Error login dengan Google:", error);
-        alert(error.message);
+
+        // Jangan tampilkan error apabila pengguna menutup popup sendiri
+        if (error.code !== 'auth/popup-closed-by-user') {
+            alert(error.message);
+        }
     }
 }
 
