@@ -60,9 +60,13 @@ const state = reactive({
         ],
     },
     produk: [],
-    inventoryPaginated: [],
-    transaksi: [],
-    keuangan: [],
+inventoryPaginated: [],
+transaksi: [],
+
+// Data khusus halaman Cek Pencairan Dana
+pendingSettlements: [],
+
+keuangan: [],
     
     carts: {},
     promotions: { perChannel: {}, perModel: {} },
@@ -555,6 +559,9 @@ const loadDataForPage = async (pageName) => {
             case 'statistik-penjualan':
     dataPromises.push(fetchAllProductData(userId));
     dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
+    break;
+            case 'rekonsiliasi':
+    dataPromises.push(fetchPendingSettlementData(userId));
     break;
             case 'transaksi':
             case 'bulk_process':
@@ -10680,6 +10687,165 @@ const fetchSupplierData = async (userId, loadMore = false) => {
 
 const bulkSettlementInput = ref(''); // State untuk menampung data paste dari Excel
 
+// =====================================================
+// DATA KHUSUS HALAMAN CEK PENCAIRAN DANA
+// =====================================================
+
+const isSettlementLoading = ref(false);
+const settlementCurrentPage = ref(1);
+const settlementItemsPerPage = ref(50);
+
+// Mengubah berbagai format tanggal menjadi Date yang aman
+function getSettlementDate(value) {
+    if (!value) return new Date(0);
+
+    if (value instanceof Date) {
+        return isNaN(value.getTime()) ? new Date(0) : value;
+    }
+
+    if (value?.toDate && typeof value.toDate === 'function') {
+        const date = value.toDate();
+        return isNaN(date.getTime()) ? new Date(0) : date;
+    }
+
+    if (value?.seconds) {
+        const date = new Date(value.seconds * 1000);
+        return isNaN(date.getTime()) ? new Date(0) : date;
+    }
+
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? new Date(0) : date;
+}
+
+
+// Daftar transaksi yang benar-benar masih belum cair
+const pendingSettlementTransactions = computed(() => {
+    return (state.pendingSettlements || [])
+        .filter(trx => {
+            return (
+                !trx.statusPencairan ||
+                trx.statusPencairan === 'Belum Cair' ||
+                trx.statusPencairan === 'Waiting'
+            );
+        })
+        .sort((a, b) => {
+            return (
+                getSettlementDate(b.tanggal).getTime() -
+                getSettlementDate(a.tanggal).getTime()
+            );
+        });
+});
+
+
+// Total halaman
+const settlementTotalPages = computed(() => {
+    return Math.max(
+        1,
+        Math.ceil(
+            pendingSettlementTransactions.value.length /
+            settlementItemsPerPage.value
+        )
+    );
+});
+
+
+// Data yang ditampilkan pada halaman aktif
+const paginatedPendingSettlements = computed(() => {
+    const start =
+        (settlementCurrentPage.value - 1) *
+        settlementItemsPerPage.value;
+
+    const end = start + settlementItemsPerPage.value;
+
+    return pendingSettlementTransactions.value.slice(start, end);
+});
+
+
+// Pastikan nomor halaman tidak melebihi total halaman
+watch(pendingSettlementTransactions, () => {
+    if (settlementCurrentPage.value > settlementTotalPages.value) {
+        settlementCurrentPage.value = settlementTotalPages.value;
+    }
+});
+
+
+// Mengambil seluruh transaksi yang masih belum cair
+async function fetchPendingSettlementData(userId) {
+    if (!userId) return;
+
+    isSettlementLoading.value = true;
+
+    try {
+        // Ambil dua kemungkinan status transaksi belum cair
+        const belumCairQuery = query(
+            collection(db, 'transactions'),
+            where('userId', '==', userId),
+            where('statusPencairan', '==', 'Belum Cair')
+        );
+
+        const waitingQuery = query(
+            collection(db, 'transactions'),
+            where('userId', '==', userId),
+            where('statusPencairan', '==', 'Waiting')
+        );
+
+        const [belumCairSnapshot, waitingSnapshot] =
+            await Promise.all([
+                getDocs(belumCairQuery),
+                getDocs(waitingQuery)
+            ]);
+
+        const transactionMap = new Map();
+
+        const addSnapshotToMap = snapshot => {
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+
+                const transaction = {
+                    id: docSnap.id,
+                    ...data,
+                    tanggal: getSettlementDate(data.tanggal),
+                    tanggalPencairan: data.tanggalPencairan
+                        ? getSettlementDate(data.tanggalPencairan)
+                        : null
+                };
+
+                // Jangan masukkan transaksi yang sudah dihapus/diarsipkan
+                if (!isActiveExportRecord(transaction)) return;
+
+                transactionMap.set(transaction.id, transaction);
+            });
+        };
+
+        addSnapshotToMap(belumCairSnapshot);
+        addSnapshotToMap(waitingSnapshot);
+
+        state.pendingSettlements = Array.from(
+            transactionMap.values()
+        );
+
+        settlementCurrentPage.value = 1;
+
+        console.log(
+            `Berhasil memuat ${state.pendingSettlements.length} pesanan belum cair.`
+        );
+
+    } catch (error) {
+        console.error(
+            'Gagal mengambil transaksi belum cair:',
+            error
+        );
+
+        state.pendingSettlements = [];
+
+        alert(
+            'Daftar pesanan belum cair gagal dimuat. Silakan muat ulang halaman.'
+        );
+    } finally {
+        isSettlementLoading.value = false;
+    }
+}
+
 async function processBulkSettlement(targetStatus = 'Sudah Cair') {
     if (!bulkSettlementInput.value.trim()) {
         return alert("Tempelkan daftar ID Pesanan terlebih dahulu.");
@@ -10717,9 +10883,14 @@ async function processBulkSettlement(targetStatus = 'Sudah Cair') {
         const batch = writeBatch(db);
 
         uniqueIds.forEach(orderId => {
-            const foundTrx = state.transaksi.find(t => {
-                return (t.marketplaceOrderId || '').toString().toLowerCase() === orderId.toLowerCase();
-            });
+            const foundTrx = state.pendingSettlements.find(t => {
+    return (t.marketplaceOrderId || '')
+        .toString()
+        .trim()
+        .toLowerCase() === orderId
+        .trim()
+        .toLowerCase();
+});
 
             if (!foundTrx) {
                 notFoundIds.push(orderId);
@@ -12196,51 +12367,199 @@ SKU-BAJU-PUTIH-S"
             </div>
 
             <!-- BAGIAN 2: DAFTAR PESANAN GANTUNG -->
-            <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                <div class="flex justify-between items-center mb-4">
-                    <h4 class="font-bold text-slate-700">2. Daftar Pesanan Belum Cair (Gantung)</h4>
-                    <span class="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">
-                        {{ state.transaksi.filter(t => !t.statusPencairan || t.statusPencairan === 'Belum Cair').length }} Pesanan
-                    </span>
-                </div>
+<div
+    class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up"
+    style="animation-delay: 200ms;"
+>
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+        <div>
+            <h4 class="font-bold text-slate-700">
+                2. Daftar Pesanan Belum Cair (Gantung)
+            </h4>
 
-                <div class="overflow-x-auto max-h-[600px] border rounded-lg">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-50 sticky top-0 text-slate-600 uppercase text-[10px] font-bold">
-                            <tr>
-                                <th class="p-4">Tanggal</th>
-                                <th class="p-4">ID Pesanan</th>
-                                <th class="p-4 text-right">Estimasi Cair</th>
-                                <th class="p-4 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <!-- Filter hanya menampilkan yang benar-benar belum cair -->
-                            <tr v-for="trx in state.transaksi.filter(t => !t.statusPencairan || t.statusPencairan === 'Belum Cair')" :key="trx.id" class="hover:bg-yellow-50/50 transition-colors">
-                                <td class="p-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
-                                <td class="p-4">
-                                    <p class="font-mono font-bold text-indigo-600">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</p>
-                                    <p class="text-[10px] text-slate-400">{{ trx.channel }}</p>
-                                </td>
-                                <td class="p-4 text-right font-bold text-slate-700">{{ formatCurrency(trx.total) }}</td>
-                                <td class="p-4 text-center">
-                                    <span class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Waiting</span>
-                                </td>
-                            </tr>
-                            
-                            <tr v-if="state.transaksi.filter(t => !t.statusPencairan || t.statusPencairan === 'Belum Cair').length === 0">
-                                <td colspan="4" class="p-20 text-center">
-                                    <div class="flex flex-col items-center">
-                                        <div class="text-4xl mb-2">🎉</div>
-                                        <p class="text-slate-500 font-medium">Semua dana sudah cair!</p>
-                                        <p class="text-xs text-slate-400">Tidak ada pesanan gantung untuk saat ini.</p>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <p class="text-xs text-slate-400 mt-1">
+                Menampilkan 50 pesanan per halaman.
+            </p>
+        </div>
+
+        <span
+            class="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full"
+        >
+            {{ pendingSettlementTransactions.length }} Pesanan
+        </span>
+    </div>
+
+
+    <div class="overflow-x-auto max-h-[600px] border rounded-lg">
+        <table class="w-full text-sm text-left">
+
+            <thead
+                class="bg-slate-50 sticky top-0 text-slate-600 uppercase text-[10px] font-bold"
+            >
+                <tr>
+                    <th class="p-4">Tanggal</th>
+                    <th class="p-4">ID Pesanan</th>
+                    <th class="p-4 text-right">Estimasi Cair</th>
+                    <th class="p-4 text-center">Status</th>
+                </tr>
+            </thead>
+
+            <tbody class="divide-y divide-slate-100">
+
+                <!-- TAMPILAN SAAT DATA DIMUAT -->
+                <tr v-if="isSettlementLoading">
+                    <td colspan="4" class="p-16 text-center">
+                        <div class="flex flex-col items-center">
+
+                            <div
+                                class="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"
+                            ></div>
+
+                            <p class="text-slate-500 mt-3">
+                                Memuat seluruh pesanan belum cair...
+                            </p>
+
+                        </div>
+                    </td>
+                </tr>
+
+
+                <!-- DATA SETELAH SELESAI DIMUAT -->
+                <template v-else>
+
+                    <tr
+                        v-for="trx in paginatedPendingSettlements"
+                        :key="trx.id"
+                        class="hover:bg-yellow-50/50 transition-colors"
+                    >
+                        <td class="p-4">
+                            {{
+                                getSettlementDate(trx.tanggal)
+                                    .toLocaleDateString('id-ID')
+                            }}
+                        </td>
+
+                        <td class="p-4">
+                            <p class="font-mono font-bold text-indigo-600">
+                                {{
+                                    trx.marketplaceOrderId ||
+                                    trx.orderId ||
+                                    trx.idPesanan ||
+                                    trx.nomorPesanan ||
+                                    (trx.id ? trx.id.slice(-6) : '-')
+                                }}
+                            </p>
+
+                            <p class="text-[10px] text-slate-400">
+                                {{ trx.channel || 'Channel tidak diketahui' }}
+                            </p>
+                        </td>
+
+                        <td class="p-4 text-right font-bold text-slate-700">
+                            {{ formatCurrency(Number(trx.total) || 0) }}
+                        </td>
+
+                        <td class="p-4 text-center">
+                            <span
+                                class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
+                            >
+                                Belum Cair
+                            </span>
+                        </td>
+                    </tr>
+
+
+                    <!-- JIKA TIDAK ADA PESANAN BELUM CAIR -->
+                    <tr v-if="pendingSettlementTransactions.length === 0">
+                        <td colspan="4" class="p-20 text-center">
+                            <div class="flex flex-col items-center">
+
+                                <div class="text-4xl mb-2">
+                                    🎉
+                                </div>
+
+                                <p class="text-slate-500 font-medium">
+                                    Semua dana sudah cair!
+                                </p>
+
+                                <p class="text-xs text-slate-400">
+                                    Tidak ada pesanan gantung untuk saat ini.
+                                </p>
+
+                            </div>
+                        </td>
+                    </tr>
+
+                </template>
+
+            </tbody>
+        </table>
+    </div>
+
+
+    <!-- TOMBOL PERPINDAHAN HALAMAN -->
+    <div
+        v-if="
+            !isSettlementLoading &&
+            pendingSettlementTransactions.length > 0
+        "
+        class="flex flex-wrap items-center justify-between gap-3 mt-5"
+    >
+        <p class="text-xs text-slate-500">
+            Menampilkan
+
+            {{
+                ((settlementCurrentPage - 1) *
+                    settlementItemsPerPage) + 1
+            }}
+
+            sampai
+
+            {{
+                Math.min(
+                    settlementCurrentPage *
+                        settlementItemsPerPage,
+                    pendingSettlementTransactions.length
+                )
+            }}
+
+            dari {{ pendingSettlementTransactions.length }} pesanan
+        </p>
+
+
+        <div class="flex items-center gap-2">
+
+            <button
+                type="button"
+                @click="settlementCurrentPage--"
+                :disabled="settlementCurrentPage <= 1"
+                class="px-4 py-2 rounded-lg border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+                Sebelumnya
+            </button>
+
+
+            <span class="text-sm font-bold text-slate-700 px-2">
+                Halaman {{ settlementCurrentPage }}
+                dari {{ settlementTotalPages }}
+            </span>
+
+
+            <button
+                type="button"
+                @click="settlementCurrentPage++"
+                :disabled="
+                    settlementCurrentPage >= settlementTotalPages
+                "
+                class="px-4 py-2 rounded-lg border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+                Berikutnya
+            </button>
+
+        </div>
+    </div>
+</div>
+
         </div>
     </div>
 </div>
