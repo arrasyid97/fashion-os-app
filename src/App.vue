@@ -63,6 +63,9 @@ const state = reactive({
 inventoryPaginated: [],
 transaksi: [],
 
+// Data retur
+retur: [],
+
 // Data khusus halaman Cek Pencairan Dana
 pendingSettlements: [],
 
@@ -5354,7 +5357,7 @@ const laporanTotalBiayaJasa = computed(() => {
 
 const filteredRetur = computed(() => {
     // 1. "Bongkar" data retur menjadi daftar item yang rata (flattened list)
-    const flatReturItems = state.retur.flatMap(doc => 
+    const flatReturItems = (state.retur || []).flatMap(doc => 
         (doc.items || []).map(itemDetail => ({
             ...itemDetail, 
             returnDocId: doc.id, 
@@ -11059,8 +11062,12 @@ onMounted(() => {
             const userDocSnap = await getDoc(doc(db, 'users', user.uid));
             userProfile.data = userDocSnap.exists() ? userDocSnap.data() : {};
 
-            await setupListeners(user.uid, userProfile.data.isPartner);
+           await setupListeners(user.uid, userProfile.data.isPartner);
+
 changePage(activePage.value);
+
+// Penting agar data halaman tetap dimuat ketika browser direfresh
+await loadDataForPage(activePage.value);
 
 if (userProfile.data.onboardingDone !== true) {
     uiState.onboardingVisible = true;
