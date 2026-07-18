@@ -3534,7 +3534,7 @@ async function processBatchOrders() {
             batch.set(transactionRef, newTransactionData);
             newTransactions.push({ ...newTransactionData, id: transactionRef.id });
 
-            // --- PERBAIKAN STOK SUPAYA TIDAK NGACO (PAKAI INCREMENT) ---
+            // --- PERBAIKANN STOK SUPAYA TIDAK NGACO (PAKAI INCREMENT) ---
             for (const item of order.items) {
                 const productRef = doc(db, "products", item.docId);
                 batch.update(productRef, { physical_stock: increment(-item.qty) });
