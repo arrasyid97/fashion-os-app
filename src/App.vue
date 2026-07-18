@@ -3428,7 +3428,7 @@ function deleteQueuedOrder(index) {
 
 // FUNGSI FINAL UNTUK MEMPROSES SEMUA PESANAN DI ANTRIAN
 async function processBatchOrders() {
-    const ordersToProcess = uiState.bulk_order_queue;
+    const ordersToProcess = [...uiState.bulk_order_queue];
     if (ordersToProcess.length === 0) {
         return alert("Tidak ada pesanan di antrian untuk diproses.");
     }
@@ -3440,8 +3440,20 @@ async function processBatchOrders() {
     const batch = writeBatch(db);
     
     try {
-        const newTransactions = [];
-        for (const order of ordersToProcess) {
+    const newTransactions = [];
+
+    // Satu identitas untuk satu kali proses massal
+    const bulkBatchId = `BULK-${Date.now()}`;
+
+    // Waktu dasar untuk menjaga urutan transaksi
+    const bulkBaseTime = Date.now();
+
+    for (
+        let orderIndex = 0;
+        orderIndex < ordersToProcess.length;
+        orderIndex++
+    ) {
+        const order = ordersToProcess[orderIndex];
             const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
             
             const diskon = calculateBestDiscount(order.items, uiState.activeCartChannel);
@@ -3487,18 +3499,36 @@ async function processBatchOrders() {
             }
 
             const newTransactionData = {
-                marketplaceOrderId: order.marketplaceOrderId,
-                tanggal: new Date(),
-                items: order.items.map(i => ({ sku: i.sku, qty: i.qty, hargaJual: i.hargaJualAktual, hpp: i.hpp })),
-                subtotal,
-                diskon,
-                total: finalTotal,
-                channel: marketplace.name,
-                channelId: uiState.activeCartChannel,
-                biaya: { rincian: biayaList, total: totalBiaya },
-                statusPencairan: 'Belum Cair',
-                userId: currentUser.value.uid
-            };
+    marketplaceOrderId: order.marketplaceOrderId,
+
+    // Pesanan pertama mempunyai waktu paling baru
+    // agar urutan di Riwayat Transaksi tetap 1, 2, 3
+    tanggal: new Date(bulkBaseTime - orderIndex),
+
+    // Identitas dan nomor urutan proses massal
+    bulkBatchId: bulkBatchId,
+    bulkSequence: orderIndex + 1,
+    inputSource: 'bulk_process',
+
+    items: order.items.map(i => ({
+        sku: i.sku,
+        qty: i.qty,
+        hargaJual: i.hargaJualAktual,
+        hpp: i.hpp
+    })),
+
+    subtotal,
+    diskon,
+    total: finalTotal,
+    channel: marketplace.name,
+    channelId: uiState.activeCartChannel,
+    biaya: {
+        rincian: biayaList,
+        total: totalBiaya
+    },
+    statusPencairan: 'Belum Cair',
+    userId: currentUser.value.uid
+};
 
             const transactionRef = doc(collection(db, "transactions"));
             batch.set(transactionRef, newTransactionData);
