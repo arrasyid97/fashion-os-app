@@ -3,6 +3,7 @@ import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
+import TentangPage from './pages/TentangPage.vue';
 
 // Impor dari file konfigurasi Firebase Anda
 
