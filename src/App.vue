@@ -526,19 +526,47 @@ function toggleSidebarGroup(group) {
 }
 
 const dataFetched = reactive({
-  products: false,
-  allProductsLoaded: false,
-  transactions: false,
-  production: false,
-  finance: false,
-  suppliers: false,
-  returns: false,
-  notes: false,
-  // Tambahkan flag lain jika ada modul data besar lainnya
+    // Produk
+    products: false,
+    allProductsLoaded: false,
+    pricesAndAllocations: false,
+
+    // Transaksi dan retur
+    transactions: false,
+    allTransactionsLoaded: false,
+
+    returns: false,
+    allReturnsLoaded: false,
+
+    // Halaman lainnya
+    pendingSettlements: false,
+    production: false,
+    finance: false,
+    suppliers: false,
+    notes: false,
+    fabric: false,
+    investorsAndBanks: false
 });
+
+// Mencegah halaman yang sama menjalankan query
+// dua kali secara bersamaan.
+const pagesCurrentlyLoading = new Set();
 
 const loadDataForPage = async (pageName) => {
     if (!currentUser.value) return;
+
+    // Permintaan pertama tetap berjalan.
+    // Permintaan kedua untuk halaman yang sama dilewati
+    // sampai permintaan pertama selesai.
+    if (pagesCurrentlyLoading.has(pageName)) {
+        console.log(
+            `[SKIP LOAD] Halaman "${pageName}" masih dimuat.`
+        );
+        return;
+    }
+
+    pagesCurrentlyLoading.add(pageName);
+
     const userId = currentUser.value.uid;
 
     try {
@@ -632,10 +660,15 @@ case 'roas-dashboard':
             nextTick(renderCharts);
         }
 
-    } catch (error) {
-    console.error(`Failed to load data for page ${pageName}:`, error);
-}
-}
+        } catch (error) {
+        console.error(
+            `Failed to load data for page ${pageName}:`,
+            error
+        );
+    } finally {
+        pagesCurrentlyLoading.delete(pageName);
+    }
+};
 
 const lastEditedModel = ref(null);
 const groupRefs = ref({});
@@ -3550,7 +3583,13 @@ async function processBatchOrders() {
         await batch.commit();
 
         state.transaksi.unshift(...newTransactions);
-        
+        // Bila halaman pencairan pernah dimuat,
+// transaksi baru langsung dimasukkan tanpa query ulang.
+if (dataFetched.pendingSettlements) {
+    state.pendingSettlements.unshift(
+        ...newTransactions
+    );
+}
         // Update tampilan stok lokal
         ordersToProcess.forEach(order => {
             order.items.forEach(item => {
@@ -7338,7 +7377,22 @@ async function executeCompleteTransaction() {
              if (invItem) invItem.stokFisik -= item.qty;
         });
         
-        await fetchTransactionAndReturnData(currentUser.value.uid, false);
+        // Masukkan transaksi baru langsung ke data lokal.
+// Tidak perlu membaca ulang seluruh transaksi Firebase.
+const createdTransaction = {
+    id: transactionRef.id,
+    ...newTransactionData
+};
+
+state.transaksi.unshift(createdTransaction);
+
+// Bila daftar pesanan belum cair sudah pernah dimuat,
+// tambahkan transaksi baru ke daftar tersebut juga.
+if (dataFetched.pendingSettlements) {
+    state.pendingSettlements.unshift(
+        createdTransaction
+    );
+}
 
         state.carts[uiState.activeCartChannel] = [];
         uiState.pos_order_id = '';
@@ -9874,13 +9928,47 @@ async function deleteTransaction(transactionId) {
 
         await batch.commit();
 
-        // --- PERBAIKAN DI SINI ---
-        // Alih-alih hanya memfilter state lokal, kita panggil ulang data dari server
-        // untuk memastikan konsistensi data 100% dan memperbaiki bug filter.
-        await fetchTransactionAndReturnData(currentUser.value.uid, false);
-        // Baris `state.transaksi = state.transaksi.filter(...)` sudah tidak diperlukan lagi.
-        
-        alert("Transaksi berhasil dihapus dan stok telah dikembalikan.");
+// Firebase sudah berhasil.
+// Sekarang perbarui stok yang tampil di browser.
+for (const item of trxToDelete.items || []) {
+    const qty = Number(item.qty) || 0;
+
+    const productInState = state.produk.find(
+        p => p.sku === item.sku
+    );
+
+    if (productInState) {
+        productInState.stokFisik =
+            (Number(productInState.stokFisik) || 0) +
+            qty;
+    }
+
+    const inventoryProduct =
+        state.inventoryPaginated.find(
+            p => p.sku === item.sku
+        );
+
+    if (inventoryProduct) {
+        inventoryProduct.stokFisik =
+            (Number(inventoryProduct.stokFisik) || 0) +
+            qty;
+    }
+}
+
+// Hapus transaksi dari data lokal.
+state.transaksi = state.transaksi.filter(
+    trx => trx.id !== transactionId
+);
+
+// Hapus juga dari daftar pesanan belum cair.
+state.pendingSettlements =
+    state.pendingSettlements.filter(
+        trx => trx.id !== transactionId
+    );
+
+alert(
+    "Transaksi berhasil dihapus dan stok telah dikembalikan."
+);
 
     } catch (error) {
         console.error("Error saat menghapus transaksi:", error);
@@ -10566,8 +10654,32 @@ const fetchAllProductData = async (userId) => {
     }
 };
 
-const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate = null, endDate = null, forceAll = false) => {
+const fetchTransactionAndReturnData = async (
+    userId,
+    loadMore = false,
+    startDate = null,
+    endDate = null,
+    forceAll = false
+) => {
     const ITEMS_PER_PAGE = 15;
+
+    // Seluruh transaksi dan retur sudah tersedia di state.
+    // Jangan unduh ulang saat pindah halaman.
+    const fullTransactionDataReady =
+        dataFetched.allTransactionsLoaded === true &&
+        dataFetched.allReturnsLoaded === true;
+
+    if (
+        !loadMore &&
+        !startDate &&
+        !endDate &&
+        fullTransactionDataReady
+    ) {
+        console.log(
+            '[CACHE SESSION] Seluruh transaksi dan retur sudah tersedia.'
+        );
+        return;
+    }
 
     // --- TRANSAKSI ---
     if (loadMore && !uiState.transaksiHasMore && !startDate && !forceAll) return;
@@ -10634,10 +10746,16 @@ const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate
         }
 
         if (forceAll) {
-            uiState.transaksiHasMore = false;
-        } else if (!startDate && transactionSnap.docs.length < ITEMS_PER_PAGE) {
-            uiState.transaksiHasMore = false;
-        }
+    uiState.transaksiHasMore = false;
+
+    // Seluruh transaksi user sudah dimuat.
+    dataFetched.allTransactionsLoaded = true;
+} else if (
+    !startDate &&
+    transactionSnap.docs.length < ITEMS_PER_PAGE
+) {
+    uiState.transaksiHasMore = false;
+}
 
         dataFetched.transactions = true;
     } catch (error) {
@@ -10691,10 +10809,15 @@ const fetchTransactionAndReturnData = async (userId, loadMore = false, startDate
         }
 
         if (forceAll) {
-            uiState.returHasMore = false;
-        } else if (returnSnap.docs.length < ITEMS_PER_PAGE) {
-            uiState.returHasMore = false;
-        }
+    uiState.returHasMore = false;
+
+    // Seluruh data retur user sudah dimuat.
+    dataFetched.allReturnsLoaded = true;
+} else if (
+    returnSnap.docs.length < ITEMS_PER_PAGE
+) {
+    uiState.returHasMore = false;
+}
 
         dataFetched.returns = true;
     } catch (error) {
@@ -11081,6 +11204,10 @@ let countReturnCreated = 0;
 const notFoundIds = [];
 const newReturnDocs = [];
 
+// Menyimpan perubahan transaksi.
+// Baru diterapkan ke tampilan setelah batch Firebase berhasil.
+const updatedTransactions = [];
+
 // Gabungan stok dari seluruh ID pesanan yang diretur
 const returnedStockMap = new Map();
 
@@ -11121,14 +11248,23 @@ const trxRef = doc(
 };
 
 if (targetStatus === 'Sudah Cair') {
-    updatePayload.tanggalPencairan = new Date();
-    foundTrx.tanggalPencairan = updatePayload.tanggalPencairan;
+    updatePayload.tanggalPencairan =
+        new Date();
 }
 
-batch.update(trxRef, updatePayload);
+batch.update(
+    trxRef,
+    updatePayload
+);
 
-foundTrx.statusPencairan = targetStatus;
-            countSuccess++;
+// Simpan perubahan sementara.
+// Jangan ubah tampilan sebelum batch berhasil.
+updatedTransactions.push({
+    id: foundTrx.id,
+    updatePayload
+});
+
+countSuccess++;
 
             if (targetStatus === 'Retur/Pengembalian') {
     const returnRef = doc(
@@ -11205,7 +11341,37 @@ queuePhysicalStockReturn(
 
 await batch.commit();
 
-        if (newReturnDocs.length > 0) {
+// Batch Firebase sudah berhasil.
+// Sekarang perbarui transaksi pada seluruh state lokal.
+updatedTransactions.forEach(
+    ({ id, updatePayload }) => {
+        const pendingTransaction =
+            state.pendingSettlements.find(
+                trx => trx.id === id
+            );
+
+        if (pendingTransaction) {
+            Object.assign(
+                pendingTransaction,
+                updatePayload
+            );
+        }
+
+        const mainTransaction =
+            state.transaksi.find(
+                trx => trx.id === id
+            );
+
+        if (mainTransaction) {
+            Object.assign(
+                mainTransaction,
+                updatePayload
+            );
+        }
+    }
+);
+
+if (newReturnDocs.length > 0) {
     state.retur.unshift(...newReturnDocs);
 
     // Perbarui stok yang tampil tanpa harus refresh
