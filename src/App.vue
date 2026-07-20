@@ -562,13 +562,18 @@ const dataFetched = reactive({
     allReturnsLoaded: false,
 
     // Halaman lainnya
-    pendingSettlements: false,
+        pendingSettlements: false,
     production: false,
     finance: false,
+
     suppliers: false,
+    purchaseOrders: false,
+
     notes: false,
     fabric: false,
-    investorsAndBanks: false
+    investorsAndBanks: false,
+
+    settings: false
 });
 
 // Mencegah halaman yang sama menjalankan query
@@ -578,16 +583,20 @@ const pagesCurrentlyLoading = new Set();
 // INDEXEDDB + PEMERIKSAAN VERSI DATA SERVER
 // ============================================================
 
-// Empat modul besar yang paling banyak menggunakan Firestore reads.
-const BIG_DATA_SYNC_FIELDS = Object.freeze({
-    sales: 'module_sales_version',
+// Urutan settings harus paling awal.
+// Produk memerlukan data marketplace dan model dari settings.
+const SYNC_MODULE_FIELDS = Object.freeze({
+    settings: 'module_settings_version',
     products: 'module_products_version',
+    sales: 'module_sales_version',
     finance: 'module_finance_version',
-    production: 'module_production_version'
+    production: 'module_production_version',
+    suppliers: 'module_suppliers_version',
+    notes: 'module_notes_version',
+    investment: 'module_investment_version'
 });
 
 
-// Menjaga agar proses startup cache hanya berjalan satu kali.
 const cacheStartupState = reactive({
     userId: null,
     running: false,
@@ -595,83 +604,340 @@ const cacheStartupState = reactive({
 });
 
 
-// Nama penyimpanan versi lokal.
-// UID dipakai supaya versi antar-akun tidak tercampur.
-const getSyncStorageKey = (userId) => {
+// ============================================================
+// INDEXEDDB KHUSUS METADATA VERSI
+// BUKAN DATABASE INTERNAL FIRESTORE
+// ============================================================
+
+const SYNC_META_DB_NAME =
+    'fashion_os_cache_metadata';
+
+const SYNC_META_DB_VERSION = 1;
+
+const SYNC_META_STORE_NAME =
+    'user_versions';
+
+let syncMetadataDbPromise = null;
+
+
+// Key localStorage lama.
+// Hanya dipakai untuk migrasi dan cadangan darurat.
+const getLegacySyncStorageKey = (userId) => {
     return `fashion_os_sync_versions_v1_${userId}`;
 };
 
 
-// Membaca versi terakhir yang sudah berhasil disinkronkan
-// pada browser ini.
-const readLocalSyncVersions = (userId) => {
+const normalizeSyncVersions = (versions = {}) => {
+    const normalized = {
+        schemaVersion: 1
+    };
+
+    Object.keys(SYNC_MODULE_FIELDS)
+        .forEach(moduleName => {
+            normalized[moduleName] =
+                Number(versions[moduleName]) || 0;
+        });
+
+    return normalized;
+};
+
+
+const openSyncMetadataDb = () => {
+    if (syncMetadataDbPromise) {
+        return syncMetadataDbPromise;
+    }
+
+    syncMetadataDbPromise =
+        new Promise((resolve, reject) => {
+            if (
+                typeof window === 'undefined' ||
+                !window.indexedDB
+            ) {
+                reject(
+                    new Error(
+                        'IndexedDB tidak tersedia di browser ini.'
+                    )
+                );
+
+                return;
+            }
+
+            const request =
+                window.indexedDB.open(
+                    SYNC_META_DB_NAME,
+                    SYNC_META_DB_VERSION
+                );
+
+            request.onupgradeneeded = () => {
+                const database = request.result;
+
+                if (
+                    !database.objectStoreNames.contains(
+                        SYNC_META_STORE_NAME
+                    )
+                ) {
+                    database.createObjectStore(
+                        SYNC_META_STORE_NAME,
+                        {
+                            keyPath: 'userId'
+                        }
+                    );
+                }
+            };
+
+            request.onsuccess = () => {
+                const database = request.result;
+
+                database.onversionchange = () => {
+                    database.close();
+                    syncMetadataDbPromise = null;
+                };
+
+                resolve(database);
+            };
+
+            request.onerror = () => {
+                syncMetadataDbPromise = null;
+
+                reject(
+                    request.error ||
+                    new Error(
+                        'Gagal membuka IndexedDB metadata.'
+                    )
+                );
+            };
+
+            request.onblocked = () => {
+                console.warn(
+                    '[SYNC METADATA] Pembaruan IndexedDB tertahan oleh tab lain.'
+                );
+            };
+        });
+
+    return syncMetadataDbPromise;
+};
+
+
+const readSyncMetadataRecord =
+    async (userId) => {
+        const database =
+            await openSyncMetadataDb();
+
+        return new Promise((resolve, reject) => {
+            const transaction =
+                database.transaction(
+                    SYNC_META_STORE_NAME,
+                    'readonly'
+                );
+
+            const store =
+                transaction.objectStore(
+                    SYNC_META_STORE_NAME
+                );
+
+            const request = store.get(userId);
+
+            request.onsuccess = () => {
+                resolve(request.result || null);
+            };
+
+            request.onerror = () => {
+                reject(
+                    request.error ||
+                    new Error(
+                        'Gagal membaca metadata versi.'
+                    )
+                );
+            };
+        });
+    };
+
+
+const writeSyncMetadataRecord =
+    async (record) => {
+        const database =
+            await openSyncMetadataDb();
+
+        return new Promise((resolve, reject) => {
+            const transaction =
+                database.transaction(
+                    SYNC_META_STORE_NAME,
+                    'readwrite'
+                );
+
+            transaction
+                .objectStore(
+                    SYNC_META_STORE_NAME
+                )
+                .put(record);
+
+            transaction.oncomplete = () => {
+                resolve();
+            };
+
+            transaction.onerror = () => {
+                reject(
+                    transaction.error ||
+                    new Error(
+                        'Gagal menyimpan metadata versi.'
+                    )
+                );
+            };
+
+            transaction.onabort = () => {
+                reject(
+                    transaction.error ||
+                    new Error(
+                        'Penyimpanan metadata dibatalkan.'
+                    )
+                );
+            };
+        });
+    };
+
+
+const saveLocalSyncVersions = async (
+    userId,
+    versions
+) => {
+    const normalized =
+        normalizeSyncVersions(versions);
+
+    const record = {
+        userId,
+        ...normalized,
+        savedAt: Date.now()
+    };
+
     try {
-        const savedValue = localStorage.getItem(
-            getSyncStorageKey(userId)
+        await writeSyncMetadataRecord(record);
+
+        // Hapus versi lama setelah berhasil masuk IndexedDB.
+        localStorage.removeItem(
+            getLegacySyncStorageKey(userId)
         );
-
-        if (!savedValue) {
-            return null;
-        }
-
-        return JSON.parse(savedValue);
     } catch (error) {
+        // Cadangan agar aplikasi tetap bekerja
+        // pada browser yang bermasalah dengan IndexedDB.
         console.warn(
-            '[SYNC VERSION] Versi lokal rusak. Akan disinkronkan ulang.',
+            '[SYNC METADATA] IndexedDB gagal. Memakai localStorage sebagai cadangan.',
             error
         );
 
-        return null;
+        localStorage.setItem(
+            getLegacySyncStorageKey(userId),
+            JSON.stringify(normalized)
+        );
     }
 };
 
 
-// Menyimpan versi hanya setelah data server berhasil dimuat.
-const saveLocalSyncVersions = (
-    userId,
-    versions
-) => {
-    localStorage.setItem(
-        getSyncStorageKey(userId),
-        JSON.stringify({
-            schemaVersion: 1,
-            ...versions
-        })
-    );
-};
+const readLocalSyncVersions =
+    async (userId) => {
+        try {
+            const record =
+                await readSyncMetadataRecord(userId);
 
+            if (record) {
+                return normalizeSyncVersions(
+                    record
+                );
+            }
 
-// Mengubah isi user_sync menjadi angka versi sederhana.
-const extractServerSyncVersions = (syncData = {}) => {
-    return {
-        sales:
-            Number(
-                syncData[BIG_DATA_SYNC_FIELDS.sales]
-            ) || 0,
+            // Migrasi otomatis dari localStorage lama.
+            const legacyValue =
+                localStorage.getItem(
+                    getLegacySyncStorageKey(userId)
+                );
 
-        products:
-            Number(
-                syncData[BIG_DATA_SYNC_FIELDS.products]
-            ) || 0,
+            if (!legacyValue) {
+                return null;
+            }
 
-        finance:
-            Number(
-                syncData[BIG_DATA_SYNC_FIELDS.finance]
-            ) || 0,
+            const migratedVersions =
+                normalizeSyncVersions(
+                    JSON.parse(legacyValue)
+                );
 
-        production:
-            Number(
-                syncData[BIG_DATA_SYNC_FIELDS.production]
-            ) || 0
+            await saveLocalSyncVersions(
+                userId,
+                migratedVersions
+            );
+
+            console.log(
+                '[SYNC METADATA] Versi lokal dipindahkan dari localStorage ke IndexedDB.'
+            );
+
+            return migratedVersions;
+        } catch (error) {
+            console.warn(
+                '[SYNC METADATA] Gagal membaca IndexedDB. Mencoba cadangan localStorage.',
+                error
+            );
+
+            try {
+                const fallbackValue =
+                    localStorage.getItem(
+                        getLegacySyncStorageKey(userId)
+                    );
+
+                return fallbackValue
+                    ? normalizeSyncVersions(
+                        JSON.parse(fallbackValue)
+                    )
+                    : null;
+            } catch (fallbackError) {
+                console.warn(
+                    '[SYNC METADATA] Cadangan localStorage juga tidak dapat dibaca.',
+                    fallbackError
+                );
+
+                return null;
+            }
+        }
     };
-};
 
 
-// Mengosongkan penanda cache sesi untuk satu modul.
-// Ini tidak menghapus data Firestore.
-// Ini hanya mengizinkan fungsi fetch berjalan kembali.
-const resetBigModuleFlags = (moduleName) => {
+// Mengambil seluruh versi modul dari user_sync.
+const extractServerSyncVersions =
+    (syncData = {}) => {
+        const versions = {};
+
+        Object.entries(SYNC_MODULE_FIELDS)
+            .forEach(
+                ([moduleName, fieldName]) => {
+                    versions[moduleName] =
+                        Number(
+                            syncData[fieldName]
+                        ) || 0;
+                }
+            );
+
+        return normalizeSyncVersions(versions);
+    };
+
+
+// ============================================================
+// RESET FLAG MODUL
+// ============================================================
+
+const resetSyncModuleFlags = (moduleName) => {
     switch (moduleName) {
+        case 'settings':
+            dataFetched.settings = false;
+            break;
+
+
+        case 'products':
+            dataFetched.products = false;
+            dataFetched.allProductsLoaded = false;
+            dataFetched.pricesAndAllocations = false;
+
+            uiState.productsLastVisible = null;
+            uiState.productsHasMore = true;
+            break;
+
+
         case 'sales':
             dataFetched.transactions = false;
             dataFetched.allTransactionsLoaded = false;
@@ -689,16 +955,6 @@ const resetBigModuleFlags = (moduleName) => {
             break;
 
 
-        case 'products':
-            dataFetched.products = false;
-            dataFetched.allProductsLoaded = false;
-            dataFetched.pricesAndAllocations = false;
-
-            uiState.productsLastVisible = null;
-            uiState.productsHasMore = true;
-            break;
-
-
         case 'finance':
             dataFetched.finance = false;
             break;
@@ -711,33 +967,56 @@ const resetBigModuleFlags = (moduleName) => {
             uiState.produksiLastVisible = null;
             uiState.produksiHasMore = true;
             break;
+
+
+        case 'suppliers':
+            dataFetched.suppliers = false;
+            dataFetched.purchaseOrders = false;
+
+            uiState.purchaseOrdersLastVisible = null;
+            uiState.purchaseOrdersHasMore = true;
+            break;
+
+
+        case 'notes':
+            dataFetched.notes = false;
+            break;
+
+
+        case 'investment':
+            dataFetched.investorsAndBanks = false;
+            break;
     }
 };
 
 
-// Reset semua modul besar.
-// Dipakai ketika browser atau akun baru belum mempunyai cache lengkap.
-const resetAllBigModuleFlags = () => {
-    Object.keys(BIG_DATA_SYNC_FIELDS).forEach(
-        resetBigModuleFlags
-    );
+const resetAllSyncModuleFlags = () => {
+    Object.keys(SYNC_MODULE_FIELDS)
+        .forEach(resetSyncModuleFlags);
 };
 
 
-// Memastikan fungsi fetch benar-benar berhasil mengisi modul.
-const isBigModuleReady = (moduleName) => {
+// ============================================================
+// PEMERIKSAAN KESIAPAN MODUL
+// ============================================================
+
+const isSyncModuleReady = (moduleName) => {
     switch (moduleName) {
-        case 'sales':
-            return (
-                dataFetched.allTransactionsLoaded === true &&
-                dataFetched.allReturnsLoaded === true
-            );
+        case 'settings':
+            return dataFetched.settings === true;
 
 
         case 'products':
             return (
                 dataFetched.allProductsLoaded === true &&
                 dataFetched.pricesAndAllocations === true
+            );
+
+
+        case 'sales':
+            return (
+                dataFetched.allTransactionsLoaded === true &&
+                dataFetched.allReturnsLoaded === true
             );
 
 
@@ -752,14 +1031,29 @@ const isBigModuleReady = (moduleName) => {
             );
 
 
+        case 'suppliers':
+            return (
+                dataFetched.suppliers === true &&
+                dataFetched.purchaseOrders === true
+            );
+
+
+        case 'notes':
+            return dataFetched.notes === true;
+
+
+        case 'investment':
+            return (
+                dataFetched.investorsAndBanks === true
+            );
+
+
         default:
             return false;
     }
 };
 
 
-// Membaca satu modul dari IndexedDB dengan aman.
-// Error satu modul tidak menghentikan modul yang lain.
 const loadCachedModuleSafely = async (
     moduleName,
     loader
@@ -775,48 +1069,78 @@ const loadCachedModuleSafely = async (
 };
 
 
-// Memuat semua modul besar ketika Firestore sedang offline.
-// Karena network dimatikan, getDocs() menggunakan IndexedDB,
-// bukan mengambil ulang dari server.
-const loadBigModulesFromIndexedDb = async (userId) => {
-    console.log(
-        '[INDEXEDDB] Memuat data besar dari cache lokal.'
-    );
+// ============================================================
+// MEMUAT MODUL DARI CACHE FIRESTORE
+// ============================================================
 
-    await loadCachedModuleSafely(
-        'products',
-        () => fetchAllProductData(userId)
-    );
+const loadBigModulesFromIndexedDb =
+    async (userId) => {
+        console.log(
+            '[INDEXEDDB] Memuat seluruh modul dari cache lokal.'
+        );
 
-    await loadCachedModuleSafely(
-        'sales',
-        () => fetchTransactionAndReturnData(
-            userId,
-            false,
-            null,
-            null,
-            true
-        )
-    );
+        // Settings harus didahulukan.
+        await loadCachedModuleSafely(
+            'settings',
+            () => fetchCoreData(userId)
+        );
 
-    await loadCachedModuleSafely(
-        'finance',
-        () => fetchKeuanganData(true)
-    );
+        await loadCachedModuleSafely(
+            'products',
+            () => fetchAllProductData(userId)
+        );
 
-    await loadCachedModuleSafely(
-        'production',
-        () => fetchProductionData(
-            userId,
-            false
-        )
-    );
-};
+        await loadCachedModuleSafely(
+            'sales',
+            () => fetchTransactionAndReturnData(
+                userId,
+                false,
+                null,
+                null,
+                true
+            )
+        );
+
+        await loadCachedModuleSafely(
+            'finance',
+            () => fetchKeuanganData(true)
+        );
+
+        await loadCachedModuleSafely(
+            'production',
+            () => fetchProductionData(
+                userId,
+                false
+            )
+        );
+
+        await loadCachedModuleSafely(
+            'suppliers',
+            () => fetchSupplierData(
+                userId,
+                false
+            )
+        );
+
+        await loadCachedModuleSafely(
+            'notes',
+            () => fetchNotesData(userId)
+        );
+
+        await loadCachedModuleSafely(
+            'investment',
+            () => fetchInvestorsAndBanksData(
+                userId
+            )
+        );
+    };
 
 
-// Menjalankan fetch server hanya untuk modul
-// yang versinya berubah atau cache-nya tidak lengkap.
-const refreshChangedBigModules = async (
+// ============================================================
+// REFRESH HANYA MODUL YANG BERUBAH
+// ============================================================
+
+const refreshChangedSyncModules = async (
     userId,
     changedModules
 ) => {
@@ -825,9 +1149,22 @@ const refreshChangedBigModules = async (
             `[SYNC SERVER] Memperbarui modul "${moduleName}".`
         );
 
-        resetBigModuleFlags(moduleName);
+        resetSyncModuleFlags(moduleName);
 
         switch (moduleName) {
+            case 'settings':
+                await fetchCoreData(
+                    userId,
+                    true
+                );
+                break;
+
+
+            case 'products':
+                await fetchAllProductData(userId);
+                break;
+
+
             case 'sales':
                 await fetchTransactionAndReturnData(
                     userId,
@@ -836,11 +1173,6 @@ const refreshChangedBigModules = async (
                     null,
                     true
                 );
-                break;
-
-
-            case 'products':
-                await fetchAllProductData(userId);
                 break;
 
 
@@ -855,10 +1187,34 @@ const refreshChangedBigModules = async (
                     false
                 );
                 break;
+
+
+            case 'suppliers':
+                await fetchSupplierData(
+                    userId,
+                    false,
+                    true
+                );
+                break;
+
+
+            case 'notes':
+                await fetchNotesData(
+                    userId,
+                    true
+                );
+                break;
+
+
+            case 'investment':
+                await fetchInvestorsAndBanksData(
+                    userId,
+                    true
+                );
+                break;
         }
 
-        // Jangan menyimpan versi baru bila fetch gagal.
-        if (!isBigModuleReady(moduleName)) {
+        if (!isSyncModuleReady(moduleName)) {
             throw new Error(
                 `Modul "${moduleName}" belum berhasil disinkronkan.`
             );
@@ -867,176 +1223,187 @@ const refreshChangedBigModules = async (
 };
 
 
-// Tahap pertama startup:
-//
-// 1. Matikan koneksi Firestore.
-// 2. Reset flag sesi.
-// 3. Baca empat modul besar dari IndexedDB.
-const beginIndexedDbStartup = async (userId) => {
-    // Akun berbeda harus mempunyai proses startup sendiri.
-    if (cacheStartupState.userId !== userId) {
-        cacheStartupState.userId = userId;
-        cacheStartupState.running = false;
-        cacheStartupState.finished = false;
-    }
+// ============================================================
+// STARTUP CACHE
+// ============================================================
 
-    if (
-        cacheStartupState.running ||
-        cacheStartupState.finished
-    ) {
-        return false;
-    }
-
-    cacheStartupState.running = true;
-
-    try {
-        await disableNetwork(db);
-
-        resetAllBigModuleFlags();
-
-        await loadBigModulesFromIndexedDb(userId);
-
-        return true;
-    } catch (error) {
-        console.warn(
-            '[INDEXEDDB] Gagal memulai cache lokal. Aplikasi memakai koneksi normal.',
-            error
-        );
-
-        try {
-            await enableNetwork(db);
-        } catch (enableError) {
-            console.warn(
-                '[FIRESTORE] Gagal mengaktifkan kembali network.',
-                enableError
-            );
+const beginIndexedDbStartup =
+    async (userId) => {
+        if (
+            cacheStartupState.userId !== userId
+        ) {
+            cacheStartupState.userId = userId;
+            cacheStartupState.running = false;
+            cacheStartupState.finished = false;
         }
 
-        cacheStartupState.running = false;
-        cacheStartupState.finished = true;
+        if (
+            cacheStartupState.running ||
+            cacheStartupState.finished
+        ) {
+            return false;
+        }
 
-        return false;
-    }
-};
+        cacheStartupState.running = true;
 
+        try {
+            await disableNetwork(db);
 
-// Tahap kedua startup:
-//
-// 1. Aktifkan network kembali.
-// 2. Ambil satu dokumen user_sync dari server.
-// 3. Bandingkan versi server dengan versi browser.
-// 4. Refresh hanya modul yang berubah.
-const finishIndexedDbStartup = async (userId) => {
-    try {
-        await enableNetwork(db);
+            resetAllSyncModuleFlags();
 
-        const syncReference = doc(
-            db,
-            'user_sync',
-            userId
-        );
-
-        // Pembacaan ini sengaja dipaksa ke server.
-        // Inilah pemeriksaan versi satu dokumen.
-        const syncSnapshot =
-            await getDocFromServer(syncReference);
-
-        const serverVersions =
-            extractServerSyncVersions(
-                syncSnapshot.exists()
-                    ? syncSnapshot.data()
-                    : {}
+            await loadBigModulesFromIndexedDb(
+                userId
             );
 
-        const localVersions =
-            readLocalSyncVersions(userId);
+            return true;
+        } catch (error) {
+            console.warn(
+                '[INDEXEDDB] Gagal memulai cache lokal. Aplikasi memakai koneksi normal.',
+                error
+            );
 
-        const isFirstSyncOnThisBrowser =
-            !localVersions ||
-            localVersions.schemaVersion !== 1;
+            try {
+                await enableNetwork(db);
+            } catch (enableError) {
+                console.warn(
+                    '[FIRESTORE] Gagal mengaktifkan kembali network.',
+                    enableError
+                );
+            }
 
-        const changedModules = new Set();
+            cacheStartupState.running = false;
+            cacheStartupState.finished = true;
 
-        // Browser/perangkat baru harus mengambil data server
-        // satu kali agar IndexedDB benar-benar lengkap.
-        if (isFirstSyncOnThisBrowser) {
-            Object.keys(BIG_DATA_SYNC_FIELDS)
-                .forEach(moduleName => {
-                    changedModules.add(moduleName);
+            return false;
+        }
+    };
+
+
+const finishIndexedDbStartup =
+    async (userId) => {
+        try {
+            await enableNetwork(db);
+
+            const syncReference = doc(
+                db,
+                'user_sync',
+                userId
+            );
+
+            const syncSnapshot =
+                await getDocFromServer(
+                    syncReference
+                );
+
+            const serverVersions =
+                extractServerSyncVersions(
+                    syncSnapshot.exists()
+                        ? syncSnapshot.data()
+                        : {}
+                );
+
+            const localVersions =
+                await readLocalSyncVersions(
+                    userId
+                );
+
+            const isFirstSyncOnThisBrowser =
+                !localVersions ||
+                localVersions.schemaVersion !== 1;
+
+            const changedModules = new Set();
+
+            if (isFirstSyncOnThisBrowser) {
+                Object.keys(
+                    SYNC_MODULE_FIELDS
+                ).forEach(moduleName => {
+                    changedModules.add(
+                        moduleName
+                    );
                 });
-        } else {
-            Object.keys(BIG_DATA_SYNC_FIELDS)
-                .forEach(moduleName => {
+            } else {
+                Object.keys(
+                    SYNC_MODULE_FIELDS
+                ).forEach(moduleName => {
                     const localVersion =
                         Number(
-                            localVersions[moduleName]
+                            localVersions[
+                                moduleName
+                            ]
                         ) || 0;
 
                     const serverVersion =
                         Number(
-                            serverVersions[moduleName]
+                            serverVersions[
+                                moduleName
+                            ]
                         ) || 0;
 
-                    if (localVersion !== serverVersion) {
-                        changedModules.add(moduleName);
+                    if (
+                        localVersion !==
+                        serverVersion
+                    ) {
+                        changedModules.add(
+                            moduleName
+                        );
                     }
                 });
-        }
+            }
 
-        // Perlindungan tambahan:
-        // versi boleh sama, tetapi IndexedDB bisa saja kosong
-        // atau dibersihkan oleh browser.
-        Object.keys(BIG_DATA_SYNC_FIELDS)
-            .forEach(moduleName => {
-                if (!isBigModuleReady(moduleName)) {
-                    changedModules.add(moduleName);
+            // Perlindungan bila cache browser dibersihkan.
+            Object.keys(
+                SYNC_MODULE_FIELDS
+            ).forEach(moduleName => {
+                if (
+                    !isSyncModuleReady(
+                        moduleName
+                    )
+                ) {
+                    changedModules.add(
+                        moduleName
+                    );
                 }
             });
 
+            if (changedModules.size === 0) {
+                console.log(
+                    '[SYNC VERSION] Versi sama. Tidak membaca ulang modul Firestore.'
+                );
 
-        if (changedModules.size === 0) {
+                return;
+            }
+
+            const modulesToRefresh =
+                Array.from(changedModules);
+
             console.log(
-                '[SYNC VERSION] Versi sama. Tidak membaca ulang koleksi besar.'
+                '[SYNC VERSION] Modul yang berubah:',
+                modulesToRefresh
             );
 
-            return;
+            await refreshChangedSyncModules(
+                userId,
+                modulesToRefresh
+            );
+
+            await saveLocalSyncVersions(
+                userId,
+                serverVersions
+            );
+
+            console.log(
+                '[SYNC VERSION] Sinkronisasi server selesai.'
+            );
+        } catch (error) {
+            console.warn(
+                '[SYNC VERSION] Pemeriksaan server gagal. Cache lokal tetap digunakan.',
+                error
+            );
+        } finally {
+            cacheStartupState.running = false;
+            cacheStartupState.finished = true;
         }
-
-        const modulesToRefresh =
-            Array.from(changedModules);
-
-        console.log(
-            '[SYNC VERSION] Modul yang berubah:',
-            modulesToRefresh
-        );
-
-        await refreshChangedBigModules(
-            userId,
-            modulesToRefresh
-        );
-
-        // Versi disimpan hanya setelah semua fetch berhasil.
-        saveLocalSyncVersions(
-            userId,
-            serverVersions
-        );
-
-        console.log(
-            '[SYNC VERSION] Sinkronisasi server selesai.'
-        );
-    } catch (error) {
-        // Bila internet sedang mati atau rules belum benar,
-        // data IndexedDB tetap dipakai.
-        // Versi lokal tidak diubah agar sinkronisasi dicoba lagi.
-        console.warn(
-            '[SYNC VERSION] Pemeriksaan server gagal. Cache lokal tetap digunakan.',
-            error
-        );
-    } finally {
-        cacheStartupState.running = false;
-        cacheStartupState.finished = true;
-    }
-};
+    };
 const loadDataForPage = async (pageName) => {
     if (!currentUser.value) return;
 
@@ -10901,54 +11268,102 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 
 let unsubscribe = () => {}; 
 
-const setupListeners = async (userId, isUserPartner) => { // <-- PERUBAHAN DI SINI
-    unsubscribe(); // Hentikan listener lama
+const setupListeners = async (
+    userId,
+    isUserPartner
+) => {
+    unsubscribe();
 
-    // Listener untuk settings (real-time)
-    const settingsListener = onSnapshot(doc(db, "settings", userId), (docSnap) => {
-        if (docSnap.exists()) {
-            const settingsData = docSnap.data();
-            Object.assign(state.settings, settingsData);
-        }
-    }, (error) => { console.error("Error fetching settings:", error); });
-
-    // Listener untuk komisi mitra (real-time jika dia adalah mitra)
+    // Komisi mitra tetap real-time.
     let commissionsListener = () => {};
-    if (isUserPartner) { // <-- PERUBAHAN DI SINI
+
+    if (isUserPartner) {
         const commissionsQuery = query(
             collection(db, 'commissions'),
             where('partnerId', '==', userId)
         );
-        commissionsListener = onSnapshot(commissionsQuery, (snapshot) => {
-            commissions.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        });
+
+        commissionsListener = onSnapshot(
+            commissionsQuery,
+            (snapshot) => {
+                commissions.value =
+                    snapshot.docs.map(docSnap => ({
+                        id: docSnap.id,
+                        ...docSnap.data()
+                    }));
+            }
+        );
     }
 
-    // Panggil data inti yang dibutuhkan segera
-    await fetchCoreData(userId);
-
-    // Fungsi untuk menghentikan listener saat logout
     unsubscribe = () => {
-        settingsListener();
         commissionsListener();
     };
 };
 
-const fetchCoreData = async (userId) => {
+const fetchCoreData = async (
+    userId,
+    forceRefresh = false
+) => {
+    if (!userId) return;
+
+    if (
+        !forceRefresh &&
+        dataFetched.settings
+    ) {
+        console.log(
+            '[CACHE SESSION] Pengaturan, kategori, promosi, dan komisi produk sudah tersedia.'
+        );
+
+        return;
+    }
+
     try {
-        // 1. Ambil data Dokumen (Settings, Promotions, Commissions)
-        const [settingsSnap, promotionsSnap, commissionsSnap] = await Promise.all([
-            getDoc(doc(db, "settings", userId)),
-            getDoc(doc(db, "promotions", userId)),
-            getDoc(doc(db, "product_commissions", userId)),
+        const readDocument =
+            forceRefresh
+                ? getDocFromServer
+                : getDoc;
+
+        const readDocuments =
+            forceRefresh
+                ? getDocsFromServer
+                : getDocs;
+
+        const categoriesQuery = query(
+            collection(db, 'categories'),
+            where('userId', '==', userId)
+        );
+
+        const [
+            settingsSnap,
+            promotionsSnap,
+            commissionsSnap,
+            categoriesSnap
+        ] = await Promise.all([
+            readDocument(
+                doc(db, 'settings', userId)
+            ),
+
+            readDocument(
+                doc(db, 'promotions', userId)
+            ),
+
+            readDocument(
+                doc(
+                    db,
+                    'product_commissions',
+                    userId
+                )
+            ),
+
+            readDocuments(categoriesQuery)
         ]);
 
-        // 2. (BARU) Ambil data Koleksi 'categories' (Agar tidak hilang saat refresh)
-        const categoriesQuery = query(collection(db, "categories"), where("userId", "==", userId));
-        const categoriesSnap = await getDocs(categoriesQuery);
-        const loadedCategories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const loadedCategories =
+            categoriesSnap.docs.map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data()
+            }));
 
-        // 3. Atur Default PIN jika belum ada
         const defaultPinSettings = {
             dashboard: false,
             incomeHistory: false,
@@ -10958,43 +11373,69 @@ const fetchCoreData = async (userId) => {
             hargaHpp: false
         };
 
-        // 4. Masukkan data Settings ke State
         if (settingsSnap.exists()) {
-            const settingsData = settingsSnap.data();
-            Object.assign(state.settings, settingsData);
-            state.settings.pinProtection = { ...defaultPinSettings, ...(settingsData.pinProtection || {}) };
+            const settingsData =
+                settingsSnap.data();
+
+            Object.assign(
+                state.settings,
+                settingsData
+            );
+
+            state.settings.pinProtection = {
+                ...defaultPinSettings,
+                ...(
+                    settingsData.pinProtection ||
+                    {}
+                )
+            };
         } else {
-            state.settings.pinProtection = defaultPinSettings;
+            state.settings.pinProtection =
+                defaultPinSettings;
         }
 
-        // 5. (PENTING) Masukkan data kategori yang baru diambil ke State
-        state.settings.categories = loadedCategories;
+        state.settings.categories =
+            loadedCategories;
 
-        // 6. Logika Inflow Categories (Pemasukan) - Biarkan seperti kode Anda
-        if (userProfile.value?.data?.inflowCategories) { 
-             // Note: Saya ubah sedikit jadi userProfile.value?.data untuk keamanan jika ref
-            state.settings.inflowCategories = userProfile.value.data.inflowCategories;
-        } else if (state.settings.inflowCategories) {
-            // Fallback jika ada di settings
+        if (
+            userProfile.data?.inflowCategories
+        ) {
+            state.settings.inflowCategories =
+                userProfile.data.inflowCategories;
         }
-        
-        // 7. Masukkan data Promotions
+
         if (promotionsSnap.exists()) {
-            const promoData = promotionsSnap.data();
-            state.promotions.perChannel = promoData.perChannel || {};
-            state.promotions.perModel = promoData.perModel || {};
+            const promoData =
+                promotionsSnap.data();
+
+            state.promotions.perChannel =
+                promoData.perChannel || {};
+
+            state.promotions.perModel =
+                promoData.perModel || {};
+        } else {
+            state.promotions.perChannel = {};
+            state.promotions.perModel = {};
         }
 
-        // 8. Masukkan data Commissions
         if (commissionsSnap.exists()) {
-            const commsData = commissionsSnap.data();
-            state.commissions.perModel = commsData.perModel || {};
+            const commsData =
+                commissionsSnap.data();
+
+            state.commissions.perModel =
+                commsData.perModel || {};
         } else {
             state.commissions.perModel = {};
         }
 
+        dataFetched.settings = true;
     } catch (error) {
-        console.error("Error fetching core data:", error);
+        dataFetched.settings = false;
+
+        console.error(
+            'Error fetching core data:',
+            error
+        );
     }
 };
 
@@ -11384,20 +11825,110 @@ const fetchProductionData = async (userId, loadMore = false) => {
 };
 
 // Fungsi khusus untuk data keuangan dan investor
-const fetchInvestorsAndBanksData = async (userId) => {
-    if (dataFetched.investorsAndBanks) return;
+const fetchInvestorsAndBanksData = async (
+    userId,
+    forceRefresh = false
+) => {
+    if (
+        !forceRefresh &&
+        dataFetched.investorsAndBanks
+    ) {
+        console.log(
+            '[CACHE SESSION] Investor, pembayaran investor, dan rekening sudah tersedia.'
+        );
+
+        return;
+    }
+
     try {
-        const [investorsSnap, bankAccountsSnap, investorPaymentsSnap] = await Promise.all([
-            getDocs(query(collection(db, "investors"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "bank_accounts"), where("userId", "==", userId))),
-            getDocs(query(collection(db, "investor_payments"), where("userId", "==", userId))),
+        const readDocuments =
+            forceRefresh
+                ? getDocsFromServer
+                : getDocs;
+
+        const [
+            investorsSnap,
+            bankAccountsSnap,
+            investorPaymentsSnap
+        ] = await Promise.all([
+            readDocuments(
+                query(
+                    collection(db, 'investors'),
+                    where(
+                        'userId',
+                        '==',
+                        userId
+                    )
+                )
+            ),
+
+            readDocuments(
+                query(
+                    collection(
+                        db,
+                        'bank_accounts'
+                    ),
+                    where(
+                        'userId',
+                        '==',
+                        userId
+                    )
+                )
+            ),
+
+            readDocuments(
+                query(
+                    collection(
+                        db,
+                        'investor_payments'
+                    ),
+                    where(
+                        'userId',
+                        '==',
+                        userId
+                    )
+                )
+            )
         ]);
-        state.investor = investorsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), startDate: doc.data().startDate?.toDate() }));
-        state.bankAccounts = bankAccountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        state.investorPayments = investorPaymentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), paymentDate: doc.data().paymentDate?.toDate() }));
+
+        state.investor =
+            investorsSnap.docs.map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data(),
+                startDate:
+                    docSnap
+                        .data()
+                        .startDate
+                        ?.toDate()
+            }));
+
+        state.bankAccounts =
+            bankAccountsSnap.docs.map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data()
+            }));
+
+        state.investorPayments =
+            investorPaymentsSnap.docs.map(
+                docSnap => ({
+                    id: docSnap.id,
+                    ...docSnap.data(),
+                    paymentDate:
+                        docSnap
+                            .data()
+                            .paymentDate
+                            ?.toDate()
+                })
+            );
+
         dataFetched.investorsAndBanks = true;
     } catch (error) {
-        console.error("Error fetching investor/bank data:", error);
+        dataFetched.investorsAndBanks = false;
+
+        console.error(
+            'Error fetching investor/bank data:',
+            error
+        );
     }
 };
 
@@ -11455,64 +11986,159 @@ const fetchKeuanganData = async (forceRefresh = false) => {
     }
 };
 // Fungsi khusus untuk data supplier dan purchase order
-const fetchSupplierData = async (userId, loadMore = false) => {
-    const SUPPLIERS_PER_PAGE = 10; // Jumlah data per halaman
+const fetchSupplierData = async (
+    userId,
+    loadMore = false,
+    forceRefresh = false
+) => {
+    const SUPPLIERS_PER_PAGE = 10;
 
-    // Bagian ini untuk data supplier, tidak butuh paginasi karena jumlahnya sedikit
-    // dan hanya akan dijalankan sekali.
+    const supplierModuleReady =
+        dataFetched.suppliers === true &&
+        dataFetched.purchaseOrders === true;
+
+    if (
+        !loadMore &&
+        !forceRefresh &&
+        supplierModuleReady
+    ) {
+        console.log(
+            '[CACHE SESSION] Supplier dan purchase order sudah tersedia.'
+        );
+
+        return;
+    }
+
+    const readDocuments =
+        forceRefresh
+            ? getDocsFromServer
+            : getDocs;
+
+    if (forceRefresh) {
+        dataFetched.suppliers = false;
+        dataFetched.purchaseOrders = false;
+    }
+
+    // Daftar supplier
     if (!dataFetched.suppliers) {
-        console.log("Fetching supplier list...");
         try {
-            const suppliersSnap = await getDocs(query(collection(db, "suppliers"), where("userId", "==", userId)));
-            state.suppliers = suppliersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const suppliersSnap =
+                await readDocuments(
+                    query(
+                        collection(
+                            db,
+                            'suppliers'
+                        ),
+                        where(
+                            'userId',
+                            '==',
+                            userId
+                        )
+                    )
+                );
+
+            state.suppliers =
+                suppliersSnap.docs.map(
+                    docSnap => ({
+                        id: docSnap.id,
+                        ...docSnap.data()
+                    })
+                );
+
             dataFetched.suppliers = true;
         } catch (error) {
-            console.error("Error fetching suppliers:", error);
+            dataFetched.suppliers = false;
+
+            console.error(
+                'Error fetching suppliers:',
+                error
+            );
         }
     }
 
-    // --- BAGIAN INI YANG DIPERBAIKI ---
-    // Hentikan jika pengguna klik "Muat Lebih Banyak" padahal sudah tidak ada data lagi
-    if (loadMore && !uiState.purchaseOrdersHasMore) return; 
-    
+    if (
+        loadMore &&
+        !uiState.purchaseOrdersHasMore
+    ) {
+        return;
+    }
+
     try {
-        // Query dasar untuk mengambil data purchase order
-        let q = query(
-            collection(db, "purchase_orders"),
-            where("userId", "==", userId),
-            orderBy("tanggal", "desc"),
+        let purchaseOrderQuery = query(
+            collection(
+                db,
+                'purchase_orders'
+            ),
+            where(
+                'userId',
+                '==',
+                userId
+            ),
+            orderBy('tanggal', 'desc'),
             limit(SUPPLIERS_PER_PAGE)
         );
 
-        // Jika ini adalah aksi "Muat Lebih Banyak", tambahkan 'startAfter' untuk memulai dari data terakhir
-        if (loadMore && uiState.purchaseOrdersLastVisible) {
-            q = query(q, startAfter(uiState.purchaseOrdersLastVisible));
+        if (
+            loadMore &&
+            uiState.purchaseOrdersLastVisible
+        ) {
+            purchaseOrderQuery = query(
+                purchaseOrderQuery,
+                startAfter(
+                    uiState
+                        .purchaseOrdersLastVisible
+                )
+            );
         } else {
-            // Jika ini adalah pemanggilan PERTAMA (bukan 'loadMore'), maka KOSONGKAN array
-            // Ini memastikan data tidak duplikat saat berpindah halaman
             state.purchaseOrders = [];
-            uiState.purchaseOrdersHasMore = true; // Reset flag setiap kali data dimuat ulang dari awal
+
+            uiState.purchaseOrdersLastVisible =
+                null;
+
+            uiState.purchaseOrdersHasMore =
+                true;
         }
 
-        const poSnapshot = await getDocs(q);
+        const poSnapshot =
+            await readDocuments(
+                purchaseOrderQuery
+            );
 
         if (!poSnapshot.empty) {
-            // Simpan dokumen terakhir yang terlihat untuk paginasi selanjutnya
-            uiState.purchaseOrdersLastVisible = poSnapshot.docs[poSnapshot.docs.length - 1];
-            
-            // Tambahkan data baru ke dalam array yang sudah ada
-            poSnapshot.forEach(doc => {
-                state.purchaseOrders.push({ id: doc.id, ...doc.data(), tanggal: doc.data().tanggal?.toDate() });
+            uiState.purchaseOrdersLastVisible =
+                poSnapshot.docs[
+                    poSnapshot.docs.length - 1
+                ];
+
+            poSnapshot.forEach(docSnap => {
+                state.purchaseOrders.push({
+                    id: docSnap.id,
+                    ...docSnap.data(),
+                    tanggal:
+                        docSnap
+                            .data()
+                            .tanggal
+                            ?.toDate()
+                });
             });
         }
-        
-        // Jika data yang didapat lebih sedikit dari limit, berarti ini halaman terakhir
-        if (poSnapshot.docs.length < SUPPLIERS_PER_PAGE) {
-            uiState.purchaseOrdersHasMore = false;
+
+        if (
+            poSnapshot.docs.length <
+            SUPPLIERS_PER_PAGE
+        ) {
+            uiState.purchaseOrdersHasMore =
+                false;
         }
 
+        dataFetched.purchaseOrders = true;
     } catch (error) {
-        console.error("Error fetching purchase orders:", error);
+        dataFetched.purchaseOrders = false;
+
+        console.error(
+            'Error fetching purchase orders:',
+            error
+        );
     }
 };
 
@@ -11917,17 +12543,61 @@ if (newReturnDocs.length > 0) {
 }
 
 // Fungsi khusus untuk catatan voucher
-const fetchNotesData = async (userId) => {
-    if (dataFetched.notes) return;
-    console.log("Fetching notes data...");
+const fetchNotesData = async (
+    userId,
+    forceRefresh = false
+) => {
+    if (
+        !forceRefresh &&
+        dataFetched.notes
+    ) {
+        console.log(
+            '[CACHE SESSION] Catatan voucher sudah tersedia.'
+        );
+
+        return;
+    }
+
     try {
-        const [notesSnap] = await Promise.all([
-            getDocs(query(collection(db, "voucher_notes"), where("userId", "==", userId))),
-        ]);
-        state.voucherNotes = notesSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), endDate: doc.data().endDate?.toDate() }));
+        const readDocuments =
+            forceRefresh
+                ? getDocsFromServer
+                : getDocs;
+
+        const notesSnap =
+            await readDocuments(
+                query(
+                    collection(
+                        db,
+                        'voucher_notes'
+                    ),
+                    where(
+                        'userId',
+                        '==',
+                        userId
+                    )
+                )
+            );
+
+        state.voucherNotes =
+            notesSnap.docs.map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data(),
+                endDate:
+                    docSnap
+                        .data()
+                        .endDate
+                        ?.toDate()
+            }));
+
         dataFetched.notes = true;
-    } catch(error) {
-        console.error("Error fetching notes data:", error);
+    } catch (error) {
+        dataFetched.notes = false;
+
+        console.error(
+            'Error fetching notes data:',
+            error
+        );
     }
 };
 
