@@ -4350,7 +4350,7 @@ async function submitStockAdjustment() {
 
         // Jika ada kerugian, tambahkan ke tabel keuangan lokal (kosmetik)
         if (adjustmentType === 'pengurangan' && hppLoss > 0) {
-            await fetchKeuanganData(); // Reload data keuangan biar aman
+            await fetchKeuanganData(true); // Reload data keuangan biar aman
         }
 
         alert(`Stok untuk SKU ${skuToUpdate} berhasil disesuaikan.`);
@@ -8716,7 +8716,7 @@ try {
     });
 
         // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
-        await fetchKeuanganData(); 
+        await fetchKeuanganData(true); 
         
         hideModal();
         alert('Data pengeluaran berhasil disimpan!');
@@ -8736,7 +8736,7 @@ async function deleteBiaya(id) {
         await deleteDoc(doc(db, "keuangan", id)); 
         
         // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
-        await fetchKeuanganData(); 
+        await fetchKeuanganData(true); 
         
         alert('Data pengeluaran berhasil dihapus.');
     } catch (error) {
@@ -8759,7 +8759,7 @@ async function submitPemasukan() {
         });
 
         // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
-        await fetchKeuanganData(); 
+        await fetchKeuanganData(true); 
 
         hideModal();
         alert('Data pemasukan berhasil disimpan!');
@@ -8779,7 +8779,7 @@ async function deletePemasukan(id) {
         await deleteDoc(doc(db, "keuangan", id)); 
         
         // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
-        await fetchKeuanganData(); 
+        await fetchKeuanganData(true); 
         
         alert('Data pemasukan berhasil dihapus.');
     } catch (error) {
@@ -10576,8 +10576,12 @@ const fetchProductData = async (userId, loadMore = false) => {
 
 const fetchAllProductData = async (userId) => {
     // Gunakan flag baru untuk mencegah fetch ulang jika SEMUA data sudah ada
-    if (dataFetched.allProductsLoaded) return; 
-    console.log("Fetching ALL products for HPP/Promotion pages...");
+    if (dataFetched.allProductsLoaded) {
+        console.log(
+            '[CACHE SESSION] Seluruh produk, harga, dan stok sudah tersedia.'
+        );
+        return;
+    }
 
     try {
         // Selalu kosongkan array produk, karena fungsi ini bertujuan memuat semuanya dari awal
@@ -10897,8 +10901,18 @@ const fetchInvestorsAndBanksData = async (userId) => {
 };
 
 // Fungsi baru yang canggih untuk data keuangan dengan filter & paginasi
-const fetchKeuanganData = async () => {
+const fetchKeuanganData = async (forceRefresh = false) => {
     if (!currentUser.value) return;
+
+    // Bila data keuangan sudah dimuat dalam sesi ini,
+    // gunakan data yang sudah ada di state.
+    if (!forceRefresh && dataFetched.finance) {
+        console.log(
+            '[CACHE SESSION] Seluruh data keuangan sudah tersedia.'
+        );
+        return;
+    }
+
     const userId = currentUser.value.uid;
     
     // Kueri Paling Stabil: Menggunakan 3 field untuk memastikan urutan Ascending yang sempurna.
