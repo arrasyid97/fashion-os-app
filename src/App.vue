@@ -9,7 +9,30 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import { db, auth } from './firebase.js'; 
 
 // Impor fungsi-fungsi untuk Database (Firestore)
-import { collection, doc, setDoc, updateDoc, deleteDoc, writeBatch, runTransaction, addDoc, onSnapshot, query, where, getDocs, getDocsFromServer, getDoc, getDocFromServer, orderBy, limit, startAfter, documentId, increment } from 'firebase/firestore';
+import {
+    collection,
+    doc,
+    setDoc,
+    updateDoc,
+    deleteDoc,
+    writeBatch,
+    runTransaction,
+    addDoc,
+    onSnapshot,
+    query,
+    where,
+    getDocs,
+    getDocsFromServer,
+    getDoc,
+    getDocFromServer,
+    orderBy,
+    limit,
+    startAfter,
+    documentId,
+    increment,
+    disableNetwork,
+    enableNetwork
+} from 'firebase/firestore';
 let bulkSearchDebounceTimer = null;
 let bulkScanTimer = null;
 let posScanTimer = null;
@@ -551,7 +574,469 @@ const dataFetched = reactive({
 // Mencegah halaman yang sama menjalankan query
 // dua kali secara bersamaan.
 const pagesCurrentlyLoading = new Set();
+// ============================================================
+// INDEXEDDB + PEMERIKSAAN VERSI DATA SERVER
+// ============================================================
 
+// Empat modul besar yang paling banyak menggunakan Firestore reads.
+const BIG_DATA_SYNC_FIELDS = Object.freeze({
+    sales: 'module_sales_version',
+    products: 'module_products_version',
+    finance: 'module_finance_version',
+    production: 'module_production_version'
+});
+
+
+// Menjaga agar proses startup cache hanya berjalan satu kali.
+const cacheStartupState = reactive({
+    userId: null,
+    running: false,
+    finished: false
+});
+
+
+// Nama penyimpanan versi lokal.
+// UID dipakai supaya versi antar-akun tidak tercampur.
+const getSyncStorageKey = (userId) => {
+    return `fashion_os_sync_versions_v1_${userId}`;
+};
+
+
+// Membaca versi terakhir yang sudah berhasil disinkronkan
+// pada browser ini.
+const readLocalSyncVersions = (userId) => {
+    try {
+        const savedValue = localStorage.getItem(
+            getSyncStorageKey(userId)
+        );
+
+        if (!savedValue) {
+            return null;
+        }
+
+        return JSON.parse(savedValue);
+    } catch (error) {
+        console.warn(
+            '[SYNC VERSION] Versi lokal rusak. Akan disinkronkan ulang.',
+            error
+        );
+
+        return null;
+    }
+};
+
+
+// Menyimpan versi hanya setelah data server berhasil dimuat.
+const saveLocalSyncVersions = (
+    userId,
+    versions
+) => {
+    localStorage.setItem(
+        getSyncStorageKey(userId),
+        JSON.stringify({
+            schemaVersion: 1,
+            ...versions
+        })
+    );
+};
+
+
+// Mengubah isi user_sync menjadi angka versi sederhana.
+const extractServerSyncVersions = (syncData = {}) => {
+    return {
+        sales:
+            Number(
+                syncData[BIG_DATA_SYNC_FIELDS.sales]
+            ) || 0,
+
+        products:
+            Number(
+                syncData[BIG_DATA_SYNC_FIELDS.products]
+            ) || 0,
+
+        finance:
+            Number(
+                syncData[BIG_DATA_SYNC_FIELDS.finance]
+            ) || 0,
+
+        production:
+            Number(
+                syncData[BIG_DATA_SYNC_FIELDS.production]
+            ) || 0
+    };
+};
+
+
+// Mengosongkan penanda cache sesi untuk satu modul.
+// Ini tidak menghapus data Firestore.
+// Ini hanya mengizinkan fungsi fetch berjalan kembali.
+const resetBigModuleFlags = (moduleName) => {
+    switch (moduleName) {
+        case 'sales':
+            dataFetched.transactions = false;
+            dataFetched.allTransactionsLoaded = false;
+
+            dataFetched.returns = false;
+            dataFetched.allReturnsLoaded = false;
+
+            dataFetched.pendingSettlements = false;
+
+            uiState.transaksiLastVisible = null;
+            uiState.transaksiHasMore = true;
+
+            uiState.returLastVisible = null;
+            uiState.returHasMore = true;
+            break;
+
+
+        case 'products':
+            dataFetched.products = false;
+            dataFetched.allProductsLoaded = false;
+            dataFetched.pricesAndAllocations = false;
+
+            uiState.productsLastVisible = null;
+            uiState.productsHasMore = true;
+            break;
+
+
+        case 'finance':
+            dataFetched.finance = false;
+            break;
+
+
+        case 'production':
+            dataFetched.production = false;
+            dataFetched.fabric = false;
+
+            uiState.produksiLastVisible = null;
+            uiState.produksiHasMore = true;
+            break;
+    }
+};
+
+
+// Reset semua modul besar.
+// Dipakai ketika browser atau akun baru belum mempunyai cache lengkap.
+const resetAllBigModuleFlags = () => {
+    Object.keys(BIG_DATA_SYNC_FIELDS).forEach(
+        resetBigModuleFlags
+    );
+};
+
+
+// Memastikan fungsi fetch benar-benar berhasil mengisi modul.
+const isBigModuleReady = (moduleName) => {
+    switch (moduleName) {
+        case 'sales':
+            return (
+                dataFetched.allTransactionsLoaded === true &&
+                dataFetched.allReturnsLoaded === true
+            );
+
+
+        case 'products':
+            return (
+                dataFetched.allProductsLoaded === true &&
+                dataFetched.pricesAndAllocations === true
+            );
+
+
+        case 'finance':
+            return dataFetched.finance === true;
+
+
+        case 'production':
+            return (
+                dataFetched.production === true &&
+                dataFetched.fabric === true
+            );
+
+
+        default:
+            return false;
+    }
+};
+
+
+// Membaca satu modul dari IndexedDB dengan aman.
+// Error satu modul tidak menghentikan modul yang lain.
+const loadCachedModuleSafely = async (
+    moduleName,
+    loader
+) => {
+    try {
+        await loader();
+    } catch (error) {
+        console.warn(
+            `[INDEXEDDB] Cache modul "${moduleName}" belum tersedia.`,
+            error
+        );
+    }
+};
+
+
+// Memuat semua modul besar ketika Firestore sedang offline.
+// Karena network dimatikan, getDocs() menggunakan IndexedDB,
+// bukan mengambil ulang dari server.
+const loadBigModulesFromIndexedDb = async (userId) => {
+    console.log(
+        '[INDEXEDDB] Memuat data besar dari cache lokal.'
+    );
+
+    await loadCachedModuleSafely(
+        'products',
+        () => fetchAllProductData(userId)
+    );
+
+    await loadCachedModuleSafely(
+        'sales',
+        () => fetchTransactionAndReturnData(
+            userId,
+            false,
+            null,
+            null,
+            true
+        )
+    );
+
+    await loadCachedModuleSafely(
+        'finance',
+        () => fetchKeuanganData(true)
+    );
+
+    await loadCachedModuleSafely(
+        'production',
+        () => fetchProductionData(
+            userId,
+            false
+        )
+    );
+};
+
+
+// Menjalankan fetch server hanya untuk modul
+// yang versinya berubah atau cache-nya tidak lengkap.
+const refreshChangedBigModules = async (
+    userId,
+    changedModules
+) => {
+    for (const moduleName of changedModules) {
+        console.log(
+            `[SYNC SERVER] Memperbarui modul "${moduleName}".`
+        );
+
+        resetBigModuleFlags(moduleName);
+
+        switch (moduleName) {
+            case 'sales':
+                await fetchTransactionAndReturnData(
+                    userId,
+                    false,
+                    null,
+                    null,
+                    true
+                );
+                break;
+
+
+            case 'products':
+                await fetchAllProductData(userId);
+                break;
+
+
+            case 'finance':
+                await fetchKeuanganData(true);
+                break;
+
+
+            case 'production':
+                await fetchProductionData(
+                    userId,
+                    false
+                );
+                break;
+        }
+
+        // Jangan menyimpan versi baru bila fetch gagal.
+        if (!isBigModuleReady(moduleName)) {
+            throw new Error(
+                `Modul "${moduleName}" belum berhasil disinkronkan.`
+            );
+        }
+    }
+};
+
+
+// Tahap pertama startup:
+//
+// 1. Matikan koneksi Firestore.
+// 2. Reset flag sesi.
+// 3. Baca empat modul besar dari IndexedDB.
+const beginIndexedDbStartup = async (userId) => {
+    // Akun berbeda harus mempunyai proses startup sendiri.
+    if (cacheStartupState.userId !== userId) {
+        cacheStartupState.userId = userId;
+        cacheStartupState.running = false;
+        cacheStartupState.finished = false;
+    }
+
+    if (
+        cacheStartupState.running ||
+        cacheStartupState.finished
+    ) {
+        return false;
+    }
+
+    cacheStartupState.running = true;
+
+    try {
+        await disableNetwork(db);
+
+        resetAllBigModuleFlags();
+
+        await loadBigModulesFromIndexedDb(userId);
+
+        return true;
+    } catch (error) {
+        console.warn(
+            '[INDEXEDDB] Gagal memulai cache lokal. Aplikasi memakai koneksi normal.',
+            error
+        );
+
+        try {
+            await enableNetwork(db);
+        } catch (enableError) {
+            console.warn(
+                '[FIRESTORE] Gagal mengaktifkan kembali network.',
+                enableError
+            );
+        }
+
+        cacheStartupState.running = false;
+        cacheStartupState.finished = true;
+
+        return false;
+    }
+};
+
+
+// Tahap kedua startup:
+//
+// 1. Aktifkan network kembali.
+// 2. Ambil satu dokumen user_sync dari server.
+// 3. Bandingkan versi server dengan versi browser.
+// 4. Refresh hanya modul yang berubah.
+const finishIndexedDbStartup = async (userId) => {
+    try {
+        await enableNetwork(db);
+
+        const syncReference = doc(
+            db,
+            'user_sync',
+            userId
+        );
+
+        // Pembacaan ini sengaja dipaksa ke server.
+        // Inilah pemeriksaan versi satu dokumen.
+        const syncSnapshot =
+            await getDocFromServer(syncReference);
+
+        const serverVersions =
+            extractServerSyncVersions(
+                syncSnapshot.exists()
+                    ? syncSnapshot.data()
+                    : {}
+            );
+
+        const localVersions =
+            readLocalSyncVersions(userId);
+
+        const isFirstSyncOnThisBrowser =
+            !localVersions ||
+            localVersions.schemaVersion !== 1;
+
+        const changedModules = new Set();
+
+        // Browser/perangkat baru harus mengambil data server
+        // satu kali agar IndexedDB benar-benar lengkap.
+        if (isFirstSyncOnThisBrowser) {
+            Object.keys(BIG_DATA_SYNC_FIELDS)
+                .forEach(moduleName => {
+                    changedModules.add(moduleName);
+                });
+        } else {
+            Object.keys(BIG_DATA_SYNC_FIELDS)
+                .forEach(moduleName => {
+                    const localVersion =
+                        Number(
+                            localVersions[moduleName]
+                        ) || 0;
+
+                    const serverVersion =
+                        Number(
+                            serverVersions[moduleName]
+                        ) || 0;
+
+                    if (localVersion !== serverVersion) {
+                        changedModules.add(moduleName);
+                    }
+                });
+        }
+
+        // Perlindungan tambahan:
+        // versi boleh sama, tetapi IndexedDB bisa saja kosong
+        // atau dibersihkan oleh browser.
+        Object.keys(BIG_DATA_SYNC_FIELDS)
+            .forEach(moduleName => {
+                if (!isBigModuleReady(moduleName)) {
+                    changedModules.add(moduleName);
+                }
+            });
+
+
+        if (changedModules.size === 0) {
+            console.log(
+                '[SYNC VERSION] Versi sama. Tidak membaca ulang koleksi besar.'
+            );
+
+            return;
+        }
+
+        const modulesToRefresh =
+            Array.from(changedModules);
+
+        console.log(
+            '[SYNC VERSION] Modul yang berubah:',
+            modulesToRefresh
+        );
+
+        await refreshChangedBigModules(
+            userId,
+            modulesToRefresh
+        );
+
+        // Versi disimpan hanya setelah semua fetch berhasil.
+        saveLocalSyncVersions(
+            userId,
+            serverVersions
+        );
+
+        console.log(
+            '[SYNC VERSION] Sinkronisasi server selesai.'
+        );
+    } catch (error) {
+        // Bila internet sedang mati atau rules belum benar,
+        // data IndexedDB tetap dipakai.
+        // Versi lokal tidak diubah agar sinkronisasi dicoba lagi.
+        console.warn(
+            '[SYNC VERSION] Pemeriksaan server gagal. Cache lokal tetap digunakan.',
+            error
+        );
+    } finally {
+        cacheStartupState.running = false;
+        cacheStartupState.finished = true;
+    }
+};
 const loadDataForPage = async (pageName) => {
     if (!currentUser.value) return;
 
@@ -567,9 +1052,15 @@ const loadDataForPage = async (pageName) => {
 
     pagesCurrentlyLoading.add(pageName);
 
-    const userId = currentUser.value.uid;
+const userId = currentUser.value.uid;
 
-    try {
+// Hanya pemanggilan halaman pertama yang bertugas
+// menyelesaikan proses cache startup.
+let shouldFinishIndexedDbStartup = false;
+
+try {
+    shouldFinishIndexedDbStartup =
+        await beginIndexedDbStartup(userId);
         const dataPromises = [];
 
         switch(pageName) {
@@ -666,8 +1157,14 @@ case 'roas-dashboard':
             error
         );
     } finally {
-        pagesCurrentlyLoading.delete(pageName);
+    pagesCurrentlyLoading.delete(pageName);
+
+    // Sesudah halaman menampilkan data IndexedDB,
+    // hidupkan network dan periksa satu dokumen versi.
+    if (shouldFinishIndexedDbStartup) {
+        await finishIndexedDbStartup(userId);
     }
+}
 };
 
 const lastEditedModel = ref(null);
@@ -10597,7 +11094,11 @@ const fetchAllProductData = async (userId) => {
         ]);
         const allPrices = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allAllocations = allocationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+ // Simpan harga dan alokasi yang sudah berhasil diambil
+state.productPrices = allPrices;
+state.stockAllocations = allAllocations;
 
+dataFetched.pricesAndAllocations = true;       
         while (hasMoreData) {
             let q = query(
                 collection(db, "products"),

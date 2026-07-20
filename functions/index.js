@@ -1,4 +1,9 @@
-const {onDocumentCreated, onDocumentUpdated, onDocumentDeleted} = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentUpdated,
+  onDocumentDeleted,
+  onDocumentWritten,
+} = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -399,3 +404,249 @@ exports.updateSummaryOnDeleteIncome = onDocumentDeleted("keuangan/{financeId}", 
     };
     return summaryRef.set(updateData, { merge: true });
 });
+// ============================================================
+// PENANDA VERSI DATA USER UNTUK SINKRONISASI CACHE
+// ============================================================
+
+// Nama function Firebase, nama koleksi, dan kelompok datanya.
+const syncTrackedCollections = {
+  syncTransactions: {
+    collectionName: "transactions",
+    moduleName: "sales",
+  },
+
+  syncReturns: {
+    collectionName: "returns",
+    moduleName: "sales",
+  },
+
+  syncProducts: {
+    collectionName: "products",
+    moduleName: "products",
+  },
+
+  syncProductPrices: {
+    collectionName: "product_prices",
+    moduleName: "products",
+  },
+
+  syncStockAllocations: {
+    collectionName: "stock_allocations",
+    moduleName: "products",
+  },
+
+  syncFinance: {
+    collectionName: "keuangan",
+    moduleName: "finance",
+  },
+
+  syncProductionBatches: {
+    collectionName: "production_batches",
+    moduleName: "production",
+  },
+
+  syncFabricStock: {
+    collectionName: "fabric_stock",
+    moduleName: "production",
+  },
+
+  syncSuppliers: {
+    collectionName: "suppliers",
+    moduleName: "suppliers",
+  },
+
+  syncPurchaseOrders: {
+    collectionName: "purchase_orders",
+    moduleName: "suppliers",
+  },
+
+  syncVoucherNotes: {
+    collectionName: "voucher_notes",
+    moduleName: "notes",
+  },
+
+  syncInvestors: {
+    collectionName: "investors",
+    moduleName: "investment",
+  },
+
+  syncInvestorPayments: {
+    collectionName: "investor_payments",
+    moduleName: "investment",
+  },
+
+  syncBankAccounts: {
+    collectionName: "bank_accounts",
+    moduleName: "investment",
+  },
+
+  syncCategories: {
+    collectionName: "categories",
+    moduleName: "settings",
+  },
+
+  // Pada koleksi ini, ID dokumennya adalah UID user.
+  syncSettings: {
+    collectionName: "settings",
+    moduleName: "settings",
+    userIdFromDocumentId: true,
+  },
+
+  syncPromotions: {
+    collectionName: "promotions",
+    moduleName: "settings",
+    userIdFromDocumentId: true,
+  },
+
+  syncProductCommissions: {
+    collectionName: "product_commissions",
+    moduleName: "settings",
+    userIdFromDocumentId: true,
+  },
+};
+
+
+// Mengambil data terbaru.
+// Jika dokumen dihapus, data diambil dari kondisi sebelum dihapus.
+function getSyncEventData(event) {
+  if (event.data.after.exists) {
+    return event.data.after.data() || {};
+  }
+
+  if (event.data.before.exists) {
+    return event.data.before.data() || {};
+  }
+
+  return {};
+}
+
+
+// Menentukan jenis perubahan untuk kebutuhan pemeriksaan.
+function getSyncOperation(event) {
+  const beforeExists = event.data.before.exists;
+  const afterExists = event.data.after.exists;
+
+  if (!beforeExists && afterExists) {
+    return "created";
+  }
+
+  if (beforeExists && !afterExists) {
+    return "deleted";
+  }
+
+  return "updated";
+}
+
+
+// Mencari UID pemilik dokumen.
+async function resolveSyncUserId(event, config) {
+  // Settings dan beberapa pengaturan lain memakai UID
+  // sebagai ID dokumen.
+  if (config.userIdFromDocumentId) {
+    return event.params.documentId || null;
+  }
+
+  const data = getSyncEventData(event);
+
+  // Sebagian besar koleksi sudah mempunyai field userId.
+  if (data.userId) {
+    return data.userId;
+  }
+
+  // Perlindungan untuk data harga atau alokasi lama
+  // yang mungkin belum mempunyai field userId.
+  const isProductRelated =
+    config.collectionName === "product_prices" ||
+    config.collectionName === "stock_allocations";
+
+  if (!isProductRelated) {
+    return null;
+  }
+
+  const productId =
+    data.product_id ||
+    data.productId ||
+    (
+      config.collectionName === "stock_allocations"
+        ? event.params.documentId
+        : null
+    );
+
+  if (!productId) {
+    return null;
+  }
+
+  const productSnap =
+    await db.doc(`products/${productId}`).get();
+
+  if (!productSnap.exists) {
+    return null;
+  }
+
+  return productSnap.data().userId || null;
+}
+
+
+// Membuat atau memperbarui user_sync/{uid}.
+async function markUserDataChanged(event, config) {
+  const userId = await resolveSyncUserId(
+    event,
+    config
+  );
+
+  if (!userId) {
+    console.warn(
+      "[SYNC VERSION] userId tidak ditemukan:",
+      `${config.collectionName}/${event.params.documentId}`
+    );
+
+    return null;
+  }
+
+  const syncRef = db.doc(`user_sync/${userId}`);
+
+  const moduleVersionField =
+    `module_${config.moduleName}_version`;
+
+  const moduleUpdatedAtField =
+    `module_${config.moduleName}_updatedAt`;
+
+  return syncRef.set({
+    schemaVersion: 1,
+
+    // Versi keseluruhan data user.
+    version:
+      admin.firestore.FieldValue.increment(1),
+
+    updatedAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+
+    // Versi khusus per kelompok data.
+    [moduleVersionField]:
+      admin.firestore.FieldValue.increment(1),
+
+    [moduleUpdatedAtField]:
+      admin.firestore.FieldValue.serverTimestamp(),
+
+    // Hanya untuk membantu pemeriksaan.
+    lastChange: {
+      collection: config.collectionName,
+      documentId: event.params.documentId,
+      operation: getSyncOperation(event),
+      eventId: event.id || null,
+    },
+  }, { merge: true });
+}
+
+
+// Membuat Cloud Function untuk setiap koleksi di atas.
+Object.entries(syncTrackedCollections).forEach(
+  ([functionName, config]) => {
+    exports[functionName] = onDocumentWritten(
+      `${config.collectionName}/{documentId}`,
+      async (event) => {
+        return markUserDataChanged(event, config);
+      }
+    );
+  }
+);
