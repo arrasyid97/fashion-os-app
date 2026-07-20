@@ -4837,12 +4837,27 @@ const transaksiCairKeys = new Set();
     kpis.danaBelumCair = danaBelumCair;
     kpis.qtyBelumCair = qtyBelumCair;
 
-    let totalNilaiReturGross = 0;
-    let totalDiskonBatal = 0;
-    let totalHppRetur = 0;
-    let biayaMarketplaceBatal = 0;
+    // Semua retur pada filter Dashboard.
+// Dipakai khusus untuk kartu Total Nilai Retur.
+let totalNilaiReturSemua = 0;
+
+// Retur dari transaksi Sudah Cair.
+// Dipakai untuk koreksi omzet, HPP, biaya, dan laba.
+let totalNilaiReturGross = 0;
+
+let totalDiskonBatal = 0;
+let totalHppRetur = 0;
+let biayaMarketplaceBatal = 0;
 
     (retur || []).forEach(r => {
+    // Seluruh data retur masuk ke kartu Total Nilai Retur,
+    // baik dari Manajemen Retur maupun Audit & Pencairan Dana.
+    (r.items || []).forEach(item => {
+        totalNilaiReturSemua +=
+            (Number(item.nilaiRetur) || 0) +
+            (Number(item.nilaiDiskon) || 0);
+    });
+
     const returKeys = [
         r.originalTransactionId,
         r.transactionId,
@@ -4888,7 +4903,7 @@ const transaksiCairKeys = new Set();
     kpis.totalDiskon = totalDiskonAwal - totalDiskonBatal;
     kpis.totalHppTerjual = totalHppTerjualAwal - totalHppRetur;
     kpis.totalBiayaTransaksi = totalBiayaTransaksiAwal - biayaMarketplaceBatal;
-    kpis.totalNilaiRetur = totalNilaiReturGross;
+    kpis.totalNilaiRetur = totalNilaiReturSemua;
     kpis.pemasukanLain = pemasukanLain;
 
     kpis.omsetBersih = kpis.omsetKotor - kpis.totalDiskon;
@@ -8884,6 +8899,165 @@ async function deleteReturnItem(itemToDelete) {
     }
 }
 
+function buildReturnItemsFromTransaction(
+    transaction,
+    itemsToReturn = [],
+    defaultReason = ''
+) {
+    const transactionItems = Array.isArray(transaction?.items)
+        ? transaction.items
+        : [];
+
+    // Gunakan subtotal tersimpan.
+    // Untuk data lama yang tidak mempunyai subtotal,
+    // hitung ulang dari seluruh item transaksi.
+    const fallbackSubtotal = transactionItems.reduce((sum, item) => {
+        const qty = Number(item.qty) || 0;
+
+        const hargaJual = Number(
+            item.hargaJualAktual ??
+            item.hargaJual ??
+            item.price ??
+            item.harga ??
+            0
+        ) || 0;
+
+        return sum + (hargaJual * qty);
+    }, 0);
+
+    const subtotalTransaksi =
+        Number(transaction?.subtotal) ||
+        fallbackSubtotal ||
+        1;
+
+    const totalDiskon =
+        Number(transaction?.diskon?.totalDiscount) || 0;
+
+    const totalBiayaMarketplace =
+        Number(transaction?.biaya?.total) || 0;
+
+    return (itemsToReturn || [])
+        .map(item => {
+            const qty =
+                Number(item.returnQty ?? item.qty) || 0;
+
+            const hargaJual = Number(
+                item.hargaJualAktual ??
+                item.hargaJual ??
+                item.price ??
+                item.harga ??
+                0
+            ) || 0;
+
+            const nilaiKotorItem = hargaJual * qty;
+
+            const porsiItem =
+                subtotalTransaksi > 0
+                    ? nilaiKotorItem / subtotalTransaksi
+                    : 0;
+
+            const nilaiDiskon =
+                totalDiskon * porsiItem;
+
+            const biayaMarketplace =
+                totalBiayaMarketplace * porsiItem;
+
+            const nilaiReturBersih =
+                nilaiKotorItem - nilaiDiskon;
+
+            return {
+                sku: item.sku || '',
+                qty,
+                nilaiRetur: nilaiReturBersih,
+                nilaiDiskon,
+                biayaMarketplace,
+                alasan:
+                    item.alasan ||
+                    defaultReason ||
+                    ''
+            };
+        })
+        .filter(item => item.sku && item.qty > 0);
+}
+
+
+// Mengumpulkan jumlah stok yang perlu dikembalikan.
+// Map dipakai agar satu SKU hanya diperbarui sekali.
+function addReturnedItemsToStockMap(stockMap, returnItems = []) {
+    (returnItems || []).forEach(item => {
+        const sku = String(item.sku || '').trim();
+        const qty = Number(item.qty) || 0;
+
+        if (!sku || qty <= 0) return;
+
+        stockMap.set(
+            sku,
+            (stockMap.get(sku) || 0) + qty
+        );
+    });
+}
+
+
+// Memasukkan pengembalian stok fisik ke Firebase batch.
+function queuePhysicalStockReturn(batch, stockMap) {
+    stockMap.forEach((qty, sku) => {
+        const product =
+            getProductBySku(sku) ||
+            state.inventoryPaginated.find(p =>
+                String(p.sku || '').toLowerCase() ===
+                sku.toLowerCase()
+            );
+
+        if (!product?.docId) {
+            throw new Error(
+                `Produk dengan SKU "${sku}" tidak ditemukan di Inventaris. Retur dibatalkan agar stok tidak salah.`
+            );
+        }
+
+        const productRef = doc(
+            db,
+            "products",
+            product.docId
+        );
+
+        // Increment menghitung langsung di server Firebase.
+        batch.update(productRef, {
+            physical_stock: increment(qty)
+        });
+    });
+}
+
+
+// Memperbarui tampilan stok setelah Firebase berhasil.
+function applyPhysicalStockReturnToLocal(stockMap) {
+    stockMap.forEach((qty, sku) => {
+        const normalizedSku = sku.toLowerCase();
+
+        const productInState = state.produk.find(p =>
+            String(p.sku || '').toLowerCase() ===
+            normalizedSku
+        );
+
+        if (productInState) {
+            productInState.stokFisik =
+                (Number(productInState.stokFisik) || 0) +
+                qty;
+        }
+
+        const inventoryProduct =
+            state.inventoryPaginated.find(p =>
+                String(p.sku || '').toLowerCase() ===
+                normalizedSku
+            );
+
+        if (inventoryProduct) {
+            inventoryProduct.stokFisik =
+                (Number(inventoryProduct.stokFisik) || 0) +
+                qty;
+        }
+    });
+}
+
 async function submitReturForm() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.modalData;
@@ -8896,48 +9070,40 @@ async function submitReturForm() {
 
     try {
         const batch = writeBatch(db);
-        const trxAsli = form.foundTransaction;
-        const newKeuanganEntries = [];
+const trxAsli = form.foundTransaction;
+const newKeuanganEntries = [];
+
+// Menampung stok fisik yang akan dikembalikan
+const returnedStockMap = new Map();
 
         const dataToSave = {
-            tanggal: new Date(),
-            channelId: trxAsli.channelId,
-            originalTransactionId: trxAsli.id,
-            items: selectedItems.map(item => {
-                const porsiItem = (item.hargaJual * item.returnQty) / (trxAsli.subtotal || 1);
-                const nilaiDiskon = (trxAsli.diskon?.totalDiscount || 0) * porsiItem;
-                const biayaMarketplace = (trxAsli.biaya?.total || 0) * porsiItem;
-                const nilaiReturBersih = item.hargaJual * item.returnQty - nilaiDiskon;
+    tanggal: new Date(),
+    channelId: trxAsli.channelId,
+    originalTransactionId: trxAsli.id,
 
-                return {
-                    sku: item.sku,
-                    qty: item.returnQty,
-                    nilaiRetur: nilaiReturBersih,
-                    nilaiDiskon: nilaiDiskon,
-                    biayaMarketplace: biayaMarketplace,
-                    alasan: item.alasan || '',
-                    // BARIS tindakLanjut DIHAPUS DARI SINI
-                };
-            }),
-            userId: currentUser.value.uid
-        };
+    items: buildReturnItemsFromTransaction(
+        trxAsli,
+        selectedItems,
+        'Retur dari Manajemen Retur'
+    ),
+
+    userId: currentUser.value.uid
+};
 
         const returnRef = doc(collection(db, "returns"));
         batch.set(returnRef, dataToSave);
 
-        for (const item of dataToSave.items) {
-            const productInState = getProductBySku(item.sku);
-            if (productInState) {
-                const newStockFisik = productInState.stokFisik + item.qty;
-                const productRef = doc(db, "products", productInState.docId);
-                const allocationRef = doc(db, "stock_allocations", productInState.docId);
-                
-                batch.update(productRef, { physical_stock: newStockFisik });
-                const newAlokasi = { ...productInState.stokAlokasi };
-                newAlokasi[trxAsli.channelId] = (newAlokasi[trxAsli.channelId] || 0) + item.qty;
-                batch.set(allocationRef, newAlokasi, { merge: true });
-            }
-        }
+        // Kumpulkan jumlah stok dari seluruh item retur
+addReturnedItemsToStockMap(
+    returnedStockMap,
+    dataToSave.items
+);
+
+// Kembalikan stok fisik dalam batch yang sama
+queuePhysicalStockReturn(
+    batch,
+    returnedStockMap
+);
         
         await batch.commit();
 
@@ -8946,17 +9112,11 @@ async function submitReturForm() {
             state.keuangan.push(...newKeuanganEntries);
         }
 
-        for (const item of selectedItems) {
-            const productInState = state.produk.find(p => p.sku === item.sku);
-            if (productInState) {
-                productInState.stokFisik += item.returnQty;
-                const invProduct = state.inventoryPaginated.find(p => p.sku === item.sku);
-                if (invProduct) {
-                    invProduct.stokFisik += item.returnQty;
-                }
-                productInState.stokAlokasi[trxAsli.channelId] += item.returnQty;
-            }
-        }
+        // Firebase sudah berhasil.
+// Sekarang perbarui angka stok yang tampil.
+applyPhysicalStockReturnToLocal(
+    returnedStockMap
+);
 
         alert(`Data retur untuk pesanan ${trxAsli.marketplaceOrderId} berhasil disimpan!`);
         hideModal();
@@ -10883,7 +11043,16 @@ async function processBulkSettlement(targetStatus = 'Sudah Cair') {
     if (!bulkSettlementInput.value.trim()) {
         return alert("Tempelkan daftar ID Pesanan terlebih dahulu.");
     }
-
+// Data produk diperlukan untuk mengembalikan stok.
+// Hanya dimuat ketika tombol Retur/Pengembalian dipakai.
+if (
+    targetStatus === 'Retur/Pengembalian' &&
+    !dataFetched.allProductsLoaded
+) {
+    await fetchAllProductData(
+        currentUser.value.uid
+    );
+}
     const rawIds = bulkSettlementInput.value
         .split(/[\n,]+/)
         .map(id => id.trim())
@@ -10908,9 +11077,12 @@ async function processBulkSettlement(targetStatus = 'Sudah Cair') {
     isSaving.value = true;
 
     let countSuccess = 0;
-    let countReturnCreated = 0;
-    const notFoundIds = [];
-    const newReturnDocs = [];
+let countReturnCreated = 0;
+const notFoundIds = [];
+const newReturnDocs = [];
+
+// Gabungan stok dari seluruh ID pesanan yang diretur
+const returnedStockMap = new Map();
 
     try {
         const batch = writeBatch(db);
@@ -10931,10 +11103,18 @@ async function processBulkSettlement(targetStatus = 'Sudah Cair') {
             }
 
             if (foundTrx.statusPencairan === targetStatus) {
-                return;
-            }
+    return;
+}
 
-            const trxRef = doc(db, "transactions", foundTrx.id);
+// Simpan status sebelum diubah menjadi Retur/Pengembalian
+const previousSettlementStatus =
+    foundTrx.statusPencairan || 'Belum Cair';
+
+const trxRef = doc(
+    db,
+    "transactions",
+    foundTrx.id
+);
 
             const updatePayload = {
     statusPencairan: targetStatus
@@ -10951,52 +11131,88 @@ foundTrx.statusPencairan = targetStatus;
             countSuccess++;
 
             if (targetStatus === 'Retur/Pengembalian') {
-                const returnRef = doc(collection(db, "returns"));
+    const returnRef = doc(
+        collection(db, "returns")
+    );
 
-                const returnData = {
-                    tanggal: new Date(),
-                    channelId: foundTrx.channelId || '',
-                    originalTransactionId: foundTrx.id,
-                    marketplaceOrderId: foundTrx.marketplaceOrderId || orderId,
-                    sumber: 'Audit & Pencairan Dana',
-                    statusRetur: 'Retur / Pengembalian',
-                    items: (foundTrx.items || []).map(item => {
-                        const qty = item.qty || 0;
-                        const hargaJual = item.hargaJualAktual || item.hargaJual || item.price || item.harga || 0;
+    // Seluruh item pesanan otomatis diretur.
+    // Rumusnya sama dengan Manajemen Retur.
+    const returnItems =
+        buildReturnItemsFromTransaction(
+            foundTrx,
+            foundTrx.items || [],
+            'Retur / Pengembalian dari Audit & Pencairan Dana'
+        );
 
-                        return {
-                            sku: item.sku || '',
-                            qty: qty,
-                            nilaiRetur: hargaJual * qty,
-                            nilaiDiskon: 0,
-                            biayaMarketplace: 0,
-                            alasan: 'Retur / Pengembalian dari audit pencairan dana'
-                        };
-                    }),
-                    userId: currentUser.value.uid,
-                    createdAt: new Date()
-                };
+    if (returnItems.length === 0) {
+        throw new Error(
+            `Pesanan ${orderId} tidak mempunyai item retur yang valid.`
+        );
+    }
 
-                batch.set(returnRef, returnData);
+    const returnData = {
+        tanggal: new Date(),
+        channelId: foundTrx.channelId || '',
+        originalTransactionId: foundTrx.id,
+        marketplaceOrderId:
+            foundTrx.marketplaceOrderId ||
+            orderId,
 
-                newReturnDocs.push({
-                    id: returnRef.id,
-                    ...returnData
-                });
+        sumber: 'Audit & Pencairan Dana',
+        statusRetur: 'Retur / Pengembalian',
 
-                countReturnCreated++;
-            }
+        // Catatan agar riwayat status tetap jelas
+        statusPencairanSebelumRetur:
+            previousSettlementStatus,
+
+        items: returnItems,
+        userId: currentUser.value.uid,
+        createdAt: new Date()
+    };
+
+    batch.set(
+        returnRef,
+        returnData
+    );
+
+    // Kumpulkan stok fisik seluruh item pesanan
+    addReturnedItemsToStockMap(
+        returnedStockMap,
+        returnItems
+    );
+
+    newReturnDocs.push({
+        id: returnRef.id,
+        ...returnData
+    });
+
+    countReturnCreated++;
+}
         });
 
         if (countSuccess === 0) {
-            throw new Error("Tidak ada ID yang cocok dengan daftar pesanan gantung. Periksa kembali ID Pesanan Anda.");
-        }
+    throw new Error(
+        "Tidak ada ID yang cocok dengan daftar pesanan gantung. Periksa kembali ID Pesanan Anda."
+    );
+}
 
-        await batch.commit();
+// Bila prosesnya adalah retur, kembalikan stok fisik.
+// Bila Dana Cair atau Batal, Map kosong dan tidak mengubah stok.
+queuePhysicalStockReturn(
+    batch,
+    returnedStockMap
+);
+
+await batch.commit();
 
         if (newReturnDocs.length > 0) {
-            state.retur.unshift(...newReturnDocs);
-        }
+    state.retur.unshift(...newReturnDocs);
+
+    // Perbarui stok yang tampil tanpa harus refresh
+    applyPhysicalStockReturnToLocal(
+        returnedStockMap
+    );
+}
 
         let message = `Berhasil! ${countSuccess} pesanan diperbarui menjadi: ${targetStatus}.`;
 
