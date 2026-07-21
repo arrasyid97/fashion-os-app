@@ -13982,7 +13982,7 @@ SKU-BAJU-PUTIH-S"
             </h4>
 
             <p class="text-xs text-slate-400 mt-1">
-                Menampilkan 50 pesanan per halaman.
+                Menampilkan Daftar Pesanan.
             </p>
         </div>
 
