@@ -629,7 +629,7 @@ const getLegacySyncStorageKey = (userId) => {
 
 const normalizeSyncVersions = (versions = {}) => {
     const normalized = {
-        schemaVersion: 1
+        schemaVersion: 2
     };
 
     Object.keys(SYNC_MODULE_FIELDS)
@@ -1309,7 +1309,7 @@ const finishIndexedDbStartup =
 
             const isFirstSyncOnThisBrowser =
                 !localVersions ||
-                localVersions.schemaVersion !== 1;
+                localVersions.schemaVersion !== 2
 
             const changedModules = new Set();
 
@@ -1842,29 +1842,60 @@ function getActiveArray(items) {
     return (items || []).filter(isActiveExportRecord);
 }
 
-async function getDocsByProductIds(collectionName, productIds, ownerUserId = null) {
+async function getDocsByProductIds(
+    collectionName,
+    productIds,
+    ownerUserId = null,
+    readFromServer = true
+) {
     const results = [];
-    const cleanIds = [...new Set((productIds || []).filter(Boolean))];
 
-    for (let i = 0; i < cleanIds.length; i += 10) {
-        const chunk = cleanIds.slice(i, i + 10);
+    const cleanIds = [
+        ...new Set(
+            (productIds || []).filter(Boolean)
+        )
+    ];
+
+    const readDocuments =
+        readFromServer
+            ? getDocsFromServer
+            : getDocs;
+
+    for (
+        let index = 0;
+        index < cleanIds.length;
+        index += 10
+    ) {
+        const chunk = cleanIds.slice(
+            index,
+            index + 10
+        );
 
         if (chunk.length === 0) continue;
 
-        const snap = await getDocsFromServer(
+        const snapshot = await readDocuments(
             query(
-                collection(db, collectionName),
-                where("product_id", "in", chunk)
+                collection(
+                    db,
+                    collectionName
+                ),
+                where(
+                    "product_id",
+                    "in",
+                    chunk
+                )
             )
         );
 
-        const rows = snapshotToRows(snap).filter(row => {
-            // Kalau data harga lama belum punya userId, tetap boleh ikut
-            // selama product_id-nya memang milik produk user yang sedang diexport.
-            if (!ownerUserId) return true;
-            if (!row.userId) return true;
-            return row.userId === ownerUserId;
-        });
+        const rows =
+            snapshotToRows(snapshot).filter(row => {
+                if (!ownerUserId) return true;
+
+                // Data harga lama belum tentu mempunyai userId.
+                if (!row.userId) return true;
+
+                return row.userId === ownerUserId;
+            });
 
         results.push(...rows);
     }
@@ -11440,81 +11471,62 @@ const fetchCoreData = async (
 };
 
 // Fungsi khusus untuk data produk, harga, dan alokasi
-const fetchProductData = async (userId, loadMore = false) => {
+const fetchProductData = async (
+    userId,
+    loadMore = false
+) => {
     const PRODUCTS_PER_PAGE = 100;
 
-    if (!dataFetched.pricesAndAllocations) {
-        try {
-            const [pricesSnap, allocationsSnap] = await Promise.all([
-                getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-                getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
-            ]);
-            state.productPrices = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            state.stockAllocations = allocationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            dataFetched.pricesAndAllocations = true;
-        } catch (error) {
-            console.error("Error fetching prices/allocations:", error);
-        }
-    }
-
-    if (loadMore && !uiState.productsHasMore) return;
-
     try {
-        let q = query(
-            collection(db, "products"),
-            where("userId", "==", userId),
-            orderBy("product_name", "asc"),
-            limit(PRODUCTS_PER_PAGE)
+        if (
+            !dataFetched.allProductsLoaded ||
+            !dataFetched.pricesAndAllocations
+        ) {
+            await fetchAllProductData(userId);
+        }
+
+        const requestedVisibleCount =
+            loadMore
+                ? state.inventoryPaginated.length +
+                    PRODUCTS_PER_PAGE
+                : PRODUCTS_PER_PAGE;
+
+        const visibleCount = Math.min(
+            requestedVisibleCount,
+            state.produk.length
         );
 
-        if (loadMore && uiState.productsLastVisible) {
-            q = query(q, startAfter(uiState.productsLastVisible));
-        } else {
-            state.inventoryPaginated = []; // Selalu reset data TAMPILAN inventaris
-            uiState.productsLastVisible = null;
-            uiState.productsHasMore = true;
-        }
+        // Tombol Muat Lebih Banyak sekarang hanya
+        // menampilkan produk berikutnya dari data lokal.
+        state.inventoryPaginated =
+            state.produk.slice(
+                0,
+                visibleCount
+            );
 
-        const productSnap = await getDocs(q);
+        uiState.productsLastVisible = null;
 
-        if (!productSnap.empty) {
-            uiState.productsLastVisible = productSnap.docs[productSnap.docs.length - 1];
-            
-            const newProducts = productSnap.docs.map(docSnap => {
-                const p = { id: docSnap.id, ...docSnap.data() };
-                const hargaJual = {};
-                const stokAlokasi = {};
-                const productAllocation = state.stockAllocations.find(alloc => alloc.id === p.id);
-                
-                (state.settings.marketplaces || []).forEach(mp => {
-                    const priceInfo = state.productPrices.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                    hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                    stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-                });
+        uiState.productsHasMore =
+            visibleCount <
+            state.produk.length;
 
-                return {
-                    docId: p.id, sku: p.sku, nama: p.product_name, model_id: p.model_id,
-                    warna: p.color, varian: p.variant, stokFisik: p.physical_stock, hpp: p.hpp,
-                    hargaJual, stokAlokasi, userId: p.userId
-                };
-            });
-
-            state.inventoryPaginated.push(...newProducts);
-        }
-        
-        if (productSnap.docs.length < PRODUCTS_PER_PAGE) {
-            uiState.productsHasMore = false;
-        }
         dataFetched.products = true;
-
     } catch (error) {
-        console.error("Error fetching paginated products:", error);
+        console.error(
+            "Error menampilkan produk Inventaris:",
+            error
+        );
+
+        throw error;
     }
 };
 
 const fetchAllProductData = async (userId) => {
     // Gunakan flag baru untuk mencegah fetch ulang jika SEMUA data sudah ada
-    if (dataFetched.allProductsLoaded) {
+    if (
+    dataFetched.allProductsLoaded &&
+    dataFetched.pricesAndAllocations
+) {
         console.log(
             '[CACHE SESSION] Seluruh produk, harga, dan stok sudah tersedia.'
         );
@@ -11591,9 +11603,92 @@ dataFetched.pricesAndAllocations = true;
             }
         }
         
-        // Tandai bahwa SEMUA produk telah berhasil dimuat
-        dataFetched.allProductsLoaded = true; 
-        console.log(`Successfully fetched ${state.produk.length} total products.`);
+        // ========================================================
+// AMBIL JUGA HARGA LAMA BERDASARKAN PRODUCT_ID
+// ========================================================
+// Sebagian dokumen harga akun lama belum memiliki userId.
+const legacyPrices = await getDocsByProductIds(
+    "product_prices",
+    state.produk.map(
+        product => product.docId
+    ),
+    userId,
+    false
+);
+
+// Gabungkan harga dengan userId dan harga format lama.
+const mergedPrices = dedupeRowsByDocId([
+    ...allPrices,
+    ...legacyPrices
+]);
+
+state.productPrices = mergedPrices;
+
+// Map membuat pencarian harga jauh lebih cepat
+// untuk akun yang produknya banyak.
+const priceMap = new Map();
+
+mergedPrices.forEach(price => {
+    if (
+        !price.product_id ||
+        !price.marketplace_id
+    ) {
+        return;
+    }
+
+    priceMap.set(
+        `${price.product_id}__${price.marketplace_id}`,
+        price.price
+    );
+});
+
+// Masukkan kembali harga ke masing-masing produk.
+state.produk.forEach(product => {
+    (
+        state.settings.marketplaces ||
+        []
+    ).forEach(marketplace => {
+        const priceKey =
+            `${product.docId}__${marketplace.id}`;
+
+        product.hargaJual[marketplace.id] =
+            priceMap.has(priceKey)
+                ? priceMap.get(priceKey)
+                : 0;
+    });
+});
+
+// Siapkan tampilan awal Inventaris.
+// Kalau sebelumnya sudah membuka lebih dari 100,
+// pertahankan jumlah yang terlihat.
+const visibleCount = Math.min(
+    Math.max(
+        state.inventoryPaginated.length,
+        100
+    ),
+    state.produk.length
+);
+
+state.inventoryPaginated =
+    state.produk.slice(
+        0,
+        visibleCount
+    );
+
+uiState.productsLastVisible = null;
+
+uiState.productsHasMore =
+    visibleCount <
+    state.produk.length;
+
+// Tandai semua data produk berhasil dimuat.
+dataFetched.products = true;
+dataFetched.allProductsLoaded = true;
+dataFetched.pricesAndAllocations = true;
+
+console.log(
+    `Successfully fetched ${state.produk.length} total products and ${mergedPrices.length} product prices.`
+);
 
     } catch (error) {
         console.error("Error fetching all products:", error);
