@@ -4328,148 +4328,914 @@ function deleteQueuedOrder(index) {
 
 // FUNGSI FINAL UNTUK MEMPROSES SEMUA PESANAN DI ANTRIAN
 async function processBatchOrders() {
+    if (uiState.is_processing_scan) return;
+
     const ordersToProcess = [...uiState.bulk_order_queue];
+
     if (ordersToProcess.length === 0) {
-        return alert("Tidak ada pesanan di antrian untuk diproses.");
+        return alert(
+            'Tidak ada pesanan di antrian untuk diproses.'
+        );
     }
-    if (!confirm(`Anda akan memproses ${ordersToProcess.length} pesanan... Lanjutkan?`)) return;
+
+    if (
+        !confirm(
+            `Anda akan memproses ${ordersToProcess.length} pesanan... Lanjutkan?`
+        )
+    ) {
+        return;
+    }
 
     uiState.is_processing_scan = true;
-    const marketplace = getMarketplaceById(uiState.activeCartChannel);
+
     let successCount = 0;
-    const batch = writeBatch(db);
-    
+    const committedOrderIndexes = new Set();
+
     try {
-    const newTransactions = [];
+        // ========================================================
+        // TUNGGU STARTUP INDEXEDDB SELESAI
+        // ========================================================
+        // Saat startup, network Firestore dimatikan sementara.
+        // Jangan melakukan write sebelum proses cache selesai.
+        const waitStartedAt = Date.now();
+        const maxWaitMs = 90000;
 
-    // Satu identitas untuk satu kali proses massal
-    const bulkBatchId = `BULK-${Date.now()}`;
+        while (cacheStartupState.running) {
+            if (
+                Date.now() - waitStartedAt >
+                maxWaitMs
+            ) {
+                throw new Error(
+                    'Sinkronisasi awal terlalu lama. Tutup tab Fashion OS lain, muat ulang halaman, lalu coba kembali.'
+                );
+            }
 
-    // Waktu dasar untuk menjaga urutan transaksi
-    const bulkBaseTime = Date.now();
+            await new Promise(resolve =>
+                setTimeout(resolve, 250)
+            );
+        }
 
-    for (
-        let orderIndex = 0;
-        orderIndex < ordersToProcess.length;
-        orderIndex++
-    ) {
-        const order = ordersToProcess[orderIndex];
-            const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
-            
-            const diskon = calculateBestDiscount(order.items, uiState.activeCartChannel);
-            const finalTotal = subtotal - diskon.totalDiscount;
+        // Memastikan koneksi Firestore sudah aktif.
+        await enableNetwork(db);
+
+        const userId = currentUser.value?.uid;
+
+        if (!userId) {
+            throw new Error(
+                'Sesi login tidak ditemukan. Silakan login kembali.'
+            );
+        }
+
+        const marketplace =
+            getMarketplaceById(
+                uiState.activeCartChannel
+            );
+
+        if (!marketplace) {
+            throw new Error(
+                'Channel penjualan belum dipilih atau datanya tidak ditemukan.'
+            );
+        }
+
+        // ========================================================
+        // MEMBERSIHKAN DATA SEBELUM MASUK FIRESTORE
+        // ========================================================
+        const sanitizeFirestoreValue = value => {
+            if (
+                value === undefined ||
+                value === null
+            ) {
+                return null;
+            }
+
+            if (value instanceof Date) {
+                return value;
+            }
+
+            if (Array.isArray(value)) {
+                return value.map(
+                    sanitizeFirestoreValue
+                );
+            }
+
+            if (typeof value === 'number') {
+                return Number.isFinite(value)
+                    ? value
+                    : 0;
+            }
+
+            if (
+                typeof value === 'object'
+            ) {
+                const cleanObject = {};
+
+                Object.entries(value).forEach(
+                    ([key, childValue]) => {
+                        if (
+                            childValue !==
+                            undefined
+                        ) {
+                            cleanObject[key] =
+                                sanitizeFirestoreValue(
+                                    childValue
+                                );
+                        }
+                    }
+                );
+
+                return cleanObject;
+            }
+
+            return value;
+        };
+
+        // ========================================================
+        // VALIDASI ID PESANAN
+        // ========================================================
+        const seenOrderIds = new Set();
+
+        ordersToProcess.forEach(
+            (order, orderIndex) => {
+                const orderId = String(
+                    order.marketplaceOrderId ||
+                    order.id ||
+                    ''
+                ).trim();
+
+                if (!orderId) {
+                    throw new Error(
+                        `Pesanan nomor ${orderIndex + 1} belum mempunyai ID pesanan.`
+                    );
+                }
+
+                if (
+                    seenOrderIds.has(orderId)
+                ) {
+                    throw new Error(
+                        `ID pesanan ${orderId} muncul lebih dari satu kali di antrian.`
+                    );
+                }
+
+                if (
+                    !Array.isArray(
+                        order.items
+                    ) ||
+                    order.items.length === 0
+                ) {
+                    throw new Error(
+                        `Pesanan ${orderId} belum mempunyai produk.`
+                    );
+                }
+
+                seenOrderIds.add(orderId);
+            }
+        );
+
+        // ========================================================
+        // CEGAH TRANSAKSI GANDA
+        // ========================================================
+        // Berguna apabila transaksi sebenarnya sudah tersimpan,
+        // tetapi browser sebelumnya menampilkan error.
+        const existingOrderIds = new Set(
+            state.transaksi
+                .map(transaction =>
+                    String(
+                        transaction
+                            .marketplaceOrderId ||
+                        ''
+                    ).trim()
+                )
+                .filter(Boolean)
+        );
+
+        const duplicateOrderIds =
+            ordersToProcess
+                .map(order =>
+                    String(
+                        order
+                            .marketplaceOrderId ||
+                        order.id ||
+                        ''
+                    ).trim()
+                )
+                .filter(orderId =>
+                    existingOrderIds.has(
+                        orderId
+                    )
+                );
+
+        if (
+            duplicateOrderIds.length > 0
+        ) {
+            throw new Error(
+                `Pesanan berikut sudah ada di Riwayat Transaksi: ${duplicateOrderIds.join(', ')}. Hapus dari antrian agar tidak tercatat dua kali.`
+            );
+        }
+
+        const bulkBatchId =
+            `BULK-${Date.now()}`;
+
+        const bulkBaseTime =
+            Date.now();
+
+        const preparedOrders = [];
+
+        // ========================================================
+        // SIAPKAN SELURUH DATA TRANSAKSI
+        // ========================================================
+        for (
+            let orderIndex = 0;
+            orderIndex <
+            ordersToProcess.length;
+            orderIndex++
+        ) {
+            const order =
+                ordersToProcess[
+                    orderIndex
+                ];
+
+            const orderId = String(
+                order.marketplaceOrderId ||
+                order.id
+            ).trim();
+
+            const cleanItems =
+                order.items.map(item => {
+                    const quantity =
+                        Number(item.qty);
+
+                    const sellingPrice =
+                        Number(
+                            item
+                                .hargaJualAktual
+                        );
+
+                    const hpp =
+                        Number(item.hpp);
+
+                    if (!item.docId) {
+                        throw new Error(
+                            `SKU ${item.sku || '-'} pada pesanan ${orderId} tidak mempunyai ID produk. Buka Inventaris, tunggu data selesai dimuat, lalu coba kembali.`
+                        );
+                    }
+
+                    if (
+                        !Number.isFinite(
+                            quantity
+                        ) ||
+                        quantity <= 0
+                    ) {
+                        throw new Error(
+                            `Jumlah SKU ${item.sku || '-'} pada pesanan ${orderId} tidak valid.`
+                        );
+                    }
+
+                    if (
+                        !Number.isFinite(
+                            sellingPrice
+                        ) ||
+                        sellingPrice < 0
+                    ) {
+                        throw new Error(
+                            `Harga jual SKU ${item.sku || '-'} pada pesanan ${orderId} tidak valid.`
+                        );
+                    }
+
+                    return {
+                        docId:
+                            item.docId,
+
+                        sku:
+                            item.sku ||
+                            '',
+
+                        qty:
+                            quantity,
+
+                        hargaJualAktual:
+                            sellingPrice,
+
+                        hpp:
+                            Number.isFinite(
+                                hpp
+                            )
+                                ? hpp
+                                : 0,
+
+                        model_id:
+                            item.model_id ||
+                            '',
+
+                        nama:
+                            item.nama ||
+                            ''
+                    };
+                });
+
+            const subtotal =
+                cleanItems.reduce(
+                    (sum, item) =>
+                        sum +
+                        (
+                            item.hargaJualAktual *
+                            item.qty
+                        ),
+                    0
+                );
+
+            // Perhitungan diskon lama tetap dipakai.
+            const diskon =
+                calculateBestDiscount(
+                    order.items,
+                    uiState
+                        .activeCartChannel
+                );
+
+            const totalDiscount =
+                Number(
+                    diskon
+                        ?.totalDiscount
+                ) || 0;
+
+            const finalTotal =
+                subtotal -
+                totalDiscount;
 
             let totalBiaya = 0;
             const biayaList = [];
-            
-            // Menghitung rasio sisa harga setelah dipotong diskon voucher secara global untuk antrian ini
-            const rasioBersih = subtotal > 0 ? (finalTotal / subtotal) : 1;
+
+            const rasioBersih =
+                subtotal > 0
+                    ? finalTotal /
+                      subtotal
+                    : 1;
+
             let totalKomisiProduk = 0;
 
-            // LOGIKA TOTAL KOMISI PRODUK TETAP DIJAGA UTUH
-            for (const item of order.items) {
-                const modelId = item.model_id;
-                const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
-                const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
-                if (commissionRate > 0) {
-                    // Komisi Produk (Affiliate) disesuaikan agar dikali ke nilai bersih setelah diskon voucher
-                    totalKomisiProduk += (commissionRate / 100) * ((item.hargaJualAktual * item.qty) * rasioBersih);
+            for (
+                const item of cleanItems
+            ) {
+                const modelName = (
+                    state.settings
+                        .modelProduk
+                        .find(
+                            model =>
+                                model.id ===
+                                item.model_id
+                        )
+                        ?.namaModel ||
+                    item.nama
+                ).split(' ')[0];
+
+                const commissionRate =
+                    Number(
+                        state
+                            .commissions
+                            .perModel[
+                                modelName
+                            ]?.[
+                                uiState
+                                    .activeCartChannel
+                            ]
+                    ) || 0;
+
+                if (
+                    commissionRate > 0
+                ) {
+                    totalKomisiProduk +=
+                        (
+                            commissionRate /
+                            100
+                        ) *
+                        (
+                            (
+                                item.hargaJualAktual *
+                                item.qty
+                            ) *
+                            rasioBersih
+                        );
                 }
             }
 
-            if (totalKomisiProduk > 0) {
-                biayaList.push({ name: 'Komisi Produk', value: Math.round(totalKomisiProduk) });
-                totalBiaya += Math.round(totalKomisiProduk);
-            }
-            
-            // Perhitungan biaya admin dan program shopee berdasarkan finalTotal (Omset Bersih) & dibulatkan ke Rupiah utuh
-            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            // Perbaikan hitungan program tambahan massal (Bisa Persen atau Rupiah)
-            if (marketplace.programs && marketplace.programs.length > 0) {
-                marketplace.programs.forEach(p => {
-                    if (p.rate > 0) {
-                        // Jika type == 'fixed' gunakan nominal rupiah langsung, jika tidak hitung persentase dari finalTotal pesanan ini
-                        const val = p.type === 'fixed' ? p.rate : (p.rate / 100) * finalTotal;
-                        biayaList.push({ name: p.name, value: Math.round(val) });
-                        totalBiaya += Math.round(val);
-                    }
+            if (
+                totalKomisiProduk > 0
+            ) {
+                const value =
+                    Math.round(
+                        totalKomisiProduk
+                    );
+
+                biayaList.push({
+                    name:
+                        'Komisi Produk',
+                    value
                 });
+
+                totalBiaya += value;
             }
 
-            const newTransactionData = {
-    marketplaceOrderId: order.marketplaceOrderId,
+            if (
+                Number(
+                    marketplace.adm
+                ) > 0
+            ) {
+                const value =
+                    Math.round(
+                        (
+                            Number(
+                                marketplace.adm
+                            ) /
+                            100
+                        ) *
+                        finalTotal
+                    );
 
-    // Pesanan pertama mempunyai waktu paling baru
-    // agar urutan di Riwayat Transaksi tetap 1, 2, 3
-    tanggal: new Date(bulkBaseTime - orderIndex),
+                biayaList.push({
+                    name:
+                        'Administrasi',
+                    value
+                });
 
-    // Identitas dan nomor urutan proses massal
-    bulkBatchId: bulkBatchId,
-    bulkSequence: orderIndex + 1,
-    inputSource: 'bulk_process',
-
-    items: order.items.map(i => ({
-        sku: i.sku,
-        qty: i.qty,
-        hargaJual: i.hargaJualAktual,
-        hpp: i.hpp
-    })),
-
-    subtotal,
-    diskon,
-    total: finalTotal,
-    channel: marketplace.name,
-    channelId: uiState.activeCartChannel,
-    biaya: {
-        rincian: biayaList,
-        total: totalBiaya
-    },
-    statusPencairan: 'Belum Cair',
-    userId: currentUser.value.uid
-};
-
-            const transactionRef = doc(collection(db, "transactions"));
-            batch.set(transactionRef, newTransactionData);
-            newTransactions.push({ ...newTransactionData, id: transactionRef.id });
-
-            // --- PERBAIKANN STOK SUPAYA TIDAK NGACO (PAKAI INCREMENT) ---
-            for (const item of order.items) {
-                const productRef = doc(db, "products", item.docId);
-                batch.update(productRef, { physical_stock: increment(-item.qty) });
+                totalBiaya += value;
             }
-            // -----------------------------------------------------------
-            
-            successCount++;
-        }
-        
-        await batch.commit();
 
-        state.transaksi.unshift(...newTransactions);
-        // Bila halaman pencairan pernah dimuat,
-// transaksi baru langsung dimasukkan tanpa query ulang.
-if (dataFetched.pendingSettlements) {
-    state.pendingSettlements.unshift(
-        ...newTransactions
-    );
-}
-        // Update tampilan stok lokal
-        ordersToProcess.forEach(order => {
-            order.items.forEach(item => {
-                const productInState = state.produk.find(p => p.docId === item.docId);
-                if (productInState) {
-                    productInState.stokFisik -= item.qty;
-                }
-                const invItem = state.inventoryPaginated.find(p => p.docId === item.docId);
-                if (invItem) invItem.stokFisik -= item.qty;
+            if (
+                Number(
+                    marketplace
+                        .perPesanan
+                ) > 0
+            ) {
+                const value =
+                    Math.round(
+                        Number(
+                            marketplace
+                                .perPesanan
+                        )
+                    );
+
+                biayaList.push({
+                    name:
+                        'Per Pesanan',
+                    value
+                });
+
+                totalBiaya += value;
+            }
+
+            if (
+                Number(
+                    marketplace
+                        .layanan
+                ) > 0
+            ) {
+                const value =
+                    Math.round(
+                        (
+                            Number(
+                                marketplace
+                                    .layanan
+                            ) /
+                            100
+                        ) *
+                        finalTotal
+                    );
+
+                biayaList.push({
+                    name:
+                        'Layanan Gratis Ongkir Xtra',
+                    value
+                });
+
+                totalBiaya += value;
+            }
+
+            if (
+                Array.isArray(
+                    marketplace.programs
+                )
+            ) {
+                marketplace
+                    .programs
+                    .forEach(program => {
+                        const rate =
+                            Number(
+                                program.rate
+                            ) || 0;
+
+                        if (rate <= 0) {
+                            return;
+                        }
+
+                        const value =
+                            Math.round(
+                                program.type ===
+                                'fixed'
+                                    ? rate
+                                    : (
+                                        rate /
+                                        100
+                                      ) *
+                                      finalTotal
+                            );
+
+                        biayaList.push({
+                            name:
+                                program.name ||
+                                'Program Tambahan',
+                            value
+                        });
+
+                        totalBiaya +=
+                            value;
+                    });
+            }
+
+            const transactionData =
+                sanitizeFirestoreValue({
+                    marketplaceOrderId:
+                        orderId,
+
+                    tanggal:
+                        new Date(
+                            bulkBaseTime -
+                            orderIndex
+                        ),
+
+                    bulkBatchId,
+
+                    bulkSequence:
+                        orderIndex + 1,
+
+                    inputSource:
+                        'bulk_process',
+
+                    items:
+                        cleanItems.map(
+                            item => ({
+                                sku:
+                                    item.sku,
+
+                                qty:
+                                    item.qty,
+
+                                hargaJual:
+                                    item
+                                        .hargaJualAktual,
+
+                                hpp:
+                                    item.hpp
+                            })
+                        ),
+
+                    subtotal,
+                    diskon,
+                    total:
+                        finalTotal,
+
+                    channel:
+                        marketplace.name ||
+                        '',
+
+                    channelId:
+                        uiState
+                            .activeCartChannel,
+
+                    biaya: {
+                        rincian:
+                            biayaList,
+
+                        total:
+                            totalBiaya
+                    },
+
+                    statusPencairan:
+                        'Belum Cair',
+
+                    userId
+                });
+
+            preparedOrders.push({
+                sourceIndex:
+                    orderIndex,
+
+                cleanItems,
+
+                transactionRef:
+                    doc(
+                        collection(
+                            db,
+                            'transactions'
+                        )
+                    ),
+
+                transactionData
             });
-        });
+        }
 
-        alert(`Proses Selesai! ${successCount} pesanan berhasil diproses.`);
+        // ========================================================
+        // MEMBAGI WRITE MENJADI BATCH AMAN
+        // ========================================================
+        const maxWritesPerBatch = 450;
+
+        const chunks = [];
+
+        let currentChunk = {
+            orders: [],
+            stockChanges:
+                new Map()
+        };
+
+        const saveCurrentChunk = () => {
+            if (
+                currentChunk
+                    .orders
+                    .length === 0
+            ) {
+                return;
+            }
+
+            chunks.push(
+                currentChunk
+            );
+
+            currentChunk = {
+                orders: [],
+                stockChanges:
+                    new Map()
+            };
+        };
+
+        preparedOrders.forEach(
+            preparedOrder => {
+                const uniqueProductIds =
+                    new Set(
+                        preparedOrder
+                            .cleanItems
+                            .map(
+                                item =>
+                                    item.docId
+                            )
+                    );
+
+                const newProductWrites =
+                    Array.from(
+                        uniqueProductIds
+                    ).filter(
+                        productId =>
+                            !currentChunk
+                                .stockChanges
+                                .has(
+                                    productId
+                                )
+                    ).length;
+
+                const estimatedWrites =
+                    currentChunk
+                        .orders
+                        .length +
+                    1 +
+                    currentChunk
+                        .stockChanges
+                        .size +
+                    newProductWrites;
+
+                if (
+                    currentChunk
+                        .orders
+                        .length > 0 &&
+                    estimatedWrites >
+                        maxWritesPerBatch
+                ) {
+                    saveCurrentChunk();
+                }
+
+                if (
+                    1 +
+                    uniqueProductIds
+                        .size >
+                    maxWritesPerBatch
+                ) {
+                    throw new Error(
+                        `Pesanan ${preparedOrder.transactionData.marketplaceOrderId} mempunyai terlalu banyak produk untuk diproses sekaligus.`
+                    );
+                }
+
+                currentChunk
+                    .orders
+                    .push(
+                        preparedOrder
+                    );
+
+                preparedOrder
+                    .cleanItems
+                    .forEach(item => {
+                        const existing =
+                            currentChunk
+                                .stockChanges
+                                .get(
+                                    item.docId
+                                );
+
+                        if (existing) {
+                            existing.qty +=
+                                item.qty;
+                        } else {
+                            currentChunk
+                                .stockChanges
+                                .set(
+                                    item.docId,
+                                    {
+                                        docId:
+                                            item.docId,
+
+                                        qty:
+                                            item.qty
+                                    }
+                                );
+                        }
+                    });
+            }
+        );
+
+        saveCurrentChunk();
+
+        // ========================================================
+        // COMMIT SETIAP BATCH SECARA BERURUTAN
+        // ========================================================
+        for (
+            const chunk of chunks
+        ) {
+            const batch =
+                writeBatch(db);
+
+            chunk.orders.forEach(
+                preparedOrder => {
+                    batch.set(
+                        preparedOrder
+                            .transactionRef,
+
+                        preparedOrder
+                            .transactionData
+                    );
+                }
+            );
+
+            chunk.stockChanges.forEach(
+                stockChange => {
+                    batch.update(
+                        doc(
+                            db,
+                            'products',
+                            stockChange
+                                .docId
+                        ),
+                        {
+                            physical_stock:
+                                increment(
+                                    -stockChange.qty
+                                )
+                        }
+                    );
+                }
+            );
+
+            await batch.commit();
+
+            const committedTransactions =
+                chunk.orders.map(
+                    preparedOrder => ({
+                        ...preparedOrder
+                            .transactionData,
+
+                        id:
+                            preparedOrder
+                                .transactionRef
+                                .id
+                    })
+                );
+
+            state.transaksi.unshift(
+                ...committedTransactions
+            );
+
+            if (
+                dataFetched
+                    .pendingSettlements
+            ) {
+                state
+                    .pendingSettlements
+                    .unshift(
+                        ...committedTransactions
+                    );
+            }
+
+            // ====================================================
+            // UPDATE STOK LOKAL SATU KALI PER PRODUK
+            // ====================================================
+            chunk.stockChanges.forEach(
+                stockChange => {
+                    const productInState =
+                        state.produk.find(
+                            product =>
+                                product.docId ===
+                                stockChange.docId
+                        );
+
+                    if (
+                        productInState
+                    ) {
+                        productInState
+                            .stokFisik =
+                            Number(
+                                productInState
+                                    .stokFisik
+                            ) -
+                            stockChange.qty;
+                    }
+
+                    const inventoryItem =
+                        state
+                            .inventoryPaginated
+                            .find(
+                                product =>
+                                    product.docId ===
+                                    stockChange
+                                        .docId
+                            );
+
+                    // Setelah perbaikan Inventaris,
+                    // dua array biasanya menunjuk object yang sama.
+                    // Jangan mengurangi stok dua kali.
+                    if (
+                        inventoryItem &&
+                        inventoryItem !==
+                            productInState
+                    ) {
+                        inventoryItem
+                            .stokFisik =
+                            Number(
+                                inventoryItem
+                                    .stokFisik
+                            ) -
+                            stockChange.qty;
+                    }
+                }
+            );
+
+            chunk.orders.forEach(
+                preparedOrder => {
+                    committedOrderIndexes.add(
+                        preparedOrder
+                            .sourceIndex
+                    );
+                }
+            );
+
+            successCount +=
+                chunk.orders.length;
+        }
+
         uiState.bulk_order_queue = [];
+
+        alert(
+            `Proses selesai! ${successCount} pesanan berhasil diproses.`
+        );
     } catch (error) {
-        alert(`Terjadi kesalahan: ${error.message}. Tidak ada pesanan yang diproses.`);
+        console.error(
+            'Gagal memproses pesanan massal:',
+            error
+        );
+
+        // Bila sebagian batch berhasil,
+        // hapus hanya pesanan yang sudah berhasil.
+        if (
+            committedOrderIndexes.size >
+            0
+        ) {
+            uiState.bulk_order_queue =
+                uiState
+                    .bulk_order_queue
+                    .filter(
+                        (
+                            _,
+                            orderIndex
+                        ) =>
+                            !committedOrderIndexes
+                                .has(
+                                    orderIndex
+                                )
+                    );
+
+            alert(
+                `${successCount} pesanan berhasil diproses. ` +
+                `${uiState.bulk_order_queue.length} pesanan belum diproses. ` +
+                `Penyebab: ${error.message}`
+            );
+        } else {
+            alert(
+                `Terjadi kesalahan: ${error.message}. Tidak ada pesanan yang diproses.`
+            );
+        }
     } finally {
         uiState.is_processing_scan = false;
     }
@@ -11439,164 +12205,358 @@ const fetchCoreData = async (
     }
 };
 
-// Fungsi khusus untuk data produk, harga, dan alokasi
-const fetchProductData = async (userId, loadMore = false) => {
-    const PRODUCTS_PER_PAGE = 100;
+// ============================================================
+// INVENTARIS — DATA PENUH + PAGINATION TAMPILAN LOKAL
+// ============================================================
 
-    if (!dataFetched.pricesAndAllocations) {
-        try {
-            const [pricesSnap, allocationsSnap] = await Promise.all([
-                getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-                getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
-            ]);
-            state.productPrices = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            state.stockAllocations = allocationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            dataFetched.pricesAndAllocations = true;
-        } catch (error) {
-            console.error("Error fetching prices/allocations:", error);
-        }
-    }
+const INVENTORY_PAGE_SIZE = 100;
 
-    if (loadMore && !uiState.productsHasMore) return;
 
+// Tombol "Muat Lebih Banyak" hanya menambah data yang ditampilkan.
+// Tidak melakukan query Firestore lagi.
+const fetchProductData = async (
+    userId,
+    loadMore = false
+) => {
     try {
-        let q = query(
-            collection(db, "products"),
-            where("userId", "==", userId),
-            orderBy("product_name", "asc"),
-            limit(PRODUCTS_PER_PAGE)
+        if (
+            !dataFetched.allProductsLoaded ||
+            !dataFetched.pricesAndAllocations
+        ) {
+            await fetchAllProductData(userId);
+        }
+
+        // Hilangkan kemungkinan produk ganda.
+        const uniqueProducts = Array.from(
+            new Map(
+                state.produk.map(product => [
+                    product.docId,
+                    product
+                ])
+            ).values()
         );
 
-        if (loadMore && uiState.productsLastVisible) {
-            q = query(q, startAfter(uiState.productsLastVisible));
-        } else {
-            state.inventoryPaginated = []; // Selalu reset data TAMPILAN inventaris
-            uiState.productsLastVisible = null;
-            uiState.productsHasMore = true;
-        }
+        state.produk = uniqueProducts;
 
-        const productSnap = await getDocs(q);
+        const currentVisibleCount = loadMore
+            ? state.inventoryPaginated.length +
+                INVENTORY_PAGE_SIZE
+            : INVENTORY_PAGE_SIZE;
 
-        if (!productSnap.empty) {
-            uiState.productsLastVisible = productSnap.docs[productSnap.docs.length - 1];
-            
-            const newProducts = productSnap.docs.map(docSnap => {
-                const p = { id: docSnap.id, ...docSnap.data() };
-                const hargaJual = {};
-                const stokAlokasi = {};
-                const productAllocation = state.stockAllocations.find(alloc => alloc.id === p.id);
-                
-                (state.settings.marketplaces || []).forEach(mp => {
-                    const priceInfo = state.productPrices.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                    hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                    stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-                });
+        const nextVisibleCount = Math.min(
+            currentVisibleCount,
+            uniqueProducts.length
+        );
 
-                return {
-                    docId: p.id, sku: p.sku, nama: p.product_name, model_id: p.model_id,
-                    warna: p.color, varian: p.variant, stokFisik: p.physical_stock, hpp: p.hpp,
-                    hargaJual, stokAlokasi, userId: p.userId
-                };
-            });
+        state.inventoryPaginated =
+            uniqueProducts.slice(
+                0,
+                nextVisibleCount
+            );
 
-            state.inventoryPaginated.push(...newProducts);
-        }
-        
-        if (productSnap.docs.length < PRODUCTS_PER_PAGE) {
-            uiState.productsHasMore = false;
-        }
+        // Inventaris tidak memakai cursor Firestore lagi.
+        uiState.productsLastVisible = null;
+
+        uiState.productsHasMore =
+            nextVisibleCount <
+            uniqueProducts.length;
+
         dataFetched.products = true;
-
     } catch (error) {
-        console.error("Error fetching paginated products:", error);
+        console.error(
+            'Gagal menampilkan data inventaris:',
+            error
+        );
+
+        throw error;
     }
 };
 
+
+// Mengambil seluruh produk, harga, dan alokasi.
+// Fungsi ini dipakai oleh cache dan sinkronisasi versi.
 const fetchAllProductData = async (userId) => {
-    // Gunakan flag baru untuk mencegah fetch ulang jika SEMUA data sudah ada
-    if (dataFetched.allProductsLoaded) {
+    if (
+        dataFetched.allProductsLoaded &&
+        dataFetched.pricesAndAllocations
+    ) {
+        // Pastikan halaman Inventaris tetap mendapat
+        // 100 produk pertama dari data yang sudah tersedia.
+        if (
+            state.inventoryPaginated.length === 0 &&
+            state.produk.length > 0
+        ) {
+            state.inventoryPaginated =
+                state.produk.slice(
+                    0,
+                    INVENTORY_PAGE_SIZE
+                );
+
+            uiState.productsHasMore =
+                state.inventoryPaginated.length <
+                state.produk.length;
+        }
+
         console.log(
             '[CACHE SESSION] Seluruh produk, harga, dan stok sudah tersedia.'
         );
+
         return;
     }
 
+    // Pertahankan jumlah data yang sebelumnya
+    // sudah ditampilkan di Inventaris.
+    const previousVisibleCount = Math.max(
+        state.inventoryPaginated.length,
+        INVENTORY_PAGE_SIZE
+    );
+
     try {
-        // Selalu kosongkan array produk, karena fungsi ini bertujuan memuat semuanya dari awal
-        state.produk = []; 
+        const [
+            pricesSnap,
+            allocationsSnap
+        ] = await Promise.all([
+            getDocs(
+                query(
+                    collection(
+                        db,
+                        'product_prices'
+                    ),
+                    where(
+                        'userId',
+                        '==',
+                        userId
+                    )
+                )
+            ),
+
+            getDocs(
+                query(
+                    collection(
+                        db,
+                        'stock_allocations'
+                    ),
+                    where(
+                        'userId',
+                        '==',
+                        userId
+                    )
+                )
+            )
+        ]);
+
+        state.productPrices =
+            pricesSnap.docs.map(
+                docSnap => ({
+                    id: docSnap.id,
+                    ...docSnap.data()
+                })
+            );
+
+        state.stockAllocations =
+            allocationsSnap.docs.map(
+                docSnap => ({
+                    id: docSnap.id,
+                    ...docSnap.data()
+                })
+            );
+
+        // Map harga agar pencarian cepat.
+        const priceMap = new Map();
+
+        state.productPrices.forEach(price => {
+            priceMap.set(
+                `${price.product_id}__${price.marketplace_id}`,
+                Number(price.price) || 0
+            );
+        });
+
+        // Map alokasi agar tidak memakai .find()
+        // berulang kali untuk setiap produk.
+        const allocationMap = new Map(
+            state.stockAllocations.map(
+                allocation => [
+                    allocation.id,
+                    allocation
+                ]
+            )
+        );
+
+        // Map produk mencegah data ganda.
+        const productsById = new Map();
 
         let lastVisible = null;
         let hasMoreData = true;
 
-        // Ambil juga data harga dan alokasi sekali jalan
-        const [pricesSnap, allocationsSnap] = await Promise.all([
-            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
-        ]);
-        const allPrices = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const allAllocations = allocationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
- // Simpan harga dan alokasi yang sudah berhasil diambil
-state.productPrices = allPrices;
-state.stockAllocations = allAllocations;
-
-dataFetched.pricesAndAllocations = true;       
         while (hasMoreData) {
-            let q = query(
-                collection(db, "products"),
-                where("userId", "==", userId),
-                orderBy("product_name", "asc"),
-                limit(500) // Ambil lebih banyak per batch untuk efisiensi
+            let productQuery = query(
+                collection(
+                    db,
+                    'products'
+                ),
+                where(
+                    'userId',
+                    '==',
+                    userId
+                ),
+                orderBy(
+                    'product_name',
+                    'asc'
+                ),
+                limit(500)
             );
 
             if (lastVisible) {
-                q = query(q, startAfter(lastVisible));
+                productQuery = query(
+                    productQuery,
+                    startAfter(lastVisible)
+                );
             }
 
-            const productSnap = await getDocs(q);
+            const productSnap =
+                await getDocs(productQuery);
 
-            if (!productSnap.empty) {
-                lastVisible = productSnap.docs[productSnap.docs.length - 1];
-                
-                // Proses dan langsung tambahkan ke state.produk
-                productSnap.forEach(docSnap => {
-                    const p = { id: docSnap.id, ...docSnap.data() };
+            if (productSnap.empty) {
+                hasMoreData = false;
+                break;
+            }
+
+            productSnap.docs.forEach(
+                docSnap => {
+                    const productData = {
+                        id: docSnap.id,
+                        ...docSnap.data()
+                    };
+
                     const hargaJual = {};
                     const stokAlokasi = {};
-                    const productAllocation = allAllocations.find(alloc => alloc.id === p.id);
-                    
-                    (state.settings.marketplaces || []).forEach(mp => {
-                        const priceInfo = allPrices.find(pr => pr.product_id === p.id && pr.marketplace_id === mp.id);
-                        hargaJual[mp.id] = priceInfo ? priceInfo.price : 0;
-                        stokAlokasi[mp.id] = productAllocation ? (productAllocation[mp.id] || 0) : 0;
-                    });
 
-                    state.produk.push({
-                        docId: p.id,
-                        sku: p.sku,
-                        nama: p.product_name,
-                        model_id: p.model_id,
-                        warna: p.color,
-                        varian: p.variant,
-                        stokFisik: p.physical_stock,
-                        hpp: p.hpp,
-                        hargaJual,
-                        stokAlokasi,
-                        userId: p.userId
-                    });
-                });
-            }
+                    const allocation =
+                        allocationMap.get(
+                            productData.id
+                        ) || {};
 
-            if (productSnap.docs.length < 500) {
-                hasMoreData = false;
-            }
+                    (
+                        state.settings.marketplaces ||
+                        []
+                    ).forEach(
+                        marketplace => {
+                            hargaJual[
+                                marketplace.id
+                            ] =
+                                priceMap.get(
+                                    `${productData.id}__${marketplace.id}`
+                                ) || 0;
+
+                            stokAlokasi[
+                                marketplace.id
+                            ] =
+                                Number(
+                                    allocation[
+                                        marketplace.id
+                                    ]
+                                ) || 0;
+                        }
+                    );
+
+                    productsById.set(
+                        productData.id,
+                        {
+                            docId:
+                                productData.id,
+
+                            sku:
+                                productData.sku ||
+                                '',
+
+                            nama:
+                                productData.product_name ||
+                                '',
+
+                            model_id:
+                                productData.model_id ||
+                                '',
+
+                            warna:
+                                productData.color ||
+                                '',
+
+                            varian:
+                                productData.variant ||
+                                '',
+
+                            stokFisik:
+                                Number(
+                                    productData.physical_stock
+                                ) || 0,
+
+                            hpp:
+                                Number(
+                                    productData.hpp
+                                ) || 0,
+
+                            hargaJual,
+                            stokAlokasi,
+
+                            userId:
+                                productData.userId
+                        }
+                    );
+                }
+            );
+
+            lastVisible =
+                productSnap.docs[
+                    productSnap.docs.length - 1
+                ];
+
+            hasMoreData =
+                productSnap.docs.length === 500;
         }
-        
-        // Tandai bahwa SEMUA produk telah berhasil dimuat
-        dataFetched.allProductsLoaded = true; 
-        console.log(`Successfully fetched ${state.produk.length} total products.`);
 
+        // Mengganti array satu kali lebih ringan
+        // daripada push ribuan kali.
+        state.produk = Array.from(
+            productsById.values()
+        );
+
+        dataFetched.products = true;
+        dataFetched.allProductsLoaded = true;
+        dataFetched.pricesAndAllocations = true;
+
+        const visibleCount = Math.min(
+            previousVisibleCount,
+            state.produk.length
+        );
+
+        state.inventoryPaginated =
+            state.produk.slice(
+                0,
+                visibleCount
+            );
+
+        uiState.productsLastVisible = null;
+
+        uiState.productsHasMore =
+            visibleCount <
+            state.produk.length;
+
+        console.log(
+            `Successfully fetched ${state.produk.length} total products.`
+        );
     } catch (error) {
-        console.error("Error fetching all products:", error);
+        // Jangan tandai data berhasil apabila
+        // pengambilan data gagal.
+        dataFetched.products = false;
+        dataFetched.allProductsLoaded = false;
+        dataFetched.pricesAndAllocations = false;
+
+        console.error(
+            'Error fetching all products:',
+            error
+        );
+
+        throw error;
     }
 };
 
