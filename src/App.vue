@@ -10393,7 +10393,19 @@ state.pendingSettlements =
     state.pendingSettlements.filter(
         trx => trx.id !== transactionId
     );
+// Data transaksi berubah.
+// Batalkan status cache supaya halaman lain membaca ulang data terbaru.
+dataFetched.transactions = false;
+dataFetched.allTransactionsLoaded = false;
+dataFetched.returns = false;
+dataFetched.allReturnsLoaded = false;
+dataFetched.pendingSettlements = false;
 
+uiState.transaksiLastVisible = null;
+uiState.transaksiHasMore = true;
+
+uiState.returLastVisible = null;
+uiState.returHasMore = true;
 alert(
     "Transaksi berhasil dihapus dan stok telah dikembalikan."
 );
@@ -11244,16 +11256,17 @@ const fetchTransactionAndReturnData = async (
         dataFetched.allReturnsLoaded === true;
 
     if (
-        !loadMore &&
-        !startDate &&
-        !endDate &&
-        fullTransactionDataReady
-    ) {
-        console.log(
-            '[CACHE SESSION] Seluruh transaksi dan retur sudah tersedia.'
-        );
-        return;
-    }
+    !loadMore &&
+    !startDate &&
+    !endDate &&
+    !forceAll &&
+    fullTransactionDataReady
+) {
+    console.log(
+        '[CACHE SESSION] Seluruh transaksi dan retur sudah tersedia.'
+    );
+    return;
+}
 
     // --- TRANSAKSI ---
     if (loadMore && !uiState.transaksiHasMore && !startDate && !forceAll) return;
@@ -11297,7 +11310,9 @@ const fetchTransactionAndReturnData = async (
             }
         }
 
-        const transactionSnap = await getDocs(q_trx);
+        const transactionSnap = forceAll
+    ? await getDocsFromServer(q_trx)
+    : await getDocs(q_trx);
 
         if (!transactionSnap.empty) {
             uiState.transaksiLastVisible = transactionSnap.docs[transactionSnap.docs.length - 1];
@@ -11366,7 +11381,9 @@ const fetchTransactionAndReturnData = async (
             uiState.returHasMore = true;
         }
 
-        const returnSnap = await getDocs(q_retur);
+        const returnSnap = forceAll
+    ? await getDocsFromServer(q_retur)
+    : await getDocs(q_retur);
 
         if (!returnSnap.empty) {
             uiState.returLastVisible = returnSnap.docs[returnSnap.docs.length - 1];
