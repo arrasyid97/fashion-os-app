@@ -1846,61 +1846,55 @@ async function getDocsByProductIds(
     collectionName,
     productIds,
     ownerUserId = null,
-    readFromServer = true
+    readFromServer = false
 ) {
-    const results = [];
-
-    const cleanIds = [
-        ...new Set(
-            (productIds || []).filter(Boolean)
-        )
-    ];
-
-    const readDocuments =
-        readFromServer
-            ? getDocsFromServer
-            : getDocs;
-
-    for (
-        let index = 0;
-        index < cleanIds.length;
-        index += 10
-    ) {
-        const chunk = cleanIds.slice(
-            index,
-            index + 10
+    const cleanProductIds =
+        new Set(
+            (productIds || [])
+                .filter(Boolean)
         );
 
-        if (chunk.length === 0) continue;
+    if (cleanProductIds.size === 0) {
+        return [];
+    }
 
-        const snapshot = await readDocuments(
-            query(
-                collection(
-                    db,
-                    collectionName
-                ),
-                where(
-                    "product_id",
-                    "in",
-                    chunk
-                )
+    if (!ownerUserId) {
+        console.warn(
+            `[QUERY DIBATALKAN] ${collectionName} tidak dibaca tanpa ownerUserId.`
+        );
+
+        return [];
+    }
+
+    const ownerQuery =
+        query(
+            collection(
+                db,
+                collectionName
+            ),
+            where(
+                'userId',
+                '==',
+                ownerUserId
             )
         );
 
-        const rows =
-            snapshotToRows(snapshot).filter(row => {
-                if (!ownerUserId) return true;
+    const snapshot =
+        readFromServer
+            ? await getDocsFromServer(
+                ownerQuery
+            )
+            : await getDocs(
+                ownerQuery
+            );
 
-                // Data harga lama belum tentu mempunyai userId.
-                if (!row.userId) return true;
-
-                return row.userId === ownerUserId;
-            });
-
-        results.push(...rows);
-    }
-
-    return results;
+    return snapshotToRows(
+        snapshot
+    ).filter(row =>
+        cleanProductIds.has(
+            row.product_id
+        )
+    );
 }
 
 function dedupeRowsByDocId(rows) {
@@ -19346,9 +19340,9 @@ SKU-BAJU-PUTIH-S"
     <p class="text-slate-600 mb-4">Anda akan menyelesaikan transaksi untuk channel <span class="font-semibold text-slate-800">{{ uiState.modalData.channelName }}</span>.</p>
     <div class="bg-slate-50 p-4 rounded-lg space-y-2 text-sm">
         <div class="flex justify-between"><span>Subtotal:</span><span>{{ formatCurrency(uiState.modalData.subtotal) }}</span></div>
-        <div v-if="uiState.modalData.discount.totalDiscount > 0" class="flex justify-between text-green-600">
-            <span>Diskon ({{ uiState.modalData.discount.description }}):</span>
-            <span>-{{ formatCurrency(uiState.modalData.discount.totalDiscount) }}</span>
+        <div v-if="uiState.modalData?.discount?.totalDiscount > 0" class="flex justify-between text-green-600">
+            <span>Diskon ({{ uiState.modalData?.discount?.description }}):</span>
+            <span>-{{ formatCurrency(uiState.modalData?.discount?.totalDiscount) }}</span>
         </div>
         <div class="flex justify-between text-lg font-bold pt-2 border-t mt-2">
             <span>Total Belanja:</span>
