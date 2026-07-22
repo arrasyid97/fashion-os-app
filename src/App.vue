@@ -29,9 +29,7 @@ import {
     limit,
     startAfter,
     documentId,
-    increment,
-    disableNetwork,
-    enableNetwork
+    increment
 } from 'firebase/firestore';
 let bulkSearchDebounceTimer = null;
 let bulkScanTimer = null;
@@ -718,40 +716,6 @@ const openSyncMetadataDb = () => {
 };
 
 
-const readSyncMetadataRecord =
-    async (userId) => {
-        const database =
-            await openSyncMetadataDb();
-
-        return new Promise((resolve, reject) => {
-            const transaction =
-                database.transaction(
-                    SYNC_META_STORE_NAME,
-                    'readonly'
-                );
-
-            const store =
-                transaction.objectStore(
-                    SYNC_META_STORE_NAME
-                );
-
-            const request = store.get(userId);
-
-            request.onsuccess = () => {
-                resolve(request.result || null);
-            };
-
-            request.onerror = () => {
-                reject(
-                    request.error ||
-                    new Error(
-                        'Gagal membaca metadata versi.'
-                    )
-                );
-            };
-        });
-    };
-
 
 const writeSyncMetadataRecord =
     async (record) => {
@@ -832,70 +796,6 @@ const saveLocalSyncVersions = async (
 };
 
 
-const readLocalSyncVersions =
-    async (userId) => {
-        try {
-            const record =
-                await readSyncMetadataRecord(userId);
-
-            if (record) {
-                return normalizeSyncVersions(
-                    record
-                );
-            }
-
-            // Migrasi otomatis dari localStorage lama.
-            const legacyValue =
-                localStorage.getItem(
-                    getLegacySyncStorageKey(userId)
-                );
-
-            if (!legacyValue) {
-                return null;
-            }
-
-            const migratedVersions =
-                normalizeSyncVersions(
-                    JSON.parse(legacyValue)
-                );
-
-            await saveLocalSyncVersions(
-                userId,
-                migratedVersions
-            );
-
-            console.log(
-                '[SYNC METADATA] Versi lokal dipindahkan dari localStorage ke IndexedDB.'
-            );
-
-            return migratedVersions;
-        } catch (error) {
-            console.warn(
-                '[SYNC METADATA] Gagal membaca IndexedDB. Mencoba cadangan localStorage.',
-                error
-            );
-
-            try {
-                const fallbackValue =
-                    localStorage.getItem(
-                        getLegacySyncStorageKey(userId)
-                    );
-
-                return fallbackValue
-                    ? normalizeSyncVersions(
-                        JSON.parse(fallbackValue)
-                    )
-                    : null;
-            } catch (fallbackError) {
-                console.warn(
-                    '[SYNC METADATA] Cadangan localStorage juga tidak dapat dibaca.',
-                    fallbackError
-                );
-
-                return null;
-            }
-        }
-    };
 
 
 // Mengambil seluruh versi modul dari user_sync.
@@ -917,141 +817,7 @@ const extractServerSyncVersions =
     };
 
 
-// ============================================================
-// RESET FLAG MODUL
-// ============================================================
 
-const resetSyncModuleFlags = (moduleName) => {
-    switch (moduleName) {
-        case 'settings':
-            dataFetched.settings = false;
-            break;
-
-
-        case 'products':
-            dataFetched.products = false;
-            dataFetched.allProductsLoaded = false;
-            dataFetched.pricesAndAllocations = false;
-
-            uiState.productsLastVisible = null;
-            uiState.productsHasMore = true;
-            break;
-
-
-        case 'sales':
-            dataFetched.transactions = false;
-            dataFetched.allTransactionsLoaded = false;
-
-            dataFetched.returns = false;
-            dataFetched.allReturnsLoaded = false;
-
-            dataFetched.pendingSettlements = false;
-
-            uiState.transaksiLastVisible = null;
-            uiState.transaksiHasMore = true;
-
-            uiState.returLastVisible = null;
-            uiState.returHasMore = true;
-            break;
-
-
-        case 'finance':
-            dataFetched.finance = false;
-            break;
-
-
-        case 'production':
-            dataFetched.production = false;
-            dataFetched.fabric = false;
-
-            uiState.produksiLastVisible = null;
-            uiState.produksiHasMore = true;
-            break;
-
-
-        case 'suppliers':
-            dataFetched.suppliers = false;
-            dataFetched.purchaseOrders = false;
-
-            uiState.purchaseOrdersLastVisible = null;
-            uiState.purchaseOrdersHasMore = true;
-            break;
-
-
-        case 'notes':
-            dataFetched.notes = false;
-            break;
-
-
-        case 'investment':
-            dataFetched.investorsAndBanks = false;
-            break;
-    }
-};
-
-
-const resetAllSyncModuleFlags = () => {
-    Object.keys(SYNC_MODULE_FIELDS)
-        .forEach(resetSyncModuleFlags);
-};
-
-
-// ============================================================
-// PEMERIKSAAN KESIAPAN MODUL
-// ============================================================
-
-const isSyncModuleReady = (moduleName) => {
-    switch (moduleName) {
-        case 'settings':
-            return dataFetched.settings === true;
-
-
-        case 'products':
-            return (
-                dataFetched.allProductsLoaded === true &&
-                dataFetched.pricesAndAllocations === true
-            );
-
-
-        case 'sales':
-            return (
-                dataFetched.allTransactionsLoaded === true &&
-                dataFetched.allReturnsLoaded === true
-            );
-
-
-        case 'finance':
-            return dataFetched.finance === true;
-
-
-        case 'production':
-            return (
-                dataFetched.production === true &&
-                dataFetched.fabric === true
-            );
-
-
-        case 'suppliers':
-            return (
-                dataFetched.suppliers === true &&
-                dataFetched.purchaseOrders === true
-            );
-
-
-        case 'notes':
-            return dataFetched.notes === true;
-
-
-        case 'investment':
-            return (
-                dataFetched.investorsAndBanks === true
-            );
-
-
-        default:
-            return false;
-    }
-};
 
 
 const loadCachedModuleSafely = async (
@@ -1076,151 +842,18 @@ const loadCachedModuleSafely = async (
 const loadBigModulesFromIndexedDb =
     async (userId) => {
         console.log(
-            '[INDEXEDDB] Memuat seluruh modul dari cache lokal.'
+            '[STARTUP CEPAT] Memuat pengaturan inti saja.'
         );
 
-        // Settings harus didahulukan.
+        // Startup tidak boleh membaca seluruh produk,
+        // transaksi, retur, keuangan, produksi, dan supplier.
+        // Modul besar akan dimuat ketika halamannya dibuka.
         await loadCachedModuleSafely(
             'settings',
             () => fetchCoreData(userId)
         );
-
-        await loadCachedModuleSafely(
-            'products',
-            () => fetchAllProductData(userId)
-        );
-
-        await loadCachedModuleSafely(
-            'sales',
-            () => fetchTransactionAndReturnData(
-                userId,
-                false,
-                null,
-                null,
-                true
-            )
-        );
-
-        await loadCachedModuleSafely(
-            'finance',
-            () => fetchKeuanganData(true)
-        );
-
-        await loadCachedModuleSafely(
-            'production',
-            () => fetchProductionData(
-                userId,
-                false
-            )
-        );
-
-        await loadCachedModuleSafely(
-            'suppliers',
-            () => fetchSupplierData(
-                userId,
-                false
-            )
-        );
-
-        await loadCachedModuleSafely(
-            'notes',
-            () => fetchNotesData(userId)
-        );
-
-        await loadCachedModuleSafely(
-            'investment',
-            () => fetchInvestorsAndBanksData(
-                userId
-            )
-        );
     };
 
-
-// ============================================================
-// REFRESH HANYA MODUL YANG BERUBAH
-// ============================================================
-
-const refreshChangedSyncModules = async (
-    userId,
-    changedModules
-) => {
-    for (const moduleName of changedModules) {
-        console.log(
-            `[SYNC SERVER] Memperbarui modul "${moduleName}".`
-        );
-
-        resetSyncModuleFlags(moduleName);
-
-        switch (moduleName) {
-            case 'settings':
-                await fetchCoreData(
-                    userId,
-                    true
-                );
-                break;
-
-
-            case 'products':
-                await fetchAllProductData(userId);
-                break;
-
-
-            case 'sales':
-                await fetchTransactionAndReturnData(
-                    userId,
-                    false,
-                    null,
-                    null,
-                    true
-                );
-                break;
-
-
-            case 'finance':
-                await fetchKeuanganData(true);
-                break;
-
-
-            case 'production':
-                await fetchProductionData(
-                    userId,
-                    false
-                );
-                break;
-
-
-            case 'suppliers':
-                await fetchSupplierData(
-                    userId,
-                    false,
-                    true
-                );
-                break;
-
-
-            case 'notes':
-                await fetchNotesData(
-                    userId,
-                    true
-                );
-                break;
-
-
-            case 'investment':
-                await fetchInvestorsAndBanksData(
-                    userId,
-                    true
-                );
-                break;
-        }
-
-        if (!isSyncModuleReady(moduleName)) {
-            throw new Error(
-                `Modul "${moduleName}" belum berhasil disinkronkan.`
-            );
-        }
-    }
-};
 
 
 // ============================================================
@@ -1247,10 +880,9 @@ const beginIndexedDbStartup =
         cacheStartupState.running = true;
 
         try {
-            await disableNetwork(db);
-
-            resetAllSyncModuleFlags();
-
+            // Jangan matikan jaringan Firestore.
+            // Mematikan jaringan membuat pembacaan server
+            // menghasilkan pesan client is offline.
             await loadBigModulesFromIndexedDb(
                 userId
             );
@@ -1258,18 +890,9 @@ const beginIndexedDbStartup =
             return true;
         } catch (error) {
             console.warn(
-                '[INDEXEDDB] Gagal memulai cache lokal. Aplikasi memakai koneksi normal.',
+                '[STARTUP CEPAT] Data inti belum berhasil dimuat.',
                 error
             );
-
-            try {
-                await enableNetwork(db);
-            } catch (enableError) {
-                console.warn(
-                    '[FIRESTORE] Gagal mengaktifkan kembali network.',
-                    enableError
-                );
-            }
 
             cacheStartupState.running = false;
             cacheStartupState.finished = true;
@@ -1278,18 +901,17 @@ const beginIndexedDbStartup =
         }
     };
 
-
 const finishIndexedDbStartup =
     async (userId) => {
         try {
-            await enableNetwork(db);
-
             const syncReference = doc(
                 db,
                 'user_sync',
                 userId
             );
 
+            // Hanya satu pembacaan kecil untuk mengetahui
+            // versi data server.
             const syncSnapshot =
                 await getDocFromServer(
                     syncReference
@@ -1302,101 +924,17 @@ const finishIndexedDbStartup =
                         : {}
                 );
 
-            const localVersions =
-                await readLocalSyncVersions(
-                    userId
-                );
-
-            const isFirstSyncOnThisBrowser =
-                !localVersions ||
-                localVersions.schemaVersion !== 2
-
-            const changedModules = new Set();
-
-            if (isFirstSyncOnThisBrowser) {
-                Object.keys(
-                    SYNC_MODULE_FIELDS
-                ).forEach(moduleName => {
-                    changedModules.add(
-                        moduleName
-                    );
-                });
-            } else {
-                Object.keys(
-                    SYNC_MODULE_FIELDS
-                ).forEach(moduleName => {
-                    const localVersion =
-                        Number(
-                            localVersions[
-                                moduleName
-                            ]
-                        ) || 0;
-
-                    const serverVersion =
-                        Number(
-                            serverVersions[
-                                moduleName
-                            ]
-                        ) || 0;
-
-                    if (
-                        localVersion !==
-                        serverVersion
-                    ) {
-                        changedModules.add(
-                            moduleName
-                        );
-                    }
-                });
-            }
-
-            // Perlindungan bila cache browser dibersihkan.
-            Object.keys(
-                SYNC_MODULE_FIELDS
-            ).forEach(moduleName => {
-                if (
-                    !isSyncModuleReady(
-                        moduleName
-                    )
-                ) {
-                    changedModules.add(
-                        moduleName
-                    );
-                }
-            });
-
-            if (changedModules.size === 0) {
-                console.log(
-                    '[SYNC VERSION] Versi sama. Tidak membaca ulang modul Firestore.'
-                );
-
-                return;
-            }
-
-            const modulesToRefresh =
-                Array.from(changedModules);
-
-            console.log(
-                '[SYNC VERSION] Modul yang berubah:',
-                modulesToRefresh
-            );
-
-            await refreshChangedSyncModules(
-                userId,
-                modulesToRefresh
-            );
-
             await saveLocalSyncVersions(
                 userId,
                 serverVersions
             );
 
             console.log(
-                '[SYNC VERSION] Sinkronisasi server selesai.'
+                '[SYNC VERSION] Metadata versi diperbarui. Modul besar dimuat saat halamannya dibuka.'
             );
         } catch (error) {
             console.warn(
-                '[SYNC VERSION] Pemeriksaan server gagal. Cache lokal tetap digunakan.',
+                '[SYNC VERSION] Pemeriksaan versi server gagal. Aplikasi tetap dapat digunakan.',
                 error
             );
         } finally {
@@ -1404,6 +942,7 @@ const finishIndexedDbStartup =
             cacheStartupState.finished = true;
         }
     };
+
 const loadDataForPage = async (pageName) => {
     if (!currentUser.value) return;
 
@@ -12707,36 +12246,88 @@ onMounted(() => {
     }, 60000); 
 
     onAuthStateChanged(auth, async (user) => {
-        isLoading.value = true;
-        hasLoadedInitialData.value = false;
-        Object.keys(dataFetched).forEach(key => dataFetched[key] = false);
+    isLoading.value = true;
+    hasLoadedInitialData.value = false;
 
-        if (user) {
-            currentUser.value = user; // Simpan data otentikasi Firebase
+    Object.keys(dataFetched).forEach(key => {
+        dataFetched[key] = false;
+    });
 
-            // Ambil data profil dari Firestore dan simpan di state reaktif terpisah
-            const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-            userProfile.data = userDocSnap.exists() ? userDocSnap.data() : {};
+    if (!user) {
+        currentUser.value = null;
+        userProfile.data = null;
+        activePage.value = 'login';
 
-           await setupListeners(user.uid, userProfile.data.isPartner);
-
-changePage(activePage.value);
-
-// Penting agar data halaman tetap dimuat ketika browser direfresh
-await loadDataForPage(activePage.value);
-
-if (userProfile.data.onboardingDone !== true) {
-    uiState.onboardingVisible = true;
-    uiState.onboardingStep = 0;
-}
-        } else {
-            currentUser.value = null;
-            userProfile.data = null; // Kosongkan profil saat logout
-            activePage.value = 'login';
-            if (unsubscribe) unsubscribe();
+        if (unsubscribe) {
+            unsubscribe();
         }
+
         isLoading.value = false;
         hasLoadedInitialData.value = true;
+
+        return;
+    }
+
+    currentUser.value = user;
+
+    try {
+        // Saat login hanya baca profil dan pengaturan inti.
+        const userDocSnap = await getDoc(
+            doc(
+                db,
+                'users',
+                user.uid
+            )
+        );
+
+        userProfile.data =
+            userDocSnap.exists()
+                ? userDocSnap.data()
+                : {};
+
+        await fetchCoreData(user.uid);
+
+        await setupListeners(
+            user.uid,
+            userProfile.data.isPartner
+        );
+
+        // Tetap buka halaman terakhir pengguna.
+        changePage(activePage.value);
+
+        if (
+            userProfile.data.onboardingDone !== true
+        ) {
+            uiState.onboardingVisible = true;
+            uiState.onboardingStep = 0;
+        }
+    } catch (error) {
+        console.error(
+            '[STARTUP] Gagal memuat data inti:',
+            error
+        );
+    } finally {
+        // Aplikasi langsung ditampilkan setelah data inti.
+        // Tidak menunggu ribuan produk dan transaksi.
+        isLoading.value = false;
+        hasLoadedInitialData.value = true;
+    }
+
+    // Data halaman aktif dimuat di belakang layar.
+    // Jangan memakai await di sini karena akan
+    // mengunci tampilan aplikasi.
+    Promise.resolve()
+        .then(() =>
+            loadDataForPage(
+                activePage.value
+            )
+        )
+        .catch(error => {
+            console.error(
+                `[BACKGROUND LOAD] Gagal memuat halaman "${activePage.value}":`,
+                error
+            );
+        });
     });
 });
 
