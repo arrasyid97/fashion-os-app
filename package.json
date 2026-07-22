@@ -16,7 +16,7 @@
     "chartjs-adapter-date-fns": "^3.0.0",
     "core-js": "^3.8.3",
     "date-fns": "^3.6.0",
-    "firebase": "^10.12.2",
+    "firebase": "^12.16.0",
     "firebase-admin": "^13.5.0",
     "https-proxy-agent": "^7.0.5",
     "jsbarcode": "^3.12.1",
