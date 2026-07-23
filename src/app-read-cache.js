@@ -334,6 +334,84 @@ export const readModuleCache = async (
     }
 };
 
+// Membaca snapshot terakhir tanpa menolaknya hanya karena versi
+// modul V3 berubah. Fungsi ini khusus dipakai mesin incremental V4:
+// keamanan data ditentukan oleh incrementalVersion dan jurnal server.
+export const readModuleCacheSnapshot = async (
+    moduleName,
+    cacheKey
+) => {
+    if (
+        !cacheEnabled ||
+        !activeUserId ||
+        !moduleName ||
+        !cacheKey
+    ) {
+        return null;
+    }
+
+    try {
+        const record = await runStoreRequest(
+            'readonly',
+            store => store.get(
+                cacheRecordId(
+                    activeUserId,
+                    moduleName,
+                    cacheKey
+                )
+            )
+        );
+
+        if (
+            !record ||
+            record.schemaVersion !==
+                CACHE_SCHEMA_VERSION ||
+            typeof record.payload !== 'string'
+        ) {
+            return null;
+        }
+
+        return {
+            payload: decodeCacheValue(
+                JSON.parse(record.payload)
+            ),
+            incrementalVersion:
+                Number.isFinite(
+                    Number(
+                        record.incrementalVersion
+                    )
+                )
+                    ? Number(
+                        record.incrementalVersion
+                    )
+                    : null,
+            moduleVersion:
+                Number(record.moduleVersion) || 0,
+            currentModuleVersion:
+                getModuleVersion(moduleName),
+            v3VersionMatches:
+                Number(record.moduleVersion) ===
+                getModuleVersion(moduleName),
+            savedAt:
+                Number(record.savedAt) || 0,
+            dirty:
+                localStorage.getItem(
+                    dirtyStorageKey(
+                        activeUserId,
+                        moduleName
+                    )
+                ) === '1'
+        };
+    } catch (error) {
+        console.warn(
+            `[APP CACHE V4] Snapshot ${moduleName}/${cacheKey} tidak dapat dibaca.`,
+            error
+        );
+
+        return null;
+    }
+};
+
 export const writeModuleCache = async (
     moduleName,
     cacheKey,
@@ -390,6 +468,109 @@ export const writeModuleCache = async (
         return false;
     }
 };
+
+// Menyimpan payload bersama posisi jurnal incremental. Versi V3 tetap
+// ikut disimpan agar rollback ke V3 tidak merusak struktur IndexedDB.
+export const writeIncrementalModuleCache =
+    async (
+        moduleName,
+        cacheKey,
+        payload,
+        incrementalVersion
+    ) => {
+        if (
+            !cacheEnabled ||
+            !activeUserId ||
+            !moduleName ||
+            !cacheKey ||
+            !Number.isFinite(
+                Number(incrementalVersion)
+            ) ||
+            Number(incrementalVersion) < 0
+        ) {
+            return false;
+        }
+
+        try {
+            const record = {
+                id: cacheRecordId(
+                    activeUserId,
+                    moduleName,
+                    cacheKey
+                ),
+                userId: activeUserId,
+                moduleName,
+                cacheKey,
+                schemaVersion:
+                    CACHE_SCHEMA_VERSION,
+                moduleVersion:
+                    getModuleVersion(moduleName),
+                incrementalVersion:
+                    Number(incrementalVersion),
+                savedAt: Date.now(),
+                payload: JSON.stringify(
+                    encodeCacheValue(payload)
+                )
+            };
+
+            await runStoreRequest(
+                'readwrite',
+                store => store.put(record)
+            );
+
+            localStorage.removeItem(
+                dirtyStorageKey(
+                    activeUserId,
+                    moduleName
+                )
+            );
+
+            return true;
+        } catch (error) {
+            console.warn(
+                `[APP CACHE V4] Cache ${moduleName}/${cacheKey} tidak dapat disimpan.`,
+                error
+            );
+
+            return false;
+        }
+    };
+
+export const isModuleCacheDirty =
+    moduleName => {
+        if (
+            !activeUserId ||
+            !moduleName
+        ) {
+            return false;
+        }
+
+        return (
+            localStorage.getItem(
+                dirtyStorageKey(
+                    activeUserId,
+                    moduleName
+                )
+            ) === '1'
+        );
+    };
+
+export const clearModuleCacheDirty =
+    moduleName => {
+        if (
+            !activeUserId ||
+            !moduleName
+        ) {
+            return;
+        }
+
+        localStorage.removeItem(
+            dirtyStorageKey(
+                activeUserId,
+                moduleName
+            )
+        );
+    };
 
 export const invalidateModuleCache =
     moduleName => {

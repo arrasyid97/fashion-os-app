@@ -657,3 +657,10 @@ Object.assign(
   exports,
   require("./dashboard-summary-v2"),
 );
+
+// FASHION_OS_INCREMENTAL_READ_V4
+// Jurnal perubahan koleksi besar + API sinkronisasi per dokumen.
+Object.assign(
+  exports,
+  require("./incremental-sync-v4"),
+);

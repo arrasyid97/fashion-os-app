@@ -16,6 +16,19 @@ import {
     setReadCacheContext,
     writeModuleCache,
 } from './app-read-cache.js';
+import {
+    finalizeFullReloadV4,
+    syncIncrementalModuleV4,
+} from './incremental-read-v4.js';
+import {
+    filterRowsByRangeV4,
+    mergeFinanceChangesV4,
+    mergeProductChangesV4,
+    mergeSalesChangesV4,
+    validateFinancePayloadV4,
+    validateProductsPayloadV4,
+    validateSalesPayloadV4,
+} from './incremental-adapters-v4.js';
 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import {
@@ -14036,6 +14049,60 @@ const applyLoadedSellingPricesToProducts =
         });
     };
 
+const applyLoadedStockAllocationsToProducts =
+    products => {
+        const allocationMap =
+            new Map(
+                (
+                    state.stockAllocations ||
+                    []
+                ).map(allocation => [
+                    String(
+                        allocation.id ||
+                        allocation.product_id ||
+                        allocation.productId ||
+                        ''
+                    ),
+                    allocation
+                ])
+            );
+
+        (
+            products ||
+            state.produk ||
+            []
+        ).forEach(product => {
+            const allocation =
+                allocationMap.get(
+                    String(
+                        product.docId
+                    )
+                ) || {};
+
+            if (
+                !product.stokAlokasi ||
+                typeof product.stokAlokasi !==
+                    'object'
+            ) {
+                product.stokAlokasi = {};
+            }
+
+            (
+                state.settings.marketplaces ||
+                []
+            ).forEach(marketplace => {
+                product.stokAlokasi[
+                    marketplace.id
+                ] =
+                    Number(
+                        allocation[
+                            marketplace.id
+                        ]
+                    ) || 0;
+            });
+        });
+    };
+
 const applyAllProductsCache =
     payload => {
         if (
@@ -14058,6 +14125,10 @@ const applyAllProductsCache =
             payload.stockAllocations;
 
         applyLoadedSellingPricesToProducts(
+            state.produk
+        );
+
+        applyLoadedStockAllocationsToProducts(
             state.produk
         );
 
@@ -14095,8 +14166,12 @@ const applyAllProductsCache =
         return true;
     };
 
-const fetchAllProductData = async (userId) => {
-    // Gunakan flag baru untuk mencegah fetch ulang jika SEMUA data sudah ada
+let productDataRequestV4 = null;
+
+const runFetchAllProductData = async (userId) => {
+    // State sesi tidak langsung dikembalikan. V4 tetap memeriksa satu
+    // versi modul kecil di server agar perubahan dari tab/perangkat lain
+    // dapat digabungkan tanpa membaca ulang seluruh koleksi.
     if (
     dataFetched.allProductsLoaded &&
     dataFetched.pricesAndAllocations
@@ -14108,27 +14183,56 @@ const fetchAllProductData = async (userId) => {
         );
 
         console.log(
-            '[CACHE SESSION] Seluruh produk, harga, dan stok sudah tersedia.'
+            '[INCREMENTAL V4] Produk sesi tersedia; memeriksa perubahan server.'
         );
-        return;
     }
 
-    const cachedProducts =
-        await readModuleCache(
-            'products',
-            'all-products'
-        );
+    let productBaselineVersionV4 = 0;
 
-    if (
-        applyAllProductsCache(
-            cachedProducts
-        )
-    ) {
-        console.log(
-            `[APP CACHE] ${state.produk.length} produk dimuat tanpa membaca koleksi ulang.`
-        );
+    try {
+        const incrementalResult =
+            await syncIncrementalModuleV4({
+                firebaseFunctions:
+                    functions,
+                moduleName:
+                    'products',
+                cacheKey:
+                    'all-products',
+                validatePayload:
+                    validateProductsPayloadV4,
+                mergeChanges:
+                    mergeProductChangesV4
+            });
 
-        return;
+        if (
+            incrementalResult.payload &&
+            applyAllProductsCache(
+                incrementalResult.payload
+            )
+        ) {
+            const readMessage =
+                incrementalResult.status ===
+                    'incremental'
+                    ? `${incrementalResult.documentReadCount} dokumen produk yang berubah`
+                    : 'cache lokal';
+
+            console.log(
+                `[INCREMENTAL V4] ${state.produk.length} produk dimuat dari ${readMessage}.`
+            );
+
+            return;
+        }
+
+        productBaselineVersionV4 =
+            Number(
+                incrementalResult
+                    .baselineVersion
+            ) || 0;
+    } catch (error) {
+        console.warn(
+            '[INCREMENTAL V4] Sinkronisasi produk gagal. Menjalankan fallback penuh yang aman.',
+            error
+        );
     }
 
     try {
@@ -14140,8 +14244,8 @@ const fetchAllProductData = async (userId) => {
 
         // Ambil juga data harga dan alokasi sekali jalan
         const [pricesSnap, allocationsSnap] = await Promise.all([
-            getDocs(query(collection(db, 'product_prices'), where("userId", "==", userId))),
-            getDocs(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
+            getDocsFromServer(query(collection(db, 'product_prices'), where("userId", "==", userId))),
+            getDocsFromServer(query(collection(db, 'stock_allocations'), where("userId", "==", userId))),
         ]);
         const allPrices = pricesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const allAllocations = allocationsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -14162,7 +14266,8 @@ dataFetched.pricesAndAllocations = true;
                 q = query(q, startAfter(lastVisible));
             }
 
-            const productSnap = await getDocs(q);
+            const productSnap =
+                await getDocsFromServer(q);
 
             if (!productSnap.empty) {
                 lastVisible = productSnap.docs[productSnap.docs.length - 1];
@@ -14211,7 +14316,7 @@ const legacyPrices = await getDocsByProductIds(
         product => product.docId
     ),
     userId,
-    false
+    true
 );
 
 // Gabungkan harga dengan userId dan harga format lama.
@@ -14293,10 +14398,7 @@ console.log(
     `Successfully fetched ${state.produk.length} total products and ${mergedPrices.length} product prices.`
 );
 
-await writeModuleCache(
-    'products',
-    'all-products',
-    {
+const fullProductPayload = {
         products:
             state.produk,
         productPrices:
@@ -14305,13 +14407,51 @@ await writeModuleCache(
             state.stockAllocations || [],
         visibleCount:
             state.inventoryPaginated.length
-    }
+    };
+
+const finalizedProducts =
+    await finalizeFullReloadV4({
+        firebaseFunctions:
+            functions,
+        moduleName:
+            'products',
+        cacheKey:
+            'all-products',
+        payload:
+            fullProductPayload,
+        baselineVersion:
+            productBaselineVersionV4,
+        validatePayload:
+            validateProductsPayloadV4,
+        mergeChanges:
+            mergeProductChangesV4
+    });
+
+applyAllProductsCache(
+    finalizedProducts.payload
 );
 
     } catch (error) {
         console.error("Error fetching all products:", error);
     }
 };
+
+const fetchAllProductData =
+    userId => {
+        if (productDataRequestV4) {
+            return productDataRequestV4;
+        }
+
+        productDataRequestV4 =
+            runFetchAllProductData(
+                userId
+            ).finally(() => {
+                productDataRequestV4 =
+                    null;
+            });
+
+        return productDataRequestV4;
+    };
 
 
 const HISTORY_BATCH_SIZE = 200;
@@ -14920,6 +15060,63 @@ const loadTransactionHistoryByCurrentFilter =
             return;
         }
 
+        // V4 memakai satu snapshot penjualan lengkap di IndexedDB.
+        // Semua pilihan filter dihitung lokal dari snapshot akurat itu,
+        // sehingga mengganti filter tidak membaca koleksi lagi.
+        transactionHistoryLoading.value =
+            true;
+
+        try {
+            await fetchTransactionAndReturnData(
+                userId,
+                false,
+                null,
+                null,
+                true
+            );
+
+            if (
+                requestId !==
+                transactionHistoryRequestId
+            ) {
+                return;
+            }
+
+            if (
+                dataFetched
+                    .allTransactionsLoaded
+            ) {
+                state.transaksi =
+                    filterRowsByRangeV4(
+                        state.transaksi,
+                        range
+                    );
+
+                transactionHistoryLoadedCount.value =
+                    state.transaksi.length;
+
+                dataFetched.transactions =
+                    true;
+                dataFetched
+                    .allTransactionsLoaded =
+                    range.allTime;
+
+                transactionHistoryLoading.value =
+                    false;
+
+                console.log(
+                    `[INCREMENTAL V4] Filter transaksi menampilkan ${state.transaksi.length} data dari cache lokal.`
+                );
+
+                return;
+            }
+        } catch (error) {
+            console.warn(
+                '[INCREMENTAL V4] Filter transaksi memakai loader periode sebagai fallback.',
+                error
+            );
+        }
+
         const historyCacheKey =
             createHistoryCacheKey(
                 'transaction-history',
@@ -15096,6 +15293,60 @@ const loadReturnHistoryByCurrentFilter =
                 false;
 
             return;
+        }
+
+        returnHistoryLoading.value =
+            true;
+
+        try {
+            await fetchTransactionAndReturnData(
+                userId,
+                false,
+                null,
+                null,
+                true
+            );
+
+            if (
+                requestId !==
+                returnHistoryRequestId
+            ) {
+                return;
+            }
+
+            if (
+                dataFetched
+                    .allReturnsLoaded
+            ) {
+                state.retur =
+                    filterRowsByRangeV4(
+                        state.retur,
+                        range
+                    );
+
+                returnHistoryLoadedCount.value =
+                    state.retur.length;
+
+                dataFetched.returns =
+                    true;
+                dataFetched
+                    .allReturnsLoaded =
+                    range.allTime;
+
+                returnHistoryLoading.value =
+                    false;
+
+                console.log(
+                    `[INCREMENTAL V4] Filter retur menampilkan ${state.retur.length} data dari cache lokal.`
+                );
+
+                return;
+            }
+        } catch (error) {
+            console.warn(
+                '[INCREMENTAL V4] Filter retur memakai loader periode sebagai fallback.',
+                error
+            );
         }
 
         const historyCacheKey =
@@ -16319,7 +16570,10 @@ watch(
     scheduleDashboardReload
 );
 
-const fetchTransactionAndReturnData = async (
+const salesDataRequestsV4 =
+    new Map();
+
+const runFetchTransactionAndReturnData = async (
     userId,
     loadMore = false,
     startDate = null,
@@ -16327,6 +16581,7 @@ const fetchTransactionAndReturnData = async (
     forceAll = false
 ) => {
     const ITEMS_PER_PAGE = 15;
+    let salesBaselineVersionV4 = 0;
 
     // Seluruh transaksi dan retur sudah tersedia di state.
     // Jangan unduh ulang saat pindah halaman.
@@ -16353,46 +16608,83 @@ const fetchTransactionAndReturnData = async (
         !startDate &&
         !endDate
     ) {
-        const cachedSales =
-            await readModuleCache(
-                'sales',
-                'all-sales'
+        try {
+            const incrementalResult =
+                await syncIncrementalModuleV4({
+                    firebaseFunctions:
+                        functions,
+                    moduleName:
+                        'sales',
+                    cacheKey:
+                        'all-sales',
+                    validatePayload:
+                        validateSalesPayloadV4,
+                    mergeChanges:
+                        mergeSalesChangesV4
+                });
+
+            if (
+                incrementalResult.payload
+            ) {
+                state.transaksi =
+                    incrementalResult
+                        .payload
+                        .transactions;
+                state.retur =
+                    incrementalResult
+                        .payload
+                        .returns;
+
+                uiState.transaksiHasMore =
+                    false;
+                uiState.returHasMore =
+                    false;
+
+                dataFetched.transactions =
+                    true;
+                dataFetched.returns =
+                    true;
+                dataFetched
+                    .allTransactionsLoaded =
+                    true;
+                dataFetched
+                    .allReturnsLoaded =
+                    true;
+
+                const source =
+                    incrementalResult
+                        .status ===
+                        'incremental'
+                        ? `${incrementalResult.documentReadCount} dokumen yang berubah`
+                        : 'cache lokal';
+
+                console.log(
+                    `[INCREMENTAL V4] ${state.transaksi.length} transaksi dan ${state.retur.length} retur dimuat dari ${source}.`
+                );
+
+                return;
+            }
+
+            salesBaselineVersionV4 =
+                Number(
+                    incrementalResult
+                        .baselineVersion
+                ) || 0;
+        } catch (error) {
+            console.warn(
+                '[INCREMENTAL V4] Sinkronisasi penjualan gagal. Menjalankan fallback penuh yang aman.',
+                error
             );
-
-        if (
-            cachedSales &&
-            Array.isArray(
-                cachedSales.transactions
-            ) &&
-            Array.isArray(
-                cachedSales.returns
-            )
-        ) {
-            state.transaksi =
-                cachedSales.transactions;
-            state.retur =
-                cachedSales.returns;
-
-            uiState.transaksiHasMore =
-                false;
-            uiState.returHasMore =
-                false;
-
-            dataFetched.transactions =
-                true;
-            dataFetched.returns = true;
-            dataFetched
-                .allTransactionsLoaded =
-                true;
-            dataFetched.allReturnsLoaded =
-                true;
-
-            console.log(
-                `[APP CACHE] ${state.transaksi.length} transaksi dan ${state.retur.length} retur dimuat tanpa membaca koleksi ulang.`
-            );
-
-            return;
         }
+    }
+
+    if (forceAll) {
+        dataFetched
+            .allTransactionsLoaded =
+            false;
+        dataFetched
+            .allReturnsLoaded =
+            false;
     }
 
     const isInitialSalesRequest =
@@ -16609,16 +16901,36 @@ const fetchTransactionAndReturnData = async (
             .allTransactionsLoaded &&
         dataFetched.allReturnsLoaded
     ) {
-        await writeModuleCache(
-            'sales',
-            'all-sales',
-            {
+        const finalizedSales =
+            await finalizeFullReloadV4({
+                firebaseFunctions:
+                    functions,
+                moduleName:
+                    'sales',
+                cacheKey:
+                    'all-sales',
+                payload: {
                 transactions:
                     state.transaksi,
                 returns:
                     state.retur
-            }
-        );
+                },
+                baselineVersion:
+                    salesBaselineVersionV4,
+                validatePayload:
+                    validateSalesPayloadV4,
+                mergeChanges:
+                    mergeSalesChangesV4
+            });
+
+        state.transaksi =
+            finalizedSales
+                .payload
+                .transactions;
+        state.retur =
+            finalizedSales
+                .payload
+                .returns;
     }
 
     if (isInitialSalesRequest) {
@@ -16654,6 +16966,44 @@ const fetchTransactionAndReturnData = async (
         );
     }
 };
+
+const fetchTransactionAndReturnData =
+    (...args) => {
+        const requestKey =
+            args[4] === true
+                ? 'all'
+                : (
+                    args[1] === true
+                        ? 'more'
+                        : 'initial'
+                );
+
+        if (
+            salesDataRequestsV4.has(
+                requestKey
+            )
+        ) {
+            return salesDataRequestsV4.get(
+                requestKey
+            );
+        }
+
+        const request =
+            runFetchTransactionAndReturnData(
+                ...args
+            ).finally(() => {
+                salesDataRequestsV4.delete(
+                    requestKey
+                );
+            });
+
+        salesDataRequestsV4.set(
+            requestKey,
+            request
+        );
+
+        return request;
+    };
 
 // Fungsi khusus untuk data produksi
 const fetchProductionData = async (userId, loadMore = false) => {
@@ -16944,44 +17294,69 @@ const fetchInvestorsAndBanksData = async (
 };
 
 // Fungsi baru yang canggih untuk data keuangan dengan filter & paginasi
-const fetchKeuanganData = async (forceRefresh = false) => {
+let financeDataRequestV4 = null;
+
+const runFetchKeuanganData = async (forceRefresh = false) => {
     if (!currentUser.value) return;
 
-    // Bila data keuangan sudah dimuat dalam sesi ini,
-    // gunakan data yang sudah ada di state.
+    // Walaupun state sesi sudah tersedia, V4 tetap memeriksa versi
+    // incremental agar perubahan dari tab/perangkat lain ikut terlihat.
     if (!forceRefresh && dataFetched.finance) {
         console.log(
-            '[CACHE SESSION] Seluruh data keuangan sudah tersedia.'
+            '[INCREMENTAL V4] Data keuangan sesi tersedia; memeriksa perubahan server.'
         );
-        return;
     }
 
     const userId = currentUser.value.uid;
+    let financeBaselineVersionV4 = 0;
 
-    if (!forceRefresh) {
-        const cachedFinance =
-            await readModuleCache(
-                'finance',
-                'all-finance'
-            );
+    try {
+        const incrementalResult =
+            await syncIncrementalModuleV4({
+                firebaseFunctions:
+                    functions,
+                moduleName:
+                    'finance',
+                cacheKey:
+                    'all-finance',
+                validatePayload:
+                    validateFinancePayloadV4,
+                mergeChanges:
+                    mergeFinanceChangesV4
+            });
 
         if (
-            cachedFinance &&
-            Array.isArray(
-                cachedFinance.rows
-            )
+            incrementalResult.payload
         ) {
             state.keuangan =
-                cachedFinance.rows;
+                incrementalResult
+                    .payload.rows;
 
             dataFetched.finance = true;
 
+            const source =
+                incrementalResult.status ===
+                    'incremental'
+                    ? `${incrementalResult.documentReadCount} dokumen yang berubah`
+                    : 'cache lokal';
+
             console.log(
-                `[APP CACHE] ${state.keuangan.length} data keuangan dimuat tanpa membaca koleksi ulang.`
+                `[INCREMENTAL V4] ${state.keuangan.length} data keuangan dimuat dari ${source}.`
             );
 
             return;
         }
+
+        financeBaselineVersionV4 =
+            Number(
+                incrementalResult
+                    .baselineVersion
+            ) || 0;
+    } catch (error) {
+        console.warn(
+            '[INCREMENTAL V4] Sinkronisasi keuangan gagal. Menjalankan fallback penuh yang aman.',
+            error
+        );
     }
     
     // Kueri Paling Stabil: Menggunakan 3 field untuk memastikan urutan Ascending yang sempurna.
@@ -16993,7 +17368,8 @@ const fetchKeuanganData = async (forceRefresh = false) => {
     );
 
     try {
-        const keuanganSnap = await getDocs(q);
+        const keuanganSnap =
+            await getDocsFromServer(q);
         
         const fetchedKeuangan = keuanganSnap.docs
     .map(doc => {
@@ -17018,18 +17394,49 @@ const fetchKeuanganData = async (forceRefresh = false) => {
         dataFetched.finance = true;
         console.log(`[Keuangan] Berhasil memuat ${state.keuangan.length} data.`);
 
-        await writeModuleCache(
-            'finance',
-            'all-finance',
-            {
+        const finalizedFinance =
+            await finalizeFullReloadV4({
+                firebaseFunctions:
+                    functions,
+                moduleName:
+                    'finance',
+                cacheKey:
+                    'all-finance',
+                payload: {
                 rows: state.keuangan
-            }
-        );
+                },
+                baselineVersion:
+                    financeBaselineVersionV4,
+                validatePayload:
+                    validateFinancePayloadV4,
+                mergeChanges:
+                    mergeFinanceChangesV4
+            });
+
+        state.keuangan =
+            finalizedFinance.payload.rows;
 
     } catch (error) {
         console.error("Error fetching Keuangan data:", error);
     }
 };
+
+const fetchKeuanganData =
+    (...args) => {
+        if (financeDataRequestV4) {
+            return financeDataRequestV4;
+        }
+
+        financeDataRequestV4 =
+            runFetchKeuanganData(
+                ...args
+            ).finally(() => {
+                financeDataRequestV4 =
+                    null;
+            });
+
+        return financeDataRequestV4;
+    };
 // Fungsi khusus untuk data supplier dan purchase order
 const fetchSupplierData = async (
     userId,
@@ -17348,6 +17755,60 @@ async function fetchPendingSettlementData(userId) {
     isSettlementLoading.value = true;
 
     try {
+        await fetchTransactionAndReturnData(
+            userId,
+            false,
+            null,
+            null,
+            true
+        );
+
+        if (
+            dataFetched
+                .allTransactionsLoaded
+        ) {
+            state.pendingSettlements =
+                (
+                    state.transaksi || []
+                ).filter(transaction => {
+                    const status =
+                        String(
+                            transaction
+                                .statusPencairan ||
+                            'Belum Cair'
+                        )
+                            .trim()
+                            .toLocaleLowerCase(
+                                'id-ID'
+                            );
+
+                    return (
+                        isActiveExportRecord(
+                            transaction
+                        ) &&
+                        (
+                            status ===
+                                'belum cair' ||
+                            status ===
+                                'waiting'
+                        )
+                    );
+                });
+
+            dataFetched
+                .pendingSettlements =
+                true;
+
+            settlementCurrentPage.value =
+                1;
+
+            console.log(
+                `[INCREMENTAL V4] ${state.pendingSettlements.length} pesanan belum cair dihitung dari cache penjualan lokal.`
+            );
+
+            return;
+        }
+
         const cachedPendingSettlements =
             await readModuleCache(
                 'sales',
