@@ -29,7 +29,9 @@ import {
     limit,
     startAfter,
     documentId,
-    increment
+    increment,
+    getAggregateFromServer,
+    sum,
 } from 'firebase/firestore';
 let bulkSearchDebounceTimer = null;
 let bulkScanTimer = null;
@@ -5182,6 +5184,216 @@ const dashboardLoadedCounts =
 const dashboardPaidReturnOriginKeys =
     ref([]);
 
+// FASHION_OS_CASH_RETURN_LIVE_V2
+// Saldo kas seluruh waktu. Nilai ini tidak mengikuti filter Dashboard.
+const dashboardCashBalance =
+    reactive({
+        value: 0,
+        loading: false,
+        error: '',
+        loaded: false
+    });
+
+let dashboardCashBalanceRequestId = 0;
+
+const getDashboardAggregateTotal =
+    async (sourceQuery, fieldPath) => {
+        const snapshot =
+            await getAggregateFromServer(
+                sourceQuery,
+                {
+                    total: sum(fieldPath)
+                }
+            );
+
+        return Number(
+            snapshot.data().total
+        ) || 0;
+    };
+
+const loadDashboardCashBalance =
+    async userId => {
+        if (!userId) {
+            dashboardCashBalance.value = 0;
+            dashboardCashBalance.loaded = false;
+            dashboardCashBalance.error = '';
+            return;
+        }
+
+        const requestId =
+            ++dashboardCashBalanceRequestId;
+
+        dashboardCashBalance.loading = true;
+        dashboardCashBalance.error = '';
+
+        try {
+            const settledTransactionsQuery =
+                query(
+                    collection(db, 'transactions'),
+                    where('userId', '==', userId),
+                    where(
+                        'statusPencairan',
+                        '==',
+                        'Sudah Cair'
+                    )
+                );
+
+            const otherIncomeQuery =
+                query(
+                    collection(db, 'keuangan'),
+                    where('userId', '==', userId),
+                    where(
+                        'jenis',
+                        '==',
+                        'pemasukan_lain'
+                    )
+                );
+
+            const expenseQuery =
+                jenis =>
+                    query(
+                        collection(db, 'keuangan'),
+                        where('userId', '==', userId),
+                        where('jenis', '==', jenis)
+                    );
+
+            // Dipisah per field agar transaksi lama yang tidak mempunyai
+            // field diskon/biaya tetap masuk ke perhitungan subtotal.
+            const [
+                settledGross,
+                settledDiscount,
+                settledFees,
+                otherIncome,
+                expense,
+                otherCost
+            ] = await Promise.all([
+                getDashboardAggregateTotal(
+                    settledTransactionsQuery,
+                    'subtotal'
+                ),
+                getDashboardAggregateTotal(
+                    settledTransactionsQuery,
+                    'diskon.totalDiscount'
+                ),
+                getDashboardAggregateTotal(
+                    settledTransactionsQuery,
+                    'biaya.total'
+                ),
+                getDashboardAggregateTotal(
+                    otherIncomeQuery,
+                    'jumlah'
+                ),
+                getDashboardAggregateTotal(
+                    expenseQuery('pengeluaran'),
+                    'jumlah'
+                ),
+                getDashboardAggregateTotal(
+                    expenseQuery('biaya'),
+                    'jumlah'
+                )
+            ]);
+
+            if (
+                requestId !==
+                dashboardCashBalanceRequestId
+            ) {
+                return;
+            }
+
+            dashboardCashBalance.value =
+                (
+                    settledGross -
+                    settledDiscount -
+                    settledFees
+                ) +
+                otherIncome -
+                expense -
+                otherCost;
+
+            dashboardCashBalance.loaded = true;
+        } catch (error) {
+            if (
+                requestId !==
+                dashboardCashBalanceRequestId
+            ) {
+                return;
+            }
+
+            console.error(
+                '[DASHBOARD] Saldo Kas Berjalan gagal dihitung:',
+                error
+            );
+
+            dashboardCashBalance.error =
+                error?.message ||
+                'Saldo kas belum berhasil dimuat.';
+        } finally {
+            if (
+                requestId ===
+                dashboardCashBalanceRequestId
+            ) {
+                dashboardCashBalance.loading = false;
+            }
+        }
+    };
+
+// Satu perubahan transaksi diterapkan ke semua sumber data lokal
+// yang mungkin sedang dipakai halaman lain atau Dashboard.
+const applyTransactionUpdateToLocalStores =
+    (transactionId, updatePayload) => {
+        [
+            state.pendingSettlements,
+            state.transaksi,
+            dashboardPeriodData.transactions,
+            dashboardTodayData.transactions
+        ].forEach(list => {
+            const transaction =
+                (list || []).find(
+                    item =>
+                        item.id ===
+                        transactionId
+                );
+
+            if (transaction) {
+                Object.assign(
+                    transaction,
+                    updatePayload
+                );
+            }
+        });
+    };
+
+const addReturnToLocalStores =
+    returnRecord => {
+        if (
+            !(state.retur || []).some(
+                item =>
+                    item.id ===
+                    returnRecord.id
+            )
+        ) {
+            state.retur.unshift(
+                returnRecord
+            );
+        }
+
+        if (
+            !(dashboardPeriodData.returns || []).some(
+                item =>
+                    item.id ===
+                    returnRecord.id
+            )
+        ) {
+            dashboardPeriodData.returns = [
+                returnRecord,
+                ...dashboardPeriodData.returns
+            ];
+
+            dashboardLoadedCounts.returns =
+                dashboardPeriodData.returns.length;
+        }
+    };
+
 let dashboardRequestId = 0;
 
 let dashboardReloadTimer =
@@ -5492,38 +5704,13 @@ let biayaMarketplaceBatal = 0;
     kpis.omsetBersih = kpis.omsetKotor - kpis.totalDiskon;
     kpis.labaKotor = kpis.omsetBersih - kpis.totalHppTerjual;
     kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
-    // ARUS KAS PERIODE
-    // Mengikuti filter waktu Dashboard dan tidak perlu
-    // membaca seluruh transaksi sepanjang umur akun.
-    const totalPengeluaranKasPeriode =
-        (keuangan || [])
-            .filter(
-                record =>
-                    record.jenis ===
-                        'pengeluaran' ||
-                    record.jenis ===
-                        'biaya'
-            )
-            .reduce(
-                (sum, record) =>
-                    sum +
-                    (
-                        Number(
-                            record.jumlah
-                        ) || 0
-                    ),
-                0
-            );
-
+    // SALDO KAS BERJALAN
+    // Nilai berasal dari aggregation query seluruh waktu dan
+    // tidak dipengaruhi filter laporan Dashboard.
     kpis.saldoKas =
-        (
-            kpis.omsetBersih +
-            kpis.pemasukanLain
-        ) -
-        (
-            kpis.totalBiayaTransaksi +
-            totalPengeluaranKasPeriode
-        );
+        Number(
+            dashboardCashBalance.value
+        ) || 0;
 
     // Total inventaris diambil dari satu dokumen ringkasan
     // yang sudah dipelihara Cloud Function.
@@ -5770,16 +5957,34 @@ const filteredGudangKain = computed(() => {
 
     return kainData;
 });
+
+// PATCH INVENTORY GROUPS V3
+const INVENTORY_MODEL_QUERY_CHUNK_SIZE = 30;
+
+const getInventoryBaseModelName = value => {
+    const cleanName =
+        String(value || 'Tanpa Nama')
+            .trim()
+            .replace(/\s+/g, ' ');
+
+    return (
+        cleanName.split(' ')[0] ||
+        'Tanpa Nama'
+    );
+};
+
+const getInventoryModelGroupKey = value =>
+    `model:${getInventoryBaseModelName(value)
+        .toLocaleLowerCase('id-ID')}`;
+
 const inventoryProductGroups = computed(() => {
     const loadedProducts =
         state.inventoryPaginated || [];
 
     const searchTerm =
-        String(
-            uiState.inventorySearch || ''
-        )
+        String(uiState.inventorySearch || '')
             .trim()
-            .toLowerCase();
+            .toLocaleLowerCase('id-ID');
 
     const stockFilter =
         uiState.inventoryFilterStock;
@@ -5787,28 +5992,100 @@ const inventoryProductGroups = computed(() => {
     const minStock =
         Number(state.settings.minStok) || 0;
 
-    let groups =
-        (
-            state.settings.modelProduk ||
-            []
-        ).map(model => {
-            const modelId = model.id;
+    // Beberapa entri Pengaturan dapat memiliki ID berbeda,
+    // tetapi nama model dasar yang sama (contoh: AISHA).
+    // Gabungkan semuanya sebelum membuat baris induk inventaris.
+    const groupedModels = new Map();
 
-            const fullModelName =
-                String(
-                    model.namaModel || 'Tanpa Nama'
-                );
+    (
+        state.settings.modelProduk ||
+        []
+    ).forEach(model => {
+        const modelId = model?.id;
 
-            const displayModelName =
+        if (
+            modelId === undefined ||
+            modelId === null ||
+            modelId === ''
+        ) {
+            return;
+        }
+
+        const fullModelName =
+            String(
+                model.namaModel ||
+                'Tanpa Nama'
+            )
+                .trim()
+                .replace(/\s+/g, ' ');
+
+        const displayModelName =
+            getInventoryBaseModelName(
                 fullModelName
-                    .split(' ')[0] ||
-                fullModelName;
+            );
+
+        const groupKey =
+            getInventoryModelGroupKey(
+                fullModelName
+            );
+
+        if (!groupedModels.has(groupKey)) {
+            groupedModels.set(groupKey, {
+                groupKey,
+                namaModel:
+                    displayModelName,
+                modelIds: [],
+                fullModelNames: []
+            });
+        }
+
+        const targetGroup =
+            groupedModels.get(groupKey);
+
+        const alreadyHasModelId =
+            targetGroup.modelIds.some(
+                savedId =>
+                    String(savedId) ===
+                    String(modelId)
+            );
+
+        if (!alreadyHasModelId) {
+            targetGroup.modelIds.push(
+                modelId
+            );
+        }
+
+        if (
+            !targetGroup.fullModelNames
+                .includes(fullModelName)
+        ) {
+            targetGroup.fullModelNames.push(
+                fullModelName
+            );
+        }
+    });
+
+    let groups =
+        Array.from(
+            groupedModels.values()
+        ).map(group => {
+            const modelIdKeys =
+                new Set(
+                    group.modelIds.map(
+                        modelId =>
+                            String(modelId)
+                    )
+                );
 
             const variants =
                 loadedProducts.filter(
                     product =>
-                        product.model_id ===
-                        modelId
+                        modelIdKeys.has(
+                            String(
+                                product.model_id ||
+                                ''
+                            )
+                        )
                 );
 
             const totalStock =
@@ -5843,25 +6120,24 @@ const inventoryProductGroups = computed(() => {
                 );
 
             return {
-                modelId,
-                namaModel:
-                    displayModelName,
+                ...group,
                 namaModelLengkap:
-                    fullModelName,
+                    group.fullModelNames
+                        .join(' '),
                 variants,
                 totalStock,
                 totalNilaiStok,
                 isLoaded:
                     inventoryModelLoaded[
-                        modelId
+                        group.groupKey
                     ] === true,
                 isLoading:
                     inventoryModelLoading[
-                        modelId
+                        group.groupKey
                     ] === true,
                 error:
                     inventoryModelErrors[
-                        modelId
+                        group.groupKey
                     ] || ''
             };
         });
@@ -5870,10 +6146,14 @@ const inventoryProductGroups = computed(() => {
         groups = groups.filter(group => {
             const modelMatch =
                 group.namaModel
-                    .toLowerCase()
+                    .toLocaleLowerCase(
+                        'id-ID'
+                    )
                     .includes(searchTerm) ||
                 group.namaModelLengkap
-                    .toLowerCase()
+                    .toLocaleLowerCase(
+                        'id-ID'
+                    )
                     .includes(searchTerm);
 
             const loadedVariantMatch =
@@ -5882,14 +6162,18 @@ const inventoryProductGroups = computed(() => {
                         String(
                             variant.sku || ''
                         )
-                            .toLowerCase()
+                            .toLocaleLowerCase(
+                                'id-ID'
+                            )
                             .includes(
                                 searchTerm
                             ) ||
                         String(
                             variant.nama || ''
                         )
-                            .toLowerCase()
+                            .toLocaleLowerCase(
+                                'id-ID'
+                            )
                             .includes(
                                 searchTerm
                             )
@@ -6021,7 +6305,11 @@ const inventoryProductGroups = computed(() => {
                     ).localeCompare(
                         String(
                             b.warna || ''
-                        )
+                        ),
+                        'id',
+                        {
+                            numeric: true
+                        }
                     );
 
                 if (
@@ -9862,10 +10150,41 @@ const newKeuanganEntries = [];
 // Menampung stok fisik yang akan dikembalikan
 const returnedStockMap = new Map();
 
+const previousSettlementStatus =
+    trxAsli.statusPencairan ||
+    'Belum Cair';
+
+const transactionUpdatePayload = {
+    statusPencairan:
+        'Retur/Pengembalian',
+    tanggalRetur: new Date()
+};
+
+// Retur dan perubahan status transaksi disimpan secara atomik.
+// Bila salah satu gagal, keduanya batal sehingga Dana Gantung
+// tidak bisa tertinggal karena status setengah tersimpan.
+batch.update(
+    doc(
+        db,
+        'transactions',
+        trxAsli.id
+    ),
+    transactionUpdatePayload
+);
+
         const dataToSave = {
     tanggal: new Date(),
     channelId: trxAsli.channelId,
     originalTransactionId: trxAsli.id,
+    marketplaceOrderId:
+        trxAsli.marketplaceOrderId ||
+        '',
+    sumber: 'Manajemen Retur',
+    statusRetur:
+        'Retur / Pengembalian',
+    statusPencairanSebelumRetur:
+        previousSettlementStatus,
+    createdAt: new Date(),
 
     items: buildReturnItemsFromTransaction(
         trxAsli,
@@ -9893,7 +10212,29 @@ queuePhysicalStockReturn(
         
         await batch.commit();
 
-        state.retur.unshift({ id: returnRef.id, ...dataToSave });
+        const localReturnRecord = {
+            id: returnRef.id,
+            ...dataToSave
+        };
+
+        addReturnToLocalStores(
+            localReturnRecord
+        );
+
+        applyTransactionUpdateToLocalStores(
+            trxAsli.id,
+            transactionUpdatePayload
+        );
+
+        if (
+            previousSettlementStatus ===
+            'Sudah Cair'
+        ) {
+            await loadDashboardCashBalance(
+                currentUser.value.uid
+            );
+        }
+
         if (newKeuanganEntries.length > 0) {
             state.keuangan.push(...newKeuanganEntries);
         }
@@ -11333,6 +11674,7 @@ const fetchCoreData = async (
 };
 
 // Fungsi khusus untuk data produk, harga, dan alokasi
+
 const mapInventoryProductDocument =
     docSnap => {
         const product =
@@ -11360,19 +11702,74 @@ const mapInventoryProductDocument =
         };
     };
 
+const resolveInventoryGroup =
+    groupOrModelId => {
+        if (
+            groupOrModelId &&
+            typeof groupOrModelId ===
+                'object'
+        ) {
+            const modelIds =
+                Array.isArray(
+                    groupOrModelId.modelIds
+                )
+                    ? groupOrModelId.modelIds
+                        .filter(
+                            modelId =>
+                                modelId !==
+                                    undefined &&
+                                modelId !== null &&
+                                modelId !== ''
+                        )
+                    : [];
+
+            return {
+                groupKey:
+                    groupOrModelId.groupKey ||
+                    getInventoryModelGroupKey(
+                        groupOrModelId.namaModel
+                    ),
+                modelIds
+            };
+        }
+
+        return {
+            groupKey:
+                String(
+                    groupOrModelId || ''
+                ),
+            modelIds:
+                groupOrModelId
+                    ? [groupOrModelId]
+                    : []
+        };
+    };
+
 const loadInventoryModelProducts =
     async (
         userId,
-        modelId,
+        groupOrModelId,
         forceRefresh = false
     ) => {
-        if (!userId || !modelId) {
+        const {
+            groupKey,
+            modelIds
+        } =
+            resolveInventoryGroup(
+                groupOrModelId
+            );
+
+        if (
+            !userId ||
+            !groupKey ||
+            modelIds.length === 0
+        ) {
             return;
         }
 
         if (
             inventoryModelLoading[
-                modelId
+                groupKey
             ]
         ) {
             return;
@@ -11380,7 +11777,7 @@ const loadInventoryModelProducts =
 
         if (
             inventoryModelLoaded[
-                modelId
+                groupKey
             ] &&
             !forceRefresh
         ) {
@@ -11388,46 +11785,111 @@ const loadInventoryModelProducts =
         }
 
         inventoryModelLoading[
-            modelId
+            groupKey
         ] = true;
 
         inventoryModelErrors[
-            modelId
+            groupKey
         ] = '';
 
         try {
-            const modelQuery =
-                query(
-                    collection(
-                        db,
-                        'products'
-                    ),
-                    where(
-                        'userId',
-                        '==',
-                        userId
-                    ),
-                    where(
-                        'model_id',
-                        '==',
+            const uniqueModelIds = [];
+
+            modelIds.forEach(modelId => {
+                const alreadyIncluded =
+                    uniqueModelIds.some(
+                        savedId =>
+                            String(savedId) ===
+                            String(modelId)
+                    );
+
+                if (!alreadyIncluded) {
+                    uniqueModelIds.push(
                         modelId
+                    );
+                }
+            });
+
+            const modelProductsById =
+                new Map();
+
+            // Firestore membatasi query "in" maksimal 30 nilai.
+            // Grup besar dibagi otomatis agar semua varian tetap terbaca.
+            for (
+                let index = 0;
+                index <
+                    uniqueModelIds.length;
+                index +=
+                    INVENTORY_MODEL_QUERY_CHUNK_SIZE
+            ) {
+                const modelIdBatch =
+                    uniqueModelIds.slice(
+                        index,
+                        index +
+                            INVENTORY_MODEL_QUERY_CHUNK_SIZE
+                    );
+
+                const modelConstraint =
+                    modelIdBatch.length === 1
+                        ? where(
+                            'model_id',
+                            '==',
+                            modelIdBatch[0]
+                        )
+                        : where(
+                            'model_id',
+                            'in',
+                            modelIdBatch
+                        );
+
+                const modelQuery =
+                    query(
+                        collection(
+                            db,
+                            'products'
+                        ),
+                        where(
+                            'userId',
+                            '==',
+                            userId
+                        ),
+                        modelConstraint
+                    );
+
+                const modelSnapshot =
+                    await getDocsFromServer(
+                        modelQuery
+                    );
+
+                modelSnapshot.docs.forEach(
+                    docSnap => {
+                        const mappedProduct =
+                            mapInventoryProductDocument(
+                                docSnap
+                            );
+
+                        modelProductsById.set(
+                            mappedProduct.docId,
+                            mappedProduct
+                        );
+                    }
+                );
+            }
+
+            const modelProducts =
+                Array.from(
+                    modelProductsById.values()
+                );
+
+            const loadedModelIdKeys =
+                new Set(
+                    uniqueModelIds.map(
+                        modelId =>
+                            String(modelId)
                     )
                 );
 
-            // Server dipakai agar produk yang sudah dihapus
-            // tidak tetap muncul dari cache lama.
-            const modelSnapshot =
-                await getDocsFromServer(
-                    modelQuery
-                );
-
-            const modelProducts =
-                modelSnapshot.docs
-                    .map(
-                        mapInventoryProductDocument
-                    );
-
-            // Hapus versi lokal model ini,
+            // Hapus versi lokal seluruh model anggota grup,
             // lalu masukkan hasil server terbaru.
             state.inventoryPaginated =
                 (
@@ -11435,34 +11897,28 @@ const loadInventoryModelProducts =
                     []
                 ).filter(
                     product =>
-                        product.model_id !==
-                        modelId
+                        !loadedModelIdKeys.has(
+                            String(
+                                product.model_id ||
+                                ''
+                            )
+                        )
                 );
 
             state.inventoryPaginated.push(
                 ...modelProducts
             );
 
-            // Sinkronkan produk yang kebetulan
-            // sudah ada di state global tanpa
-            // mengunduh semua produk.
-            const loadedIds =
-                new Set(
-                    modelProducts.map(
-                        product =>
-                            product.docId
-                    )
-                );
-
             state.produk =
                 (
                     state.produk || []
                 ).filter(
                     product =>
-                        product.model_id !==
-                            modelId ||
-                        !loadedIds.has(
-                            product.docId
+                        !loadedModelIdKeys.has(
+                            String(
+                                product.model_id ||
+                                ''
+                            )
                         )
                 );
 
@@ -11471,41 +11927,41 @@ const loadInventoryModelProducts =
             );
 
             inventoryModelLoaded[
-                modelId
+                groupKey
             ] = true;
 
             dataFetched.products = true;
 
             console.log(
-                `[INVENTARIS] Model ${modelId}: ${modelProducts.length} varian dimuat.`
+                `[INVENTARIS] Grup ${groupKey}: ${modelProducts.length} varian dari ${uniqueModelIds.length} ID model dimuat.`
             );
         } catch (error) {
             console.error(
-                '[INVENTARIS] Gagal memuat model:',
+                '[INVENTARIS] Gagal memuat grup model:',
                 error
             );
 
             inventoryModelErrors[
-                modelId
+                groupKey
             ] =
                 error?.message ||
                 'Gagal memuat data model.';
         } finally {
             inventoryModelLoading[
-                modelId
+                groupKey
             ] = false;
         }
     };
 
 const toggleInventoryGroup =
     async group => {
-        if (!group?.modelId) {
+        if (!group?.groupKey) {
             return;
         }
 
         if (
             uiState.activeAccordion ===
-            group.modelId
+            group.groupKey
         ) {
             uiState.activeAccordion =
                 null;
@@ -11514,11 +11970,11 @@ const toggleInventoryGroup =
         }
 
         uiState.activeAccordion =
-            group.modelId;
+            group.groupKey;
 
         await loadInventoryModelProducts(
             currentUser.value?.uid,
-            group.modelId
+            group
         );
     };
 
@@ -13078,12 +13534,61 @@ const loadDashboardReturnOrigins =
         returns,
         isRequestCurrent
     ) => {
+        const paidKeys =
+            new Set();
+
+        const unresolvedReturns =
+            (returns || []).filter(
+                returnRecord => {
+                    const previousStatus =
+                        returnRecord
+                            .statusPencairanSebelumRetur;
+
+                    if (
+                        previousStatus ===
+                        'Sudah Cair'
+                    ) {
+                        [
+                            returnRecord.id,
+                            returnRecord
+                                .originalTransactionId,
+                            returnRecord
+                                .transactionId,
+                            returnRecord
+                                .marketplaceOrderId,
+                            returnRecord.orderId,
+                            returnRecord.idPesanan,
+                            returnRecord.nomorPesanan
+                        ]
+                            .filter(Boolean)
+                            .forEach(
+                                key =>
+                                    paidKeys.add(
+                                        String(key)
+                                            .toLowerCase()
+                                    )
+                            );
+
+                        return false;
+                    }
+
+                    // Status Belum Cair berarti retur tidak pernah
+                    // menjadi pemasukan kas. Tidak perlu membaca
+                    // transaksi asal lagi.
+                    if (previousStatus) {
+                        return false;
+                    }
+
+                    // Retur lama yang belum menyimpan status asal
+                    // tetap memakai fallback pembacaan transaksi.
+                    return true;
+                }
+            );
+
         const transactionIds =
             Array.from(
                 new Set(
-                    (
-                        returns || []
-                    )
+                    unresolvedReturns
                         .flatMap(
                             returnRecord => [
                                 returnRecord
@@ -13096,9 +13601,6 @@ const loadDashboardReturnOrigins =
                         .map(String)
                 )
             );
-
-        const paidKeys =
-            new Set();
 
         for (
             const transactionId of
@@ -13156,11 +13658,19 @@ const loadDashboardReturnOrigins =
                             )
                     );
             } catch (error) {
-                console.warn(
-                    '[DASHBOARD] Transaksi asal retur tidak dapat dibaca:',
-                    transactionId,
-                    error
-                );
+                // Data uji lama dapat menunjuk transaksi yang tidak
+                // boleh dibaca oleh akun aktif. Lewati permission-denied
+                // tanpa memenuhi Console dengan pesan berulang.
+                if (
+                    error?.code !==
+                    'permission-denied'
+                ) {
+                    console.warn(
+                        '[DASHBOARD] Transaksi asal retur tidak dapat dibaca:',
+                        transactionId,
+                        error
+                    );
+                }
             }
         }
 
@@ -13318,6 +13828,11 @@ const loadDashboardDataByCurrentFilter =
         dashboardDataLoading.value =
             true;
 
+        const cashBalancePromise =
+            loadDashboardCashBalance(
+                userId
+            );
+
         const transactionMap =
             new Map();
 
@@ -13464,7 +13979,8 @@ const loadDashboardDataByCurrentFilter =
                 transactionDatePromise,
                 payoutDatePromise,
                 returnsPromise,
-                financePromise
+                financePromise,
+                cashBalancePromise
             ]);
 
             if (
@@ -14521,15 +15037,37 @@ updatedTransactions.forEach(
                 updatePayload
             );
         }
+
+        applyTransactionUpdateToLocalStores(
+            id,
+            updatePayload
+        );
     }
 );
 
 if (newReturnDocs.length > 0) {
-    state.retur.unshift(...newReturnDocs);
+    newReturnDocs
+        .slice()
+        .reverse()
+        .forEach(
+            returnRecord =>
+                addReturnToLocalStores(
+                    returnRecord
+                )
+        );
 
     // Perbarui stok yang tampil tanpa harus refresh
     applyPhysicalStockReturnToLocal(
         returnedStockMap
+    );
+}
+
+if (
+    targetStatus === 'Sudah Cair' ||
+    targetStatus === 'Retur/Pengembalian'
+) {
+    await loadDashboardCashBalance(
+        currentUser.value.uid
     );
 }
 
@@ -15407,9 +15945,9 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Arus Kas Periode</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Saldo Kas Berjalan</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
-                            <p class="text-xs text-slate-400 mt-1">Mengikuti filter waktu Dashboard</p>
+                            <p class="text-xs text-slate-400 mt-1">{{ dashboardCashBalance.error ? 'Saldo belum berhasil dimuat' : (dashboardCashBalance.loading ? 'Menghitung saldo seluruh waktu...' : 'Posisi kas saat ini • Tidak mengikuti filter') }}</p>
                         </div>
                     </div>
                     <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="help-icon-button">?</button>
@@ -16359,11 +16897,11 @@ SKU-BAJU-PUTIH-S"
         <tr v-if="inventoryProductGroups.length === 0">
             <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
         </tr>
-        <template v-for="group in inventoryProductGroups" :key="group.modelId">
-            <tr :ref="el => { if (el) groupRefs[group.modelId] = el }" class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="toggleInventoryGroup(group)">
+        <template v-for="group in inventoryProductGroups" :key="group.groupKey">
+            <tr :ref="el => { if (el) groupRefs[group.groupKey] = el }" class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="toggleInventoryGroup(group)">
                 <td class="px-6 py-4 font-bold text-slate-800">
                     <div class="flex items-center">
-                        <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.modelId }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.groupKey }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                         <div>
                             {{ group.namaModel }}
                             <span
@@ -16408,7 +16946,7 @@ SKU-BAJU-PUTIH-S"
                 </td>
             </tr>
 
-            <template v-if="uiState.activeAccordion === group.modelId">
+            <template v-if="uiState.activeAccordion === group.groupKey">
                 <tr v-if="group.isLoading">
                     <td colspan="7" class="px-6 py-8 text-center text-indigo-600">
                         Memuat varian {{ group.namaModel }}...
@@ -16419,7 +16957,7 @@ SKU-BAJU-PUTIH-S"
                     <td colspan="7" class="px-6 py-6 text-center text-red-600">
                         {{ group.error }}
                         <button
-                            @click.stop="loadInventoryModelProducts(currentUser.uid, group.modelId, true)"
+                            @click.stop="loadInventoryModelProducts(currentUser.uid, group, true)"
                             class="ml-2 underline font-semibold"
                         >
                             Coba Lagi

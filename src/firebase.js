@@ -1,10 +1,6 @@
 import { initializeApp } from "firebase/app";
 
-import {
-    initializeFirestore,
-    persistentLocalCache,
-    persistentMultipleTabManager
-} from "firebase/firestore";
+import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
 
 import { getAuth } from "firebase/auth";
 
@@ -20,13 +16,12 @@ const firebaseConfig = {
 // Inisialisasi Firebase satu kali
 const app = initializeApp(firebaseConfig);
 
-// Firestore dengan cache permanen IndexedDB.
-// persistentMultipleTabManager membuat beberapa tab browser
-// dapat memakai dan menyinkronkan cache Firestore yang sama.
+
+// PATCH POS FIRESTORE MEMORY CACHE
+// Gunakan cache memori agar Vue tidak menulis objek query ke IndexedDB.
+// Data utama tetap dibaca dan disimpan langsung ke Firestore server.
 export const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-    })
+    localCache: memoryLocalCache()
 });
 
 // Firebase Authentication
