@@ -30,8 +30,6 @@ import {
     startAfter,
     documentId,
     increment,
-    getAggregateFromServer,
-    sum,
 } from 'firebase/firestore';
 let bulkSearchDebounceTimer = null;
 let bulkScanTimer = null;
@@ -5197,21 +5195,7 @@ const dashboardCashBalance =
 let dashboardCashBalanceRequestId = 0;
 
 // FASHION_OS_DASHBOARD_CASH_AND_SELLING_PRICES_V1
-const getDashboardAggregateTotal =
-    async (sourceQuery, fieldPath) => {
-        const snapshot =
-            await getAggregateFromServer(
-                sourceQuery,
-                {
-                    total: sum(fieldPath)
-                }
-            );
-
-        return Number(
-            snapshot.data().total
-        ) || 0;
-    };
-
+// FASHION_OS_DASHBOARD_CASH_BUILD_FIX_V3
 const toDashboardCashNumber =
     value => {
         const parsed = Number(value);
@@ -5377,6 +5361,7 @@ const loadDashboardCashBalanceFromDocuments =
         );
     };
 
+// FASHION_OS_DASHBOARD_CASH_NO_INDEX_V2
 const loadDashboardCashBalance =
     async userId => {
         if (!userId) {
@@ -5393,102 +5378,12 @@ const loadDashboardCashBalance =
         dashboardCashBalance.error = '';
 
         try {
-            let cashValue;
-
-            try {
-                const settledTransactionsQuery =
-                    query(
-                        collection(db, 'transactions'),
-                        where('userId', '==', userId),
-                        where(
-                            'statusPencairan',
-                            '==',
-                            'Sudah Cair'
-                        )
-                    );
-
-                const otherIncomeQuery =
-                    query(
-                        collection(db, 'keuangan'),
-                        where('userId', '==', userId),
-                        where(
-                            'jenis',
-                            '==',
-                            'pemasukan_lain'
-                        )
-                    );
-
-                const expenseQuery =
-                    jenis =>
-                        query(
-                            collection(db, 'keuangan'),
-                            where('userId', '==', userId),
-                            where('jenis', '==', jenis)
-                        );
-
-                const [
-                    settledGross,
-                    settledDiscount,
-                    settledFees,
-                    otherIncome,
-                    expense,
-                    otherCost
-                ] = await Promise.all([
-                    getDashboardAggregateTotal(
-                        settledTransactionsQuery,
-                        'subtotal'
-                    ),
-                    getDashboardAggregateTotal(
-                        settledTransactionsQuery,
-                        'diskon.totalDiscount'
-                    ),
-                    getDashboardAggregateTotal(
-                        settledTransactionsQuery,
-                        'biaya.total'
-                    ),
-                    getDashboardAggregateTotal(
-                        otherIncomeQuery,
-                        'jumlah'
-                    ),
-                    getDashboardAggregateTotal(
-                        expenseQuery('pengeluaran'),
-                        'jumlah'
-                    ),
-                    getDashboardAggregateTotal(
-                        expenseQuery('biaya'),
-                        'jumlah'
-                    )
-                ]);
-
-                cashValue =
-                    (
-                        settledGross -
-                        settledDiscount -
-                        settledFees
-                    ) +
-                    otherIncome -
-                    expense -
-                    otherCost;
-
-                // Nilai gross nol juga dapat berarti dokumen lama tidak
-                // mempunyai field subtotal. Hitung ulang dari dokumennya.
-                if (settledGross === 0) {
-                    cashValue =
-                        await loadDashboardCashBalanceFromDocuments(
-                            userId
-                        );
-                }
-            } catch (aggregateError) {
-                console.warn(
-                    '[DASHBOARD] Aggregate saldo tidak tersedia, memakai pembacaan cadangan:',
-                    aggregateError
+            // Langsung gunakan query sederhana per user. Jalur ini tidak
+            // membutuhkan indeks agregasi Firestore tambahan.
+            const cashValue =
+                await loadDashboardCashBalanceFromDocuments(
+                    userId
                 );
-
-                cashValue =
-                    await loadDashboardCashBalanceFromDocuments(
-                        userId
-                    );
-            }
 
             if (
                 requestId !==
