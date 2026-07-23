@@ -975,14 +975,20 @@ try {
 
         switch(pageName) {
             case 'dashboard': {
-    // Dashboard KPI final harus mengambil semua transaksi dan semua data keuangan
-    // agar filter Hari Ini, Semua, dan rentang waktu bisa dihitung ulang secara akurat dari data mentah.
-    dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
-    dataPromises.push(fetchKeuanganData());
-    dataPromises.push(fetchSummaryData(userId));
-    dataPromises.push(fetchAllProductData(userId));
-    break;
-}
+                dataPromises.push(
+                    loadDashboardDataByCurrentFilter(
+                        userId
+                    )
+                );
+
+                dataPromises.push(
+                    fetchSummaryData(
+                        userId
+                    )
+                );
+
+                break;
+            }
             case 'audit-data':
     dataPromises.push(fetchAllProductData(userId));
     dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
@@ -5177,9 +5183,21 @@ const dashboardFilteredData = computed(() => {
             .filter(item => item.tanggal);
     };
 
-    const keuanganData = mapToDateObject(state.keuangan);
-    const transaksiData = mapToDateObject(state.transaksi, 'transaksi');
-    const returData = mapToDateObject(state.retur);
+    const keuanganData =
+        mapToDateObject(
+            dashboardPeriodData.finance
+        );
+
+    const transaksiData =
+        mapToDateObject(
+            dashboardPeriodData.transactions,
+            'transaksi'
+        );
+
+    const returData =
+        mapToDateObject(
+            dashboardPeriodData.returns
+        );
 
     const filterOptions = [
         uiState.dashboardDateFilter,
@@ -5309,6 +5327,16 @@ const dashboardKpis = computed(() => {
 
 const transaksiCairKeys = new Set();
 
+(
+    dashboardPaidReturnOriginKeys.value ||
+    []
+).forEach(
+    key =>
+        transaksiCairKeys.add(
+            String(key).toLowerCase()
+        )
+);
+
 (transaksi || []).forEach(trx => {
     if (trx.statusPencairan === 'Sudah Cair') {
         [
@@ -5425,85 +5453,55 @@ let biayaMarketplaceBatal = 0;
     kpis.omsetBersih = kpis.omsetKotor - kpis.totalDiskon;
     kpis.labaKotor = kpis.omsetBersih - kpis.totalHppTerjual;
     kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
-
-        // SALDO KAS BERJALAN
-    // Saldo Kas Berjalan tidak mengikuti filter waktu dashboard.
-    // Angka ini dihitung dari semua transaksi yang sudah cair + pemasukan lain - pengeluaran kas.
-    // Retur hanya dihitung jika transaksi asalnya masih ada, supaya retur yatim tidak membuat saldo kas ngaco.
-
-    let saldoOmsetKotorAllTime = 0;
-    let saldoDiskonAllTime = 0;
-    let saldoBiayaTransaksiAllTime = 0;
-
-    const saldoTransaksiCairKeys = new Set();
-
-    (state.transaksi || []).forEach(trx => {
-        if (trx.statusPencairan !== 'Sudah Cair') return;
-
-        saldoOmsetKotorAllTime += Number(trx.subtotal) || 0;
-        saldoDiskonAllTime += Number(trx.diskon?.totalDiscount) || 0;
-        saldoBiayaTransaksiAllTime += Number(trx.biaya?.total) || 0;
-
-        if (trx.id) saldoTransaksiCairKeys.add(String(trx.id).toLowerCase());
-        if (trx.marketplaceOrderId) saldoTransaksiCairKeys.add(String(trx.marketplaceOrderId).toLowerCase());
-        if (trx.orderId) saldoTransaksiCairKeys.add(String(trx.orderId).toLowerCase());
-        if (trx.idPesanan) saldoTransaksiCairKeys.add(String(trx.idPesanan).toLowerCase());
-        if (trx.nomorPesanan) saldoTransaksiCairKeys.add(String(trx.nomorPesanan).toLowerCase());
-    });
-
-    let saldoNilaiReturGrossAllTime = 0;
-    let saldoDiskonBatalAllTime = 0;
-    let saldoBiayaMarketplaceBatalAllTime = 0;
-
-    (state.retur || []).forEach(r => {
-        const returKeys = [
-            r.originalTransactionId,
-            r.transactionId,
-            r.marketplaceOrderId,
-            r.orderId,
-            r.idPesanan,
-            r.nomorPesanan
-        ]
-            .filter(Boolean)
-            .map(key => String(key).toLowerCase());
-
-        const returPunyaTransaksiAsal = returKeys.some(key => saldoTransaksiCairKeys.has(key));
-
-        if (!returPunyaTransaksiAsal) {
-            return;
-        }
-
-        (r.items || []).forEach(item => {
-            saldoNilaiReturGrossAllTime += (Number(item.nilaiRetur) || 0) + (Number(item.nilaiDiskon) || 0);
-            saldoDiskonBatalAllTime += Number(item.nilaiDiskon) || 0;
-            saldoBiayaMarketplaceBatalAllTime += Number(item.biayaMarketplace) || 0;
-        });
-    });
-
-    const saldoOmsetBersihAllTime =
-        (saldoOmsetKotorAllTime - saldoNilaiReturGrossAllTime)
-        - (saldoDiskonAllTime - saldoDiskonBatalAllTime);
-
-    const saldoBiayaTransaksiFinalAllTime =
-        saldoBiayaTransaksiAllTime - saldoBiayaMarketplaceBatalAllTime;
-
-    const saldoPemasukanLainAllTime = (state.keuangan || [])
-        .filter(k => k.jenis === 'pemasukan_lain')
-        .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
-
-    const saldoPengeluaranKasAllTime = (state.keuangan || [])
-        .filter(k => k.jenis === 'pengeluaran' || k.jenis === 'biaya')
-        .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
+    // ARUS KAS PERIODE
+    // Mengikuti filter waktu Dashboard dan tidak perlu
+    // membaca seluruh transaksi sepanjang umur akun.
+    const totalPengeluaranKasPeriode =
+        (keuangan || [])
+            .filter(
+                record =>
+                    record.jenis ===
+                        'pengeluaran' ||
+                    record.jenis ===
+                        'biaya'
+            )
+            .reduce(
+                (sum, record) =>
+                    sum +
+                    (
+                        Number(
+                            record.jumlah
+                        ) || 0
+                    ),
+                0
+            );
 
     kpis.saldoKas =
-        (saldoOmsetBersihAllTime + saldoPemasukanLainAllTime)
-        - (saldoBiayaTransaksiFinalAllTime + saldoPengeluaranKasAllTime);
+        (
+            kpis.omsetBersih +
+            kpis.pemasukanLain
+        ) -
+        (
+            kpis.totalBiayaTransaksi +
+            totalPengeluaranKasPeriode
+        );
 
-    kpis.totalUnitStok = (state.produk || [])
-        .reduce((sum, p) => sum + (Number(p.stokFisik) || 0), 0);
+    // Total inventaris diambil dari satu dokumen ringkasan
+    // yang sudah dipelihara Cloud Function.
+    const inventoryTotals =
+        state.summaryData
+            ?.inventoryTotals ||
+        {};
 
-    kpis.totalNilaiStokHPP = (state.produk || [])
-        .reduce((sum, p) => sum + ((Number(p.stokFisik) || 0) * (Number(p.hpp) || 0)), 0);
+    kpis.totalUnitStok =
+        Number(
+            inventoryTotals.totalUnitStok
+        ) || 0;
+
+    kpis.totalNilaiStokHPP =
+        Number(
+            inventoryTotals.totalNilaiStokHPP
+        ) || 0;
 
     return kpis;
 });
@@ -6671,7 +6669,10 @@ const dashboardPremiumData = computed(() => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const transaksiHariIni = (state.transaksi || []).filter(t => {
+    const transaksiHariIni = (
+        dashboardTodayData.transactions ||
+        []
+    ).filter(t => {
         const d = new Date(t.tanggal);
         return d >= today && d < tomorrow;
     });
@@ -6690,7 +6691,10 @@ const dashboardPremiumData = computed(() => {
         return sum + (t.biaya?.total || 0);
     }, 0);
 
-    const biayaOperasionalHariIni = (state.keuangan || [])
+    const biayaOperasionalHariIni = (
+        dashboardTodayData.finance ||
+        []
+    )
     .filter(k => {
         const d = k.tanggal?.toDate
             ? k.tanggal.toDate()
@@ -11019,7 +11023,20 @@ const prosesBulkScanFinal = (scannedValue) => {
 
 // --- LIFECYCLE & WATCHERS ---
 
-watch(dashboardFilteredData, () => { if (activePage.value === 'dashboard') nextTick(renderCharts); });
+watch(
+    dashboardFilteredData,
+    () => {
+        if (
+            activePage.value ===
+                'dashboard' &&
+            !dashboardDataLoading.value
+        ) {
+            nextTick(
+                renderCharts
+            );
+        }
+    }
+);
 watch(() => uiState.bulk_paste_input, () => {
     uiState.bulkPasteValidation = null;
 });
@@ -12606,6 +12623,988 @@ watch(
         uiState.returPageEndYear
     ],
     scheduleReturnHistoryReload
+);
+
+
+const DASHBOARD_BATCH_SIZE = 200;
+
+const dashboardPeriodData =
+    reactive({
+        transactions: [],
+        returns: [],
+        finance: []
+    });
+
+const dashboardTodayData =
+    reactive({
+        transactions: [],
+        finance: []
+    });
+
+const dashboardDataLoading =
+    ref(false);
+
+const dashboardDataError =
+    ref('');
+
+const dashboardDataMessage =
+    ref('');
+
+const dashboardLoadedCounts =
+    reactive({
+        transactions: 0,
+        returns: 0,
+        finance: 0
+    });
+
+const dashboardPaidReturnOriginKeys =
+    ref([]);
+
+let dashboardRequestId = 0;
+
+let dashboardReloadTimer =
+    null;
+
+const mapDashboardTransaction =
+    docSnap => {
+        const data =
+            docSnap.data() || {};
+
+        const transaction = {
+            id: docSnap.id,
+            ...data,
+            tanggal:
+                data.tanggal?.toDate
+                    ? data.tanggal.toDate()
+                    : data.tanggal,
+            tanggalPencairan:
+                data.tanggalPencairan?.toDate
+                    ? data.tanggalPencairan.toDate()
+                    : data.tanggalPencairan
+        };
+
+        return isActiveExportRecord(
+            transaction
+        )
+            ? transaction
+            : null;
+    };
+
+const mapDashboardReturn =
+    docSnap => {
+        const data =
+            docSnap.data() || {};
+
+        return {
+            id: docSnap.id,
+            ...data,
+            tanggal:
+                data.tanggal?.toDate
+                    ? data.tanggal.toDate()
+                    : data.tanggal
+        };
+    };
+
+const mapDashboardFinance =
+    docSnap => {
+        const data =
+            docSnap.data() || {};
+
+        const finance = {
+            id: docSnap.id,
+            ...data,
+            tanggal:
+                data.tanggal?.toDate
+                    ? data.tanggal.toDate()
+                    : data.tanggal
+        };
+
+        return isActiveExportRecord(
+            finance
+        )
+            ? finance
+            : null;
+    };
+
+const fetchDashboardQueryBatches =
+    async ({
+        collectionName,
+        userId,
+        dateField,
+        range,
+        mapDocument,
+        onBatch,
+        isRequestCurrent
+    }) => {
+        let lastVisible =
+            null;
+
+        let hasMore =
+            true;
+
+        while (hasMore) {
+            const constraints = [
+                where(
+                    'userId',
+                    '==',
+                    userId
+                )
+            ];
+
+            if (range.startDate) {
+                constraints.push(
+                    where(
+                        dateField,
+                        '>=',
+                        range.startDate
+                    )
+                );
+            }
+
+            if (range.endDate) {
+                constraints.push(
+                    where(
+                        dateField,
+                        '<=',
+                        range.endDate
+                    )
+                );
+            }
+
+            constraints.push(
+                orderBy(
+                    dateField,
+                    'desc'
+                )
+            );
+
+            if (lastVisible) {
+                constraints.push(
+                    startAfter(
+                        lastVisible
+                    )
+                );
+            }
+
+            constraints.push(
+                limit(
+                    DASHBOARD_BATCH_SIZE
+                )
+            );
+
+            const snapshot =
+                await getDocsFromServer(
+                    query(
+                        collection(
+                            db,
+                            collectionName
+                        ),
+                        ...constraints
+                    )
+                );
+
+            if (
+                !isRequestCurrent()
+            ) {
+                return false;
+            }
+
+            const documents =
+                snapshot.docs
+                    .map(
+                        mapDocument
+                    )
+                    .filter(Boolean);
+
+            if (
+                documents.length > 0
+            ) {
+                onBatch(
+                    documents
+                );
+            }
+
+            if (
+                snapshot.docs.length <
+                DASHBOARD_BATCH_SIZE
+            ) {
+                hasMore = false;
+                continue;
+            }
+
+            lastVisible =
+                snapshot.docs[
+                    snapshot.docs.length - 1
+                ];
+
+            await nextTick();
+        }
+
+        return true;
+    };
+
+const dashboardRangeContainsToday =
+    range => {
+        if (range.allTime) {
+            return true;
+        }
+
+        if (
+            !range.startDate ||
+            !range.endDate
+        ) {
+            return false;
+        }
+
+        const now =
+            new Date();
+
+        const todayStart =
+            new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                0,
+                0,
+                0,
+                0
+            );
+
+        const todayEnd =
+            new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                23,
+                59,
+                59,
+                999
+            );
+
+        return (
+            range.startDate <=
+                todayStart &&
+            range.endDate >=
+                todayEnd
+        );
+    };
+
+const isDateToday =
+    value => {
+        if (!value) {
+            return false;
+        }
+
+        const date =
+            value?.toDate
+                ? value.toDate()
+                : (
+                    value?.seconds
+                        ? new Date(
+                            value.seconds *
+                                1000
+                        )
+                        : new Date(
+                            value
+                        )
+                );
+
+        if (
+            Number.isNaN(
+                date.getTime()
+            )
+        ) {
+            return false;
+        }
+
+        const today =
+            new Date();
+
+        return (
+            date.getDate() ===
+                today.getDate() &&
+            date.getMonth() ===
+                today.getMonth() &&
+            date.getFullYear() ===
+                today.getFullYear()
+        );
+    };
+
+const loadDashboardReturnProducts =
+    async (
+        userId,
+        returns,
+        isRequestCurrent
+    ) => {
+        const skuList =
+            Array.from(
+                new Set(
+                    (
+                        returns || []
+                    ).flatMap(
+                        returnRecord =>
+                            (
+                                returnRecord.items ||
+                                []
+                            )
+                                .map(
+                                    item =>
+                                        String(
+                                            item.sku ||
+                                                ''
+                                        ).trim()
+                                )
+                                .filter(Boolean)
+                    )
+                )
+            );
+
+        if (
+            skuList.length === 0
+        ) {
+            return;
+        }
+
+        const productMap =
+            new Map(
+                (
+                    state.produk || []
+                ).map(
+                    product => [
+                        String(
+                            product.sku ||
+                                ''
+                        ).toLowerCase(),
+                        product
+                    ]
+                )
+            );
+
+        // Ukuran 10 sengaja konservatif agar query "in"
+        // tetap aman dan sederhana.
+        for (
+            let index = 0;
+            index < skuList.length;
+            index += 10
+        ) {
+            if (
+                !isRequestCurrent()
+            ) {
+                return;
+            }
+
+            const skuChunk =
+                skuList.slice(
+                    index,
+                    index + 10
+                );
+
+            const snapshot =
+                await getDocsFromServer(
+                    query(
+                        collection(
+                            db,
+                            'products'
+                        ),
+                        where(
+                            'userId',
+                            '==',
+                            userId
+                        ),
+                        where(
+                            'sku',
+                            'in',
+                            skuChunk
+                        )
+                    )
+                );
+
+            snapshot.docs.forEach(
+                docSnap => {
+                    const data =
+                        docSnap.data() ||
+                        {};
+
+                    productMap.set(
+                        String(
+                            data.sku ||
+                                ''
+                        ).toLowerCase(),
+                        {
+                            docId:
+                                docSnap.id,
+                            sku:
+                                data.sku || '',
+                            nama:
+                                data.product_name ||
+                                '',
+                            model_id:
+                                data.model_id ||
+                                '',
+                            warna:
+                                data.color || '',
+                            varian:
+                                data.variant ||
+                                '',
+                            stokFisik:
+                                Number(
+                                    data.physical_stock
+                                ) || 0,
+                            hpp:
+                                Number(
+                                    data.hpp
+                                ) || 0,
+                            userId:
+                                data.userId
+                        }
+                    );
+                }
+            );
+        }
+
+        if (
+            isRequestCurrent()
+        ) {
+            state.produk =
+                Array.from(
+                    productMap.values()
+                );
+        }
+    };
+
+const loadDashboardReturnOrigins =
+    async (
+        userId,
+        returns,
+        isRequestCurrent
+    ) => {
+        const transactionIds =
+            Array.from(
+                new Set(
+                    (
+                        returns || []
+                    )
+                        .flatMap(
+                            returnRecord => [
+                                returnRecord
+                                    .originalTransactionId,
+                                returnRecord
+                                    .transactionId
+                            ]
+                        )
+                        .filter(Boolean)
+                        .map(String)
+                )
+            );
+
+        const paidKeys =
+            new Set();
+
+        for (
+            const transactionId of
+                transactionIds
+        ) {
+            if (
+                !isRequestCurrent()
+            ) {
+                return;
+            }
+
+            try {
+                const snapshot =
+                    await getDocFromServer(
+                        doc(
+                            db,
+                            'transactions',
+                            transactionId
+                        )
+                    );
+
+                if (
+                    !snapshot.exists()
+                ) {
+                    continue;
+                }
+
+                const data =
+                    snapshot.data() ||
+                    {};
+
+                if (
+                    data.userId !==
+                        userId ||
+                    data.statusPencairan !==
+                        'Sudah Cair'
+                ) {
+                    continue;
+                }
+
+                [
+                    snapshot.id,
+                    data.marketplaceOrderId,
+                    data.orderId,
+                    data.idPesanan,
+                    data.nomorPesanan
+                ]
+                    .filter(Boolean)
+                    .forEach(
+                        key =>
+                            paidKeys.add(
+                                String(
+                                    key
+                                ).toLowerCase()
+                            )
+                    );
+            } catch (error) {
+                console.warn(
+                    '[DASHBOARD] Transaksi asal retur tidak dapat dibaca:',
+                    transactionId,
+                    error
+                );
+            }
+        }
+
+        if (
+            isRequestCurrent()
+        ) {
+            dashboardPaidReturnOriginKeys.value =
+                Array.from(
+                    paidKeys
+                );
+        }
+    };
+
+const loadDashboardTodayFallback =
+    async (
+        userId,
+        isRequestCurrent
+    ) => {
+        const todayRange =
+            resolveHistoryDateRange(
+                'today'
+            );
+
+        const todayTransactions =
+            [];
+
+        const todayFinance =
+            [];
+
+        await Promise.all([
+            fetchDashboardQueryBatches(
+                {
+                    collectionName:
+                        'transactions',
+                    userId,
+                    dateField:
+                        'tanggal',
+                    range:
+                        todayRange,
+                    mapDocument:
+                        mapDashboardTransaction,
+                    onBatch:
+                        documents => {
+                            todayTransactions.push(
+                                ...documents
+                            );
+                        },
+                    isRequestCurrent
+                }
+            ),
+            fetchDashboardQueryBatches(
+                {
+                    collectionName:
+                        'keuangan',
+                    userId,
+                    dateField:
+                        'tanggal',
+                    range:
+                        todayRange,
+                    mapDocument:
+                        mapDashboardFinance,
+                    onBatch:
+                        documents => {
+                            todayFinance.push(
+                                ...documents
+                            );
+                        },
+                    isRequestCurrent
+                }
+            )
+        ]);
+
+        if (
+            isRequestCurrent()
+        ) {
+            dashboardTodayData.transactions =
+                todayTransactions;
+
+            dashboardTodayData.finance =
+                todayFinance;
+        }
+    };
+
+const loadDashboardDataByCurrentFilter =
+    async userId => {
+        if (!userId) {
+            return;
+        }
+
+        const requestId =
+            ++dashboardRequestId;
+
+        const isRequestCurrent =
+            () =>
+                requestId ===
+                    dashboardRequestId &&
+                activePage.value ===
+                    'dashboard';
+
+        const range =
+            resolveHistoryDateRange(
+                uiState.dashboardDateFilter,
+                {
+                    startDate:
+                        uiState.dashboardStartDate,
+                    endDate:
+                        uiState.dashboardEndDate,
+                    startMonth:
+                        uiState.dashboardStartMonth,
+                    endMonth:
+                        uiState.dashboardEndMonth,
+                    startYear:
+                        uiState.dashboardStartYear,
+                    endYear:
+                        uiState.dashboardEndYear
+                }
+            );
+
+        dashboardDataError.value =
+            '';
+
+        dashboardDataMessage.value =
+            range.ready
+                ? ''
+                : range.message;
+
+        dashboardLoadedCounts.transactions =
+            0;
+
+        dashboardLoadedCounts.returns =
+            0;
+
+        dashboardLoadedCounts.finance =
+            0;
+
+        dashboardPeriodData.transactions =
+            [];
+
+        dashboardPeriodData.returns =
+            [];
+
+        dashboardPeriodData.finance =
+            [];
+
+        dashboardPaidReturnOriginKeys.value =
+            [];
+
+        if (!range.ready) {
+            dashboardDataLoading.value =
+                false;
+
+            return;
+        }
+
+        dashboardDataLoading.value =
+            true;
+
+        const transactionMap =
+            new Map();
+
+        const transactionDateMap =
+            new Map();
+
+        const returns =
+            [];
+
+        const finance =
+            [];
+
+        const updateTransactions =
+            documents => {
+                documents.forEach(
+                    transaction => {
+                        transactionMap.set(
+                            transaction.id,
+                            transaction
+                        );
+                    }
+                );
+
+                dashboardPeriodData.transactions =
+                    Array.from(
+                        transactionMap.values()
+                    );
+
+                dashboardLoadedCounts.transactions =
+                    transactionMap.size;
+            };
+
+        try {
+            const transactionDatePromise =
+                fetchDashboardQueryBatches(
+                    {
+                        collectionName:
+                            'transactions',
+                        userId,
+                        dateField:
+                            'tanggal',
+                        range,
+                        mapDocument:
+                            mapDashboardTransaction,
+                        onBatch:
+                            documents => {
+                                documents.forEach(
+                                    transaction => {
+                                        transactionDateMap.set(
+                                            transaction.id,
+                                            transaction
+                                        );
+                                    }
+                                );
+
+                                updateTransactions(
+                                    documents
+                                );
+                            },
+                        isRequestCurrent
+                    }
+                );
+
+            const payoutDatePromise =
+                range.allTime
+                    ? Promise.resolve(
+                        true
+                    )
+                    : fetchDashboardQueryBatches(
+                        {
+                            collectionName:
+                                'transactions',
+                            userId,
+                            dateField:
+                                'tanggalPencairan',
+                            range,
+                            mapDocument:
+                                mapDashboardTransaction,
+                            onBatch:
+                                updateTransactions,
+                            isRequestCurrent
+                        }
+                    );
+
+            const returnsPromise =
+                fetchDashboardQueryBatches(
+                    {
+                        collectionName:
+                            'returns',
+                        userId,
+                        dateField:
+                            'tanggal',
+                        range,
+                        mapDocument:
+                            mapDashboardReturn,
+                        onBatch:
+                            documents => {
+                                returns.push(
+                                    ...documents
+                                );
+
+                                dashboardPeriodData.returns =
+                                    [
+                                        ...returns
+                                    ];
+
+                                dashboardLoadedCounts.returns =
+                                    returns.length;
+                            },
+                        isRequestCurrent
+                    }
+                );
+
+            const financePromise =
+                fetchDashboardQueryBatches(
+                    {
+                        collectionName:
+                            'keuangan',
+                        userId,
+                        dateField:
+                            'tanggal',
+                        range,
+                        mapDocument:
+                            mapDashboardFinance,
+                        onBatch:
+                            documents => {
+                                finance.push(
+                                    ...documents
+                                );
+
+                                dashboardPeriodData.finance =
+                                    [
+                                        ...finance
+                                    ];
+
+                                dashboardLoadedCounts.finance =
+                                    finance.length;
+                            },
+                        isRequestCurrent
+                    }
+                );
+
+            await Promise.all([
+                transactionDatePromise,
+                payoutDatePromise,
+                returnsPromise,
+                financePromise
+            ]);
+
+            if (
+                !isRequestCurrent()
+            ) {
+                return;
+            }
+
+            if (
+                dashboardRangeContainsToday(
+                    range
+                )
+            ) {
+                dashboardTodayData.transactions =
+                    Array.from(
+                        transactionDateMap.values()
+                    ).filter(
+                        transaction =>
+                            isDateToday(
+                                transaction.tanggal
+                            )
+                    );
+
+                dashboardTodayData.finance =
+                    finance.filter(
+                        record =>
+                            isDateToday(
+                                record.tanggal
+                            )
+                    );
+            } else {
+                await loadDashboardTodayFallback(
+                    userId,
+                    isRequestCurrent
+                );
+            }
+
+            await Promise.all([
+                loadDashboardReturnProducts(
+                    userId,
+                    returns,
+                    isRequestCurrent
+                ),
+                loadDashboardReturnOrigins(
+                    userId,
+                    returns,
+                    isRequestCurrent
+                )
+            ]);
+
+            if (
+                !isRequestCurrent()
+            ) {
+                return;
+            }
+
+            // State global tidak ditandai lengkap,
+            // sebab Dashboard hanya membaca periode tertentu.
+            dataFetched.transactions =
+                false;
+
+            dataFetched.returns =
+                false;
+
+            dataFetched.finance =
+                false;
+
+            dataFetched.allTransactionsLoaded =
+                false;
+
+            dataFetched.allReturnsLoaded =
+                false;
+        } catch (error) {
+            if (
+                !isRequestCurrent()
+            ) {
+                return;
+            }
+
+            console.error(
+                '[DASHBOARD] Gagal memuat data periode:',
+                error
+            );
+
+            dashboardDataError.value =
+                error?.message ||
+                'Data Dashboard belum berhasil dimuat.';
+        } finally {
+            if (
+                requestId ===
+                dashboardRequestId
+            ) {
+                dashboardDataLoading.value =
+                    false;
+
+                if (
+                    activePage.value ===
+                        'dashboard'
+                ) {
+                    await nextTick();
+                    renderCharts();
+                }
+            }
+        }
+    };
+
+const scheduleDashboardReload =
+    () => {
+        clearTimeout(
+            dashboardReloadTimer
+        );
+
+        dashboardReloadTimer =
+            setTimeout(
+                () => {
+                    if (
+                        activePage.value ===
+                            'dashboard' &&
+                        currentUser.value?.uid
+                    ) {
+                        loadDashboardDataByCurrentFilter(
+                            currentUser.value.uid
+                        );
+                    }
+                },
+                350
+            );
+    };
+
+watch(
+    () => [
+        uiState.dashboardDateFilter,
+        uiState.dashboardStartDate,
+        uiState.dashboardEndDate,
+        uiState.dashboardStartMonth,
+        uiState.dashboardEndMonth,
+        uiState.dashboardStartYear,
+        uiState.dashboardEndYear
+    ],
+    scheduleDashboardReload
 );
 
 const fetchTransactionAndReturnData = async (
@@ -14361,6 +15360,40 @@ watch(activePage, (newPage, oldPage) => {
                 <p class="text-xs text-slate-500 mt-2">
                     Filter ini hanya untuk laporan bisnis final di bawah.
                 </p>
+
+                <div
+                    v-if="dashboardDataLoading"
+                    class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700"
+                >
+                    Memuat data sesuai periode...
+                    Transaksi:
+                    <strong>{{ dashboardLoadedCounts.transactions }}</strong>,
+                    retur:
+                    <strong>{{ dashboardLoadedCounts.returns }}</strong>,
+                    keuangan:
+                    <strong>{{ dashboardLoadedCounts.finance }}</strong>.
+                </div>
+
+                <div
+                    v-else-if="dashboardDataMessage"
+                    class="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                >
+                    {{ dashboardDataMessage }}
+                </div>
+
+                <div
+                    v-else-if="dashboardDataError"
+                    class="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                >
+                    {{ dashboardDataError }}
+
+                    <button
+                        @click="loadDashboardDataByCurrentFilter(currentUser.uid)"
+                        class="ml-2 font-bold underline"
+                    >
+                        Coba Lagi
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -14374,9 +15407,9 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Saldo Kas Berjalan</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Arus Kas Periode</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
-                            <p class="text-xs text-slate-400 mt-1">Posisi kas bisnis saat ini</p>
+                            <p class="text-xs text-slate-400 mt-1">Mengikuti filter waktu Dashboard</p>
                         </div>
                     </div>
                     <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="help-icon-button">?</button>
