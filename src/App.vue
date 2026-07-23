@@ -16313,7 +16313,7 @@ const loadDashboardDataByCurrentFilter =
 
         if (summaryLoaded) {
             dashboardDataMessage.value =
-                'Mode hemat aktif • data dibaca dari ringkasan, bukan dari ribuan transaksi.';
+                'Mode hemat aktif • Data ditampilkan secara lengkap dengan proses pemuatan yang lebih efisien.';
 
             dashboardDataLoading.value =
                 false;
