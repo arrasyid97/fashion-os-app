@@ -273,11 +273,15 @@ massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     produksiSearch: '',
     promosiSelectedModel: '',
     returPageBulan: new Date().getMonth() + 1,
-    returPageDateFilter: 'all_time',
+    returPageDateFilter: 'today',
     returPageEndDate: '',
     returPageSearchQuery: '',
     returPageSearchRecommendations: [],
     returPageStartDate: '',
+    returPageStartMonth: new Date().getMonth() + 1,
+    returPageEndMonth: new Date().getMonth() + 1,
+    returPageStartYear: new Date().getFullYear(),
+    returPageEndYear: new Date().getFullYear(),
     returPageTahun: new Date().getFullYear(),
     returSearchQuery: '',
     returSearchRecommendations: [],
@@ -992,10 +996,45 @@ try {
     dataPromises.push(fetchPendingSettlementData(userId));
     break;
             case 'transaksi':
+                dataPromises.push(
+                    fetchAllProductData(
+                        userId
+                    )
+                );
+
+                dataPromises.push(
+                    loadTransactionHistoryByCurrentFilter(
+                        userId
+                    )
+                );
+
+                dataPromises.push(
+                    fetchNotesData(
+                        userId
+                    )
+                );
+
+                break;
+
             case 'bulk_process':
-                dataPromises.push(fetchAllProductData(userId));
-                dataPromises.push(fetchTransactionAndReturnData(userId));
-                dataPromises.push(fetchNotesData(userId));
+                dataPromises.push(
+                    fetchAllProductData(
+                        userId
+                    )
+                );
+
+                dataPromises.push(
+                    fetchTransactionAndReturnData(
+                        userId
+                    )
+                );
+
+                dataPromises.push(
+                    fetchNotesData(
+                        userId
+                    )
+                );
+
                 break;
 
             case 'inventaris':
@@ -1012,7 +1051,13 @@ try {
                 if (pageName === 'promosi') dataPromises.push(fetchNotesData(userId));
                 if (pageName === 'produksi') dataPromises.push(fetchProductionData(userId));
                 if (pageName === 'supplier') dataPromises.push(fetchSupplierData(userId));
-                if (pageName === 'retur') dataPromises.push(fetchTransactionAndReturnData(userId));
+                if (pageName === 'retur') {
+                    dataPromises.push(
+                        loadReturnHistoryByCurrentFilter(
+                            userId
+                        )
+                    );
+                }
                 break;
             
             case 'gudang-kain':
@@ -11702,6 +11747,867 @@ console.log(
     }
 };
 
+
+const HISTORY_BATCH_SIZE = 200;
+
+const transactionHistoryLoading =
+    ref(false);
+
+const returnHistoryLoading =
+    ref(false);
+
+const transactionHistoryLoadedCount =
+    ref(0);
+
+const returnHistoryLoadedCount =
+    ref(0);
+
+const transactionHistoryError =
+    ref('');
+
+const returnHistoryError =
+    ref('');
+
+const transactionHistoryMessage =
+    ref('');
+
+const returnHistoryMessage =
+    ref('');
+
+let transactionHistoryRequestId = 0;
+let returnHistoryRequestId = 0;
+
+let transactionHistoryReloadTimer =
+    null;
+
+let returnHistoryReloadTimer =
+    null;
+
+const createLocalDateFromInput =
+    (
+        value,
+        endOfDay = false
+    ) => {
+        if (!value) {
+            return null;
+        }
+
+        const parts =
+            String(value)
+                .split('-')
+                .map(Number);
+
+        if (
+            parts.length !== 3 ||
+            parts.some(
+                part =>
+                    !Number.isFinite(part)
+            )
+        ) {
+            return null;
+        }
+
+        const [
+            year,
+            month,
+            day
+        ] = parts;
+
+        return new Date(
+            year,
+            month - 1,
+            day,
+            endOfDay ? 23 : 0,
+            endOfDay ? 59 : 0,
+            endOfDay ? 59 : 0,
+            endOfDay ? 999 : 0
+        );
+    };
+
+const resolveHistoryDateRange =
+    (
+        filterType,
+        {
+            startDate = '',
+            endDate = '',
+            startMonth = null,
+            endMonth = null,
+            startYear = null,
+            endYear = null
+        } = {}
+    ) => {
+        const now =
+            new Date();
+
+        const todayStart =
+            new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                0,
+                0,
+                0,
+                0
+            );
+
+        const todayEnd =
+            new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                23,
+                59,
+                59,
+                999
+            );
+
+        switch (filterType) {
+            case 'today':
+                return {
+                    ready: true,
+                    allTime: false,
+                    startDate:
+                        todayStart,
+                    endDate:
+                        todayEnd
+                };
+
+            case 'last_7_days': {
+                const start =
+                    new Date(
+                        todayStart
+                    );
+
+                // Hari ini + 6 hari sebelumnya
+                // = tepat 7 hari kalender.
+                start.setDate(
+                    start.getDate() - 6
+                );
+
+                return {
+                    ready: true,
+                    allTime: false,
+                    startDate: start,
+                    endDate:
+                        todayEnd
+                };
+            }
+
+            case 'last_30_days': {
+                const start =
+                    new Date(
+                        todayStart
+                    );
+
+                // Hari ini + 29 hari sebelumnya
+                // = tepat 30 hari kalender.
+                start.setDate(
+                    start.getDate() - 29
+                );
+
+                return {
+                    ready: true,
+                    allTime: false,
+                    startDate: start,
+                    endDate:
+                        todayEnd
+                };
+            }
+
+            case 'this_year':
+                return {
+                    ready: true,
+                    allTime: false,
+                    startDate:
+                        new Date(
+                            now.getFullYear(),
+                            0,
+                            1,
+                            0,
+                            0,
+                            0,
+                            0
+                        ),
+                    endDate:
+                        new Date(
+                            now.getFullYear(),
+                            11,
+                            31,
+                            23,
+                            59,
+                            59,
+                            999
+                        )
+                };
+
+            case 'by_date_range': {
+                const start =
+                    createLocalDateFromInput(
+                        startDate,
+                        false
+                    );
+
+                const end =
+                    createLocalDateFromInput(
+                        endDate,
+                        true
+                    );
+
+                if (!start || !end) {
+                    return {
+                        ready: false,
+                        message:
+                            'Pilih tanggal awal dan tanggal akhir.'
+                    };
+                }
+
+                if (start > end) {
+                    return {
+                        ready: false,
+                        message:
+                            'Tanggal awal tidak boleh melewati tanggal akhir.'
+                    };
+                }
+
+                return {
+                    ready: true,
+                    allTime: false,
+                    startDate: start,
+                    endDate: end
+                };
+            }
+
+            case 'by_month_range': {
+                const startMonthNumber =
+                    Number(startMonth);
+
+                const endMonthNumber =
+                    Number(endMonth);
+
+                const startYearNumber =
+                    Number(startYear);
+
+                const endYearNumber =
+                    Number(endYear);
+
+                if (
+                    !startMonthNumber ||
+                    !endMonthNumber ||
+                    !startYearNumber ||
+                    !endYearNumber
+                ) {
+                    return {
+                        ready: false,
+                        message:
+                            'Lengkapi bulan dan tahun awal serta akhir.'
+                    };
+                }
+
+                const start =
+                    new Date(
+                        startYearNumber,
+                        startMonthNumber - 1,
+                        1,
+                        0,
+                        0,
+                        0,
+                        0
+                    );
+
+                const end =
+                    new Date(
+                        endYearNumber,
+                        endMonthNumber,
+                        0,
+                        23,
+                        59,
+                        59,
+                        999
+                    );
+
+                if (start > end) {
+                    return {
+                        ready: false,
+                        message:
+                            'Bulan awal tidak boleh melewati bulan akhir.'
+                    };
+                }
+
+                return {
+                    ready: true,
+                    allTime: false,
+                    startDate: start,
+                    endDate: end
+                };
+            }
+
+            case 'by_year_range': {
+                const startYearNumber =
+                    Number(startYear);
+
+                const endYearNumber =
+                    Number(endYear);
+
+                if (
+                    !startYearNumber ||
+                    !endYearNumber
+                ) {
+                    return {
+                        ready: false,
+                        message:
+                            'Lengkapi tahun awal dan tahun akhir.'
+                    };
+                }
+
+                const start =
+                    new Date(
+                        startYearNumber,
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        0
+                    );
+
+                const end =
+                    new Date(
+                        endYearNumber,
+                        11,
+                        31,
+                        23,
+                        59,
+                        59,
+                        999
+                    );
+
+                if (start > end) {
+                    return {
+                        ready: false,
+                        message:
+                            'Tahun awal tidak boleh melewati tahun akhir.'
+                    };
+                }
+
+                return {
+                    ready: true,
+                    allTime: false,
+                    startDate: start,
+                    endDate: end
+                };
+            }
+
+            case 'all_time':
+            default:
+                return {
+                    ready: true,
+                    allTime: true,
+                    startDate: null,
+                    endDate: null
+                };
+        }
+    };
+
+const fetchHistoryCollectionByPeriod =
+    async ({
+        collectionName,
+        userId,
+        range,
+        mapDocument,
+        appendDocuments,
+        isRequestCurrent
+    }) => {
+        let lastVisible =
+            null;
+
+        let totalLoaded =
+    0;
+
+let hasMore =
+    true;
+
+while (hasMore) {
+            const constraints = [
+                where(
+                    'userId',
+                    '==',
+                    userId
+                )
+            ];
+
+            if (range.startDate) {
+                constraints.push(
+                    where(
+                        'tanggal',
+                        '>=',
+                        range.startDate
+                    )
+                );
+            }
+
+            if (range.endDate) {
+                constraints.push(
+                    where(
+                        'tanggal',
+                        '<=',
+                        range.endDate
+                    )
+                );
+            }
+
+            constraints.push(
+                orderBy(
+                    'tanggal',
+                    'desc'
+                )
+            );
+
+            if (lastVisible) {
+                constraints.push(
+                    startAfter(
+                        lastVisible
+                    )
+                );
+            }
+
+            constraints.push(
+                limit(
+                    HISTORY_BATCH_SIZE
+                )
+            );
+
+            const snapshot =
+                await getDocsFromServer(
+                    query(
+                        collection(
+                            db,
+                            collectionName
+                        ),
+                        ...constraints
+                    )
+                );
+
+            if (
+                !isRequestCurrent()
+            ) {
+                return {
+                    completed: false,
+                    totalLoaded
+                };
+            }
+
+            const mappedDocuments =
+                snapshot.docs
+                    .map(
+                        mapDocument
+                    )
+                    .filter(Boolean);
+
+            if (
+                mappedDocuments.length > 0
+            ) {
+                appendDocuments(
+                    mappedDocuments
+                );
+
+                totalLoaded +=
+                    mappedDocuments.length;
+            }
+
+            if (
+    snapshot.docs.length <
+    HISTORY_BATCH_SIZE
+) {
+    hasMore = false;
+    continue;
+}
+
+            lastVisible =
+                snapshot.docs[
+                    snapshot.docs.length - 1
+                ];
+
+            // Beri kesempatan Vue menampilkan batch
+            // yang sudah selesai sebelum batch berikutnya.
+            await nextTick();
+        }
+
+        return {
+            completed: true,
+            totalLoaded
+        };
+    };
+
+const mapTransactionHistoryDocument =
+    docSnap => {
+        const data =
+            docSnap.data() || {};
+
+        const transaction = {
+            id: docSnap.id,
+            ...data,
+            tanggal:
+                data.tanggal?.toDate
+                    ? data.tanggal.toDate()
+                    : data.tanggal,
+            tanggalPencairan:
+                data.tanggalPencairan?.toDate
+                    ? data.tanggalPencairan.toDate()
+                    : data.tanggalPencairan
+        };
+
+        return isActiveExportRecord(
+            transaction
+        )
+            ? transaction
+            : null;
+    };
+
+const mapReturnHistoryDocument =
+    docSnap => {
+        const data =
+            docSnap.data() || {};
+
+        return {
+            id: docSnap.id,
+            ...data,
+            tanggal:
+                data.tanggal?.toDate
+                    ? data.tanggal.toDate()
+                    : data.tanggal
+        };
+    };
+
+const loadTransactionHistoryByCurrentFilter =
+    async userId => {
+        if (!userId) {
+            return;
+        }
+
+        const requestId =
+            ++transactionHistoryRequestId;
+
+        const range =
+            resolveHistoryDateRange(
+                uiState.posDateFilter,
+                {
+                    startDate:
+                        uiState.posStartDate,
+                    endDate:
+                        uiState.posEndDate,
+                    startMonth:
+                        uiState.posStartMonth,
+                    endMonth:
+                        uiState.posEndMonth,
+                    startYear:
+                        uiState.posStartYear,
+                    endYear:
+                        uiState.posEndYear
+                }
+            );
+
+        transactionHistoryError.value =
+            '';
+
+        transactionHistoryMessage.value =
+            range.ready
+                ? ''
+                : range.message;
+
+        state.transaksi = [];
+
+        transactionHistoryLoadedCount.value =
+            0;
+
+        uiState.transaksiLastVisible =
+            null;
+
+        uiState.transaksiHasMore =
+            false;
+
+        dataFetched.allTransactionsLoaded =
+            false;
+
+        if (!range.ready) {
+            transactionHistoryLoading.value =
+                false;
+
+            return;
+        }
+
+        transactionHistoryLoading.value =
+            true;
+
+        try {
+            const result =
+                await fetchHistoryCollectionByPeriod(
+                    {
+                        collectionName:
+                            'transactions',
+                        userId,
+                        range,
+                        mapDocument:
+                            mapTransactionHistoryDocument,
+                        appendDocuments:
+                            documents => {
+                                state.transaksi.push(
+                                    ...documents
+                                );
+
+                                transactionHistoryLoadedCount.value =
+                                    state.transaksi.length;
+                            },
+                        isRequestCurrent:
+                            () =>
+                                requestId ===
+                                    transactionHistoryRequestId &&
+                                activePage.value ===
+                                    'transaksi'
+                    }
+                );
+
+            if (
+                requestId !==
+                transactionHistoryRequestId
+            ) {
+                return;
+            }
+
+            if (result.completed) {
+                dataFetched.transactions =
+                    true;
+
+                dataFetched.allTransactionsLoaded =
+                    range.allTime;
+            }
+        } catch (error) {
+            if (
+                requestId !==
+                transactionHistoryRequestId
+            ) {
+                return;
+            }
+
+            console.error(
+                '[RIWAYAT TRANSAKSI] Gagal memuat data:',
+                error
+            );
+
+            transactionHistoryError.value =
+                error?.message ||
+                'Riwayat transaksi belum berhasil dimuat.';
+        } finally {
+            if (
+                requestId ===
+                transactionHistoryRequestId
+            ) {
+                transactionHistoryLoading.value =
+                    false;
+            }
+        }
+    };
+
+const loadReturnHistoryByCurrentFilter =
+    async userId => {
+        if (!userId) {
+            return;
+        }
+
+        const requestId =
+            ++returnHistoryRequestId;
+
+        const range =
+            resolveHistoryDateRange(
+                uiState.returPageDateFilter,
+                {
+                    startDate:
+                        uiState.returPageStartDate,
+                    endDate:
+                        uiState.returPageEndDate,
+                    startMonth:
+                        uiState.returPageStartMonth,
+                    endMonth:
+                        uiState.returPageEndMonth,
+                    startYear:
+                        uiState.returPageStartYear,
+                    endYear:
+                        uiState.returPageEndYear
+                }
+            );
+
+        returnHistoryError.value =
+            '';
+
+        returnHistoryMessage.value =
+            range.ready
+                ? ''
+                : range.message;
+
+        state.retur = [];
+
+        returnHistoryLoadedCount.value =
+            0;
+
+        uiState.returLastVisible =
+            null;
+
+        uiState.returHasMore =
+            false;
+
+        dataFetched.allReturnsLoaded =
+            false;
+
+        if (!range.ready) {
+            returnHistoryLoading.value =
+                false;
+
+            return;
+        }
+
+        returnHistoryLoading.value =
+            true;
+
+        try {
+            const result =
+                await fetchHistoryCollectionByPeriod(
+                    {
+                        collectionName:
+                            'returns',
+                        userId,
+                        range,
+                        mapDocument:
+                            mapReturnHistoryDocument,
+                        appendDocuments:
+                            documents => {
+                                state.retur.push(
+                                    ...documents
+                                );
+
+                                returnHistoryLoadedCount.value =
+                                    state.retur.length;
+                            },
+                        isRequestCurrent:
+                            () =>
+                                requestId ===
+                                    returnHistoryRequestId &&
+                                activePage.value ===
+                                    'retur'
+                    }
+                );
+
+            if (
+                requestId !==
+                returnHistoryRequestId
+            ) {
+                return;
+            }
+
+            if (result.completed) {
+                dataFetched.returns =
+                    true;
+
+                dataFetched.allReturnsLoaded =
+                    range.allTime;
+            }
+        } catch (error) {
+            if (
+                requestId !==
+                returnHistoryRequestId
+            ) {
+                return;
+            }
+
+            console.error(
+                '[MANAJEMEN RETUR] Gagal memuat data:',
+                error
+            );
+
+            returnHistoryError.value =
+                error?.message ||
+                'Data retur belum berhasil dimuat.';
+        } finally {
+            if (
+                requestId ===
+                returnHistoryRequestId
+            ) {
+                returnHistoryLoading.value =
+                    false;
+            }
+        }
+    };
+
+const scheduleTransactionHistoryReload =
+    () => {
+        clearTimeout(
+            transactionHistoryReloadTimer
+        );
+
+        transactionHistoryReloadTimer =
+            setTimeout(
+                () => {
+                    if (
+                        activePage.value ===
+                            'transaksi' &&
+                        currentUser.value?.uid
+                    ) {
+                        loadTransactionHistoryByCurrentFilter(
+                            currentUser.value.uid
+                        );
+                    }
+                },
+                350
+            );
+    };
+
+const scheduleReturnHistoryReload =
+    () => {
+        clearTimeout(
+            returnHistoryReloadTimer
+        );
+
+        returnHistoryReloadTimer =
+            setTimeout(
+                () => {
+                    if (
+                        activePage.value ===
+                            'retur' &&
+                        currentUser.value?.uid
+                    ) {
+                        loadReturnHistoryByCurrentFilter(
+                            currentUser.value.uid
+                        );
+                    }
+                },
+                350
+            );
+    };
+
+watch(
+    () => [
+        uiState.posDateFilter,
+        uiState.posStartDate,
+        uiState.posEndDate,
+        uiState.posStartMonth,
+        uiState.posEndMonth,
+        uiState.posStartYear,
+        uiState.posEndYear
+    ],
+    scheduleTransactionHistoryReload
+);
+
+watch(
+    () => [
+        uiState.returPageDateFilter,
+        uiState.returPageStartDate,
+        uiState.returPageEndDate,
+        uiState.returPageStartMonth,
+        uiState.returPageEndMonth,
+        uiState.returPageStartYear,
+        uiState.returPageEndYear
+    ],
+    scheduleReturnHistoryReload
+);
+
 const fetchTransactionAndReturnData = async (
     userId,
     loadMore = false,
@@ -13739,6 +14645,36 @@ watch(activePage, (newPage, oldPage) => {
                 <input type="number" v-model.number="uiState.posEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
             </div>
         </div>
+        <div
+            v-if="transactionHistoryLoading"
+            class="mb-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700"
+        >
+            Menampilkan
+            <strong>{{ transactionHistoryLoadedCount }}</strong>
+            transaksi. Data berikutnya sedang dimuat otomatis...
+        </div>
+
+        <div
+            v-else-if="transactionHistoryMessage"
+            class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+        >
+            {{ transactionHistoryMessage }}
+        </div>
+
+        <div
+            v-else-if="transactionHistoryError"
+            class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+            {{ transactionHistoryError }}
+
+            <button
+                @click="loadTransactionHistoryByCurrentFilter(currentUser.uid)"
+                class="ml-2 font-bold underline"
+            >
+                Coba Lagi
+            </button>
+        </div>
+
         <div class="overflow-x-auto max-h-96">
             <table class="w-full text-sm text-left text-slate-500">
                 <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
@@ -13751,7 +14687,7 @@ watch(activePage, (newPage, oldPage) => {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200/50">
-                    <tr v-if="filteredTransaksi.length === 0">
+                    <tr v-if="!transactionHistoryLoading && filteredTransaksi.length === 0">
                         <td colspan="5" class="text-center py-4">Belum ada transaksi pada periode ini.</td>
                     </tr>
                     <tr v-for="trx in filteredTransaksi" :key="trx.id" class="hover:bg-slate-50/50">
@@ -13766,12 +14702,6 @@ watch(activePage, (newPage, oldPage) => {
                     </tr>
                 </tbody>
             </table>
-        </div>
-        
-        <div v-if="uiState.transaksiHasMore" class="mt-4 text-center">
-            <button @click="fetchTransactionAndReturnData(currentUser.uid, true)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
-                Muat Lebih Banyak
-            </button>
         </div>
     </div>
 </div>
@@ -15695,6 +16625,36 @@ SKU-BAJU-PUTIH-S"
                     </div>
                 </div>
 
+                <div
+                    v-if="returnHistoryLoading"
+                    class="mb-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700"
+                >
+                    Menampilkan
+                    <strong>{{ returnHistoryLoadedCount }}</strong>
+                    data retur. Data berikutnya sedang dimuat otomatis...
+                </div>
+
+                <div
+                    v-else-if="returnHistoryMessage"
+                    class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                >
+                    {{ returnHistoryMessage }}
+                </div>
+
+                <div
+                    v-else-if="returnHistoryError"
+                    class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                >
+                    {{ returnHistoryError }}
+
+                    <button
+                        @click="loadReturnHistoryByCurrentFilter(currentUser.uid)"
+                        class="ml-2 font-bold underline"
+                    >
+                        Coba Lagi
+                    </button>
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left text-slate-500">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
@@ -15711,7 +16671,7 @@ SKU-BAJU-PUTIH-S"
     </tr>
 </thead>
                         <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="filteredRetur.length === 0">
+                            <tr v-if="!returnHistoryLoading && filteredRetur.length === 0">
                                 <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
                             </tr>
                             <tr v-for="(item, index) in filteredRetur" :key="`${item.returnDocId}-${item.sku}-${index}`" class="hover:bg-slate-50/50">
@@ -15734,12 +16694,6 @@ SKU-BAJU-PUTIH-S"
                             </tr>
                         </tbody>
                     </table>
-                </div>
-                
-                <div v-if="uiState.returHasMore" class="mt-4 text-center">
-                    <button @click="fetchTransactionAndReturnData(currentUser.uid, true)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
-                        Muat Lebih Banyak
-                    </button>
                 </div>
 
             </div>
