@@ -79,6 +79,60 @@ const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
 
 // ============================================================
+// MODE FOKUS + PRIVASI DANA GANTUNG
+// ============================================================
+const FOCUS_MODE_STORAGE_KEY =
+    'fashion_os_focus_mode_v1';
+
+const PENDING_PRIVACY_STORAGE_KEY =
+    'fashion_os_pending_privacy_v1';
+
+const isFocusMode =
+    ref(
+        localStorage.getItem(
+            FOCUS_MODE_STORAGE_KEY
+        ) === 'on'
+    );
+
+const isPendingPrivacyMode =
+    ref(
+        localStorage.getItem(
+            PENDING_PRIVACY_STORAGE_KEY
+        ) === 'on'
+    );
+
+watch(
+    isFocusMode,
+    enabled => {
+        localStorage.setItem(
+            FOCUS_MODE_STORAGE_KEY,
+            enabled
+                ? 'on'
+                : 'off'
+        );
+    },
+    {
+        immediate: true
+    }
+);
+
+watch(
+    isPendingPrivacyMode,
+    enabled => {
+        localStorage.setItem(
+            PENDING_PRIVACY_STORAGE_KEY,
+            enabled
+                ? 'on'
+                : 'off'
+        );
+    },
+    {
+        immediate: true
+    }
+);
+
+
+// ============================================================
 // MODE GELAP FASHION OS
 // ============================================================
 const DARK_MODE_STORAGE_KEY =
@@ -646,6 +700,18 @@ function toggleSidebarGroup(group) {
 
     uiState.sidebarGroups[group] = !isCurrentlyOpen;
 }
+
+
+function toggleFocusMode() {
+    isFocusMode.value =
+        !isFocusMode.value;
+}
+
+function togglePendingPrivacyMode() {
+    isPendingPrivacyMode.value =
+        !isPendingPrivacyMode.value;
+}
+
 
 
 function toggleDarkMode() {
@@ -18724,7 +18790,10 @@ watch(activePage, (newPage, oldPage) => {
         :class="{ 'fashion-dark': isDarkMode }"
     >
       <!-- Sidebar -->
-      <aside class="w-64 bg-gray-900 text-gray-300 flex-shrink-0 hidden md:flex md:flex-col">
+      <aside
+        v-show="!isFocusMode"
+        class="w-64 bg-gray-900 text-gray-300 flex-shrink-0 hidden md:flex md:flex-col"
+    >
     <div class="h-16 flex items-center justify-center px-4 border-b border-gray-700/50">
         <h1 class="text-xl font-bold text-white tracking-wider">{{ state.settings.brandName }}</h1>
     </div>
@@ -18879,6 +18948,114 @@ watch(activePage, (newPage, oldPage) => {
     </button>
 </div>
 
+
+<div class="view-mode-controls">
+    <button
+        type="button"
+        class="view-mode-card"
+        :aria-pressed="isFocusMode"
+        aria-label="Aktifkan Mode Fokus"
+        @click="toggleFocusMode"
+    >
+        <span class="view-mode-icon" aria-hidden="true">
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                class="h-5 w-5"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
+                />
+            </svg>
+        </span>
+
+        <span class="min-w-0 flex-1 text-left">
+            <span class="block text-sm font-semibold text-white">
+                Mode Fokus
+            </span>
+            <span class="block text-xs text-gray-400">
+                Sembunyikan sidebar
+            </span>
+        </span>
+
+        <span class="view-mode-action">
+            Buka
+        </span>
+    </button>
+
+    <button
+        type="button"
+        class="view-mode-card"
+        :class="{
+            'view-mode-card-active':
+                isPendingPrivacyMode
+        }"
+        :aria-pressed="isPendingPrivacyMode"
+        :aria-label="isPendingPrivacyMode ? 'Tampilkan Dana Gantung' : 'Samarkan Dana Gantung'"
+        @click="togglePendingPrivacyMode"
+    >
+        <span class="view-mode-icon" aria-hidden="true">
+            <svg
+                v-if="isPendingPrivacyMode"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                class="h-5 w-5"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 4.2A10.7 10.7 0 0112 4c5 0 8.7 4.5 9.6 6a1.8 1.8 0 010 2 17 17 0 01-2.2 2.8M6.6 6.6A17.4 17.4 0 002.4 10a1.8 1.8 0 000 2C3.3 13.5 7 18 12 18a10.7 10.7 0 004-.8"
+                />
+            </svg>
+
+            <svg
+                v-else
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                class="h-5 w-5"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M2.4 10a1.8 1.8 0 000 2C3.3 13.5 7 18 12 18s8.7-4.5 9.6-6a1.8 1.8 0 000-2C20.7 8.5 17 4 12 4S3.3 8.5 2.4 10z"
+                />
+                <circle cx="12" cy="11" r="3" />
+            </svg>
+        </span>
+
+        <span class="min-w-0 flex-1 text-left">
+            <span class="block text-sm font-semibold text-white">
+                Privasi Dana
+            </span>
+            <span class="block text-xs text-gray-400">
+                {{ isPendingPrivacyMode ? 'Dana Gantung disamarkan' : 'Dana Gantung terlihat' }}
+            </span>
+        </span>
+
+        <span
+            class="view-mode-switch"
+            :class="{
+                'view-mode-switch-active':
+                    isPendingPrivacyMode
+            }"
+            aria-hidden="true"
+        >
+            <span class="view-mode-switch-knob"></span>
+        </span>
+    </button>
+</div>
+
 <button
     type="button"
     @click="toggleSidebarGroup('bantuan')"
@@ -18946,7 +19123,36 @@ watch(activePage, (newPage, oldPage) => {
 </aside>
 
       <!-- Main Content -->
-      <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+      <main
+        class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8"
+        :class="{ 'focus-mode-main': isFocusMode }"
+    >
+
+    <button
+        v-if="isFocusMode"
+        type="button"
+        class="focus-mode-return hidden md:flex"
+        aria-label="Tampilkan kembali sidebar"
+        @click="toggleFocusMode"
+    >
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            class="h-5 w-5"
+            aria-hidden="true"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 6h16M4 12h16M4 18h16"
+            />
+        </svg>
+
+        <span>Tampilkan Sidebar</span>
+    </button>
     
     <div v-if="isLoading" class="flex items-center justify-center h-full">
         <div class="text-center">
@@ -19470,9 +19676,28 @@ watch(activePage, (newPage, oldPage) => {
         </div>
         <div class="flex-1 min-w-0">
             <h3 class="text-sm font-medium text-slate-500">Dana Gantung (HPP + Laba)</h3>
-            <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">{{ formatCurrency(dashboardKpis.danaBelumCair) }}</p>
+            <p
+                class="kpi-value text-2xl font-bold mt-1 text-yellow-600"
+                :title="isPendingPrivacyMode ? 'Nilai Dana Gantung sedang disamarkan' : ''"
+            >
+                <span v-if="isPendingPrivacyMode" class="pending-private-value">
+                    Rp ••••••••
+                </span>
+                <span v-else>
+                    {{ formatCurrency(dashboardKpis.danaBelumCair) }}
+                </span>
+            </p>
             <p class="text-xs text-slate-500 mt-1 font-medium italic">
-                Total: <span class="text-slate-800 font-bold">{{ formatNumber(dashboardKpis.qtyBelumCair) }} qty</span> belum cair
+                Total:
+                <span class="text-slate-800 font-bold">
+                    <span v-if="isPendingPrivacyMode" class="pending-private-value">
+                        ••• qty
+                    </span>
+                    <span v-else>
+                        {{ formatNumber(dashboardKpis.qtyBelumCair) }} qty
+                    </span>
+                </span>
+                belum cair
             </p>
         </div>
     </div>
@@ -28353,6 +28578,167 @@ BAJU-PUTIH-M</pre>
     .fashion-dark :deep(.label-box *) {
         background-color: #ffffff !important;
         color: #111827 !important;
+    }
+}
+
+
+/* FASHION_OS_FOCUS_PENDING_PRIVACY_V1 */
+
+/* ============================================================
+   MODE FOKUS + PRIVASI DANA GANTUNG
+   ============================================================ */
+.focus-mode-main {
+    width: 100%;
+}
+
+.focus-mode-return {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 80;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid rgba(148, 163, 184, 0.30);
+    border-radius: 0.75rem;
+    background-color: rgba(15, 23, 42, 0.95);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    box-shadow:
+        0 12px 30px
+        rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(10px);
+    transition:
+        transform 0.2s ease,
+        background-color 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.focus-mode-return:hover {
+    background-color: #1e293b;
+    border-color: rgba(129, 140, 248, 0.65);
+    transform: translateY(-1px);
+}
+
+.focus-mode-return:focus-visible {
+    outline: 2px solid #818cf8;
+    outline-offset: 2px;
+}
+
+.view-mode-controls {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0 0.75rem 0.75rem;
+}
+
+.view-mode-card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.7rem;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 0.75rem;
+    background-color: rgba(255, 255, 255, 0.045);
+    color: #e5e7eb;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.view-mode-card:hover {
+    background-color: rgba(255, 255, 255, 0.09);
+    border-color: rgba(129, 140, 248, 0.50);
+}
+
+.view-mode-card:active {
+    transform: scale(0.985);
+}
+
+.view-mode-card:focus-visible {
+    outline: 2px solid #818cf8;
+    outline-offset: 2px;
+}
+
+.view-mode-card-active {
+    background-color: rgba(79, 70, 229, 0.14);
+    border-color: rgba(129, 140, 248, 0.55);
+}
+
+.view-mode-icon {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.625rem;
+    background-color: rgba(99, 102, 241, 0.18);
+    color: #c7d2fe;
+}
+
+.view-mode-action {
+    flex-shrink: 0;
+    padding: 0.25rem 0.45rem;
+    border-radius: 0.45rem;
+    background-color: rgba(99, 102, 241, 0.18);
+    color: #c7d2fe;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.view-mode-switch {
+    position: relative;
+    width: 2.6rem;
+    height: 1.4rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background-color: #475569;
+    transition:
+        background-color 0.2s ease;
+}
+
+.view-mode-switch-knob {
+    position: absolute;
+    top: 0.175rem;
+    left: 0.175rem;
+    width: 1.05rem;
+    height: 1.05rem;
+    border-radius: 9999px;
+    background-color: #ffffff;
+    box-shadow:
+        0 2px 5px
+        rgba(0, 0, 0, 0.30);
+    transition:
+        transform 0.2s ease;
+}
+
+.view-mode-switch-active {
+    background-color: #6366f1;
+}
+
+.view-mode-switch-active
+.view-mode-switch-knob {
+    transform: translateX(1.2rem);
+}
+
+.pending-private-value {
+    letter-spacing: 0.06em;
+    user-select: none;
+}
+
+@media (min-width: 768px) {
+    .focus-mode-main {
+        padding-top: 4.75rem !important;
+    }
+}
+
+@media print {
+    .focus-mode-return,
+    .view-mode-controls {
+        display: none !important;
     }
 }
 
