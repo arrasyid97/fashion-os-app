@@ -77,6 +77,81 @@ const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengatura
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
+
+// ============================================================
+// MODE GELAP FASHION OS
+// ============================================================
+const DARK_MODE_STORAGE_KEY =
+    'fashion_os_dark_mode_v1';
+
+const isDarkMode =
+    ref(
+        localStorage.getItem(
+            DARK_MODE_STORAGE_KEY
+        ) === 'dark'
+    );
+
+const applyDarkModeAppearance =
+    enabled => {
+        const rootElement =
+            document.documentElement;
+
+        rootElement.classList.toggle(
+            'fashion-os-dark-page',
+            enabled
+        );
+
+        rootElement.style.colorScheme =
+            enabled
+                ? 'dark'
+                : 'light';
+
+        // Chart.js berada di canvas sehingga warna teks dan garisnya
+        // tidak dapat diubah hanya dengan CSS.
+        Chart.defaults.color =
+            enabled
+                ? '#cbd5e1'
+                : '#475569';
+
+        Chart.defaults.borderColor =
+            enabled
+                ? 'rgba(148, 163, 184, 0.20)'
+                : 'rgba(148, 163, 184, 0.28)';
+    };
+
+watch(
+    isDarkMode,
+    async (
+        enabled,
+        previousValue
+    ) => {
+        localStorage.setItem(
+            DARK_MODE_STORAGE_KEY,
+            enabled
+                ? 'dark'
+                : 'light'
+        );
+
+        applyDarkModeAppearance(
+            enabled
+        );
+
+        // Saat tombol ditekan di Dashboard, buat ulang grafik
+        // supaya label dan garis langsung mengikuti tema baru.
+        if (
+            previousValue !== undefined &&
+            activePage.value ===
+                'dashboard'
+        ) {
+            await nextTick();
+            renderCharts();
+        }
+    },
+    {
+        immediate: true
+    }
+);
+
 const userProfile = reactive({ data: null }); // <-- TAMBAHKAN INI
 const currentTime = ref(new Date());        // <-- TAMBAHKAN INI
 const nomorWhatsAppAdmin = ref('6285691803476');
@@ -571,6 +646,13 @@ function toggleSidebarGroup(group) {
 
     uiState.sidebarGroups[group] = !isCurrentlyOpen;
 }
+
+
+function toggleDarkMode() {
+    isDarkMode.value =
+        !isDarkMode.value;
+}
+
 
 const dataFetched = reactive({
     // Produk
@@ -18637,7 +18719,10 @@ watch(activePage, (newPage, oldPage) => {
 </div>
         
   <div v-if="currentUser">
-    <div class="flex h-screen bg-slate-100">
+    <div
+        class="flex h-screen bg-slate-100 fashion-app-shell"
+        :class="{ 'fashion-dark': isDarkMode }"
+    >
       <!-- Sidebar -->
       <aside class="w-64 bg-gray-900 text-gray-300 flex-shrink-0 hidden md:flex md:flex-col">
     <div class="h-16 flex items-center justify-center px-4 border-b border-gray-700/50">
@@ -18728,6 +18813,71 @@ watch(activePage, (newPage, oldPage) => {
     </div>
 
 </nav>
+
+
+<div class="theme-toggle-container">
+    <button
+        type="button"
+        class="theme-toggle-card"
+        :aria-pressed="isDarkMode"
+        :aria-label="isDarkMode ? 'Nonaktifkan mode gelap' : 'Aktifkan mode gelap'"
+        @click="toggleDarkMode"
+    >
+        <span class="theme-toggle-icon" aria-hidden="true">
+            <svg
+                v-if="isDarkMode"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                class="h-5 w-5"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"
+                />
+            </svg>
+
+            <svg
+                v-else
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                class="h-5 w-5"
+            >
+                <circle cx="12" cy="12" r="4" />
+                <path
+                    stroke-linecap="round"
+                    d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"
+                />
+            </svg>
+        </span>
+
+        <span class="min-w-0 flex-1 text-left">
+            <span class="block text-sm font-semibold text-white">
+                Mode Gelap
+            </span>
+            <span class="block text-xs text-gray-400">
+                {{ isDarkMode ? 'Aktif • nyaman untuk malam hari' : 'Nonaktif • tampilan terang' }}
+            </span>
+        </span>
+
+        <span
+            class="theme-toggle-switch"
+            :class="{
+                'theme-toggle-switch-active':
+                    isDarkMode
+            }"
+            aria-hidden="true"
+        >
+            <span class="theme-toggle-switch-knob"></span>
+        </span>
+    </button>
+</div>
 
 <button
     type="button"
@@ -27796,4 +27946,414 @@ BAJU-PUTIH-M</pre>
     background-color: #4f46e5;
     color: white;
 }
+
+/* FASHION_OS_DARK_MODE_V1 */
+
+/* ============================================================
+   MODE GELAP FASHION OS
+   ============================================================ */
+:global(html.fashion-os-dark-page),
+:global(html.fashion-os-dark-page body) {
+    background-color: #0b1120;
+    color-scheme: dark;
+}
+
+.fashion-app-shell {
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
+}
+
+.fashion-dark {
+    background-color: #0b1120 !important;
+    color: #e2e8f0;
+    color-scheme: dark;
+}
+
+.fashion-dark > main {
+    background-color: #0b1120;
+}
+
+.fashion-dark :deep(.min-h-screen[class*="bg-gradient-to-br"]) {
+    background-image:
+        linear-gradient(
+            135deg,
+            #0f172a 0%,
+            #111827 55%,
+            #172033 100%
+        ) !important;
+}
+
+.fashion-dark :deep(.bg-white),
+.fashion-dark :deep([class~="bg-white/70"]),
+.fashion-dark :deep([class~="bg-white/80"]),
+.fashion-dark :deep([class~="bg-white/90"]),
+.fashion-dark :deep([class~="bg-white/95"]) {
+    background-color:
+        rgba(30, 41, 59, 0.96) !important;
+}
+
+.fashion-dark :deep(.bg-slate-50),
+.fashion-dark :deep(.bg-gray-50) {
+    background-color: #0f172a !important;
+}
+
+.fashion-dark :deep(.bg-slate-100),
+.fashion-dark :deep(.bg-gray-100) {
+    background-color: #111827 !important;
+}
+
+.fashion-dark :deep(.bg-slate-200),
+.fashion-dark :deep(.bg-gray-200) {
+    background-color: #273449 !important;
+}
+
+.fashion-dark :deep(.bg-slate-300),
+.fashion-dark :deep(.bg-gray-300) {
+    background-color: #3b4a61 !important;
+}
+
+.fashion-dark :deep(.bg-indigo-50),
+.fashion-dark :deep(.bg-indigo-100) {
+    background-color:
+        rgba(49, 46, 129, 0.34) !important;
+}
+
+.fashion-dark :deep(.bg-blue-50),
+.fashion-dark :deep(.bg-blue-100) {
+    background-color:
+        rgba(30, 64, 175, 0.28) !important;
+}
+
+.fashion-dark :deep(.bg-cyan-50),
+.fashion-dark :deep(.bg-cyan-100) {
+    background-color:
+        rgba(14, 116, 144, 0.26) !important;
+}
+
+.fashion-dark :deep(.bg-purple-50),
+.fashion-dark :deep(.bg-purple-100) {
+    background-color:
+        rgba(107, 33, 168, 0.28) !important;
+}
+
+.fashion-dark :deep(.bg-green-50),
+.fashion-dark :deep(.bg-green-100),
+.fashion-dark :deep(.bg-emerald-50),
+.fashion-dark :deep(.bg-emerald-100) {
+    background-color:
+        rgba(6, 95, 70, 0.30) !important;
+}
+
+.fashion-dark :deep(.bg-yellow-50),
+.fashion-dark :deep(.bg-yellow-100),
+.fashion-dark :deep(.bg-amber-50),
+.fashion-dark :deep(.bg-amber-100),
+.fashion-dark :deep(.bg-orange-50),
+.fashion-dark :deep(.bg-orange-100) {
+    background-color:
+        rgba(146, 64, 14, 0.28) !important;
+}
+
+.fashion-dark :deep(.bg-red-50),
+.fashion-dark :deep(.bg-red-100) {
+    background-color:
+        rgba(153, 27, 27, 0.28) !important;
+}
+
+.fashion-dark :deep(.text-black),
+.fashion-dark :deep(.text-slate-950),
+.fashion-dark :deep(.text-slate-900),
+.fashion-dark :deep(.text-slate-800),
+.fashion-dark :deep(.text-slate-700),
+.fashion-dark :deep(.text-gray-900),
+.fashion-dark :deep(.text-gray-800),
+.fashion-dark :deep(.text-gray-700) {
+    color: #f1f5f9 !important;
+}
+
+.fashion-dark :deep(.text-slate-600),
+.fashion-dark :deep(.text-gray-600) {
+    color: #cbd5e1 !important;
+}
+
+.fashion-dark :deep(.text-slate-500),
+.fashion-dark :deep(.text-gray-500) {
+    color: #94a3b8 !important;
+}
+
+.fashion-dark :deep(.text-indigo-900),
+.fashion-dark :deep(.text-indigo-800),
+.fashion-dark :deep(.text-indigo-700),
+.fashion-dark :deep(.text-indigo-600) {
+    color: #a5b4fc !important;
+}
+
+.fashion-dark :deep(.text-blue-900),
+.fashion-dark :deep(.text-blue-800),
+.fashion-dark :deep(.text-blue-700),
+.fashion-dark :deep(.text-blue-600) {
+    color: #93c5fd !important;
+}
+
+.fashion-dark :deep(.text-cyan-900),
+.fashion-dark :deep(.text-cyan-800),
+.fashion-dark :deep(.text-cyan-700),
+.fashion-dark :deep(.text-cyan-600) {
+    color: #67e8f9 !important;
+}
+
+.fashion-dark :deep(.text-purple-900),
+.fashion-dark :deep(.text-purple-800),
+.fashion-dark :deep(.text-purple-700),
+.fashion-dark :deep(.text-purple-600) {
+    color: #d8b4fe !important;
+}
+
+.fashion-dark :deep(.text-green-900),
+.fashion-dark :deep(.text-green-800),
+.fashion-dark :deep(.text-green-700),
+.fashion-dark :deep(.text-green-600),
+.fashion-dark :deep(.text-emerald-900),
+.fashion-dark :deep(.text-emerald-800),
+.fashion-dark :deep(.text-emerald-700),
+.fashion-dark :deep(.text-emerald-600) {
+    color: #6ee7b7 !important;
+}
+
+.fashion-dark :deep(.text-yellow-900),
+.fashion-dark :deep(.text-yellow-800),
+.fashion-dark :deep(.text-yellow-700),
+.fashion-dark :deep(.text-amber-900),
+.fashion-dark :deep(.text-amber-800),
+.fashion-dark :deep(.text-amber-700),
+.fashion-dark :deep(.text-orange-900),
+.fashion-dark :deep(.text-orange-800),
+.fashion-dark :deep(.text-orange-700) {
+    color: #fcd34d !important;
+}
+
+.fashion-dark :deep(.text-red-900),
+.fashion-dark :deep(.text-red-800),
+.fashion-dark :deep(.text-red-700),
+.fashion-dark :deep(.text-red-600) {
+    color: #fca5a5 !important;
+}
+
+.fashion-dark :deep(.border-slate-100),
+.fashion-dark :deep(.border-slate-200),
+.fashion-dark :deep(.border-slate-300),
+.fashion-dark :deep(.border-gray-100),
+.fashion-dark :deep(.border-gray-200),
+.fashion-dark :deep(.border-gray-300) {
+    border-color: #334155 !important;
+}
+
+.fashion-dark :deep([class*="divide-slate"]) > :not([hidden]) ~ :not([hidden]),
+.fashion-dark :deep([class*="divide-gray"]) > :not([hidden]) ~ :not([hidden]) {
+    border-color: #334155 !important;
+}
+
+.fashion-dark :deep(hr) {
+    border-color: #334155 !important;
+}
+
+.fashion-dark :deep(input:not([type="checkbox"]):not([type="radio"])),
+.fashion-dark :deep(select),
+.fashion-dark :deep(textarea) {
+    background-color: #0f172a !important;
+    border-color: #475569 !important;
+    color: #f8fafc !important;
+    box-shadow: none;
+}
+
+.fashion-dark :deep(input::placeholder),
+.fashion-dark :deep(textarea::placeholder) {
+    color: #64748b !important;
+    opacity: 1;
+}
+
+.fashion-dark :deep(input:disabled),
+.fashion-dark :deep(select:disabled),
+.fashion-dark :deep(textarea:disabled) {
+    background-color: #1e293b !important;
+    color: #94a3b8 !important;
+}
+
+.fashion-dark :deep(select option) {
+    background-color: #0f172a;
+    color: #f8fafc;
+}
+
+.fashion-dark :deep(input[type="date"]),
+.fashion-dark :deep(input[type="datetime-local"]),
+.fashion-dark :deep(input[type="month"]) {
+    color-scheme: dark;
+}
+
+.fashion-dark :deep(table) {
+    color: #e2e8f0;
+}
+
+.fashion-dark :deep(thead) {
+    background-color: #1e293b !important;
+    color: #f8fafc;
+}
+
+.fashion-dark :deep(tbody tr) {
+    border-color: #334155;
+}
+
+.fashion-dark :deep(tbody tr:hover) {
+    background-color:
+        rgba(51, 65, 85, 0.72) !important;
+}
+
+.fashion-dark :deep(.prose) {
+    color: #cbd5e1;
+}
+
+.fashion-dark :deep(.prose strong),
+.fashion-dark :deep(.prose h1),
+.fashion-dark :deep(.prose h2),
+.fashion-dark :deep(.prose h3),
+.fashion-dark :deep(.prose h4) {
+    color: #f8fafc;
+}
+
+.fashion-dark :deep(.help-icon-button),
+.fashion-dark :deep(.help-icon-button-sm) {
+    background-color: #334155;
+    color: #cbd5e1;
+}
+
+.fashion-dark :deep(.barcode-settings-panel) {
+    background-color: #1e293b;
+    border-color: #334155;
+}
+
+.fashion-dark :deep(.barcode-preview-area) {
+    background-color: #0f172a;
+}
+
+.fashion-dark :deep(.preview-sheet),
+.fashion-dark :deep(.label-box) {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+.fashion-dark :deep(.preview-sheet *),
+.fashion-dark :deep(.label-box *) {
+    color: #111827 !important;
+}
+
+.fashion-dark :deep(*) {
+    scrollbar-color: #475569 #0f172a;
+}
+
+.fashion-dark :deep(*::-webkit-scrollbar) {
+    width: 10px;
+    height: 10px;
+}
+
+.fashion-dark :deep(*::-webkit-scrollbar-track) {
+    background: #0f172a;
+}
+
+.fashion-dark :deep(*::-webkit-scrollbar-thumb) {
+    background: #475569;
+    border: 2px solid #0f172a;
+    border-radius: 9999px;
+}
+
+.theme-toggle-container {
+    padding: 0 0.75rem 0.75rem;
+}
+
+.theme-toggle-card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.055);
+    color: #e5e7eb;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.theme-toggle-card:hover {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(129, 140, 248, 0.50);
+}
+
+.theme-toggle-card:active {
+    transform: scale(0.985);
+}
+
+.theme-toggle-card:focus-visible {
+    outline: 2px solid #818cf8;
+    outline-offset: 2px;
+}
+
+.theme-toggle-icon {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border-radius: 0.625rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(99, 102, 241, 0.18);
+    color: #c7d2fe;
+}
+
+.theme-toggle-switch {
+    position: relative;
+    width: 2.75rem;
+    height: 1.5rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background-color: #475569;
+    transition: background-color 0.2s ease;
+}
+
+.theme-toggle-switch-knob {
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 9999px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.30);
+    transition: transform 0.2s ease;
+}
+
+.theme-toggle-switch-active {
+    background-color: #6366f1;
+}
+
+.theme-toggle-switch-active .theme-toggle-switch-knob {
+    transform: translateX(1.25rem);
+}
+
+@media print {
+    .theme-toggle-container {
+        display: none !important;
+    }
+
+    .fashion-dark :deep(.preview-sheet),
+    .fashion-dark :deep(.label-box),
+    .fashion-dark :deep(.preview-sheet *),
+    .fashion-dark :deep(.label-box *) {
+        background-color: #ffffff !important;
+        color: #111827 !important;
+    }
+}
+
 </style>
