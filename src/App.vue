@@ -1076,6 +1076,10 @@ case 'roas-dashboard':
 const lastEditedModel = ref(null);
 const groupRefs = ref({});
 
+const inventoryModelLoading = reactive({});
+const inventoryModelLoaded = reactive({});
+const inventoryModelErrors = reactive({});
+
 
 
 const riwayatPengeluaran = computed(() => {
@@ -5685,73 +5689,285 @@ const filteredGudangKain = computed(() => {
     return kainData;
 });
 const inventoryProductGroups = computed(() => {
-    // --- HANYA BARIS INI YANG BERUBAH ---
-    const grouped = state.inventoryPaginated.reduce((acc, product) => {
-    // ------------------------------------
-        const model = state.settings.modelProduk.find(m => m.id === product.model_id);
-        const modelName = model ? model.namaModel.split(' ')[0] : 'N/A';
+    const loadedProducts =
+        state.inventoryPaginated || [];
 
-        if (!acc[modelName]) {
-            acc[modelName] = {
-                namaModel: modelName,
-                variants: [],
-                totalStock: 0,
-                totalNilaiStok: 0,
+    const searchTerm =
+        String(
+            uiState.inventorySearch || ''
+        )
+            .trim()
+            .toLowerCase();
+
+    const stockFilter =
+        uiState.inventoryFilterStock;
+
+    const minStock =
+        Number(state.settings.minStok) || 0;
+
+    let groups =
+        (
+            state.settings.modelProduk ||
+            []
+        ).map(model => {
+            const modelId = model.id;
+
+            const fullModelName =
+                String(
+                    model.namaModel || 'Tanpa Nama'
+                );
+
+            const displayModelName =
+                fullModelName
+                    .split(' ')[0] ||
+                fullModelName;
+
+            const variants =
+                loadedProducts.filter(
+                    product =>
+                        product.model_id ===
+                        modelId
+                );
+
+            const totalStock =
+                variants.reduce(
+                    (sum, product) =>
+                        sum +
+                        (
+                            Number(
+                                product.stokFisik
+                            ) || 0
+                        ),
+                    0
+                );
+
+            const totalNilaiStok =
+                variants.reduce(
+                    (sum, product) =>
+                        sum +
+                        (
+                            (
+                                Number(
+                                    product.stokFisik
+                                ) || 0
+                            ) *
+                            (
+                                Number(
+                                    product.hpp
+                                ) || 0
+                            )
+                        ),
+                    0
+                );
+
+            return {
+                modelId,
+                namaModel:
+                    displayModelName,
+                namaModelLengkap:
+                    fullModelName,
+                variants,
+                totalStock,
+                totalNilaiStok,
+                isLoaded:
+                    inventoryModelLoaded[
+                        modelId
+                    ] === true,
+                isLoading:
+                    inventoryModelLoading[
+                        modelId
+                    ] === true,
+                error:
+                    inventoryModelErrors[
+                        modelId
+                    ] || ''
             };
-        }
-        acc[modelName].variants.push(product);
-        acc[modelName].totalStock += (product.stokFisik || 0);
-        acc[modelName].totalNilaiStok += (product.stokFisik || 0) * (parseInputNumber(product.hpp) || 0);
-        return acc;
-    }, {});
-
-    let productGroups = Object.values(grouped);
-
-    const searchTerm = (uiState.inventorySearch || '').toLowerCase();
-    const stockFilter = uiState.inventoryFilterStock;
-    const minStock = state.settings.minStok;
-
-    productGroups = productGroups.filter(group => {
-        const matchesSearch = (group.namaModel || '').toLowerCase().includes(searchTerm) || 
-                                group.variants.some(v => (v.sku || '').toLowerCase().includes(searchTerm) || (v.nama || '').toLowerCase().includes(searchTerm));
-        if (!matchesSearch) return false;
-        
-        const totalStock = group.variants.reduce((sum, v) => sum + (v.stokFisik || 0), 0);
-        if (stockFilter === 'all') return true;
-        if (stockFilter === 'aman') return totalStock > minStock;
-        if (stockFilter === 'menipis') return totalStock > 0 && totalStock <= minStock;
-        if (stockFilter === 'habis') return totalStock === 0;
-        return true;
-    });
-
-    productGroups.sort((a, b) => {
-        switch (uiState.inventorySort) {
-            case 'nama-desc': return b.namaModel.localeCompare(a.namaModel);
-            case 'stok-desc': return b.totalStock - a.totalStock;
-            case 'stok-asc': return a.totalStock - b.totalStock;
-            case 'nama-asc': default: return a.namaModel.localeCompare(a.namaModel);
-        }
-    });
-    
-    const sizeOrder = {
-        'xxs': 1, 'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7, 'xxxl': 8, 'xxxxl': 9, 'xxxxxl': 10,
-        '27': 20, '28': 21, '29': 22, '30': 23, '31': 24, '32': 25, '33': 26, '34': 27, '35': 28, '36': 29, 
-        '37': 30, '38': 31, '39': 32, '40': 33, '41': 34, '42': 35, '43': 36, '44': 37, '45': 38, '46': 39,
-        'allsize': 90, 'satuukuran': 90
-    };
-    productGroups.forEach(group => {
-        group.variants.sort((a, b) => {
-            const colorCompare = (a.warna || '').localeCompare(b.warna || '');
-            if (colorCompare !== 0) {
-                return colorCompare;
-            }
-            const sizeA = sizeOrder[a.varian.toLowerCase()] || 999;
-            const sizeB = sizeOrder[b.varian.toLowerCase()] || 999;
-            return sizeA - sizeB;
         });
+
+    if (searchTerm) {
+        groups = groups.filter(group => {
+            const modelMatch =
+                group.namaModel
+                    .toLowerCase()
+                    .includes(searchTerm) ||
+                group.namaModelLengkap
+                    .toLowerCase()
+                    .includes(searchTerm);
+
+            const loadedVariantMatch =
+                group.variants.some(
+                    variant =>
+                        String(
+                            variant.sku || ''
+                        )
+                            .toLowerCase()
+                            .includes(
+                                searchTerm
+                            ) ||
+                        String(
+                            variant.nama || ''
+                        )
+                            .toLowerCase()
+                            .includes(
+                                searchTerm
+                            )
+                );
+
+            return (
+                modelMatch ||
+                loadedVariantMatch
+            );
+        });
+    }
+
+    // Filter stok hanya diterapkan pada grup yang sudah dibuka,
+    // karena stok grup yang belum dibuka belum dibaca dari Firestore.
+    if (stockFilter !== 'all') {
+        groups = groups.filter(group => {
+            if (!group.isLoaded) {
+                return false;
+            }
+
+            if (stockFilter === 'aman') {
+                return (
+                    group.totalStock >
+                    minStock
+                );
+            }
+
+            if (
+                stockFilter ===
+                'menipis'
+            ) {
+                return (
+                    group.totalStock > 0 &&
+                    group.totalStock <=
+                        minStock
+                );
+            }
+
+            if (stockFilter === 'habis') {
+                return (
+                    group.totalStock === 0
+                );
+            }
+
+            return true;
+        });
+    }
+
+    groups.sort((a, b) => {
+        switch (
+            uiState.inventorySort
+        ) {
+            case 'nama-desc':
+                return b.namaModel
+                    .localeCompare(
+                        a.namaModel,
+                        'id',
+                        {
+                            numeric: true
+                        }
+                    );
+
+            case 'stok-desc':
+                return (
+                    b.totalStock -
+                    a.totalStock
+                );
+
+            case 'stok-asc':
+                return (
+                    a.totalStock -
+                    b.totalStock
+                );
+
+            case 'nama-asc':
+            default:
+                return a.namaModel
+                    .localeCompare(
+                        b.namaModel,
+                        'id',
+                        {
+                            numeric: true
+                        }
+                    );
+        }
     });
 
-    return productGroups;
+    const sizeOrder = {
+        xxs: 1,
+        xs: 2,
+        s: 3,
+        m: 4,
+        l: 5,
+        xl: 6,
+        xxl: 7,
+        xxxl: 8,
+        xxxxl: 9,
+        xxxxxl: 10,
+        27: 20,
+        28: 21,
+        29: 22,
+        30: 23,
+        31: 24,
+        32: 25,
+        33: 26,
+        34: 27,
+        35: 28,
+        36: 29,
+        37: 30,
+        38: 31,
+        39: 32,
+        40: 33,
+        41: 34,
+        42: 35,
+        43: 36,
+        44: 37,
+        45: 38,
+        46: 39,
+        allsize: 90,
+        satuukuran: 90
+    };
+
+    groups.forEach(group => {
+        group.variants.sort(
+            (a, b) => {
+                const colorCompare =
+                    String(
+                        a.warna || ''
+                    ).localeCompare(
+                        String(
+                            b.warna || ''
+                        )
+                    );
+
+                if (
+                    colorCompare !== 0
+                ) {
+                    return colorCompare;
+                }
+
+                const sizeA =
+                    sizeOrder[
+                        String(
+                            a.varian || ''
+                        ).toLowerCase()
+                    ] || 999;
+
+                const sizeB =
+                    sizeOrder[
+                        String(
+                            b.varian || ''
+                        ).toLowerCase()
+                    ] || 999;
+
+                return sizeA - sizeB;
+            }
+        );
+    });
+
+    return groups;
 });
 
 const allProductGroups = computed(() => {
@@ -11016,55 +11232,301 @@ const fetchCoreData = async (
 };
 
 // Fungsi khusus untuk data produk, harga, dan alokasi
-const fetchProductData = async (
-    userId,
-    loadMore = false
-) => {
-    const PRODUCTS_PER_PAGE = 100;
+const mapInventoryProductDocument =
+    docSnap => {
+        const product =
+            docSnap.data() || {};
 
-    try {
-        if (
-            !dataFetched.allProductsLoaded ||
-            !dataFetched.pricesAndAllocations
-        ) {
-            await fetchAllProductData(userId);
+        return {
+            docId: docSnap.id,
+            sku: product.sku || '',
+            nama:
+                product.product_name || '',
+            model_id:
+                product.model_id || '',
+            warna: product.color || '',
+            varian:
+                product.variant || '',
+            stokFisik:
+                Number(
+                    product.physical_stock
+                ) || 0,
+            hpp:
+                Number(product.hpp) || 0,
+            hargaJual: {},
+            stokAlokasi: {},
+            userId: product.userId
+        };
+    };
+
+const loadInventoryModelProducts =
+    async (
+        userId,
+        modelId,
+        forceRefresh = false
+    ) => {
+        if (!userId || !modelId) {
+            return;
         }
 
-        const requestedVisibleCount =
-            loadMore
-                ? state.inventoryPaginated.length +
-                    PRODUCTS_PER_PAGE
-                : PRODUCTS_PER_PAGE;
+        if (
+            inventoryModelLoading[
+                modelId
+            ]
+        ) {
+            return;
+        }
 
-        const visibleCount = Math.min(
-            requestedVisibleCount,
-            state.produk.length
-        );
+        if (
+            inventoryModelLoaded[
+                modelId
+            ] &&
+            !forceRefresh
+        ) {
+            return;
+        }
 
-        // Tombol Muat Lebih Banyak sekarang hanya
-        // menampilkan produk berikutnya dari data lokal.
-        state.inventoryPaginated =
-            state.produk.slice(
-                0,
-                visibleCount
+        inventoryModelLoading[
+            modelId
+        ] = true;
+
+        inventoryModelErrors[
+            modelId
+        ] = '';
+
+        try {
+            const modelQuery =
+                query(
+                    collection(
+                        db,
+                        'products'
+                    ),
+                    where(
+                        'userId',
+                        '==',
+                        userId
+                    ),
+                    where(
+                        'model_id',
+                        '==',
+                        modelId
+                    )
+                );
+
+            // Server dipakai agar produk yang sudah dihapus
+            // tidak tetap muncul dari cache lama.
+            const modelSnapshot =
+                await getDocsFromServer(
+                    modelQuery
+                );
+
+            const modelProducts =
+                modelSnapshot.docs
+                    .map(
+                        mapInventoryProductDocument
+                    );
+
+            // Hapus versi lokal model ini,
+            // lalu masukkan hasil server terbaru.
+            state.inventoryPaginated =
+                (
+                    state.inventoryPaginated ||
+                    []
+                ).filter(
+                    product =>
+                        product.model_id !==
+                        modelId
+                );
+
+            state.inventoryPaginated.push(
+                ...modelProducts
             );
 
-        uiState.productsLastVisible = null;
+            // Sinkronkan produk yang kebetulan
+            // sudah ada di state global tanpa
+            // mengunduh semua produk.
+            const loadedIds =
+                new Set(
+                    modelProducts.map(
+                        product =>
+                            product.docId
+                    )
+                );
+
+            state.produk =
+                (
+                    state.produk || []
+                ).filter(
+                    product =>
+                        product.model_id !==
+                            modelId ||
+                        !loadedIds.has(
+                            product.docId
+                        )
+                );
+
+            state.produk.push(
+                ...modelProducts
+            );
+
+            inventoryModelLoaded[
+                modelId
+            ] = true;
+
+            dataFetched.products = true;
+
+            console.log(
+                `[INVENTARIS] Model ${modelId}: ${modelProducts.length} varian dimuat.`
+            );
+        } catch (error) {
+            console.error(
+                '[INVENTARIS] Gagal memuat model:',
+                error
+            );
+
+            inventoryModelErrors[
+                modelId
+            ] =
+                error?.message ||
+                'Gagal memuat data model.';
+        } finally {
+            inventoryModelLoading[
+                modelId
+            ] = false;
+        }
+    };
+
+const toggleInventoryGroup =
+    async group => {
+        if (!group?.modelId) {
+            return;
+        }
+
+        if (
+            uiState.activeAccordion ===
+            group.modelId
+        ) {
+            uiState.activeAccordion =
+                null;
+
+            return;
+        }
+
+        uiState.activeAccordion =
+            group.modelId;
+
+        await loadInventoryModelProducts(
+            currentUser.value?.uid,
+            group.modelId
+        );
+    };
+
+const openInventoryStock =
+    async product => {
+        if (!product?.docId) {
+            return;
+        }
+
+        try {
+            const allocationSnapshot =
+                await getDocFromServer(
+                    doc(
+                        db,
+                        'stock_allocations',
+                        product.docId
+                    )
+                );
+
+            const allocation =
+                allocationSnapshot.exists()
+                    ? allocationSnapshot.data()
+                    : {};
+
+            const stokAlokasi = {};
+
+            (
+                state.settings.marketplaces ||
+                []
+            ).forEach(
+                marketplace => {
+                    stokAlokasi[
+                        marketplace.id
+                    ] =
+                        Number(
+                            allocation[
+                                marketplace.id
+                            ]
+                        ) || 0;
+                }
+            );
+
+            const enrichedProduct = {
+                ...product,
+                stokAlokasi
+            };
+
+            const inventoryIndex =
+                state.inventoryPaginated
+                    .findIndex(
+                        item =>
+                            item.docId ===
+                            product.docId
+                    );
+
+            if (
+                inventoryIndex !== -1
+            ) {
+                state.inventoryPaginated[
+                    inventoryIndex
+                ] =
+                    enrichedProduct;
+            }
+
+            showModal(
+                'kelolaStok',
+                {
+                    product:
+                        JSON.parse(
+                            JSON.stringify(
+                                enrichedProduct
+                            )
+                        ),
+                    original:
+                        enrichedProduct
+                }
+            );
+        } catch (error) {
+            console.error(
+                '[INVENTARIS] Gagal membaca alokasi stok:',
+                error
+            );
+
+            alert(
+                'Alokasi stok belum berhasil dimuat. Silakan coba lagi.'
+            );
+        }
+    };
+
+// Membuka halaman Inventaris tidak membaca
+// semua produk, harga, dan alokasi.
+const fetchProductData =
+    async userId => {
+        if (
+            !dataFetched.settings
+        ) {
+            await fetchCoreData(
+                userId
+            );
+        }
+
+        uiState.productsLastVisible =
+            null;
 
         uiState.productsHasMore =
-            visibleCount <
-            state.produk.length;
+            false;
 
         dataFetched.products = true;
-    } catch (error) {
-        console.error(
-            "Error menampilkan produk Inventaris:",
-            error
-        );
-
-        throw error;
-    }
-};
+    };
 
 const fetchAllProductData = async (userId) => {
     // Gunakan flag baru untuk mencegah fetch ulang jika SEMUA data sudah ada
@@ -13931,34 +14393,76 @@ SKU-BAJU-PUTIH-S"
         </tr>
     </thead>
     <tbody>
-        <tr v-if="inventoryProductGroups.length === 0 && !uiState.productsHasMore">
+        <tr v-if="inventoryProductGroups.length === 0">
             <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
         </tr>
-        <template v-for="group in inventoryProductGroups" :key="group.namaModel">
-            <tr :ref="el => { if (el) groupRefs[group.namaModel] = el }" class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel">
+        <template v-for="group in inventoryProductGroups" :key="group.modelId">
+            <tr :ref="el => { if (el) groupRefs[group.modelId] = el }" class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" @click="toggleInventoryGroup(group)">
                 <td class="px-6 py-4 font-bold text-slate-800">
                     <div class="flex items-center">
-                        <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.namaModel }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.modelId }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                         <div>
                             {{ group.namaModel }}
-                            <span class="block text-xs font-normal text-slate-500">{{ group.variants.length }} varian</span>
+                            <span
+                                v-if="group.isLoading"
+                                class="block text-xs font-normal text-indigo-500"
+                            >
+                                Memuat varian...
+                            </span>
+                            <span
+                                v-else-if="group.isLoaded"
+                                class="block text-xs font-normal text-slate-500"
+                            >
+                                {{ group.variants.length }} varian
+                            </span>
+                            <span
+                                v-else
+                                class="block text-xs font-normal text-slate-400"
+                            >
+                                Klik untuk membuka
+                            </span>
                         </div>
                     </div>
                 </td>
                 <td colspan="3"></td>
                 <td class="px-6 py-3 text-center">
-                    <span class="font-bold text-base text-slate-800">{{ formatNumber(group.totalStock) }}</span>
-                    <span class="text-xs"> pcs</span>
+                    <template v-if="group.isLoaded">
+                        <span class="font-bold text-base text-slate-800">{{ formatNumber(group.totalStock) }}</span>
+                        <span class="text-xs"> pcs</span>
+                    </template>
+                    <span v-else class="text-slate-400">—</span>
                 </td>
-                <td class="px-6 py-3 text-right font-bold text-base text-slate-800">{{ formatCurrency(group.totalNilaiStok) }}</td>
+                <td class="px-6 py-3 text-right font-bold text-base text-slate-800">
+                    <span v-if="group.isLoaded">
+                        {{ formatCurrency(group.totalNilaiStok) }}
+                    </span>
+                    <span v-else class="text-slate-400">—</span>
+                </td>
                 <td class="px-6 py-3 text-center">
-                    <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700" title="Hapus Grup Produk & Semua Variannya" :disabled="!isSubscriptionActive">
+                    <button @click.stop="deleteGroup(group.variants)" class="p-2 text-red-400 hover:text-red-700 disabled:opacity-40" title="Buka grup terlebih dahulu sebelum menghapus" :disabled="!isSubscriptionActive || !group.isLoaded">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
                 </td>
             </tr>
 
-            <template v-if="uiState.activeAccordion === group.namaModel">
+            <template v-if="uiState.activeAccordion === group.modelId">
+                <tr v-if="group.isLoading">
+                    <td colspan="7" class="px-6 py-8 text-center text-indigo-600">
+                        Memuat varian {{ group.namaModel }}...
+                    </td>
+                </tr>
+
+                <tr v-else-if="group.error">
+                    <td colspan="7" class="px-6 py-6 text-center text-red-600">
+                        {{ group.error }}
+                        <button
+                            @click.stop="loadInventoryModelProducts(currentUser.uid, group.modelId, true)"
+                            class="ml-2 underline font-semibold"
+                        >
+                            Coba Lagi
+                        </button>
+                    </td>
+                </tr>
                 <tr v-for="v in group.variants" :key="v.docId" class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in">
                     <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
                     <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
@@ -13976,22 +14480,14 @@ SKU-BAJU-PUTIH-S"
                     <td class="px-6 py-3 text-right text-slate-600">{{ formatCurrency(v.stokFisik * (v.hpp || 0)) }}</td>
                     <td class="px-6 py-3 text-center space-x-3 whitespace-nowrap text-xs">
                         <button @click.stop="removeProductVariant(v.docId)" class="font-semibold text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
-                        <button @click.stop="showModal('kelolaStok', { product: JSON.parse(JSON.stringify(v)), original: v })" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
+                        <button @click.stop="openInventoryStock(v)" class="font-semibold text-blue-500 hover:underline">Kelola Stok</button>
                         <button @click.stop="goToAturHarga(v.nama)" class="font-semibold text-green-500 hover:underline">Atur Harga</button>
                     </td>
                 </tr>
             </template>
         </template>
     </tbody>
-    <tfoot v-if="uiState.productsHasMore">
-        <tr>
-            <td colspan="7" class="text-center p-4">
-                <button @click="fetchProductData(currentUser.uid, true)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
-                    Muat Lebih Banyak
-                </button>
-            </td>
-        </tr>
-    </tfoot>
+
     </table>
                 </div>
             </div>
