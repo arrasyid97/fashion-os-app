@@ -8,17 +8,25 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 
 import { db, auth, functions } from './firebase.js'; 
 import { httpsCallable } from 'firebase/functions';
+import {
+    clearReadCacheContext,
+    invalidateModuleCache,
+    isReadCacheReady,
+    readModuleCache,
+    setReadCacheContext,
+    writeModuleCache,
+} from './app-read-cache.js';
 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import {
     collection,
     doc,
-    setDoc,
-    updateDoc,
-    deleteDoc,
-    writeBatch,
-    runTransaction,
-    addDoc,
+    setDoc as firestoreSetDoc,
+    updateDoc as firestoreUpdateDoc,
+    deleteDoc as firestoreDeleteDoc,
+    writeBatch as firestoreWriteBatch,
+    runTransaction as firestoreRunTransaction,
+    addDoc as firestoreAddDoc,
     onSnapshot,
     query,
     where,
@@ -579,6 +587,280 @@ const dataFetched = reactive({
     settings: false
 });
 
+// ============================================================
+// INVALIDASI CACHE SESUDAH FIRESTORE WRITE
+// ============================================================
+// Seluruh write tetap memakai SDK Firestore asli. Pembungkus ini
+// hanya menandai modul cache sebagai kotor setelah write berhasil,
+// sehingga refresh cepat tidak pernah menampilkan cache lama.
+const READ_CACHE_MODULE_BY_COLLECTION =
+    Object.freeze({
+        settings: 'settings',
+        promotions: 'settings',
+        product_commissions: 'settings',
+        categories: 'settings',
+
+        products: 'products',
+        product_prices: 'products',
+        stock_allocations: 'products',
+
+        transactions: 'sales',
+        returns: 'sales',
+
+        keuangan: 'finance',
+
+        production_batches: 'production',
+        fabric_stock: 'production',
+
+        suppliers: 'suppliers',
+        purchase_orders: 'suppliers',
+
+        voucher_notes: 'notes',
+
+        investors: 'investment',
+        investor_payments: 'investment',
+        bank_accounts: 'investment'
+    });
+
+const getReadCacheModuleFromReference =
+    reference => {
+        const path =
+            String(reference?.path || '');
+
+        const collectionName =
+            path.split('/')[0] || '';
+
+        return (
+            READ_CACHE_MODULE_BY_COLLECTION[
+                collectionName
+            ] || null
+        );
+    };
+
+const invalidateWrittenReferences =
+    references => {
+        const modules = new Set();
+
+        (references || []).forEach(
+            reference => {
+                const moduleName =
+                    getReadCacheModuleFromReference(
+                        reference
+                    );
+
+                if (moduleName) {
+                    modules.add(moduleName);
+                }
+            }
+        );
+
+        modules.forEach(moduleName => {
+            invalidateModuleCache(moduleName);
+        });
+    };
+
+async function setDoc(
+    reference,
+    data,
+    options
+) {
+    const result =
+        options === undefined
+            ? await firestoreSetDoc(
+                reference,
+                data
+            )
+            : await firestoreSetDoc(
+                reference,
+                data,
+                options
+            );
+
+    invalidateWrittenReferences([
+        reference
+    ]);
+
+    return result;
+}
+
+async function updateDoc(
+    reference,
+    ...args
+) {
+    const result =
+        await firestoreUpdateDoc(
+            reference,
+            ...args
+        );
+
+    invalidateWrittenReferences([
+        reference
+    ]);
+
+    return result;
+}
+
+async function deleteDoc(reference) {
+    const result =
+        await firestoreDeleteDoc(
+            reference
+        );
+
+    invalidateWrittenReferences([
+        reference
+    ]);
+
+    return result;
+}
+
+async function addDoc(
+    collectionReference,
+    data
+) {
+    const result =
+        await firestoreAddDoc(
+            collectionReference,
+            data
+        );
+
+    invalidateWrittenReferences([
+        result
+    ]);
+
+    return result;
+}
+
+function writeBatch(database) {
+    const nativeBatch =
+        firestoreWriteBatch(database);
+
+    const writtenReferences = [];
+
+    const wrappedBatch = {
+        set(reference, ...args) {
+            writtenReferences.push(
+                reference
+            );
+
+            nativeBatch.set(
+                reference,
+                ...args
+            );
+
+            return wrappedBatch;
+        },
+
+        update(reference, ...args) {
+            writtenReferences.push(
+                reference
+            );
+
+            nativeBatch.update(
+                reference,
+                ...args
+            );
+
+            return wrappedBatch;
+        },
+
+        delete(reference) {
+            writtenReferences.push(
+                reference
+            );
+
+            nativeBatch.delete(
+                reference
+            );
+
+            return wrappedBatch;
+        },
+
+        async commit() {
+            const result =
+                await nativeBatch.commit();
+
+            invalidateWrittenReferences(
+                writtenReferences
+            );
+
+            return result;
+        }
+    };
+
+    return wrappedBatch;
+}
+
+async function runTransaction(
+    database,
+    updateFunction,
+    options
+) {
+    const writtenReferences = [];
+
+    const result =
+        await firestoreRunTransaction(
+            database,
+            async nativeTransaction => {
+                const wrappedTransaction = {
+                    get(reference) {
+                        return nativeTransaction.get(
+                            reference
+                        );
+                    },
+
+                    set(reference, ...args) {
+                        writtenReferences.push(
+                            reference
+                        );
+
+                        nativeTransaction.set(
+                            reference,
+                            ...args
+                        );
+
+                        return wrappedTransaction;
+                    },
+
+                    update(reference, ...args) {
+                        writtenReferences.push(
+                            reference
+                        );
+
+                        nativeTransaction.update(
+                            reference,
+                            ...args
+                        );
+
+                        return wrappedTransaction;
+                    },
+
+                    delete(reference) {
+                        writtenReferences.push(
+                            reference
+                        );
+
+                        nativeTransaction.delete(
+                            reference
+                        );
+
+                        return wrappedTransaction;
+                    }
+                };
+
+                return updateFunction(
+                    wrappedTransaction
+                );
+            },
+            options
+        );
+
+    invalidateWrittenReferences(
+        writtenReferences
+    );
+
+    return result;
+}
+
 // Mencegah halaman yang sama menjalankan query
 // dua kali secara bersamaan.
 const pagesCurrentlyLoading = new Set();
@@ -821,6 +1103,59 @@ const extractServerSyncVersions =
         return normalizeSyncVersions(versions);
     };
 
+const preparePersistentReadCache =
+    async userId => {
+        if (!userId) {
+            clearReadCacheContext();
+            return false;
+        }
+
+        try {
+            const syncSnapshot =
+                await getDocFromServer(
+                    doc(
+                        db,
+                        'user_sync',
+                        userId
+                    )
+                );
+
+            const serverVersions =
+                extractServerSyncVersions(
+                    syncSnapshot.exists()
+                        ? syncSnapshot.data()
+                        : {}
+                );
+
+            setReadCacheContext(
+                userId,
+                serverVersions
+            );
+
+            await saveLocalSyncVersions(
+                userId,
+                serverVersions
+            );
+
+            console.log(
+                '[APP CACHE] Versi server siap. Cache halaman akan dipakai hanya bila versinya sama.'
+            );
+
+            return true;
+        } catch (error) {
+            // Gagal membaca versi berarti cache persisten
+            // tidak boleh dipakai. Loader normal tetap berjalan.
+            clearReadCacheContext();
+
+            console.warn(
+                '[APP CACHE] Pemeriksaan versi gagal. Memakai pembacaan server biasa.',
+                error
+            );
+
+            return false;
+        }
+    };
+
 
 
 
@@ -907,39 +1242,16 @@ const beginIndexedDbStartup =
     };
 
 const finishIndexedDbStartup =
-    async (userId) => {
+    async () => {
         try {
-            const syncReference = doc(
-                db,
-                'user_sync',
-                userId
-            );
-
-            // Hanya satu pembacaan kecil untuk mengetahui
-            // versi data server.
-            const syncSnapshot =
-                await getDocFromServer(
-                    syncReference
-                );
-
-            const serverVersions =
-                extractServerSyncVersions(
-                    syncSnapshot.exists()
-                        ? syncSnapshot.data()
-                        : {}
-                );
-
-            await saveLocalSyncVersions(
-                userId,
-                serverVersions
-            );
-
             console.log(
-                '[SYNC VERSION] Metadata versi diperbarui. Modul besar dimuat saat halamannya dibuka.'
+                isReadCacheReady()
+                    ? '[APP CACHE] Cache halaman aktif dan tervalidasi oleh versi server.'
+                    : '[APP CACHE] Cache persisten tidak aktif. Aplikasi memakai loader server biasa.'
             );
         } catch (error) {
             console.warn(
-                '[SYNC VERSION] Pemeriksaan versi server gagal. Aplikasi tetap dapat digunakan.',
+                '[APP CACHE] Penyelesaian startup cache gagal. Aplikasi tetap dapat digunakan.',
                 error
             );
         } finally {
@@ -12884,6 +13196,61 @@ watch(() => uiState.pengaturanTab, (newTab) => {
 
 let unsubscribe = () => {}; 
 
+const applyCoreCachePayload =
+    payload => {
+        if (!payload) {
+            return false;
+        }
+
+        Object.assign(
+            state.settings,
+            payload.settings || {}
+        );
+
+        state.settings.categories =
+            Array.isArray(payload.categories)
+                ? payload.categories
+                : [];
+
+        state.promotions.perChannel =
+            payload.promotions?.perChannel ||
+            {};
+
+        state.promotions.perModel =
+            payload.promotions?.perModel ||
+            {};
+
+        state.commissions.perModel =
+            payload.commissions?.perModel ||
+            {};
+
+        dataFetched.settings = true;
+
+        return true;
+    };
+
+const createCoreCachePayload = () => ({
+    settings: {
+        ...state.settings,
+        categories: undefined
+    },
+    categories:
+        state.settings.categories || [],
+    promotions: {
+        perChannel:
+            state.promotions.perChannel ||
+            {},
+        perModel:
+            state.promotions.perModel ||
+            {}
+    },
+    commissions: {
+        perModel:
+            state.commissions.perModel ||
+            {}
+    }
+});
+
 const setupListeners = async (
     userId,
     isUserPartner
@@ -12931,6 +13298,26 @@ const fetchCoreData = async (
         );
 
         return;
+    }
+
+    if (!forceRefresh) {
+        const cachedCoreData =
+            await readModuleCache(
+                'settings',
+                'core'
+            );
+
+        if (
+            applyCoreCachePayload(
+                cachedCoreData
+            )
+        ) {
+            console.log(
+                '[APP CACHE] Pengaturan dimuat tanpa membaca koleksi ulang.'
+            );
+
+            return;
+        }
     }
 
     try {
@@ -13045,6 +13432,12 @@ const fetchCoreData = async (
         }
 
         dataFetched.settings = true;
+
+        await writeModuleCache(
+            'settings',
+            'core',
+            createCoreCachePayload()
+        );
     } catch (error) {
         dataFetched.settings = false;
 
@@ -13123,8 +13516,77 @@ const resolveInventoryGroup =
             modelIds:
                 groupOrModelId
                     ? [groupOrModelId]
-                    : []
+            : []
         };
+    };
+
+const applyInventoryGroupProducts =
+    (
+        groupKey,
+        modelIds,
+        modelProducts
+    ) => {
+        if (
+            !groupKey ||
+            !Array.isArray(modelProducts)
+        ) {
+            return false;
+        }
+
+        const loadedModelIdKeys =
+            new Set(
+                (modelIds || []).map(
+                    modelId =>
+                        String(modelId)
+                )
+            );
+
+        state.inventoryPaginated =
+            (
+                state.inventoryPaginated ||
+                []
+            ).filter(
+                product =>
+                    !loadedModelIdKeys.has(
+                        String(
+                            product.model_id ||
+                            ''
+                        )
+                    )
+            );
+
+        state.inventoryPaginated.push(
+            ...modelProducts
+        );
+
+        if (
+            !dataFetched.allProductsLoaded
+        ) {
+            state.produk =
+                (
+                    state.produk || []
+                ).filter(
+                    product =>
+                        !loadedModelIdKeys.has(
+                            String(
+                                product.model_id ||
+                                ''
+                            )
+                        )
+                );
+
+            state.produk.push(
+                ...modelProducts
+            );
+        }
+
+        inventoryModelLoaded[
+            groupKey
+        ] = true;
+
+        dataFetched.products = true;
+
+        return true;
     };
 
 const loadInventoryModelProducts =
@@ -13191,6 +13653,63 @@ const loadInventoryModelProducts =
                     );
                 }
             });
+
+            if (
+                dataFetched
+                    .allProductsLoaded
+            ) {
+                const modelIdKeys =
+                    new Set(
+                        uniqueModelIds.map(
+                            modelId =>
+                                String(modelId)
+                        )
+                    );
+
+                const productsFromMemory =
+                    (
+                        state.produk || []
+                    ).filter(
+                        product =>
+                            modelIdKeys.has(
+                                String(
+                                    product.model_id ||
+                                    ''
+                                )
+                            )
+                    );
+
+                applyInventoryGroupProducts(
+                    groupKey,
+                    uniqueModelIds,
+                    productsFromMemory
+                );
+
+                return;
+            }
+
+            if (!forceRefresh) {
+                const cachedGroup =
+                    await readModuleCache(
+                        'products',
+                        `inventory-${groupKey}`
+                    );
+
+                if (
+                    cachedGroup &&
+                    applyInventoryGroupProducts(
+                        groupKey,
+                        uniqueModelIds,
+                        cachedGroup.products
+                    )
+                ) {
+                    console.log(
+                        `[APP CACHE] Grup Inventaris ${groupKey} dimuat tanpa membaca koleksi ulang.`
+                    );
+
+                    return;
+                }
+            }
 
             const modelProductsById =
                 new Map();
@@ -13263,56 +13782,20 @@ const loadInventoryModelProducts =
                     modelProductsById.values()
                 );
 
-            const loadedModelIdKeys =
-                new Set(
-                    uniqueModelIds.map(
-                        modelId =>
-                            String(modelId)
-                    )
-                );
-
-            // Hapus versi lokal seluruh model anggota grup,
-            // lalu masukkan hasil server terbaru.
-            state.inventoryPaginated =
-                (
-                    state.inventoryPaginated ||
-                    []
-                ).filter(
-                    product =>
-                        !loadedModelIdKeys.has(
-                            String(
-                                product.model_id ||
-                                ''
-                            )
-                        )
-                );
-
-            state.inventoryPaginated.push(
-                ...modelProducts
+            applyInventoryGroupProducts(
+                groupKey,
+                uniqueModelIds,
+                modelProducts
             );
 
-            state.produk =
-                (
-                    state.produk || []
-                ).filter(
-                    product =>
-                        !loadedModelIdKeys.has(
-                            String(
-                                product.model_id ||
-                                ''
-                            )
-                        )
-                );
-
-            state.produk.push(
-                ...modelProducts
+            await writeModuleCache(
+                'products',
+                `inventory-${groupKey}`,
+                {
+                    products:
+                        modelProducts
+                }
             );
-
-            inventoryModelLoaded[
-                groupKey
-            ] = true;
-
-            dataFetched.products = true;
 
             console.log(
                 `[INVENTARIS] Grup ${groupKey}: ${modelProducts.length} varian dari ${uniqueModelIds.length} ID model dimuat.`
@@ -13553,6 +14036,65 @@ const applyLoadedSellingPricesToProducts =
         });
     };
 
+const applyAllProductsCache =
+    payload => {
+        if (
+            !payload ||
+            !Array.isArray(payload.products) ||
+            !Array.isArray(
+                payload.productPrices
+            ) ||
+            !Array.isArray(
+                payload.stockAllocations
+            )
+        ) {
+            return false;
+        }
+
+        state.produk = payload.products;
+        state.productPrices =
+            payload.productPrices;
+        state.stockAllocations =
+            payload.stockAllocations;
+
+        applyLoadedSellingPricesToProducts(
+            state.produk
+        );
+
+        const requestedVisibleCount =
+            Number(payload.visibleCount) ||
+            100;
+
+        const visibleCount = Math.min(
+            Math.max(
+                requestedVisibleCount,
+                100
+            ),
+            state.produk.length
+        );
+
+        state.inventoryPaginated =
+            state.produk.slice(
+                0,
+                visibleCount
+            );
+
+        uiState.productsLastVisible =
+            null;
+
+        uiState.productsHasMore =
+            visibleCount <
+            state.produk.length;
+
+        dataFetched.products = true;
+        dataFetched.allProductsLoaded =
+            true;
+        dataFetched.pricesAndAllocations =
+            true;
+
+        return true;
+    };
+
 const fetchAllProductData = async (userId) => {
     // Gunakan flag baru untuk mencegah fetch ulang jika SEMUA data sudah ada
     if (
@@ -13568,6 +14110,24 @@ const fetchAllProductData = async (userId) => {
         console.log(
             '[CACHE SESSION] Seluruh produk, harga, dan stok sudah tersedia.'
         );
+        return;
+    }
+
+    const cachedProducts =
+        await readModuleCache(
+            'products',
+            'all-products'
+        );
+
+    if (
+        applyAllProductsCache(
+            cachedProducts
+        )
+    ) {
+        console.log(
+            `[APP CACHE] ${state.produk.length} produk dimuat tanpa membaca koleksi ulang.`
+        );
+
         return;
     }
 
@@ -13731,6 +14291,21 @@ dataFetched.pricesAndAllocations = true;
 
 console.log(
     `Successfully fetched ${state.produk.length} total products and ${mergedPrices.length} product prices.`
+);
+
+await writeModuleCache(
+    'products',
+    'all-products',
+    {
+        products:
+            state.produk,
+        productPrices:
+            state.productPrices || [],
+        stockAllocations:
+            state.stockAllocations || [],
+        visibleCount:
+            state.inventoryPaginated.length
+    }
 );
 
     } catch (error) {
@@ -14099,6 +14674,25 @@ const resolveHistoryDateRange =
         }
     };
 
+const createHistoryCacheKey =
+    (prefix, range) => {
+        if (range?.allTime) {
+            return `${prefix}-all-time`;
+        }
+
+        const startValue =
+            range?.startDate instanceof Date
+                ? range.startDate.getTime()
+                : 0;
+
+        const endValue =
+            range?.endDate instanceof Date
+                ? range.endDate.getTime()
+                : 0;
+
+        return `${prefix}-${startValue}-${endValue}`;
+    };
+
 const fetchHistoryCollectionByPeriod =
     async ({
         collectionName,
@@ -14326,6 +14920,46 @@ const loadTransactionHistoryByCurrentFilter =
             return;
         }
 
+        const historyCacheKey =
+            createHistoryCacheKey(
+                'transaction-history',
+                range
+            );
+
+        const cachedHistory =
+            await readModuleCache(
+                'sales',
+                historyCacheKey
+            );
+
+        if (
+            cachedHistory &&
+            Array.isArray(
+                cachedHistory.transactions
+            )
+        ) {
+            state.transaksi =
+                cachedHistory.transactions;
+
+            transactionHistoryLoadedCount.value =
+                state.transaksi.length;
+
+            dataFetched.transactions =
+                true;
+
+            dataFetched.allTransactionsLoaded =
+                range.allTime;
+
+            transactionHistoryLoading.value =
+                false;
+
+            console.log(
+                `[APP CACHE] ${state.transaksi.length} riwayat transaksi dimuat tanpa membaca koleksi ulang.`
+            );
+
+            return;
+        }
+
         transactionHistoryLoading.value =
             true;
 
@@ -14370,6 +15004,15 @@ const loadTransactionHistoryByCurrentFilter =
 
                 dataFetched.allTransactionsLoaded =
                     range.allTime;
+
+                await writeModuleCache(
+                    'sales',
+                    historyCacheKey,
+                    {
+                        transactions:
+                            state.transaksi
+                    }
+                );
             }
         } catch (error) {
             if (
@@ -14455,6 +15098,46 @@ const loadReturnHistoryByCurrentFilter =
             return;
         }
 
+        const historyCacheKey =
+            createHistoryCacheKey(
+                'return-history',
+                range
+            );
+
+        const cachedHistory =
+            await readModuleCache(
+                'sales',
+                historyCacheKey
+            );
+
+        if (
+            cachedHistory &&
+            Array.isArray(
+                cachedHistory.returns
+            )
+        ) {
+            state.retur =
+                cachedHistory.returns;
+
+            returnHistoryLoadedCount.value =
+                state.retur.length;
+
+            dataFetched.returns =
+                true;
+
+            dataFetched.allReturnsLoaded =
+                range.allTime;
+
+            returnHistoryLoading.value =
+                false;
+
+            console.log(
+                `[APP CACHE] ${state.retur.length} riwayat retur dimuat tanpa membaca koleksi ulang.`
+            );
+
+            return;
+        }
+
         returnHistoryLoading.value =
             true;
 
@@ -14499,6 +15182,15 @@ const loadReturnHistoryByCurrentFilter =
 
                 dataFetched.allReturnsLoaded =
                     range.allTime;
+
+                await writeModuleCache(
+                    'sales',
+                    historyCacheKey,
+                    {
+                        returns:
+                            state.retur
+                    }
+                );
             }
         } catch (error) {
             if (
@@ -15655,6 +16347,115 @@ const fetchTransactionAndReturnData = async (
     return;
 }
 
+    if (
+        forceAll &&
+        !loadMore &&
+        !startDate &&
+        !endDate
+    ) {
+        const cachedSales =
+            await readModuleCache(
+                'sales',
+                'all-sales'
+            );
+
+        if (
+            cachedSales &&
+            Array.isArray(
+                cachedSales.transactions
+            ) &&
+            Array.isArray(
+                cachedSales.returns
+            )
+        ) {
+            state.transaksi =
+                cachedSales.transactions;
+            state.retur =
+                cachedSales.returns;
+
+            uiState.transaksiHasMore =
+                false;
+            uiState.returHasMore =
+                false;
+
+            dataFetched.transactions =
+                true;
+            dataFetched.returns = true;
+            dataFetched
+                .allTransactionsLoaded =
+                true;
+            dataFetched.allReturnsLoaded =
+                true;
+
+            console.log(
+                `[APP CACHE] ${state.transaksi.length} transaksi dan ${state.retur.length} retur dimuat tanpa membaca koleksi ulang.`
+            );
+
+            return;
+        }
+    }
+
+    const isInitialSalesRequest =
+        !forceAll &&
+        !loadMore &&
+        !startDate &&
+        !endDate;
+
+    if (isInitialSalesRequest) {
+        const cachedInitialSales =
+            await readModuleCache(
+                'sales',
+                'initial-sales'
+            );
+
+        if (
+            cachedInitialSales &&
+            Array.isArray(
+                cachedInitialSales.transactions
+            ) &&
+            Array.isArray(
+                cachedInitialSales.returns
+            )
+        ) {
+            state.transaksi =
+                cachedInitialSales
+                    .transactions;
+
+            state.retur =
+                cachedInitialSales.returns;
+
+            uiState.transaksiLastVisible =
+                cachedInitialSales
+                    .lastTransactionDate ||
+                null;
+
+            uiState.returLastVisible =
+                cachedInitialSales
+                    .lastReturnDate ||
+                null;
+
+            uiState.transaksiHasMore =
+                cachedInitialSales
+                    .transactionsHasMore ===
+                true;
+
+            uiState.returHasMore =
+                cachedInitialSales
+                    .returnsHasMore ===
+                true;
+
+            dataFetched.transactions =
+                true;
+            dataFetched.returns = true;
+
+            console.log(
+                '[APP CACHE] Data awal transaksi dan retur dimuat tanpa membaca koleksi ulang.'
+            );
+
+            return;
+        }
+    }
+
     // --- TRANSAKSI ---
     if (loadMore && !uiState.transaksiHasMore && !startDate && !forceAll) return;
 
@@ -15801,11 +16602,115 @@ const fetchTransactionAndReturnData = async (
     } catch (error) {
         console.error("Error fetching return data:", error);
     }
+
+    if (
+        forceAll &&
+        dataFetched
+            .allTransactionsLoaded &&
+        dataFetched.allReturnsLoaded
+    ) {
+        await writeModuleCache(
+            'sales',
+            'all-sales',
+            {
+                transactions:
+                    state.transaksi,
+                returns:
+                    state.retur
+            }
+        );
+    }
+
+    if (isInitialSalesRequest) {
+        const lastTransaction =
+            state.transaksi[
+                state.transaksi.length - 1
+            ];
+
+        const lastReturn =
+            state.retur[
+                state.retur.length - 1
+            ];
+
+        await writeModuleCache(
+            'sales',
+            'initial-sales',
+            {
+                transactions:
+                    state.transaksi,
+                returns:
+                    state.retur,
+                transactionsHasMore:
+                    uiState.transaksiHasMore,
+                returnsHasMore:
+                    uiState.returHasMore,
+                lastTransactionDate:
+                    lastTransaction?.tanggal ||
+                    null,
+                lastReturnDate:
+                    lastReturn?.tanggal ||
+                    null
+            }
+        );
+    }
 };
 
 // Fungsi khusus untuk data produksi
 const fetchProductionData = async (userId, loadMore = false) => {
     const PRODUCTIONS_PER_PAGE = 9; // Muat 9 item (karena grid 3 kolom)
+
+    if (
+        !loadMore &&
+        dataFetched.production &&
+        dataFetched.fabric
+    ) {
+        console.log(
+            '[CACHE SESSION] Produksi dan stok kain sudah tersedia.'
+        );
+
+        return;
+    }
+
+    if (!loadMore) {
+        const cachedProduction =
+            await readModuleCache(
+                'production',
+                'production-page'
+            );
+
+        if (
+            cachedProduction &&
+            Array.isArray(
+                cachedProduction.production
+            ) &&
+            Array.isArray(
+                cachedProduction.fabric
+            )
+        ) {
+            state.produksi =
+                cachedProduction.production;
+            state.gudangKain =
+                cachedProduction.fabric;
+
+            uiState.produksiLastVisible =
+                cachedProduction
+                    .lastProductionDate ||
+                null;
+
+            uiState.produksiHasMore =
+                cachedProduction.hasMore ===
+                true;
+
+            dataFetched.production = true;
+            dataFetched.fabric = true;
+
+            console.log(
+                '[APP CACHE] Produksi dan stok kain dimuat tanpa membaca koleksi ulang.'
+            );
+
+            return;
+        }
+    }
 
     // Data stok kain tidak perlu paginasi
     if (!dataFetched.fabric) {
@@ -15851,6 +16756,27 @@ const fetchProductionData = async (userId, loadMore = false) => {
         }
 
         dataFetched.production = true;
+
+        const lastProduction =
+            state.produksi[
+                state.produksi.length - 1
+            ];
+
+        await writeModuleCache(
+            'production',
+            'production-page',
+            {
+                production:
+                    state.produksi,
+                fabric:
+                    state.gudangKain,
+                hasMore:
+                    uiState.produksiHasMore,
+                lastProductionDate:
+                    lastProduction?.tanggal ||
+                    null
+            }
+        );
     } catch (error) {
         console.error("Error fetching production data:", error);
     }
@@ -15870,6 +16796,45 @@ const fetchInvestorsAndBanksData = async (
         );
 
         return;
+    }
+
+    if (!forceRefresh) {
+        const cachedInvestment =
+            await readModuleCache(
+                'investment',
+                'investors-and-banks'
+            );
+
+        if (
+            cachedInvestment &&
+            Array.isArray(
+                cachedInvestment.investors
+            ) &&
+            Array.isArray(
+                cachedInvestment.bankAccounts
+            ) &&
+            Array.isArray(
+                cachedInvestment
+                    .investorPayments
+            )
+        ) {
+            state.investor =
+                cachedInvestment.investors;
+            state.bankAccounts =
+                cachedInvestment.bankAccounts;
+            state.investorPayments =
+                cachedInvestment
+                    .investorPayments;
+
+            dataFetched.investorsAndBanks =
+                true;
+
+            console.log(
+                '[APP CACHE] Data investasi dan rekening dimuat tanpa membaca koleksi ulang.'
+            );
+
+            return;
+        }
     }
 
     try {
@@ -15954,6 +16919,20 @@ const fetchInvestorsAndBanksData = async (
             );
 
         dataFetched.investorsAndBanks = true;
+
+        await writeModuleCache(
+            'investment',
+            'investors-and-banks',
+            {
+                investors:
+                    state.investor,
+                bankAccounts:
+                    state.bankAccounts,
+                investorPayments:
+                    state.investorPayments ||
+                    []
+            }
+        );
     } catch (error) {
         dataFetched.investorsAndBanks = false;
 
@@ -15978,6 +16957,32 @@ const fetchKeuanganData = async (forceRefresh = false) => {
     }
 
     const userId = currentUser.value.uid;
+
+    if (!forceRefresh) {
+        const cachedFinance =
+            await readModuleCache(
+                'finance',
+                'all-finance'
+            );
+
+        if (
+            cachedFinance &&
+            Array.isArray(
+                cachedFinance.rows
+            )
+        ) {
+            state.keuangan =
+                cachedFinance.rows;
+
+            dataFetched.finance = true;
+
+            console.log(
+                `[APP CACHE] ${state.keuangan.length} data keuangan dimuat tanpa membaca koleksi ulang.`
+            );
+
+            return;
+        }
+    }
     
     // Kueri Paling Stabil: Menggunakan 3 field untuk memastikan urutan Ascending yang sempurna.
     const q = query(
@@ -16013,6 +17018,14 @@ const fetchKeuanganData = async (forceRefresh = false) => {
         dataFetched.finance = true;
         console.log(`[Keuangan] Berhasil memuat ${state.keuangan.length} data.`);
 
+        await writeModuleCache(
+            'finance',
+            'all-finance',
+            {
+                rows: state.keuangan
+            }
+        );
+
     } catch (error) {
         console.error("Error fetching Keuangan data:", error);
     }
@@ -16039,6 +17052,52 @@ const fetchSupplierData = async (
         );
 
         return;
+    }
+
+    if (
+        !loadMore &&
+        !forceRefresh
+    ) {
+        const cachedSuppliers =
+            await readModuleCache(
+                'suppliers',
+                'supplier-page'
+            );
+
+        if (
+            cachedSuppliers &&
+            Array.isArray(
+                cachedSuppliers.suppliers
+            ) &&
+            Array.isArray(
+                cachedSuppliers.purchaseOrders
+            )
+        ) {
+            state.suppliers =
+                cachedSuppliers.suppliers;
+
+            state.purchaseOrders =
+                cachedSuppliers.purchaseOrders;
+
+            uiState.purchaseOrdersLastVisible =
+                cachedSuppliers
+                    .lastPurchaseOrderDate ||
+                null;
+
+            uiState.purchaseOrdersHasMore =
+                cachedSuppliers.hasMore ===
+                true;
+
+            dataFetched.suppliers = true;
+            dataFetched.purchaseOrders =
+                true;
+
+            console.log(
+                '[APP CACHE] Supplier dan purchase order dimuat tanpa membaca koleksi ulang.'
+            );
+
+            return;
+        }
     }
 
     const readDocuments =
@@ -16164,6 +17223,30 @@ const fetchSupplierData = async (
         }
 
         dataFetched.purchaseOrders = true;
+
+        const lastPurchaseOrder =
+            state.purchaseOrders[
+                state.purchaseOrders.length -
+                    1
+            ];
+
+        await writeModuleCache(
+            'suppliers',
+            'supplier-page',
+            {
+                suppliers:
+                    state.suppliers,
+                purchaseOrders:
+                    state.purchaseOrders,
+                hasMore:
+                    uiState
+                        .purchaseOrdersHasMore,
+                lastPurchaseOrderDate:
+                    lastPurchaseOrder
+                        ?.tanggal ||
+                    null
+            }
+        );
     } catch (error) {
         dataFetched.purchaseOrders = false;
 
@@ -16265,6 +17348,36 @@ async function fetchPendingSettlementData(userId) {
     isSettlementLoading.value = true;
 
     try {
+        const cachedPendingSettlements =
+            await readModuleCache(
+                'sales',
+                'pending-settlements'
+            );
+
+        if (
+            cachedPendingSettlements &&
+            Array.isArray(
+                cachedPendingSettlements
+                    .transactions
+            )
+        ) {
+            state.pendingSettlements =
+                cachedPendingSettlements
+                    .transactions;
+
+            dataFetched.pendingSettlements =
+                true;
+
+            settlementCurrentPage.value =
+                1;
+
+            console.log(
+                `[APP CACHE] ${state.pendingSettlements.length} pesanan belum cair dimuat tanpa membaca koleksi ulang.`
+            );
+
+            return;
+        }
+
         // Ambil dua kemungkinan status transaksi belum cair
         const belumCairQuery = query(
             collection(db, 'transactions'),
@@ -16354,6 +17467,15 @@ async function fetchPendingSettlementData(userId) {
 
         console.log(
             `Berhasil memuat ${state.pendingSettlements.length} pesanan belum cair.`
+        );
+
+        await writeModuleCache(
+            'sales',
+            'pending-settlements',
+            {
+                transactions:
+                    state.pendingSettlements
+            }
         );
 
     } catch (error) {
@@ -16641,6 +17763,32 @@ const fetchNotesData = async (
         return;
     }
 
+    if (!forceRefresh) {
+        const cachedNotes =
+            await readModuleCache(
+                'notes',
+                'voucher-notes'
+            );
+
+        if (
+            cachedNotes &&
+            Array.isArray(
+                cachedNotes.rows
+            )
+        ) {
+            state.voucherNotes =
+                cachedNotes.rows;
+
+            dataFetched.notes = true;
+
+            console.log(
+                `[APP CACHE] ${state.voucherNotes.length} catatan voucher dimuat tanpa membaca koleksi ulang.`
+            );
+
+            return;
+        }
+    }
+
     try {
         const readDocuments =
             forceRefresh
@@ -16674,6 +17822,15 @@ const fetchNotesData = async (
             }));
 
         dataFetched.notes = true;
+
+        await writeModuleCache(
+            'notes',
+            'voucher-notes',
+            {
+                rows:
+                    state.voucherNotes
+            }
+        );
     } catch (error) {
         dataFetched.notes = false;
 
@@ -16711,6 +17868,7 @@ onMounted(() => {
     if (!user) {
         currentUser.value = null;
         userProfile.data = null;
+        clearReadCacheContext();
         activePage.value = 'login';
 
         if (unsubscribe) {
@@ -16739,6 +17897,12 @@ onMounted(() => {
             userDocSnap.exists()
                 ? userDocSnap.data()
                 : {};
+
+        // Satu dokumen kecil menentukan modul cache mana
+        // yang masih sama dengan data server.
+        await preparePersistentReadCache(
+            user.uid
+        );
 
         await fetchCoreData(user.uid);
 
