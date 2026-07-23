@@ -10840,16 +10840,65 @@ async function updateProductionInventoryStatus(batchId, itemIndex) {
             // EKSEKUSI KE DATABASE
             await batch.commit();
 
-            // --- UPDATE TAMPILAN (OPTIMISTIC UI) ---
-            // Langsung update layar agar user melihat hasilnya
-            itemToUpdate.isInventoried = true; // Tombol akan hilang/berubah
-            
-            if (matchingProduct) {
-                matchingProduct.stokFisik = (matchingProduct.stokFisik || 0) + qtyToAdd;
-                // Update juga di tabel inventaris paginasi
-                const invItem = state.inventoryPaginated.find(p => p.docId === matchingProduct.docId);
-                if (invItem) invItem.stokFisik = (invItem.stokFisik || 0) + qtyToAdd;
+            // Firestore menjadi sumber kebenaran untuk angka stok.
+            // state.produk dan state.inventoryPaginated dapat menunjuk objek
+            // produk yang sama. Karena itu stok tidak boleh ditambah dengan
+            // "+=" pada kedua array: angka layar bisa bertambah dua kali.
+            let stokTerbaru =
+                (Number(matchingProduct.stokFisik) || 0) +
+                qtyToAdd;
+
+            try {
+                const freshProductSnapshot =
+                    await getDocFromServer(productRef);
+
+                if (freshProductSnapshot.exists()) {
+                    stokTerbaru =
+                        Number(
+                            freshProductSnapshot
+                                .data()
+                                ?.physical_stock
+                        ) || 0;
+                }
+            } catch (verificationError) {
+                // Commit utama sudah berhasil. Bila pembacaan verifikasi
+                // sesaat gagal, tampilkan hasil lokal satu kali. Cache produk
+                // tetap kotor dan sinkronisasi berikutnya akan memakai server.
+                console.warn(
+                    '[STOK PRODUKSI] Stok server belum dapat diverifikasi. Memakai hasil lokal satu kali.',
+                    verificationError
+                );
             }
+
+            // Tombol langsung berubah menjadi "Sudah Masuk Inventaris".
+            itemToUpdate.isInventoried = true;
+
+            const applyLatestProductionStock =
+                productList => {
+                    (productList || []).forEach(product => {
+                        if (
+                            product?.docId ===
+                            matchingProduct.docId
+                        ) {
+                            // Assignment nilai final, bukan penambahan ulang.
+                            // Aman walaupun dua array memegang objek yang sama.
+                            product.stokFisik =
+                                stokTerbaru;
+                        }
+                    });
+                };
+
+            applyLatestProductionStock(
+                state.produk
+            );
+
+            applyLatestProductionStock(
+                state.inventoryPaginated
+            );
+
+            console.log(
+                `[STOK PRODUKSI] ${itemToUpdate.sku}: +${qtyToAdd} pcs, stok terbaru ${stokTerbaru}.`
+            );
 
             // Pesan Sukses
             alert("Berhasil! Stok bertambah.");
