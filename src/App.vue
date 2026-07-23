@@ -973,6 +973,17 @@ try {
         await beginIndexedDbStartup(userId);
         const dataPromises = [];
 
+        // FASHION_OS_PENDING_FUNDS_LIVE_V4
+        // Dana Gantung tampil secara global, jadi daftar transaksi belum
+        // cair harus tersedia pada halaman mana pun yang pertama dibuka.
+        if (!dataFetched.pendingSettlements) {
+            dataPromises.push(
+                fetchPendingSettlementData(
+                    userId
+                )
+            );
+        }
+
         switch(pageName) {
             case 'dashboard': {
                 dataPromises.push(
@@ -999,7 +1010,7 @@ try {
     dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
     break;
             case 'rekonsiliasi':
-    dataPromises.push(fetchPendingSettlementData(userId));
+    // Sudah dimuat oleh pemuatan global Dana Gantung di atas.
     break;
             case 'transaksi':
                 dataPromises.push(
@@ -4066,13 +4077,25 @@ async function processBatchOrders() {
         await batch.commit();
 
         state.transaksi.unshift(...newTransactions);
-        // Bila halaman pencairan pernah dimuat,
-// transaksi baru langsung dimasukkan tanpa query ulang.
-if (dataFetched.pendingSettlements) {
-    state.pendingSettlements.unshift(
-        ...newTransactions
+        // Transaksi belum cair baru selalu langsung masuk ke Dana Gantung.
+const pendingTransactionIds =
+    new Set(
+        (
+            state.pendingSettlements ||
+            []
+        ).map(transaction =>
+            transaction.id
+        )
     );
-}
+
+state.pendingSettlements.unshift(
+    ...newTransactions.filter(
+        transaction =>
+            !pendingTransactionIds.has(
+                transaction.id
+            )
+    )
+);
         // Update tampilan stok lokal
         ordersToProcess.forEach(order => {
             order.items.forEach(item => {
@@ -5717,8 +5740,104 @@ const transaksiCairKeys = new Set();
         }
     });
 
-    kpis.danaBelumCair = danaBelumCair;
-    kpis.qtyBelumCair = qtyBelumCair;
+    // Dana Gantung adalah saldo piutang seluruh waktu dan tidak mengikuti
+    // filter periode Dashboard. Gunakan daftar khusus transaksi belum cair.
+    if (
+        dataFetched.pendingSettlements ||
+        (
+            state.pendingSettlements ||
+            []
+        ).length > 0
+    ) {
+        danaBelumCair = 0;
+        qtyBelumCair = 0;
+
+        (
+            state.pendingSettlements ||
+            []
+        ).forEach(transaction => {
+            if (
+                !isActiveExportRecord(
+                    transaction
+                )
+            ) {
+                return;
+            }
+
+            const settlementStatus =
+                String(
+                    transaction.statusPencairan ||
+                    'Belum Cair'
+                )
+                    .trim()
+                    .toLocaleLowerCase(
+                        'id-ID'
+                    );
+
+            if (
+                settlementStatus !==
+                    'belum cair' &&
+                settlementStatus !==
+                    'waiting'
+            ) {
+                return;
+            }
+
+            const transactionFees =
+                Number(
+                    transaction?.biaya?.total
+                ) || 0;
+
+            let transactionTotal =
+                Number(transaction.total);
+
+            if (
+                !Number.isFinite(
+                    transactionTotal
+                )
+            ) {
+                const subtotal =
+                    Number(
+                        transaction.subtotal
+                    ) || 0;
+
+                const discount =
+                    Number(
+                        transaction?.diskon
+                            ?.totalDiscount
+                    ) || 0;
+
+                transactionTotal =
+                    subtotal -
+                    discount;
+            }
+
+            danaBelumCair +=
+                transactionTotal -
+                transactionFees;
+
+            qtyBelumCair +=
+                (
+                    transaction.items ||
+                    []
+                ).reduce(
+                    (total, item) =>
+                        total +
+                        (
+                            Number(
+                                item.qty
+                            ) || 0
+                        ),
+                    0
+                );
+        });
+    }
+
+    kpis.danaBelumCair =
+        danaBelumCair;
+
+    kpis.qtyBelumCair =
+        qtyBelumCair;
 
     // Semua retur pada filter Dashboard.
 // Dipakai khusus untuk kartu Total Nilai Retur.
@@ -8494,9 +8613,14 @@ const createdTransaction = {
 
 state.transaksi.unshift(createdTransaction);
 
-// Bila daftar pesanan belum cair sudah pernah dimuat,
-// tambahkan transaksi baru ke daftar tersebut juga.
-if (dataFetched.pendingSettlements) {
+// Transaksi POS belum cair selalu langsung masuk ke Dana Gantung.
+if (
+    !state.pendingSettlements.some(
+        transaction =>
+            transaction.id ===
+            createdTransaction.id
+    )
+) {
     state.pendingSettlements.unshift(
         createdTransaction
     );
@@ -14990,9 +15114,46 @@ async function fetchPendingSettlementData(userId) {
         addSnapshotToMap(belumCairSnapshot);
         addSnapshotToMap(waitingSnapshot);
 
+        // Pertahankan transaksi lokal yang mungkin baru dibuat ketika
+        // permintaan server masih berjalan.
+        (
+            state.pendingSettlements ||
+            []
+        ).forEach(transaction => {
+            const status =
+                String(
+                    transaction.statusPencairan ||
+                    'Belum Cair'
+                )
+                    .trim()
+                    .toLocaleLowerCase(
+                        'id-ID'
+                    );
+
+            if (
+                isActiveExportRecord(
+                    transaction
+                ) &&
+                (
+                    status ===
+                        'belum cair' ||
+                    status ===
+                        'waiting'
+                )
+            ) {
+                transactionMap.set(
+                    transaction.id,
+                    transaction
+                );
+            }
+        });
+
         state.pendingSettlements = Array.from(
             transactionMap.values()
         );
+
+        dataFetched.pendingSettlements =
+            true;
 
         settlementCurrentPage.value = 1;
 
@@ -15007,6 +15168,9 @@ async function fetchPendingSettlementData(userId) {
         );
 
         state.pendingSettlements = [];
+
+        dataFetched.pendingSettlements =
+            false;
 
         alert(
             'Daftar pesanan belum cair gagal dimuat. Silakan muat ulang halaman.'
