@@ -81,18 +81,8 @@ const currentUser = ref(null);
 // ============================================================
 // MODE FOKUS + PRIVASI DANA GANTUNG
 // ============================================================
-const FOCUS_MODE_STORAGE_KEY =
-    'fashion_os_focus_mode_v1';
-
 const PENDING_PRIVACY_STORAGE_KEY =
     'fashion_os_pending_privacy_v1';
-
-const isFocusMode =
-    ref(
-        localStorage.getItem(
-            FOCUS_MODE_STORAGE_KEY
-        ) === 'on'
-    );
 
 const isPendingPrivacyMode =
     ref(
@@ -100,21 +90,6 @@ const isPendingPrivacyMode =
             PENDING_PRIVACY_STORAGE_KEY
         ) === 'on'
     );
-
-watch(
-    isFocusMode,
-    enabled => {
-        localStorage.setItem(
-            FOCUS_MODE_STORAGE_KEY,
-            enabled
-                ? 'on'
-                : 'off'
-        );
-    },
-    {
-        immediate: true
-    }
-);
 
 watch(
     isPendingPrivacyMode,
@@ -701,11 +676,6 @@ function toggleSidebarGroup(group) {
     uiState.sidebarGroups[group] = !isCurrentlyOpen;
 }
 
-
-function toggleFocusMode() {
-    isFocusMode.value =
-        !isFocusMode.value;
-}
 
 function togglePendingPrivacyMode() {
     isPendingPrivacyMode.value =
@@ -18790,10 +18760,7 @@ watch(activePage, (newPage, oldPage) => {
         :class="{ 'fashion-dark': isDarkMode }"
     >
       <!-- Sidebar -->
-      <aside
-        v-show="!isFocusMode"
-        class="w-64 bg-gray-900 text-gray-300 flex-shrink-0 hidden md:flex md:flex-col"
-    >
+      <aside class="w-64 bg-gray-900 text-gray-300 flex-shrink-0 hidden md:flex md:flex-col">
     <div class="h-16 flex items-center justify-center px-4 border-b border-gray-700/50">
         <h1 class="text-xl font-bold text-white tracking-wider">{{ state.settings.brandName }}</h1>
     </div>
@@ -18953,44 +18920,6 @@ watch(activePage, (newPage, oldPage) => {
     <button
         type="button"
         class="view-mode-card"
-        :aria-pressed="isFocusMode"
-        aria-label="Aktifkan Mode Fokus"
-        @click="toggleFocusMode"
-    >
-        <span class="view-mode-icon" aria-hidden="true">
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                class="h-5 w-5"
-            >
-                <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
-                />
-            </svg>
-        </span>
-
-        <span class="min-w-0 flex-1 text-left">
-            <span class="block text-sm font-semibold text-white">
-                Mode Fokus
-            </span>
-            <span class="block text-xs text-gray-400">
-                Sembunyikan sidebar
-            </span>
-        </span>
-
-        <span class="view-mode-action">
-            Buka
-        </span>
-    </button>
-
-    <button
-        type="button"
-        class="view-mode-card"
         :class="{
             'view-mode-card-active':
                 isPendingPrivacyMode
@@ -19123,36 +19052,7 @@ watch(activePage, (newPage, oldPage) => {
 </aside>
 
       <!-- Main Content -->
-      <main
-        class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8"
-        :class="{ 'focus-mode-main': isFocusMode }"
-    >
-
-    <button
-        v-if="isFocusMode"
-        type="button"
-        class="focus-mode-return hidden md:flex"
-        aria-label="Tampilkan kembali sidebar"
-        @click="toggleFocusMode"
-    >
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            class="h-5 w-5"
-            aria-hidden="true"
-        >
-            <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 6h16M4 12h16M4 18h16"
-            />
-        </svg>
-
-        <span>Tampilkan Sidebar</span>
-    </button>
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
     
     <div v-if="isLoading" class="flex items-center justify-center h-full">
         <div class="text-center">
@@ -28587,45 +28487,6 @@ BAJU-PUTIH-M</pre>
 /* ============================================================
    MODE FOKUS + PRIVASI DANA GANTUNG
    ============================================================ */
-.focus-mode-main {
-    width: 100%;
-}
-
-.focus-mode-return {
-    position: fixed;
-    top: 1rem;
-    left: 1rem;
-    z-index: 80;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.65rem 0.9rem;
-    border: 1px solid rgba(148, 163, 184, 0.30);
-    border-radius: 0.75rem;
-    background-color: rgba(15, 23, 42, 0.95);
-    color: #ffffff;
-    font-size: 0.8rem;
-    font-weight: 700;
-    box-shadow:
-        0 12px 30px
-        rgba(15, 23, 42, 0.28);
-    backdrop-filter: blur(10px);
-    transition:
-        transform 0.2s ease,
-        background-color 0.2s ease,
-        border-color 0.2s ease;
-}
-
-.focus-mode-return:hover {
-    background-color: #1e293b;
-    border-color: rgba(129, 140, 248, 0.65);
-    transform: translateY(-1px);
-}
-
-.focus-mode-return:focus-visible {
-    outline: 2px solid #818cf8;
-    outline-offset: 2px;
-}
-
 .view-mode-controls {
     display: grid;
     gap: 0.5rem;
@@ -28730,13 +28591,9 @@ BAJU-PUTIH-M</pre>
 }
 
 @media (min-width: 768px) {
-    .focus-mode-main {
-        padding-top: 4.75rem !important;
     }
-}
 
 @media print {
-    .focus-mode-return,
     .view-mode-controls {
         display: none !important;
     }
@@ -28828,6 +28685,85 @@ BAJU-PUTIH-M</pre>
 /* Bantuan tidak terlalu jauh dari kontrol mode */
 .view-mode-controls + button.sidebar-link {
     margin-top: 0.15rem;
+}
+
+
+/* FASHION_OS_REMOVE_FOCUS_ULTRA_COMPACT_V1 */
+
+/* ============================================================
+   SIDEBAR MODE ULTRA COMPACT
+   ============================================================ */
+
+/* Hanya Mode Gelap dan Privasi Dana */
+.theme-toggle-container,
+.view-mode-controls {
+    padding: 0 0.4rem 0.35rem !important;
+}
+
+.view-mode-controls {
+    gap: 0.25rem !important;
+}
+
+/* Kartu sangat ringkas */
+.theme-toggle-card,
+.view-mode-card {
+    min-height: 2.55rem !important;
+    gap: 0.4rem !important;
+    padding: 0.35rem 0.45rem !important;
+    border-radius: 0.55rem !important;
+}
+
+/* Ikon kecil */
+.theme-toggle-icon,
+.view-mode-icon {
+    width: 1.35rem !important;
+    height: 1.35rem !important;
+    border-radius: 0.4rem !important;
+}
+
+.theme-toggle-icon svg,
+.view-mode-icon svg {
+    width: 0.82rem !important;
+    height: 0.82rem !important;
+}
+
+/* Teks dibuat lebih pendek dan rapat */
+.theme-toggle-card .text-sm,
+.view-mode-card .text-sm {
+    font-size: 0.7rem !important;
+    line-height: 0.82rem !important;
+}
+
+.theme-toggle-card .text-xs,
+.view-mode-card .text-xs {
+    margin-top: 0 !important;
+    font-size: 0.57rem !important;
+    line-height: 0.72rem !important;
+}
+
+/* Sakelar lebih kecil */
+.theme-toggle-switch,
+.view-mode-switch {
+    width: 1.75rem !important;
+    height: 1rem !important;
+}
+
+.theme-toggle-switch-knob,
+.view-mode-switch-knob {
+    top: 0.125rem !important;
+    left: 0.125rem !important;
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+}
+
+.theme-toggle-switch-active .theme-toggle-switch-knob,
+.view-mode-switch-active .view-mode-switch-knob {
+    transform: translateX(0.75rem) !important;
+}
+
+/* Bantuan tetap dekat */
+.view-mode-controls + button.sidebar-link {
+    margin-top: 0.05rem !important;
 }
 
 </style>
