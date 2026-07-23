@@ -9353,6 +9353,35 @@ function unlockPemasukan() {
     }
 }
 
+const PIN_PROTECTION_DEFAULTS =
+    Object.freeze({
+        dashboard: false,
+        incomeHistory: false,
+        investmentPage: false,
+        laporanTransaksi: false,
+        laporanKeuangan: false,
+        hargaHpp: false,
+        statistikPenjualan: false,
+        exportData: false,
+        transactionDetail: false
+    });
+
+function ensurePinProtectionDefaults() {
+    const currentProtection =
+        state.settings.pinProtection &&
+        typeof state.settings.pinProtection ===
+            'object'
+            ? state.settings.pinProtection
+            : {};
+
+    state.settings.pinProtection = {
+        ...PIN_PROTECTION_DEFAULTS,
+        ...currentProtection
+    };
+
+    return state.settings.pinProtection;
+}
+
 let pendingPinProtectedAction = null;
 
 function resetPinConfirmationState() {
@@ -9374,6 +9403,11 @@ function requestPinForToggle(feature) {
         alert('Anda harus mengatur PIN utama terlebih dahulu di bagian "Ubah PIN Dasbor".');
         return;
     }
+
+    // Cache pengaturan lama mungkin belum memiliki key fitur PIN baru.
+    // Normalisasi dilakukan sebelum modal dibuka agar tombol Konfirmasi
+    // tidak berhenti diam saat statistik/export/detail diaktifkan.
+    ensurePinProtectionDefaults();
 
     pendingPinProtectedAction = null;
     uiState.pinActionToConfirm = feature;
@@ -9442,12 +9476,29 @@ async function confirmPinAndToggle() {
         return;
     }
 
-    const feature = uiState.pinActionToConfirm;
-    if (feature && Object.prototype.hasOwnProperty.call(state.settings.pinProtection, feature)) {
-        state.settings.pinProtection[feature] = !state.settings.pinProtection[feature];
-        await saveGeneralSettings();
-        resetPinConfirmationState();
+    const feature =
+        uiState.pinActionToConfirm;
+
+    const pinProtection =
+        ensurePinProtectionDefaults();
+
+    if (
+        !feature ||
+        !Object.prototype.hasOwnProperty.call(
+            pinProtection,
+            feature
+        )
+    ) {
+        uiState.pinConfirmError =
+            'Pengaturan kunci tidak ditemukan. Tutup lalu buka kembali Pengaturan Umum.';
+        return;
     }
+
+    pinProtection[feature] =
+        !pinProtection[feature];
+
+    await saveGeneralSettings();
+    resetPinConfirmationState();
 }
 
 async function submitBankAccount() {
@@ -13486,6 +13537,10 @@ const applyCoreCachePayload =
             state.settings,
             payload.settings || {}
         );
+
+        // Cache lama tetap dapat dipakai, tetapi seluruh key PIN baru
+        // harus selalu tersedia sebelum halaman Pengaturan ditampilkan.
+        ensurePinProtectionDefaults();
 
         state.settings.categories =
             Array.isArray(payload.categories)
@@ -28914,4 +28969,6 @@ BAJU-PUTIH-M</pre>
 /* FASHION_OS_MOVE_PENDING_PRIVACY_TO_SETTINGS_V1 */
 
 /* FASHION_OS_ADVANCED_PIN_PROTECTION_V1 */
+
+/* FASHION_OS_PIN_NEW_KEYS_CACHE_HOTFIX_V1 */
 </style>
