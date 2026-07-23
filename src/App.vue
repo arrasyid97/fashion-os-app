@@ -5196,6 +5196,7 @@ const dashboardCashBalance =
 
 let dashboardCashBalanceRequestId = 0;
 
+// FASHION_OS_DASHBOARD_CASH_AND_SELLING_PRICES_V1
 const getDashboardAggregateTotal =
     async (sourceQuery, fieldPath) => {
         const snapshot =
@@ -5209,6 +5210,171 @@ const getDashboardAggregateTotal =
         return Number(
             snapshot.data().total
         ) || 0;
+    };
+
+const toDashboardCashNumber =
+    value => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed)
+            ? parsed
+            : 0;
+    };
+
+const getDashboardCashDiscount =
+    transaction =>
+        toDashboardCashNumber(
+            transaction?.diskon?.totalDiscount ??
+            transaction?.totalDiscount ??
+            transaction?.discount
+        );
+
+const getDashboardCashGross =
+    transaction => {
+        const subtotal =
+            Number(transaction?.subtotal);
+
+        if (
+            Number.isFinite(subtotal) &&
+            subtotal !== 0
+        ) {
+            return subtotal;
+        }
+
+        // Dokumen lama dapat hanya memiliki total bersih.
+        // Tambahkan kembali diskon agar rumus gross - diskon tetap konsisten.
+        return (
+            toDashboardCashNumber(
+                transaction?.total ??
+                transaction?.grandTotal
+            ) +
+            getDashboardCashDiscount(
+                transaction
+            )
+        );
+    };
+
+const loadDashboardCashBalanceFromDocuments =
+    async userId => {
+        // Query sederhana per user tidak membutuhkan indeks gabungan.
+        // Jalur ini hanya dipakai bila aggregate gagal atau tidak dapat
+        // membaca subtotal dokumen lama.
+        const [
+            transactionSnapshot,
+            financeSnapshot
+        ] = await Promise.all([
+            getDocsFromServer(
+                query(
+                    collection(db, 'transactions'),
+                    where('userId', '==', userId)
+                )
+            ),
+            getDocsFromServer(
+                query(
+                    collection(db, 'keuangan'),
+                    where('userId', '==', userId)
+                )
+            )
+        ]);
+
+        let settledGross = 0;
+        let settledDiscount = 0;
+        let settledFees = 0;
+
+        transactionSnapshot.docs.forEach(
+            documentSnapshot => {
+                const transaction = {
+                    id: documentSnapshot.id,
+                    ...documentSnapshot.data()
+                };
+
+                if (
+                    !isActiveExportRecord(
+                        transaction
+                    ) ||
+                    String(
+                        transaction.statusPencairan ||
+                        ''
+                    )
+                        .trim()
+                        .toLocaleLowerCase('id-ID') !==
+                        'sudah cair'
+                ) {
+                    return;
+                }
+
+                settledGross +=
+                    getDashboardCashGross(
+                        transaction
+                    );
+
+                settledDiscount +=
+                    getDashboardCashDiscount(
+                        transaction
+                    );
+
+                settledFees +=
+                    toDashboardCashNumber(
+                        transaction?.biaya?.total ??
+                        transaction?.totalBiaya
+                    );
+            }
+        );
+
+        let otherIncome = 0;
+        let expense = 0;
+        let otherCost = 0;
+
+        financeSnapshot.docs.forEach(
+            documentSnapshot => {
+                const finance = {
+                    id: documentSnapshot.id,
+                    ...documentSnapshot.data()
+                };
+
+                if (
+                    !isActiveExportRecord(
+                        finance
+                    )
+                ) {
+                    return;
+                }
+
+                const amount =
+                    toDashboardCashNumber(
+                        finance.jumlah ??
+                        finance.amount ??
+                        finance.nominal
+                    );
+
+                if (
+                    finance.jenis ===
+                    'pemasukan_lain'
+                ) {
+                    otherIncome += amount;
+                } else if (
+                    finance.jenis ===
+                    'pengeluaran'
+                ) {
+                    expense += amount;
+                } else if (
+                    finance.jenis ===
+                    'biaya'
+                ) {
+                    otherCost += amount;
+                }
+            }
+        );
+
+        return (
+            (
+                settledGross -
+                settledDiscount -
+                settledFees
+            ) +
+            otherIncome -
+            expense -
+            otherCost
+        );
     };
 
 const loadDashboardCashBalance =
@@ -5227,71 +5393,102 @@ const loadDashboardCashBalance =
         dashboardCashBalance.error = '';
 
         try {
-            const settledTransactionsQuery =
-                query(
-                    collection(db, 'transactions'),
-                    where('userId', '==', userId),
-                    where(
-                        'statusPencairan',
-                        '==',
-                        'Sudah Cair'
-                    )
-                );
+            let cashValue;
 
-            const otherIncomeQuery =
-                query(
-                    collection(db, 'keuangan'),
-                    where('userId', '==', userId),
-                    where(
-                        'jenis',
-                        '==',
-                        'pemasukan_lain'
-                    )
-                );
+            try {
+                const settledTransactionsQuery =
+                    query(
+                        collection(db, 'transactions'),
+                        where('userId', '==', userId),
+                        where(
+                            'statusPencairan',
+                            '==',
+                            'Sudah Cair'
+                        )
+                    );
 
-            const expenseQuery =
-                jenis =>
+                const otherIncomeQuery =
                     query(
                         collection(db, 'keuangan'),
                         where('userId', '==', userId),
-                        where('jenis', '==', jenis)
+                        where(
+                            'jenis',
+                            '==',
+                            'pemasukan_lain'
+                        )
                     );
 
-            // Dipisah per field agar transaksi lama yang tidak mempunyai
-            // field diskon/biaya tetap masuk ke perhitungan subtotal.
-            const [
-                settledGross,
-                settledDiscount,
-                settledFees,
-                otherIncome,
-                expense,
-                otherCost
-            ] = await Promise.all([
-                getDashboardAggregateTotal(
-                    settledTransactionsQuery,
-                    'subtotal'
-                ),
-                getDashboardAggregateTotal(
-                    settledTransactionsQuery,
-                    'diskon.totalDiscount'
-                ),
-                getDashboardAggregateTotal(
-                    settledTransactionsQuery,
-                    'biaya.total'
-                ),
-                getDashboardAggregateTotal(
-                    otherIncomeQuery,
-                    'jumlah'
-                ),
-                getDashboardAggregateTotal(
-                    expenseQuery('pengeluaran'),
-                    'jumlah'
-                ),
-                getDashboardAggregateTotal(
-                    expenseQuery('biaya'),
-                    'jumlah'
-                )
-            ]);
+                const expenseQuery =
+                    jenis =>
+                        query(
+                            collection(db, 'keuangan'),
+                            where('userId', '==', userId),
+                            where('jenis', '==', jenis)
+                        );
+
+                const [
+                    settledGross,
+                    settledDiscount,
+                    settledFees,
+                    otherIncome,
+                    expense,
+                    otherCost
+                ] = await Promise.all([
+                    getDashboardAggregateTotal(
+                        settledTransactionsQuery,
+                        'subtotal'
+                    ),
+                    getDashboardAggregateTotal(
+                        settledTransactionsQuery,
+                        'diskon.totalDiscount'
+                    ),
+                    getDashboardAggregateTotal(
+                        settledTransactionsQuery,
+                        'biaya.total'
+                    ),
+                    getDashboardAggregateTotal(
+                        otherIncomeQuery,
+                        'jumlah'
+                    ),
+                    getDashboardAggregateTotal(
+                        expenseQuery('pengeluaran'),
+                        'jumlah'
+                    ),
+                    getDashboardAggregateTotal(
+                        expenseQuery('biaya'),
+                        'jumlah'
+                    )
+                ]);
+
+                cashValue =
+                    (
+                        settledGross -
+                        settledDiscount -
+                        settledFees
+                    ) +
+                    otherIncome -
+                    expense -
+                    otherCost;
+
+                // Nilai gross nol juga dapat berarti dokumen lama tidak
+                // mempunyai field subtotal. Hitung ulang dari dokumennya.
+                if (settledGross === 0) {
+                    cashValue =
+                        await loadDashboardCashBalanceFromDocuments(
+                            userId
+                        );
+                }
+            } catch (aggregateError) {
+                console.warn(
+                    '[DASHBOARD] Aggregate saldo tidak tersedia, memakai pembacaan cadangan:',
+                    aggregateError
+                );
+
+                cashValue =
+                    await loadDashboardCashBalanceFromDocuments(
+                        userId
+                    );
+            }
 
             if (
                 requestId !==
@@ -5301,16 +5498,12 @@ const loadDashboardCashBalance =
             }
 
             dashboardCashBalance.value =
-                (
-                    settledGross -
-                    settledDiscount -
-                    settledFees
-                ) +
-                otherIncome -
-                expense -
-                otherCost;
+                toDashboardCashNumber(
+                    cashValue
+                );
 
             dashboardCashBalance.loaded = true;
+            dashboardCashBalance.error = '';
         } catch (error) {
             if (
                 requestId !==
@@ -12085,12 +12278,104 @@ const fetchProductData =
         dataFetched.products = true;
     };
 
+const applyLoadedSellingPricesToProducts =
+    products => {
+        const priceMap = new Map();
+
+        (
+            state.productPrices ||
+            []
+        ).forEach(price => {
+            if (
+                !isActiveExportRecord(price)
+            ) {
+                return;
+            }
+
+            const productId =
+                price.product_id ??
+                price.productId;
+
+            const marketplaceId =
+                price.marketplace_id ??
+                price.marketplaceId;
+
+            if (
+                productId === undefined ||
+                productId === null ||
+                marketplaceId === undefined ||
+                marketplaceId === null
+            ) {
+                return;
+            }
+
+            const rawPrice =
+                price.price ??
+                price.harga ??
+                price.hargaJual;
+
+            const numericPrice =
+                Number(rawPrice);
+
+            priceMap.set(
+                `${String(productId)}__${String(marketplaceId)}`,
+                Number.isFinite(numericPrice)
+                    ? numericPrice
+                    : 0
+            );
+        });
+
+        (
+            products ||
+            state.produk ||
+            []
+        ).forEach(product => {
+            if (
+                !product.hargaJual ||
+                typeof product.hargaJual !==
+                    'object'
+            ) {
+                product.hargaJual = {};
+            }
+
+            (
+                state.settings.marketplaces ||
+                []
+            ).forEach(marketplace => {
+                const priceKey =
+                    `${String(product.docId)}__${String(marketplace.id)}`;
+
+                if (priceMap.has(priceKey)) {
+                    product.hargaJual[
+                        marketplace.id
+                    ] =
+                        priceMap.get(priceKey);
+                } else if (
+                    !Object.prototype.hasOwnProperty.call(
+                        product.hargaJual,
+                        marketplace.id
+                    )
+                ) {
+                    product.hargaJual[
+                        marketplace.id
+                    ] = 0;
+                }
+            });
+        });
+    };
+
 const fetchAllProductData = async (userId) => {
     // Gunakan flag baru untuk mencegah fetch ulang jika SEMUA data sudah ada
     if (
     dataFetched.allProductsLoaded &&
     dataFetched.pricesAndAllocations
 ) {
+        // Produk yang baru dimuat dari Inventaris memiliki hargaJual kosong.
+        // Pasang kembali harga yang sudah ada sebelum memakai cache.
+        applyLoadedSellingPricesToProducts(
+            state.produk
+        );
+
         console.log(
             '[CACHE SESSION] Seluruh produk, harga, dan stok sudah tersedia.'
         );
@@ -12187,6 +12472,11 @@ const mergedPrices = dedupeRowsByDocId([
 ]);
 
 state.productPrices = mergedPrices;
+
+// Pastikan produk yang sudah berada di state langsung memperoleh harga.
+applyLoadedSellingPricesToProducts(
+    state.produk
+);
 
 // Map membuat pencarian harga jauh lebih cepat
 // untuk akun yang produknya banyak.
