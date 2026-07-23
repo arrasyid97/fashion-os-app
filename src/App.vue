@@ -28742,4 +28742,92 @@ BAJU-PUTIH-M</pre>
     }
 }
 
+
+/* FASHION_OS_COMPACT_SIDEBAR_MODES_V1 */
+
+/* ============================================================
+   MODE SIDEBAR COMPACT
+   ============================================================ */
+
+/* Jarak keseluruhan antar-kontrol dipadatkan */
+.theme-toggle-container,
+.view-mode-controls {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    padding-bottom: 0.45rem !important;
+}
+
+.view-mode-controls {
+    gap: 0.35rem !important;
+}
+
+/* Tinggi kartu diperkecil */
+.theme-toggle-card,
+.view-mode-card {
+    min-height: 3.25rem;
+    gap: 0.5rem !important;
+    padding: 0.5rem 0.55rem !important;
+    border-radius: 0.65rem !important;
+}
+
+/* Ikon lebih kecil */
+.theme-toggle-icon,
+.view-mode-icon {
+    width: 1.65rem !important;
+    height: 1.65rem !important;
+    border-radius: 0.5rem !important;
+}
+
+.theme-toggle-icon svg,
+.view-mode-icon svg {
+    width: 1rem !important;
+    height: 1rem !important;
+}
+
+/* Judul dan keterangan lebih ringkas */
+.theme-toggle-card .text-sm,
+.view-mode-card .text-sm {
+    font-size: 0.78rem !important;
+    line-height: 1rem !important;
+}
+
+.theme-toggle-card .text-xs,
+.view-mode-card .text-xs {
+    margin-top: 0.05rem;
+    font-size: 0.66rem !important;
+    line-height: 0.9rem !important;
+}
+
+/* Tombol kecil "Buka" */
+.view-mode-action {
+    padding: 0.18rem 0.38rem !important;
+    border-radius: 0.4rem !important;
+    font-size: 0.6rem !important;
+}
+
+/* Sakelar dibuat lebih kecil tetapi tetap nyaman diklik */
+.theme-toggle-switch,
+.view-mode-switch {
+    width: 2.15rem !important;
+    height: 1.2rem !important;
+}
+
+.theme-toggle-switch-knob,
+.view-mode-switch-knob {
+    top: 0.15rem !important;
+    left: 0.15rem !important;
+    width: 0.9rem !important;
+    height: 0.9rem !important;
+}
+
+.theme-toggle-switch-active .theme-toggle-switch-knob,
+.view-mode-switch-active .view-mode-switch-knob {
+    transform: translateX(0.95rem) !important;
+}
+
+/* Bantuan tidak terlalu jauh dari kontrol mode */
+.view-mode-controls + button.sidebar-link {
+    margin-top: 0.15rem;
+}
+
 </style>
