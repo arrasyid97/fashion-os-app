@@ -650,3 +650,10 @@ Object.entries(syncTrackedCollections).forEach(
     );
   }
 );
+
+// FASHION_OS_DASHBOARD_SUMMARY_V2
+// Modul terpisah: tidak menimpa ringkasan lama dan aman untuk rollback.
+Object.assign(
+  exports,
+  require("./dashboard-summary-v2"),
+);

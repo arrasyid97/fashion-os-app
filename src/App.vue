@@ -6,7 +6,8 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 
 // Impor dari file konfigurasi Firebase Anda
 
-import { db, auth } from './firebase.js'; 
+import { db, auth, functions } from './firebase.js'; 
+import { httpsCallable } from 'firebase/functions';
 
 // Impor fungsi-fungsi untuk Database (Firestore)
 import {
@@ -973,14 +974,29 @@ try {
         await beginIndexedDbStartup(userId);
         const dataPromises = [];
 
-        // FASHION_OS_PENDING_FUNDS_LIVE_V4
-        // Dana Gantung tampil secara global, jadi daftar transaksi belum
-        // cair harus tersedia pada halaman mana pun yang pertama dibuka.
-        if (!dataFetched.pendingSettlements) {
+        // FASHION_OS_DASHBOARD_SUMMARY_V2
+        // Di luar Dashboard/Rekonsiliasi cukup baca satu dokumen global.
+        // Bila ringkasan belum siap, daftar Dana Gantung lama tetap dipakai.
+        if (
+            pageName !== 'dashboard' &&
+            pageName !== 'rekonsiliasi'
+        ) {
             dataPromises.push(
-                fetchPendingSettlementData(
+                loadDashboardGlobalSummaryV2(
                     userId
-                )
+                ).then(summaryReady => {
+                    if (
+                        !summaryReady &&
+                        !dataFetched
+                            .pendingSettlements
+                    ) {
+                        return fetchPendingSettlementData(
+                            userId
+                        );
+                    }
+
+                    return true;
+                })
             );
         }
 
@@ -1010,7 +1026,12 @@ try {
     dataPromises.push(fetchTransactionAndReturnData(userId, false, null, null, true));
     break;
             case 'rekonsiliasi':
-    // Sudah dimuat oleh pemuatan global Dana Gantung di atas.
+    // Halaman ini membutuhkan dokumen transaksi untuk aksi pencairan.
+    dataPromises.push(
+        fetchPendingSettlementData(
+            userId
+        )
+    );
     break;
             case 'transaksi':
                 dataPromises.push(
@@ -4096,6 +4117,14 @@ state.pendingSettlements.unshift(
             )
     )
 );
+
+newTransactions.forEach(
+    transaction =>
+        applyDashboardSummaryV2TransactionDelta(
+            null,
+            transaction
+        )
+);
         // Update tampilan stok lokal
         ordersToProcess.forEach(order => {
             order.items.forEach(item => {
@@ -5217,6 +5246,817 @@ const dashboardCashBalance =
 
 let dashboardCashBalanceRequestId = 0;
 
+// FASHION_OS_DASHBOARD_SUMMARY_V2
+// Ringkasan ini berada di koleksi baru dan tidak mengubah user_summaries
+// lama. Bila Cloud Function belum siap, pemuatan lama tetap menjadi fallback.
+const dashboardSummaryV2 =
+    reactive({
+        periodReady: false,
+        globalReady: false,
+        userId: '',
+        loading: false,
+        rebuilding: false,
+        metrics: {},
+        global: {},
+        series: [],
+        channels: {},
+        today: {},
+        version: 0,
+        readDocuments: 0,
+        error: ''
+    });
+
+const DASHBOARD_SUMMARY_V2_CACHE_PREFIX =
+    'fashion_os_dashboard_v2_cache:';
+
+const dashboardSummaryV2MemoryCache =
+    new Map();
+
+const dashboardSummaryV2RebuildAttempted =
+    new Set();
+
+let dashboardSummaryV2GlobalLoadedAt =
+    0;
+
+let dashboardSummaryV2RefreshTimer =
+    null;
+
+const getDashboardSummaryV2Callable =
+    httpsCallable(
+        functions,
+        'getDashboardSummaryV2',
+        {
+            timeout: 120000
+        }
+    );
+
+const rebuildDashboardSummaryV2Callable =
+    httpsCallable(
+        functions,
+        'rebuildDashboardSummaryV2',
+        {
+            timeout: 540000
+        }
+    );
+
+const prepareDashboardSummaryV2User =
+    userId => {
+        if (
+            dashboardSummaryV2.userId ===
+            userId
+        ) {
+            return;
+        }
+
+        dashboardSummaryV2.userId =
+            userId || '';
+
+        dashboardSummaryV2.periodReady =
+            false;
+
+        dashboardSummaryV2.globalReady =
+            false;
+
+        dashboardSummaryV2.metrics =
+            {};
+
+        dashboardSummaryV2.global =
+            {};
+
+        dashboardSummaryV2.series =
+            [];
+
+        dashboardSummaryV2.channels =
+            {};
+
+        dashboardSummaryV2.today =
+            {};
+
+        dashboardSummaryV2.version =
+            0;
+
+        dashboardSummaryV2GlobalLoadedAt =
+            0;
+
+        dashboardCashBalance.value =
+            0;
+
+        dashboardCashBalance.loaded =
+            false;
+
+        dashboardCashBalance.error =
+            '';
+    };
+
+const dashboardSummaryV2DateKey =
+    value => {
+        const date =
+            value instanceof Date
+                ? value
+                : new Date(value);
+
+        if (
+            Number.isNaN(
+                date.getTime()
+            )
+        ) {
+            return '';
+        }
+
+        const year =
+            date.getFullYear();
+
+        const month =
+            String(
+                date.getMonth() + 1
+            ).padStart(2, '0');
+
+        const day =
+            String(
+                date.getDate()
+            ).padStart(2, '0');
+
+        return `${year}-${month}-${day}`;
+    };
+
+const dashboardSummaryV2RequestPayload =
+    range => ({
+        allTime:
+            range.allTime === true,
+        startDateKey:
+            range.startDate
+                ? dashboardSummaryV2DateKey(
+                    range.startDate
+                )
+                : '',
+        endDateKey:
+            range.endDate
+                ? dashboardSummaryV2DateKey(
+                    range.endDate
+                )
+                : '',
+        todayDateKey:
+            dashboardSummaryV2DateKey(
+                new Date()
+            )
+    });
+
+const dashboardSummaryV2CacheKey =
+    (userId, requestPayload) =>
+        `${DASHBOARD_SUMMARY_V2_CACHE_PREFIX}${userId}:${JSON.stringify(requestPayload)}`;
+
+const readDashboardSummaryV2Cache =
+    cacheKey => {
+        if (
+            dashboardSummaryV2MemoryCache.has(
+                cacheKey
+            )
+        ) {
+            return dashboardSummaryV2MemoryCache.get(
+                cacheKey
+            );
+        }
+
+        try {
+            const cachedValue =
+                sessionStorage.getItem(
+                    cacheKey
+                );
+
+            if (!cachedValue) {
+                return null;
+            }
+
+            const parsedValue =
+                JSON.parse(
+                    cachedValue
+                );
+
+            if (
+                parsedValue?.ready !==
+                true
+            ) {
+                return null;
+            }
+
+            dashboardSummaryV2MemoryCache.set(
+                cacheKey,
+                parsedValue
+            );
+
+            return parsedValue;
+        } catch (error) {
+            return null;
+        }
+    };
+
+const writeDashboardSummaryV2Cache =
+    (cacheKey, value) => {
+        dashboardSummaryV2MemoryCache.set(
+            cacheKey,
+            value
+        );
+
+        try {
+            sessionStorage.setItem(
+                cacheKey,
+                JSON.stringify(value)
+            );
+        } catch (error) {
+            // Cache sesi hanya optimasi. Dashboard tetap berjalan tanpanya.
+        }
+    };
+
+const invalidateDashboardSummaryV2Cache =
+    () => {
+        dashboardSummaryV2MemoryCache.clear();
+
+        try {
+            const keysToRemove =
+                [];
+
+            for (
+                let index = 0;
+                index < sessionStorage.length;
+                index++
+            ) {
+                const key =
+                    sessionStorage.key(
+                        index
+                    );
+
+                if (
+                    key?.startsWith(
+                        DASHBOARD_SUMMARY_V2_CACHE_PREFIX
+                    )
+                ) {
+                    keysToRemove.push(
+                        key
+                    );
+                }
+            }
+
+            keysToRemove.forEach(
+                key =>
+                    sessionStorage.removeItem(
+                        key
+                    )
+            );
+        } catch (error) {
+            // Tidak semua browser mengizinkan sessionStorage.
+        }
+
+        clearTimeout(
+            dashboardSummaryV2RefreshTimer
+        );
+
+        dashboardSummaryV2RefreshTimer =
+            setTimeout(
+                () => {
+                    if (
+                        activePage.value ===
+                            'dashboard' &&
+                        currentUser.value?.uid
+                    ) {
+                        loadDashboardDataByCurrentFilter(
+                            currentUser.value.uid
+                        );
+                    }
+                },
+                2500
+            );
+    };
+
+const applyDashboardSummaryV2Global =
+    (
+        globalData,
+        userId = ''
+    ) => {
+        if (userId) {
+            dashboardSummaryV2.userId =
+                userId;
+        }
+
+        dashboardSummaryV2.global = {
+            ...(globalData || {})
+        };
+
+        dashboardSummaryV2.globalReady =
+            true;
+
+        dashboardSummaryV2GlobalLoadedAt =
+            Date.now();
+
+        dashboardCashBalance.value =
+            Number(
+                globalData?.cashBalance
+            ) || 0;
+
+        dashboardCashBalance.loaded =
+            true;
+
+        dashboardCashBalance.loading =
+            false;
+
+        dashboardCashBalance.error =
+            '';
+    };
+
+const applyDashboardSummaryV2Period =
+    (
+        data,
+        userId
+    ) => {
+        dashboardSummaryV2.metrics = {
+            ...(data.metrics || {})
+        };
+
+        dashboardSummaryV2.series =
+            Array.isArray(data.series)
+                ? data.series
+                : [];
+
+        dashboardSummaryV2.channels = {
+            ...(data.channels || {})
+        };
+
+        dashboardSummaryV2.today = {
+            ...(data.today || {})
+        };
+
+        dashboardSummaryV2.version =
+            Number(data.version) || 0;
+
+        dashboardSummaryV2.readDocuments =
+            Number(
+                data.readDocuments
+            ) || 0;
+
+        dashboardSummaryV2.periodReady =
+            true;
+
+        applyDashboardSummaryV2Global(
+            data.global,
+            userId
+        );
+    };
+
+const loadDashboardGlobalSummaryV2 =
+    async userId => {
+        if (!userId) {
+            return false;
+        }
+
+        prepareDashboardSummaryV2User(
+            userId
+        );
+
+        if (
+            dashboardSummaryV2.globalReady &&
+            dashboardSummaryV2.userId ===
+                userId &&
+            (
+                Date.now() -
+                dashboardSummaryV2GlobalLoadedAt
+            ) < 60000
+        ) {
+            return true;
+        }
+
+        try {
+            const response =
+                await getDashboardSummaryV2Callable({
+                    globalOnly: true
+                });
+
+            const data =
+                response?.data || {};
+
+            if (data.ready !== true) {
+                return false;
+            }
+
+            dashboardSummaryV2.version =
+                Number(data.version) || 0;
+
+            applyDashboardSummaryV2Global(
+                data.global,
+                userId
+            );
+
+            return true;
+        } catch (error) {
+            console.warn(
+                '[DASHBOARD V2] Ringkasan global belum tersedia. Fallback lama dipakai.',
+                error
+            );
+
+            return false;
+        }
+    };
+
+const loadDashboardPeriodSummaryV2 =
+    async (
+        userId,
+        range
+    ) => {
+        if (!userId || !range?.ready) {
+            return false;
+        }
+
+        prepareDashboardSummaryV2User(
+            userId
+        );
+
+        dashboardSummaryV2.loading =
+            true;
+
+        dashboardSummaryV2.error =
+            '';
+
+        dashboardSummaryV2.periodReady =
+            false;
+
+        dashboardCashBalance.loading =
+            true;
+
+        const requestPayload =
+            dashboardSummaryV2RequestPayload(
+                range
+            );
+
+        const cacheKey =
+            dashboardSummaryV2CacheKey(
+                userId,
+                requestPayload
+            );
+
+        const cachedData =
+            readDashboardSummaryV2Cache(
+                cacheKey
+            );
+
+        const requestWithCache = {
+            ...requestPayload
+        };
+
+        if (
+            Number.isFinite(
+                Number(
+                    cachedData?.version
+                )
+            )
+        ) {
+            requestWithCache.knownVersion =
+                Number(
+                    cachedData.version
+                );
+        }
+
+        try {
+            let response =
+                await getDashboardSummaryV2Callable(
+                    requestWithCache
+                );
+
+            let data =
+                response?.data || {};
+
+            if (
+                data.ready !== true &&
+                data.rebuilding !== true &&
+                !dashboardSummaryV2RebuildAttempted.has(
+                    userId
+                )
+            ) {
+                dashboardSummaryV2RebuildAttempted.add(
+                    userId
+                );
+
+                dashboardSummaryV2.rebuilding =
+                    true;
+
+                await rebuildDashboardSummaryV2Callable();
+
+                dashboardSummaryV2.rebuilding =
+                    false;
+
+                response =
+                    await getDashboardSummaryV2Callable(
+                        requestPayload
+                    );
+
+                data =
+                    response?.data || {};
+            }
+
+            if (
+                data.unchanged ===
+                    true &&
+                cachedData
+            ) {
+                data = {
+                    ...cachedData,
+                    global:
+                        data.global ||
+                        cachedData.global,
+                    version:
+                        data.version ||
+                        cachedData.version,
+                    readDocuments:
+                        data.readDocuments ||
+                        1
+                };
+            }
+
+            if (data.ready !== true) {
+                return false;
+            }
+
+            writeDashboardSummaryV2Cache(
+                cacheKey,
+                data
+            );
+
+            applyDashboardSummaryV2Period(
+                data,
+                userId
+            );
+
+            return true;
+        } catch (error) {
+            dashboardSummaryV2.rebuilding =
+                false;
+
+            dashboardSummaryV2.error =
+                error?.message || '';
+
+            console.warn(
+                '[DASHBOARD V2] Ringkasan belum dapat dipakai. Dashboard lama tetap dijalankan.',
+                error
+            );
+
+            return false;
+        } finally {
+            dashboardSummaryV2.loading =
+                false;
+        }
+    };
+
+const dashboardSummaryV2TransactionGlobal =
+    transaction => {
+        const discount =
+            Number(
+                transaction?.diskon
+                    ?.totalDiscount ??
+                transaction?.totalDiscount ??
+                transaction?.discount
+            ) || 0;
+
+        const gross =
+            Number.isFinite(
+                Number(
+                    transaction?.subtotal
+                )
+            )
+                ? Number(
+                    transaction.subtotal
+                )
+                : (
+                    Number(
+                        transaction?.total ??
+                        transaction?.grandTotal
+                    ) || 0
+                ) + discount;
+
+        const net =
+            Number.isFinite(
+                Number(
+                    transaction?.total ??
+                    transaction?.grandTotal
+                )
+            )
+                ? Number(
+                    transaction?.total ??
+                    transaction?.grandTotal
+                )
+                : gross - discount;
+
+        const fees =
+            Number(
+                transaction?.biaya?.total ??
+                transaction?.totalBiaya
+            ) || 0;
+
+        const qty =
+            (
+                transaction?.items ||
+                []
+            ).reduce(
+                (total, item) =>
+                    total +
+                    (
+                        Number(
+                            item.qty
+                        ) || 0
+                    ),
+                0
+            );
+
+        const status =
+            String(
+                transaction?.statusPencairan ||
+                ''
+            )
+                .trim()
+                .toLocaleLowerCase(
+                    'id-ID'
+                );
+
+        const previousStatus =
+            String(
+                transaction
+                    ?.statusPencairanSebelumRetur ||
+                ''
+            )
+                .trim()
+                .toLocaleLowerCase(
+                    'id-ID'
+                );
+
+        const isSettled =
+            status === 'sudah cair' ||
+            (
+                (
+                    status ===
+                        'retur/pengembalian' ||
+                    status ===
+                        'retur / pengembalian' ||
+                    status ===
+                        'retur'
+                ) &&
+                previousStatus ===
+                    'sudah cair'
+            );
+
+        const isPending =
+            !status ||
+            status === 'belum cair' ||
+            status === 'waiting';
+
+        return {
+            cashBalance:
+                isSettled
+                    ? net - fees
+                    : 0,
+            pendingFunds:
+                isPending
+                    ? net - fees
+                    : 0,
+            pendingQty:
+                isPending
+                    ? qty
+                    : 0
+        };
+    };
+
+const applyDashboardSummaryV2GlobalDelta =
+    delta => {
+        if (
+            dashboardSummaryV2.globalReady !==
+            true
+        ) {
+            return;
+        }
+
+        [
+            'cashBalance',
+            'pendingFunds',
+            'pendingQty'
+        ].forEach(field => {
+            dashboardSummaryV2.global[field] =
+                (
+                    Number(
+                        dashboardSummaryV2
+                            .global[field]
+                    ) || 0
+                ) +
+                (
+                    Number(
+                        delta[field]
+                    ) || 0
+                );
+        });
+
+        dashboardCashBalance.value =
+            Number(
+                dashboardSummaryV2
+                    .global.cashBalance
+            ) || 0;
+
+        invalidateDashboardSummaryV2Cache();
+    };
+
+const applyDashboardSummaryV2TransactionDelta =
+    (
+        beforeTransaction,
+        afterTransaction
+    ) => {
+        if (
+            dashboardSummaryV2.globalReady !==
+            true
+        ) {
+            return;
+        }
+
+        const before =
+            dashboardSummaryV2TransactionGlobal(
+                beforeTransaction
+            );
+
+        const after =
+            dashboardSummaryV2TransactionGlobal(
+                afterTransaction
+            );
+
+        applyDashboardSummaryV2GlobalDelta({
+            cashBalance:
+                after.cashBalance -
+                before.cashBalance,
+            pendingFunds:
+                after.pendingFunds -
+                before.pendingFunds,
+            pendingQty:
+                after.pendingQty -
+                before.pendingQty
+        });
+    };
+
+const applyDashboardSummaryV2ReturnDelta =
+    (
+        beforeReturn,
+        afterReturn
+    ) => {
+        if (
+            dashboardSummaryV2.globalReady !==
+            true
+        ) {
+            return;
+        }
+
+        const returnCashContribution =
+            returnRecord => {
+                const previousStatus =
+                    String(
+                        returnRecord
+                            ?.statusPencairanSebelumRetur ||
+                        ''
+                    )
+                        .trim()
+                        .toLocaleLowerCase(
+                            'id-ID'
+                        );
+
+                if (
+                    previousStatus !==
+                    'sudah cair'
+                ) {
+                    return 0;
+                }
+
+                return (
+                    returnRecord?.items ||
+                    []
+                ).reduce(
+                    (total, item) =>
+                        total -
+                        (
+                            Number(
+                                item.nilaiRetur
+                            ) || 0
+                        ) +
+                        (
+                            Number(
+                                item.biayaMarketplace
+                            ) || 0
+                        ),
+                    0
+                );
+            };
+
+        applyDashboardSummaryV2GlobalDelta({
+            cashBalance:
+                returnCashContribution(
+                    afterReturn
+                ) -
+                returnCashContribution(
+                    beforeReturn
+                ),
+            pendingFunds: 0,
+            pendingQty: 0
+        });
+    };
+
 // FASHION_OS_DASHBOARD_CASH_AND_SELLING_PRICES_V1
 // FASHION_OS_DASHBOARD_CASH_BUILD_FIX_V3
 const toDashboardCashNumber =
@@ -5452,12 +6292,17 @@ const loadDashboardCashBalance =
 // yang mungkin sedang dipakai halaman lain atau Dashboard.
 const applyTransactionUpdateToLocalStores =
     (transactionId, updatePayload) => {
-        [
+        const localStores = [
             state.pendingSettlements,
             state.transaksi,
             dashboardPeriodData.transactions,
             dashboardTodayData.transactions
-        ].forEach(list => {
+        ];
+
+        let beforeTransaction =
+            null;
+
+        localStores.forEach(list => {
             const transaction =
                 (list || []).find(
                     item =>
@@ -5466,24 +6311,67 @@ const applyTransactionUpdateToLocalStores =
                 );
 
             if (transaction) {
+                if (!beforeTransaction) {
+                    beforeTransaction = {
+                        ...transaction,
+                        items:
+                            (
+                                transaction.items ||
+                                []
+                            ).map(
+                                item => ({
+                                    ...item
+                                })
+                            ),
+                        biaya: {
+                            ...(
+                                transaction.biaya ||
+                                {}
+                            )
+                        },
+                        diskon: {
+                            ...(
+                                transaction.diskon ||
+                                {}
+                            )
+                        }
+                    };
+                }
+
                 Object.assign(
                     transaction,
                     updatePayload
                 );
             }
         });
+
+        if (beforeTransaction) {
+            applyDashboardSummaryV2TransactionDelta(
+                beforeTransaction,
+                {
+                    ...beforeTransaction,
+                    ...updatePayload
+                }
+            );
+        }
     };
 
 const addReturnToLocalStores =
     returnRecord => {
-        if (
-            !(state.retur || []).some(
+        const returnAlreadyExists =
+            (state.retur || []).some(
                 item =>
                     item.id ===
                     returnRecord.id
-            )
-        ) {
+            );
+
+        if (!returnAlreadyExists) {
             state.retur.unshift(
+                returnRecord
+            );
+
+            applyDashboardSummaryV2ReturnDelta(
+                null,
                 returnRecord
             );
         }
@@ -5677,6 +6565,96 @@ const dashboardKpis = computed(() => {
         totalUnitStok: 0,
         totalNilaiStokHPP: 0
     };
+
+    if (
+        dashboardSummaryV2.periodReady ===
+        true
+    ) {
+        const metrics =
+            dashboardSummaryV2.metrics ||
+            {};
+
+        const globalMetrics =
+            dashboardSummaryV2.global ||
+            {};
+
+        kpis.saldoKas =
+            Number(
+                globalMetrics.cashBalance
+            ) || 0;
+
+        kpis.omsetKotor =
+            Number(
+                metrics.omsetKotor
+            ) || 0;
+
+        kpis.totalDiskon =
+            Number(
+                metrics.totalDiskon
+            ) || 0;
+
+        kpis.omsetBersih =
+            Number(
+                metrics.omsetBersih
+            ) || 0;
+
+        kpis.totalHppTerjual =
+            Number(
+                metrics.totalHppTerjual
+            ) || 0;
+
+        kpis.totalBiayaTransaksi =
+            Number(
+                metrics.totalBiayaTransaksi
+            ) || 0;
+
+        kpis.totalBiayaOperasional =
+            Number(
+                metrics.totalBiayaOperasional
+            ) || 0;
+
+        kpis.totalNilaiRetur =
+            Number(
+                metrics.totalNilaiRetur
+            ) || 0;
+
+        kpis.pemasukanLain =
+            Number(
+                metrics.pemasukanLain
+            ) || 0;
+
+        kpis.labaKotor =
+            Number(
+                metrics.labaKotor
+            ) || 0;
+
+        kpis.labaBersih =
+            Number(
+                metrics.labaBersih
+            ) || 0;
+
+        kpis.danaBelumCair =
+            Number(
+                globalMetrics.pendingFunds
+            ) || 0;
+
+        kpis.qtyBelumCair =
+            Number(
+                globalMetrics.pendingQty
+            ) || 0;
+
+        kpis.totalUnitStok =
+            Number(
+                globalMetrics.totalUnitStok
+            ) || 0;
+
+        kpis.totalNilaiStokHPP =
+            Number(
+                globalMetrics.totalNilaiStokHPP
+            ) || 0;
+
+        return kpis;
+    }
 
     const { transaksi, keuangan, retur } = dashboardFilteredData.value;
 
@@ -5912,8 +6890,7 @@ let biayaMarketplaceBatal = 0;
     kpis.labaKotor = kpis.omsetBersih - kpis.totalHppTerjual;
     kpis.labaBersih = kpis.labaKotor - kpis.totalBiayaTransaksi - kpis.totalBiayaOperasional;
     // SALDO KAS BERJALAN
-    // Nilai berasal dari aggregation query seluruh waktu dan
-    // tidak dipengaruhi filter laporan Dashboard.
+    // Jalur dokumen lama hanya menjadi fallback bila V2 belum siap.
     kpis.saldoKas =
         Number(
             dashboardCashBalance.value
@@ -5935,6 +6912,40 @@ let biayaMarketplaceBatal = 0;
         Number(
             inventoryTotals.totalNilaiStokHPP
         ) || 0;
+
+    if (
+        dashboardSummaryV2.globalReady ===
+        true
+    ) {
+        const globalMetrics =
+            dashboardSummaryV2.global ||
+            {};
+
+        kpis.saldoKas =
+            Number(
+                globalMetrics.cashBalance
+            ) || 0;
+
+        kpis.danaBelumCair =
+            Number(
+                globalMetrics.pendingFunds
+            ) || 0;
+
+        kpis.qtyBelumCair =
+            Number(
+                globalMetrics.pendingQty
+            ) || 0;
+
+        kpis.totalUnitStok =
+            Number(
+                globalMetrics.totalUnitStok
+            ) || 0;
+
+        kpis.totalNilaiStokHPP =
+            Number(
+                globalMetrics.totalNilaiStokHPP
+            ) || 0;
+    }
 
     return kpis;
 });
@@ -7283,11 +8294,49 @@ const dashboardPremiumData = computed(() => {
             umurHari >= 14;
     });
 
+    const summaryToday =
+        dashboardSummaryV2.periodReady
+            ? (
+                dashboardSummaryV2.today ||
+                {}
+            )
+            : null;
+
     return {
-        omsetHariIni,
-        profitBersihHariIni,
-        orderHariIni: transaksiHariIni.length,
-        produkTerjualHariIni,
+        omsetHariIni:
+            summaryToday
+                ? (
+                    Number(
+                        summaryToday.omsetHariIni
+                    ) || 0
+                )
+                : omsetHariIni,
+        profitBersihHariIni:
+            summaryToday
+                ? (
+                    Number(
+                        summaryToday
+                            .profitBersihHariIni
+                    ) || 0
+                )
+                : profitBersihHariIni,
+        orderHariIni:
+            summaryToday
+                ? (
+                    Number(
+                        summaryToday.orderHariIni
+                    ) || 0
+                )
+                : transaksiHariIni.length,
+        produkTerjualHariIni:
+            summaryToday
+                ? (
+                    Number(
+                        summaryToday
+                            .produkTerjualHariIni
+                    ) || 0
+                )
+                : produkTerjualHariIni,
         produkHampirHabis,
         batchBelumSelesai: batchBelumSelesai.length,
         maklunTerlambat: maklunTerlambat.length
@@ -8626,6 +9675,11 @@ if (
     );
 }
 
+applyDashboardSummaryV2TransactionDelta(
+    null,
+    createdTransaction
+);
+
         state.carts[uiState.activeCartChannel] = [];
         uiState.pos_order_id = '';
         hideModal();
@@ -8974,6 +10028,114 @@ function renderCharts() {
     const ctxSales = document.getElementById('salesChannelChart')?.getContext('2d');
     
     if (!ctxProfit || !ctxSales) {
+        return;
+    }
+
+    if (
+        dashboardSummaryV2.periodReady ===
+        true
+    ) {
+        const series =
+            Array.isArray(
+                dashboardSummaryV2.series
+            )
+                ? dashboardSummaryV2.series
+                : [];
+
+        profitExpenseChart =
+            new Chart(
+                ctxProfit,
+                {
+                    type: 'line',
+                    data: {
+                        labels:
+                            series.map(
+                                item =>
+                                    item.key
+                            ),
+                        datasets: [
+                            {
+                                label:
+                                    'Laba Kotor',
+                                data:
+                                    series.map(
+                                        item =>
+                                            Number(
+                                                item
+                                                    .labaKotor
+                                            ) || 0
+                                    ),
+                                borderColor:
+                                    '#10b981',
+                                backgroundColor:
+                                    'rgba(16, 185, 129, 0.2)',
+                                fill: true
+                            },
+                            {
+                                label:
+                                    'Biaya Operasional',
+                                data:
+                                    series.map(
+                                        item =>
+                                            Number(
+                                                item
+                                                    .biayaOperasional
+                                            ) || 0
+                                    ),
+                                borderColor:
+                                    '#ef4444',
+                                backgroundColor:
+                                    'rgba(239, 68, 68, 0.2)',
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio:
+                            false
+                    }
+                }
+            );
+
+        const channelData =
+            dashboardSummaryV2.channels ||
+            {};
+
+        salesChannelChart =
+            new Chart(
+                ctxSales,
+                {
+                    type: 'doughnut',
+                    data: {
+                        labels:
+                            Object.keys(
+                                channelData
+                            ),
+                        datasets: [
+                            {
+                                data:
+                                    Object.values(
+                                        channelData
+                                    ),
+                                backgroundColor: [
+                                    '#4f46e5',
+                                    '#3b82f6',
+                                    '#10b981',
+                                    '#f97316',
+                                    '#ef4444'
+                                ]
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio:
+                            false
+                    }
+                }
+            );
+
         return;
     }
     
@@ -10254,6 +11416,10 @@ function buildReturnItemsFromTransaction(
             return {
                 sku: item.sku || '',
                 qty,
+                // Simpan HPP saat retur dibuat agar laporan historis tidak
+                // berubah ketika HPP produk diperbarui di masa depan.
+                hpp:
+                    Number(item.hpp) || 0,
                 nilaiRetur: nilaiReturBersih,
                 nilaiDiskon,
                 biayaMarketplace,
@@ -10369,6 +11535,8 @@ const previousSettlementStatus =
 const transactionUpdatePayload = {
     statusPencairan:
         'Retur/Pengembalian',
+    statusPencairanSebelumRetur:
+        previousSettlementStatus,
     tanggalRetur: new Date()
 };
 
@@ -10440,7 +11608,9 @@ queuePhysicalStockReturn(
 
         if (
             previousSettlementStatus ===
-            'Sudah Cair'
+                'Sudah Cair' &&
+            dashboardSummaryV2.globalReady !==
+                true
         ) {
             await loadDashboardCashBalance(
                 currentUser.value.uid
@@ -14137,6 +15307,31 @@ const loadDashboardDataByCurrentFilter =
         dashboardDataLoading.value =
             true;
 
+        const summaryLoaded =
+            await loadDashboardPeriodSummaryV2(
+                userId,
+                range
+            );
+
+        if (
+            !isRequestCurrent()
+        ) {
+            return;
+        }
+
+        if (summaryLoaded) {
+            dashboardDataMessage.value =
+                'Mode hemat aktif • data dibaca dari ringkasan, bukan dari ribuan transaksi.';
+
+            dashboardDataLoading.value =
+                false;
+
+            await nextTick();
+            renderCharts();
+
+            return;
+        }
+
         const cashBalancePromise =
             loadDashboardCashBalance(
                 userId
@@ -15270,6 +16465,15 @@ if (targetStatus === 'Sudah Cair') {
         new Date();
 }
 
+if (
+    targetStatus ===
+    'Retur/Pengembalian'
+) {
+    updatePayload
+        .statusPencairanSebelumRetur =
+        previousSettlementStatus;
+}
+
 batch.update(
     trxRef,
     updatePayload
@@ -15363,30 +16567,6 @@ await batch.commit();
 // Sekarang perbarui transaksi pada seluruh state lokal.
 updatedTransactions.forEach(
     ({ id, updatePayload }) => {
-        const pendingTransaction =
-            state.pendingSettlements.find(
-                trx => trx.id === id
-            );
-
-        if (pendingTransaction) {
-            Object.assign(
-                pendingTransaction,
-                updatePayload
-            );
-        }
-
-        const mainTransaction =
-            state.transaksi.find(
-                trx => trx.id === id
-            );
-
-        if (mainTransaction) {
-            Object.assign(
-                mainTransaction,
-                updatePayload
-            );
-        }
-
         applyTransactionUpdateToLocalStores(
             id,
             updatePayload
@@ -15412,8 +16592,12 @@ if (newReturnDocs.length > 0) {
 }
 
 if (
-    targetStatus === 'Sudah Cair' ||
-    targetStatus === 'Retur/Pengembalian'
+    (
+        targetStatus === 'Sudah Cair' ||
+        targetStatus === 'Retur/Pengembalian'
+    ) &&
+    dashboardSummaryV2.globalReady !==
+        true
 ) {
     await loadDashboardCashBalance(
         currentUser.value.uid
