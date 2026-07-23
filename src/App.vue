@@ -237,6 +237,9 @@ keuangan: [],
             profitDetails: true,
             incomeHistory: true,
             investmentPage: true,
+            statistikPenjualan: false,
+            exportData: false,
+            transactionDetail: false,
         }
 });
 
@@ -432,6 +435,8 @@ laporanTransaksiPinInput: '',
 laporanTransaksiPinError: '',
 hargaHppPinInput: '',
 hargaHppPinError: '',
+statistikPenjualanPinInput: '',
+statistikPenjualanPinError: '',
 
     referralCodeInput: '',
     referralCodeApplied: false,
@@ -544,6 +549,8 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     pinConfirmInput: '',
     pinConfirmError: '',
     pinActionToConfirm: null,
+    pinConfirmationMode: 'toggle',
+    pinActionLabel: '',
     posChannelFilter: 'all',
 
      laporanBagiHasil: {
@@ -1701,6 +1708,7 @@ const totalWithdrawn = computed(() => totalPaidCommission.value);
 const isLaporanKeuanganLocked = ref(false);
 const isLaporanTransaksiLocked = ref(false);
 const isHargaHppLocked = ref(false);
+const isStatistikPenjualanLocked = ref(false);
 const isDashboardLocked = ref(false);
 const dashboardPinInput = ref('');
 const dashboardPinError = ref('');
@@ -9345,13 +9353,72 @@ function unlockPemasukan() {
     }
 }
 
+let pendingPinProtectedAction = null;
+
+function resetPinConfirmationState() {
+    uiState.isPinConfirmModalVisible = false;
+    uiState.pinConfirmInput = '';
+    uiState.pinConfirmError = '';
+    uiState.pinActionToConfirm = null;
+    uiState.pinConfirmationMode = 'toggle';
+    uiState.pinActionLabel = '';
+    pendingPinProtectedAction = null;
+}
+
+function cancelPinConfirmation() {
+    resetPinConfirmationState();
+}
+
 function requestPinForToggle(feature) {
     if (!state.settings.dashboardPin) {
         alert('Anda harus mengatur PIN utama terlebih dahulu di bagian "Ubah PIN Dasbor".');
         return;
     }
-    uiState.pinActionToConfirm = feature; // Simpan fitur yg akan diubah (misal: 'dashboard')
-    uiState.isPinConfirmModalVisible = true; // Tampilkan modal
+
+    pendingPinProtectedAction = null;
+    uiState.pinActionToConfirm = feature;
+    uiState.pinConfirmationMode = 'toggle';
+    uiState.pinActionLabel = 'mengubah pengaturan kunci';
+    uiState.pinConfirmInput = '';
+    uiState.pinConfirmError = '';
+    uiState.isPinConfirmModalVisible = true;
+}
+
+function requestPinProtectedAction(feature, action, actionLabel = 'melanjutkan aksi ini') {
+    const protectionEnabled = Boolean(
+        state.settings.dashboardPin &&
+        state.settings.pinProtection?.[feature]
+    );
+
+    if (!protectionEnabled) {
+        return action();
+    }
+
+    pendingPinProtectedAction = action;
+    uiState.pinActionToConfirm = feature;
+    uiState.pinConfirmationMode = 'action';
+    uiState.pinActionLabel = actionLabel;
+    uiState.pinConfirmInput = '';
+    uiState.pinConfirmError = '';
+    uiState.isPinConfirmModalVisible = true;
+
+    nextTick(() => {
+        document.querySelector('[data-pin-confirm-input="true"]')?.focus();
+    });
+
+    return undefined;
+}
+
+function requestProtectedExport(action) {
+    return requestPinProtectedAction('exportData', action, 'melakukan export data');
+}
+
+function openProtectedTransactionDetail(transaction) {
+    return requestPinProtectedAction(
+        'transactionDetail',
+        () => showModal('transactionDetail', transaction),
+        'membuka detail transaksi'
+    );
 }
 
 async function confirmPinAndToggle() {
@@ -9360,19 +9427,26 @@ async function confirmPinAndToggle() {
         return;
     }
 
+    if (uiState.pinConfirmationMode === 'action') {
+        const action = pendingPinProtectedAction;
+        resetPinConfirmationState();
+
+        if (typeof action === 'function') {
+            try {
+                await action();
+            } catch (error) {
+                console.error('[PIN PROTECTION] Aksi setelah verifikasi PIN gagal:', error);
+                alert('Aksi belum berhasil dijalankan. Silakan coba kembali.');
+            }
+        }
+        return;
+    }
+
     const feature = uiState.pinActionToConfirm;
     if (feature && Object.prototype.hasOwnProperty.call(state.settings.pinProtection, feature)) {
-        // Balikkan nilainya (dari true ke false, atau false ke true)
         state.settings.pinProtection[feature] = !state.settings.pinProtection[feature];
-        
-        // Simpan perubahan ke database
-        await saveGeneralSettings(); 
-        
-        // Tutup modal dan reset
-        uiState.isPinConfirmModalVisible = false;
-        uiState.pinConfirmInput = '';
-        uiState.pinConfirmError = '';
-        uiState.pinActionToConfirm = null;
+        await saveGeneralSettings();
+        resetPinConfirmationState();
     }
 }
 
@@ -9454,6 +9528,9 @@ async function saveGeneralSettings() {
             laporanTransaksi: !!state.settings.pinProtection.laporanTransaksi,
             laporanKeuangan: !!state.settings.pinProtection.laporanKeuangan,
             hargaHpp: !!state.settings.pinProtection.hargaHpp,
+            statistikPenjualan: !!state.settings.pinProtection.statistikPenjualan,
+            exportData: !!state.settings.pinProtection.exportData,
+            transactionDetail: !!state.settings.pinProtection.transactionDetail,
         };
 
         const dataToUpdate = {
@@ -9613,6 +9690,7 @@ function changePage(pageName) {
         bulk_process: 'penjualan',
         rekonsiliasi: 'penjualan',
         retur: 'penjualan',
+        'statistik-penjualan': 'penjualan',
 
         keuangan: 'keuangan',
         'roas-dashboard': 'keuangan',
@@ -9706,6 +9784,18 @@ function changePage(pageName) {
             isHargaHppLocked.value = false;
         }
     }
+
+
+    // Logika Kunci Statistik Penjualan
+    if (pageName === 'statistik-penjualan') {
+        if (state.settings.dashboardPin && state.settings.pinProtection?.statistikPenjualan) {
+            isStatistikPenjualanLocked.value = true;
+            uiState.statistikPenjualanPinInput = '';
+            uiState.statistikPenjualanPinError = '';
+        } else {
+            isStatistikPenjualanLocked.value = false;
+        }
+    }
 }
 
 function unlockDashboard() {
@@ -9754,6 +9844,16 @@ function unlockHargaHpp() {
         uiState.hargaHppPinError = '';
     } else {
         uiState.hargaHppPinError = 'PIN salah.';
+    }
+}
+
+function unlockStatistikPenjualan() {
+    if (uiState.statistikPenjualanPinInput === state.settings.dashboardPin) {
+        isStatistikPenjualanLocked.value = false;
+        uiState.statistikPenjualanPinError = '';
+    } else {
+        uiState.statistikPenjualanPinError = 'PIN salah. Silakan coba lagi.';
+        uiState.statistikPenjualanPinInput = '';
     }
 }
 
@@ -13553,7 +13653,10 @@ const fetchCoreData = async (
             investmentPage: false,
             laporanTransaksi: false,
             laporanKeuangan: false,
-            hargaHpp: false
+            hargaHpp: false,
+            statistikPenjualan: false,
+            exportData: false,
+            transactionDetail: false
         };
 
         if (settingsSnap.exists()) {
@@ -19603,7 +19706,7 @@ watch(activePage, (newPage, oldPage) => {
                     <option value="all">Semua Channel</option>
                     <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
                 </select>
-                <button @click="exportTransactionsToExcel" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px] flex-shrink-0">Export</button>
+                <button @click="requestProtectedExport(() => exportTransactionsToExcel())" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px] flex-shrink-0">Export</button>
             </div>
         </div>
         <div class="mb-4 space-y-2">
@@ -19680,7 +19783,7 @@ watch(activePage, (newPage, oldPage) => {
                         <td class="px-6 py-4">{{ trx.channel }}</td>
                         <td class="px-6 py-4 font-semibold">{{ formatCurrency(trx.total) }}</td>
                         <td class="px-6 py-4 space-x-3">
-                            <button @click="showModal('transactionDetail', trx)" class="font-semibold text-indigo-600 hover:underline">Detail</button>
+                            <button @click="openProtectedTransactionDetail(trx)" class="font-semibold text-indigo-600 hover:underline">Detail</button>
                             <button @click="deleteTransaction(trx.id)" class="font-semibold text-red-500 hover:underline">Hapus</button>
                         </td>
                     </tr>
@@ -20994,7 +21097,7 @@ SKU-BAJU-PUTIH-S"
                                     <input type="number" v-model.number="uiState.keuanganPengeluaranEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
                                 </div>
                             </div>
-                            <button @click="exportKeuangan('pengeluaran')" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px] shadow-sm">Export</button>
+                            <button @click="requestProtectedExport(() => exportKeuangan('pengeluaran'))" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px] shadow-sm">Export</button>
                         </div>
                     </div>
                     <div class="overflow-y-auto max-h-[60vh]">
@@ -21078,7 +21181,7 @@ SKU-BAJU-PUTIH-S"
                                         <input type="number" v-model.number="uiState.keuanganPemasukanEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
                                     </div>
                                 </div>
-                                <button @click="exportKeuangan('pemasukan')" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px] shadow-sm">Export</button>
+                                <button @click="requestProtectedExport(() => exportKeuangan('pemasukan'))" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px] shadow-sm">Export</button>
                             </div>
                         </div>
                         <div class="overflow-y-auto max-h-[60vh]">
@@ -21305,7 +21408,7 @@ SKU-BAJU-PUTIH-S"
                 <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 300ms;">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-xl font-bold text-slate-800">Riwayat Pembayaran Investor</h3>
-                        <button @click="exportInvestorPayments" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">Export</button>
+                        <button @click="requestProtectedExport(() => exportInvestorPayments())" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm">Export</button>
                     </div>
                     <div class="mb-6 p-4 bg-slate-50/50 rounded-xl border shadow-sm">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
@@ -21587,7 +21690,7 @@ SKU-BAJU-PUTIH-S"
                                 <option value="by_year_range">rentang tahun</option>
                                 <option value="all_time">semua</option>
                             </select>
-                            <button @click="exportReturToExcel" id="export-retur-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 h-10 flex-shrink-0">Export</button>
+                            <button @click="requestProtectedExport(() => exportReturToExcel())" id="export-retur-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 h-10 flex-shrink-0">Export</button>
                         </div>
                         <div v-if="uiState.returPageDateFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
                             <input type="date" v-model="uiState.returPageStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
@@ -22361,7 +22464,25 @@ SKU-BAJU-PUTIH-S"
 </div>
 
 <div v-if="activePage === 'statistik-penjualan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto space-y-6">
+
+    <div v-if="isStatistikPenjualanLocked" class="flex items-center justify-center min-h-[70vh] animate-fade-in">
+        <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Statistik Penjualan Terkunci</h3>
+            <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan untuk melihat statistik penjualan.</p>
+            <form @submit.prevent="unlockStatistikPenjualan" class="w-full">
+                <input type="password" v-model="uiState.statistikPenjualanPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2" autocomplete="current-password">
+                <p v-if="uiState.statistikPenjualanPinError" class="text-red-500 text-xs mb-2">{{ uiState.statistikPenjualanPinError }}</p>
+                <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka Statistik Penjualan</button>
+            </form>
+        </div>
+    </div>
+
+    <div v-else class="max-w-7xl mx-auto space-y-6">
 
         <div class="bg-white/90 backdrop-blur-sm rounded-3xl border border-slate-200 shadow-xl p-6">
             <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
@@ -22691,6 +22812,36 @@ SKU-BAJU-PUTIH-S"
         <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.hargaHpp }"></span>
     </button>
 </div>
+
+<div class="flex justify-between items-center gap-4 p-3 bg-slate-50 rounded-lg border">
+    <div>
+        <span class="font-medium text-sm text-slate-800">Kunci Statistik Penjualan</span>
+        <p class="text-xs text-slate-500 mt-1">PIN diminta saat membuka halaman Statistik Penjualan.</p>
+    </div>
+    <button @click="requestPinForToggle('statistikPenjualan')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0" :class="state.settings.pinProtection?.statistikPenjualan ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.statistikPenjualan }"></span>
+    </button>
+</div>
+
+<div class="flex justify-between items-center gap-4 p-3 bg-slate-50 rounded-lg border">
+    <div>
+        <span class="font-medium text-sm text-slate-800">Kunci Semua Tombol Export</span>
+        <p class="text-xs text-slate-500 mt-1">Setiap export data harus dikonfirmasi dengan PIN.</p>
+    </div>
+    <button @click="requestPinForToggle('exportData')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0" :class="state.settings.pinProtection?.exportData ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.exportData }"></span>
+    </button>
+</div>
+
+<div class="flex justify-between items-center gap-4 p-3 bg-slate-50 rounded-lg border">
+    <div>
+        <span class="font-medium text-sm text-slate-800">Kunci Detail Riwayat Transaksi</span>
+        <p class="text-xs text-slate-500 mt-1">PIN diminta setiap kali tombol Detail transaksi dibuka.</p>
+    </div>
+    <button @click="requestPinForToggle('transactionDetail')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0" :class="state.settings.pinProtection?.transactionDetail ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.transactionDetail }"></span>
+    </button>
+</div>
                             </div>
                         </div>
                         <div class="border-t pt-4 mt-6">
@@ -22728,7 +22879,7 @@ SKU-BAJU-PUTIH-S"
 
     <div class="flex gap-2">
         <button 
-            @click="exportMarketplaceYangTampil" 
+            @click="requestProtectedExport(() => exportMarketplaceYangTampil())" 
             class="bg-blue-600 text-white font-bold py-1 px-3 rounded-md hover:bg-blue-700 text-sm">
             Export
         </button>
@@ -22979,17 +23130,17 @@ SKU-BAJU-PUTIH-S"
     <div><label class="block text-xs font-medium mb-1">Dari Tahun</label><input type="number" v-model.number="uiState.exportStartYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
     <div><label class="block text-xs font-medium mb-1">Sampai Tahun</label><input type="number" v-model.number="uiState.exportEndYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
 </div>
-                <button @click="exportAllDataForUser(
-    uiState.selectedUserForExport?.uid || uiState.selectedUserForExport?.id, 
-    uiState.selectedUserForExport?.email, 
-    uiState.exportFilter, 
-    uiState.exportStartDate, 
-    uiState.exportEndDate, 
-    uiState.exportStartMonth, 
-    uiState.exportEndMonth, 
-    uiState.exportStartYear, 
+                <button @click="requestProtectedExport(() => exportAllDataForUser(
+    uiState.selectedUserForExport?.uid || uiState.selectedUserForExport?.id,
+    uiState.selectedUserForExport?.email,
+    uiState.exportFilter,
+    uiState.exportStartDate,
+    uiState.exportEndDate,
+    uiState.exportStartMonth,
+    uiState.exportEndMonth,
+    uiState.exportStartYear,
     uiState.exportEndYear
-)"
+))"
  :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
                     <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
                     <span v-else>Export Data Pelanggan</span>
@@ -24015,7 +24166,7 @@ SKU-BAJU-PUTIH-S"
                             </div>
                         </div>
                         <div class="lg:col-span-4 flex justify-end">
-                            <button @click="exportPurchaseOrdersToExcel" class="bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-700 text-sm h-[42px] flex-shrink-0" :disabled="!isSubscriptionActive">
+                            <button @click="requestProtectedExport(() => exportPurchaseOrdersToExcel())" class="bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-700 text-sm h-[42px] flex-shrink-0" :disabled="!isSubscriptionActive">
                                 Export ke Excel
                             </button>
                         </div>
@@ -24595,7 +24746,7 @@ SKU-BAJU-PUTIH-S"
                 Cetak Nota Pembelian
             </button>
 
-            <button @click="exportInvoiceToExcel(uiState.modalData)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 flex items-center gap-2 shadow-sm">
+            <button @click="requestProtectedExport(() => exportInvoiceToExcel(uiState.modalData))" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 flex items-center gap-2 shadow-sm">
                 <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M14.78 3.653a3.936 3.936 0 115.567 5.567l-3.627 3.627a3.936 3.936 0 01-5.567 0 3.936 3.936 0 010-5.567l3.627-3.627zm-3.045 4.385a2.146 2.146 0 100 4.292 2.146 2.146 0 000-4.292z"/></svg>
                 Export Excel
             </button>
@@ -26150,7 +26301,7 @@ BAJU-PUTIH-M</pre>
     </div>
     <div class="flex justify-end gap-3 mt-6 border-t pt-4">
       <button @click="printProduksiDetail(uiState.modalData)" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">Cetak</button>
-      <button @click="exportProduksiDetailToExcel(uiState.modalData)" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">Export laporan</button>
+      <button @click="requestProtectedExport(() => exportProduksiDetailToExcel(uiState.modalData))" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">Export laporan</button>
       <button @click="hideModal" class="bg-slate-300 py-2 px-4 rounded-lg hover:bg-slate-400">Tutup</button>
     </div>
 </div>
@@ -27374,7 +27525,7 @@ BAJU-PUTIH-M</pre>
     </div>
     
     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-        <button @click="exportGroupedProduksiToExcel()" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Export Laporan</button>
+        <button @click="requestProtectedExport(() => exportGroupedProduksiToExcel())" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Export Laporan</button>
         <button @click="hideModal" class="bg-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-400">Tutup</button>
     </div>
 </div>
@@ -27718,7 +27869,7 @@ BAJU-PUTIH-M</pre>
     </div>
 
     <div class="flex-shrink-0 flex justify-end gap-3 mt-4 pt-4 border-t">
-        <button @click="exportLaporanSemuaToExcel" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">
+        <button @click="requestProtectedExport(() => exportLaporanSemuaToExcel())" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">
             📄 Export ke Excel
         </button>
         <button @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">
@@ -27831,18 +27982,25 @@ BAJU-PUTIH-M</pre>
     
 <div v-if="uiState.isPinConfirmModalVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-        <h3 class="text-lg font-bold text-slate-800 mb-2">Konfirmasi Aksi</h3>
-        <p class="text-sm text-slate-600 mb-4">Untuk melanjutkan, masukkan PIN keamanan Anda.</p>
+        <h3 class="text-lg font-bold text-slate-800 mb-2">
+            {{ uiState.pinConfirmationMode === 'action' ? 'Konfirmasi PIN' : 'Konfirmasi Perubahan Kunci' }}
+        </h3>
+        <p class="text-sm text-slate-600 mb-4">
+            <span v-if="uiState.pinConfirmationMode === 'action'">Masukkan PIN keamanan untuk {{ uiState.pinActionLabel }}.</span>
+            <span v-else>Masukkan PIN keamanan untuk mengubah pengaturan kunci.</span>
+        </p>
         <form @submit.prevent="confirmPinAndToggle">
             <input 
                 type="password" 
-                v-model="uiState.pinConfirmInput" 
-                placeholder="Masukkan PIN" 
+                v-model="uiState.pinConfirmInput"
+                data-pin-confirm-input="true"
+                placeholder="Masukkan PIN"
+                autocomplete="current-password"
                 class="w-full p-2 border rounded-md text-center text-lg mb-2"
             >
             <p v-if="uiState.pinConfirmError" class="text-red-500 text-xs mb-2">{{ uiState.pinConfirmError }}</p>
             <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
-                <button type="button" @click="uiState.isPinConfirmModalVisible = false" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
+                <button type="button" @click="cancelPinConfirmation" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
                 <button type="submit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Konfirmasi</button>
             </div>
         </form>
@@ -28754,4 +28912,6 @@ BAJU-PUTIH-M</pre>
 
 
 /* FASHION_OS_MOVE_PENDING_PRIVACY_TO_SETTINGS_V1 */
+
+/* FASHION_OS_ADVANCED_PIN_PROTECTION_V1 */
 </style>
