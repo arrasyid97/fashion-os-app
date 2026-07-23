@@ -5148,6 +5148,45 @@ return {
 };
 });
 
+const DASHBOARD_BATCH_SIZE = 200;
+
+const dashboardPeriodData =
+    reactive({
+        transactions: [],
+        returns: [],
+        finance: []
+    });
+
+const dashboardTodayData =
+    reactive({
+        transactions: [],
+        finance: []
+    });
+
+const dashboardDataLoading =
+    ref(false);
+
+const dashboardDataError =
+    ref('');
+
+const dashboardDataMessage =
+    ref('');
+
+const dashboardLoadedCounts =
+    reactive({
+        transactions: 0,
+        returns: 0,
+        finance: 0
+    });
+
+const dashboardPaidReturnOriginKeys =
+    ref([]);
+
+let dashboardRequestId = 0;
+
+let dashboardReloadTimer =
+    null;
+
 const dashboardFilteredData = computed(() => {
     const toSafeDate = (value) => {
         if (!value) return null;
@@ -12625,45 +12664,6 @@ watch(
     scheduleReturnHistoryReload
 );
 
-
-const DASHBOARD_BATCH_SIZE = 200;
-
-const dashboardPeriodData =
-    reactive({
-        transactions: [],
-        returns: [],
-        finance: []
-    });
-
-const dashboardTodayData =
-    reactive({
-        transactions: [],
-        finance: []
-    });
-
-const dashboardDataLoading =
-    ref(false);
-
-const dashboardDataError =
-    ref('');
-
-const dashboardDataMessage =
-    ref('');
-
-const dashboardLoadedCounts =
-    reactive({
-        transactions: 0,
-        returns: 0,
-        finance: 0
-    });
-
-const dashboardPaidReturnOriginKeys =
-    ref([]);
-
-let dashboardRequestId = 0;
-
-let dashboardReloadTimer =
-    null;
 
 const mapDashboardTransaction =
     docSnap => {
