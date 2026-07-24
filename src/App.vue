@@ -79,32 +79,12 @@ const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
 
 // ============================================================
-// MODE FOKUS + PRIVASI DANA GANTUNG
+// PRIVASI DANA GANTUNG
 // ============================================================
-const PENDING_PRIVACY_STORAGE_KEY =
-    'fashion_os_pending_privacy_v1';
-
+// Nilai sensitif selalu tersensor saat aplikasi baru dibuka atau direfresh.
+// Ikon mata pada kartu Dana Gantung mengatur tampil/sembunyi selama sesi aktif.
 const isPendingPrivacyMode =
-    ref(
-        localStorage.getItem(
-            PENDING_PRIVACY_STORAGE_KEY
-        ) === 'on'
-    );
-
-watch(
-    isPendingPrivacyMode,
-    enabled => {
-        localStorage.setItem(
-            PENDING_PRIVACY_STORAGE_KEY,
-            enabled
-                ? 'on'
-                : 'off'
-        );
-    },
-    {
-        immediate: true
-    }
-);
+    ref(true);
 
 
 // ============================================================
@@ -19663,28 +19643,40 @@ watch(activePage, (newPage, oldPage) => {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         </div>
+
         <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-medium text-slate-500">Dana Gantung (HPP + Laba)</h3>
-            <p
-                class="kpi-value text-2xl font-bold mt-1 text-yellow-600"
-                :title="isPendingPrivacyMode ? 'Nilai Dana Gantung sedang disamarkan' : ''"
-            >
-                <span v-if="isPendingPrivacyMode" class="pending-private-value">
-                    Rp ••••••••
-                </span>
-                <span v-else>
-                    {{ formatCurrency(dashboardKpis.danaBelumCair) }}
-                </span>
+            <div class="flex flex-wrap items-center gap-2 pr-7">
+                <h3 class="text-sm font-medium text-slate-500">Dana Gantung (HPP + Laba)</h3>
+                <button
+                    type="button"
+                    @click="togglePendingPrivacyMode"
+                    class="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-yellow-200 bg-yellow-50 text-yellow-700 transition-all hover:bg-yellow-100 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+                    :title="isPendingPrivacyMode ? 'Tampilkan nominal dan qty Dana Gantung' : 'Samarkan nominal dan qty Dana Gantung'"
+                    :aria-label="isPendingPrivacyMode ? 'Tampilkan nominal dan qty Dana Gantung' : 'Samarkan nominal dan qty Dana Gantung'"
+                    :aria-pressed="!isPendingPrivacyMode"
+                >
+                    <svg v-if="isPendingPrivacyMode" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.6 10.6a2 2 0 002.8 2.8" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.9 4.2A10.7 10.7 0 0112 4c5 0 8.7 4.5 9.6 6a1.8 1.8 0 010 2 18.4 18.4 0 01-2.1 2.7" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.2 6.2A18.7 18.7 0 002.4 10a1.8 1.8 0 000 2C3.3 13.5 7 18 12 18a10.6 10.6 0 004.1-.8" />
+                    </svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.4 10a1.8 1.8 0 000 2C3.3 13.5 7 18 12 18s8.7-4.5 9.6-6a1.8 1.8 0 000-2C20.7 8.5 17 4 12 4S3.3 8.5 2.4 10z" />
+                        <circle cx="12" cy="11" r="3" />
+                    </svg>
+                </button>
+            </div>
+
+            <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600" :title="isPendingPrivacyMode ? 'Nilai Dana Gantung sedang disamarkan' : ''">
+                <span v-if="isPendingPrivacyMode" class="pending-private-value">Rp ••••••••</span>
+                <span v-else>{{ formatCurrency(dashboardKpis.danaBelumCair) }}</span>
             </p>
             <p class="text-xs text-slate-500 mt-1 font-medium italic">
                 Total:
                 <span class="text-slate-800 font-bold">
-                    <span v-if="isPendingPrivacyMode" class="pending-private-value">
-                        ••• qty
-                    </span>
-                    <span v-else>
-                        {{ formatNumber(dashboardKpis.qtyBelumCair) }} qty
-                    </span>
+                    <span v-if="isPendingPrivacyMode" class="pending-private-value">••• qty</span>
+                    <span v-else>{{ formatNumber(dashboardKpis.qtyBelumCair) }} qty</span>
                 </span>
                 belum cair
             </p>
@@ -22770,61 +22762,6 @@ SKU-BAJU-PUTIH-S"
                                 <input type="number" v-model.number="state.settings.minStok" class="w-full p-2 border border-slate-300 rounded-md">
                             </div>
                         </div>
-                        <div class="border-t pt-5 mt-6">
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                                <div class="flex items-start gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0">
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="2"
-                                            class="h-5 w-5"
-                                            aria-hidden="true"
-                                        >
-                                            <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                d="M2.4 10a1.8 1.8 0 000 2C3.3 13.5 7 18 12 18s8.7-4.5 9.6-6a1.8 1.8 0 000-2C20.7 8.5 17 4 12 4S3.3 8.5 2.4 10z"
-                                            />
-                                            <circle cx="12" cy="11" r="3" />
-                                        </svg>
-                                    </div>
-
-                                    <div>
-                                        <h4 class="font-semibold text-slate-800">
-                                            Privasi Dana Gantung
-                                        </h4>
-                                        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-                                            Samarkan nominal Dana Gantung dan total qty belum cair pada Dashboard.
-                                            Angka bisnis lainnya tetap ditampilkan.
-                                        </p>
-                                        <p
-                                            class="text-xs font-semibold mt-2"
-                                            :class="isPendingPrivacyMode ? 'text-indigo-600' : 'text-slate-500'"
-                                        >
-                                            {{ isPendingPrivacyMode ? 'Aktif • Dana Gantung disamarkan' : 'Nonaktif • Dana Gantung terlihat' }}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0"
-                                    :class="isPendingPrivacyMode ? 'bg-indigo-600' : 'bg-slate-300'"
-                                    :aria-pressed="isPendingPrivacyMode"
-                                    :aria-label="isPendingPrivacyMode ? 'Tampilkan Dana Gantung' : 'Samarkan Dana Gantung'"
-                                    @click="togglePendingPrivacyMode"
-                                >
-                                    <span
-                                        class="w-5 h-5 bg-white rounded-full shadow-md transition-transform"
-                                        :class="{ 'transform translate-x-7': isPendingPrivacyMode }"
-                                    ></span>
-                                </button>
-                            </div>
-                        </div>
-
                         <div class="border-t pt-4 mt-6">
                             <h4 class="font-semibold text-slate-700 mb-2">Aktifkan Kunci PIN</h4>
                             <p class="text-xs text-slate-500 mb-4">Pilih bagian mana saja yang ingin Anda amankan menggunakan PIN.</p>
@@ -28971,4 +28908,6 @@ BAJU-PUTIH-M</pre>
 /* FASHION_OS_ADVANCED_PIN_PROTECTION_V1 */
 
 /* FASHION_OS_PIN_NEW_KEYS_CACHE_HOTFIX_V1 */
+
+/* FASHION_OS_PENDING_PRIVACY_EYE_DASHBOARD_V1 */
 </style>
