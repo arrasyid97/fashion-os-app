@@ -20047,10 +20047,13 @@ SKU-BAJU-PUTIH-S"
     <div v-else class="max-w-7xl mx-auto">
         <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
             <div>
-                <h2 class="text-3xl font-bold text-slate-800">Pengaturan Harga, HPP & Komisi</h2>
-                <p class="text-slate-500 mt-1">Atur profitabilitas untuk setiap varian produk di semua channel penjualan.</p>
+                <h2 class="text-3xl font-bold text-slate-800">Harga & HPP Produk</h2>
+                <p class="text-slate-500 mt-1">Isi HPP/modal per pcs untuk tiap varian. Data ini dipakai saat transaksi dari ekspor marketplace dicatat.</p>
             </div>
-            <div class="flex gap-3">
+            <div class="flex flex-wrap gap-3">
+                <button @click="showModal('addProduct', { sku: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors" :disabled="!isSubscriptionActive">
+                    + Tambah Produk & Isi HPP
+                </button>
                 <button @click="showModal('priceCalculator')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2.5 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors" :disabled="!isSubscriptionActive">
                     Kalkulator Harga
                 </button>
@@ -20072,8 +20075,14 @@ SKU-BAJU-PUTIH-S"
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-if="inventoryProductGroups.length === 0">
-                            <td colspan="5" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
+                        <tr v-if="allProductGroups.length === 0">
+                            <td colspan="5" class="text-center py-10">
+                                <p class="font-semibold text-slate-700">Belum ada produk untuk diisi HPP.</p>
+                                <p class="mt-1 text-sm text-slate-500">Tambahkan produk beserta SKU, warna, ukuran, dan HPP/modal per pcs terlebih dahulu.</p>
+                                <button @click="showModal('addProduct', { sku: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })" type="button" class="mt-4 rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700" :disabled="!isSubscriptionActive">
+                                    Tambah Produk & Isi HPP
+                                </button>
+                            </td>
                         </tr>
                         
                         <template v-for="group in allProductGroups" :key="group.namaModel">
@@ -20097,49 +20106,9 @@ SKU-BAJU-PUTIH-S"
         Atur Harga Massal
     </button>
 
-    <button @click.stop="uiState.activeAccordion = (uiState.activeAccordion === `komisi-${group.namaModel}` ? null : `komisi-${group.namaModel}`)"
-        class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50"
-        :class="{'bg-blue-200': uiState.activeAccordion === `komisi-${group.namaModel}`}"
-    >
-        Atur Komisi
-    </button>
 </td>
                             </tr>
 
-                            <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`" class="animate-fade-in">
-                                <td colspan="5" class="p-6 bg-blue-50/50 border-b-2 border-blue-400/50">
-                                    <div class="space-y-3">
-                                        <h4 class="text-sm font-bold text-slate-700">Pengaturan Komisi Produk untuk Model: {{ group.namaModel }}</h4>
-    <p class="text-xs text-slate-500">Komisi ini adalah biaya internal yang akan dihitung sebagai **Biaya Transaksi** pada setiap penjualan produk dalam model ini.</p>
-                                        <div class="space-y-2">
-                                            <div v-for="marketplace in state.settings.marketplaces" :key="marketplace.id" class="flex items-center justify-between">
-                                                <label class="text-sm font-medium text-slate-600">{{ marketplace.name }}</label>
-                                                <div class="relative w-32">
-                                                    <input 
-                                                        type="text" 
-                                                        v-model="commissionModelComputed(group.namaModel, marketplace.id).value"
-                                                        @input="markProductAsEdited(group.variants[0].docId)" 
-                                                        class="w-full p-1.5 pr-7 border border-slate-300 rounded-md text-right text-sm font-semibold" 
-                                                        placeholder="0"
-                                                    >
-                                                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">%</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="mt-4 flex justify-end">
-                                        <button @click.stop="saveCommissionSettings()" 
-                                            type="button" 
-                                            class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400"
-                                            :disabled="isSaving || !isSubscriptionActive"
-                                        >
-                                            <span v-if="isSaving">Menyimpan Komisi...</span>
-                                            <span v-else>Simpan & Tutup</span>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            
                             <template v-if="uiState.activeAccordion === group.namaModel || group.variants.some(v => uiState.activeAccordion === `harga-${v.sku}`)">
                                 <template v-for="v in group.variants" :key="v.docId">
                                     <tr 
@@ -20221,7 +20190,6 @@ SKU-BAJU-PUTIH-S"
                                 </template>
                             </template>
 
-                            <tr v-if="uiState.activeAccordion === `komisi-${group.namaModel}`"></tr>
                         </template>
                     </tbody>
                 </table>
