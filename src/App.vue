@@ -3689,7 +3689,8 @@ async function saveProfitDistribution() {
     profitDistributionForm.error = '';
     profitDistributionForm.message = '';
     const amount = Math.round(Number(profitDistributionForm.amount) || 0);
-    const available = laporanKeuanganData.value.yearlyTotals.undistributedProfit;
+    const selectedMonth = Number(profitDistributionForm.month) - 1;
+    const available = laporanKeuanganData.value.months[selectedMonth]?.undistributedProfit;
     if (!currentUser.value?.uid) {
         profitDistributionForm.error = 'Silakan masuk kembali sebelum mencatat pembagian laba.';
         return;
@@ -3703,7 +3704,7 @@ async function saveProfitDistribution() {
         return;
     }
     if (amount > available) {
-        profitDistributionForm.error = 'Jumlah melebihi laba yang belum dibagikan tahun ini.';
+        profitDistributionForm.error = 'Jumlah melebihi laba yang belum dibagikan pada bulan tersebut.';
         return;
     }
     isSavingProfitDistribution.value = true;
