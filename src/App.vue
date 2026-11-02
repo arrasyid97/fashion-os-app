@@ -3524,8 +3524,13 @@ const discountedYearlyPrice = ref(2500000);
 
 async function submitAddProduct() {
     const form = uiState.modalData;
+    const hppValue = Number(form.hpp);
     if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian) {
         alert('SKU, Nama, Model produk, Warna, dan Varian wajib diisi.');
+        return;
+    }
+    if (!Number.isFinite(hppValue) || hppValue <= 0) {
+        alert('Masukkan HPP/modal per pcs lebih dari Rp0.');
         return;
     }
 
@@ -3550,7 +3555,7 @@ async function submitAddProduct() {
             color: form.warna || '',
             variant: form.varian || '',
             physical_stock: 0,
-            hpp: 0,
+            hpp: hppValue,
             userId: userId,
             sku: skuFormatted
         };
@@ -24831,7 +24836,7 @@ SKU-BAJU-PUTIH-S"
 </div>
 <div v-if="uiState.modalType === 'addProduct'" class="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full h-full md:max-h-[120vh] flex flex-col">
     <h3 class="text-xl font-bold mb-2">Tambah Produk Baru</h3>
-    <p class="text-sm text-slate-500 mb-4">Harga jual spesifik untuk tiap channel dapat diatur di halaman 'Harga & HPP' setelah produk ditambahkan.</p>
+    <p class="text-sm text-slate-500 mb-4">Isi HPP/modal produk pada formulir ini agar Fashion OS bisa mencocokkan transaksi dengan biaya modal. Harga jual tiap channel dapat diatur di halaman Harga & HPP.</p>
     <form @submit.prevent="submitAddProduct" class="space-y-4 overflow-y-auto max-h-[75vh] p-2">
         <div>
             <label for="product-sku" class="block text-sm font-medium text-slate-700">SKU (Stock Keeping Unit)</label>
@@ -24864,6 +24869,12 @@ SKU-BAJU-PUTIH-S"
         <div>
             <label for="product-variant" class="block text-sm font-medium text-slate-700">Varian (Ukuran/Model)</label>
             <input type="text" v-model="uiState.modalData.varian" id="product-variant" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: M, L, XL" required>
+        </div>
+
+        <div>
+            <label for="product-hpp" class="block text-sm font-medium text-slate-700">HPP / Modal per Produk (Rp)</label>
+            <input type="number" v-model.number="uiState.modalData.hpp" id="product-hpp" min="1" step="1" inputmode="numeric" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: 65000" required>
+            <p class="mt-1 text-xs text-slate-500">Masukkan modal untuk satu pcs produk, tanpa tanda titik atau koma.</p>
         </div>
         
         <div class="flex justify-end gap-3 mt-15">
