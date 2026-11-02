@@ -12455,65 +12455,117 @@ async function saveModelProdukEdit() {
 }
 
 async function saveStockAllocation() {
-    // --- 1. GEMBOK PENGAMAN ---
     if (isSaving.value) return;
-
-    if (!currentUser.value) return alert("Anda harus login untuk menyimpan perubahan.");
-    const modalData = uiState.modalData;
-
-    if (!modalData || !modalData.product || !modalData.original) {
-        console.error("Data modal tidak lengkap atau undefined.");
-        alert("Gagal menyimpan: Data produk hilang.");
+    if (!currentUser.value) {
+        alert('Anda harus login untuk menyimpan perubahan.');
         return;
     }
-    
+
+    const modalData = uiState.modalData;
+    if (!modalData?.product || !modalData?.original?.docId) {
+        alert('Data produk tidak lengkap. Tutup modal, muat ulang Inventaris, lalu coba lagi.');
+        return;
+    }
+
     const { product, original } = modalData;
+    const desiredStock = Number(product.stokFisik);
+    const openingStock = Number(original.stokFisik ?? original.physical_stock) || 0;
+    if (!Number.isSafeInteger(desiredStock) || desiredStock < 0) {
+        alert('Stok fisik harus berupa bilangan bulat nol atau lebih.');
+        return;
+    }
+
+    const marketplaceList = state.settings.marketplaces || [];
+    const cleanAllocationData = {};
+    for (const marketplace of marketplaceList) {
+        const value = Number(product.stokAlokasi?.[marketplace.id]) || 0;
+        if (!Number.isSafeInteger(value) || value < 0) {
+            alert('Alokasi stok untuk ' + marketplace.name + ' harus berupa bilangan bulat nol atau lebih.');
+            return;
+        }
+        cleanAllocationData[marketplace.id] = value;
+    }
+    const allocationTotal = Object.values(cleanAllocationData).reduce((sum, value) => sum + value, 0);
+    if (allocationTotal > desiredStock) {
+        alert('Total alokasi (' + allocationTotal + ') melebihi stok fisik (' + desiredStock + '). Kurangi alokasi atau tambah stok terlebih dahulu.');
+        return;
+    }
+
     const userId = currentUser.value.uid;
-    const cleanAllocationData = JSON.parse(JSON.stringify(product.stokAlokasi));
-    
-    // KUNCI TOMBOL
+    const productRef = doc(db, 'products', original.docId);
+    const allocationRef = doc(db, 'stock_allocations', original.docId);
+    const allocationChanged = marketplaceList.some(marketplace =>
+        (Number(cleanAllocationData[marketplace.id]) || 0) !==
+        (Number(original.stokAlokasi?.[marketplace.id]) || 0)
+    );
     isSaving.value = true;
 
     try {
-        const batch = writeBatch(db);
+        // Terapkan selisih terhadap stok saat modal dibuka ke stok terbaru di server.
+        // Penjualan/penerimaan yang terjadi selama modal terbuka tidak tertimpa.
+        const savedPhysicalStock = await firestoreRunTransaction(db, async transaction => {
+            const productSnapshot = await transaction.get(productRef);
+            if (!productSnapshot.exists()) {
+                throw new Error('Data produk tidak ditemukan di database. Muat ulang Inventaris.');
+            }
+            const currentStock = Number(
+                productSnapshot.data().physical_stock ??
+                productSnapshot.data().stokFisik
+            ) || 0;
+            const nextStock = currentStock + (desiredStock - openingStock);
+            if (!Number.isSafeInteger(nextStock) || nextStock < 0) {
+                throw new Error('Stok terbaru berubah saat modal terbuka. Muat ulang lalu periksa jumlah stok kembali.');
+            }
+            transaction.update(productRef, { physical_stock: nextStock });
+            return nextStock;
+        });
 
-        const productRef = doc(db, "products", original.docId);
-        
-        // Update Stok Fisik (Override sesuai inputan user di form)
-        batch.update(productRef, { physical_stock: product.stokFisik || 0 });
-        
-        // Update Alokasi
-        const allocationRef = doc(db, "stock_allocations", original.docId);
-        batch.set(allocationRef, { ...cleanAllocationData, userId: userId }, { merge: true });
+        // Simpan alokasi terpisah agar kegagalan izin alokasi tidak membatalkan
+        // penambahan stok fisik yang sudah berhasil.
+        state.produk = (state.produk || []).map(item =>
+            item.docId === original.docId
+                ? { ...item, stokFisik: savedPhysicalStock, physical_stock: savedPhysicalStock }
+                : item
+        );
+        state.inventoryPaginated = (state.inventoryPaginated || []).map(item =>
+            item.docId === original.docId
+                ? { ...item, stokFisik: savedPhysicalStock, physical_stock: savedPhysicalStock }
+                : item
+        );
+        uiState.modalData.product.stokFisik = savedPhysicalStock;
+        uiState.modalData.product.physical_stock = savedPhysicalStock;
+        uiState.modalData.original.stokFisik = savedPhysicalStock;
+        uiState.modalData.original.physical_stock = savedPhysicalStock;
 
-        await batch.commit();
-
-        // Update State Lokal
-        const index = state.produk.findIndex(p => p.docId === original.docId);
-        if (index !== -1) {
-            state.produk[index].stokFisik = product.stokFisik || 0;
-            state.produk[index].stokAlokasi = { ...product.stokAlokasi };
+        if (allocationChanged) {
+            await firestoreSetDoc(allocationRef, {
+                ...cleanAllocationData,
+                userId
+            }, { merge: true });
         }
 
-        const inventoryIndex = state.inventoryPaginated.findIndex(p => p.docId === original.docId);
-        if (inventoryIndex !== -1) {
-            state.inventoryPaginated[inventoryIndex].stokFisik = product.stokFisik || 0;
-            state.inventoryPaginated[inventoryIndex].stokAlokasi = { ...product.stokAlokasi };
-        }
+        state.produk = (state.produk || []).map(item =>
+            item.docId === original.docId
+                ? { ...item, stokAlokasi: { ...cleanAllocationData } }
+                : item
+        );
+        state.inventoryPaginated = (state.inventoryPaginated || []).map(item =>
+            item.docId === original.docId
+                ? { ...item, stokAlokasi: { ...cleanAllocationData } }
+                : item
+        );
 
-        const targetModel = state.settings.modelProduk.find(m => m.id === original.model_id);
-        if (targetModel) {
-            lastEditedModel.value = targetModel.namaModel.split(' ')[0];
-        }
-        
+        const targetModel = state.settings.modelProduk.find(
+            model => model.id === original.model_id
+        );
+        if (targetModel) lastEditedModel.value = targetModel.namaModel.split(' ')[0];
+
         hideModal();
-        alert("Perubahan stok fisik dan alokasi berhasil disimpan!");
-
+        alert('Stok fisik berhasil diperbarui.' + (allocationChanged ? ' Alokasi channel juga berhasil disimpan.' : ''));
     } catch (error) {
-        console.error("Error menyimpan alokasi stok:", error);
-        alert(`Gagal menyimpan perubahan stok: ${error.message}`);
+        console.error('[INVENTARIS] Gagal menyimpan stok:', error);
+        alert(error?.message || 'Stok gagal disimpan. Periksa koneksi internet dan izin database.');
     } finally {
-        // BUKA KUNCI
         isSaving.value = false;
     }
 }
@@ -14053,86 +14105,70 @@ const toggleInventoryGroup =
 const openInventoryStock =
     async product => {
         if (!product?.docId) {
+            alert('Produk ini belum memiliki ID database. Muat ulang halaman Inventaris lalu coba lagi.');
             return;
         }
 
+        const initialAllocation = {};
+        (state.settings.marketplaces || []).forEach(marketplace => {
+            initialAllocation[marketplace.id] =
+                Number(product.stokAlokasi?.[marketplace.id]) || 0;
+        });
+
+        const normalizedProduct = {
+            ...product,
+            stokFisik: Number(product.stokFisik ?? product.physical_stock) || 0,
+            physical_stock: Number(product.physical_stock ?? product.stokFisik) || 0,
+            stokAlokasi: initialAllocation
+        };
+
+        // Tampilkan modal segera. Membaca alokasi di server tidak boleh
+        // membuat tombol Kelola Stok seolah tidak merespons.
+        showModal('kelolaStok', {
+            product: JSON.parse(JSON.stringify(normalizedProduct)),
+            original: JSON.parse(JSON.stringify(normalizedProduct)),
+            stockAllocationWarning: ''
+        });
+
         try {
-            const allocationSnapshot =
-                await getDocFromServer(
-                    doc(
-                        db,
-                        'stock_allocations',
-                        product.docId
-                    )
-                );
-
-            const allocation =
-                allocationSnapshot.exists()
-                    ? allocationSnapshot.data()
-                    : {};
-
-            const stokAlokasi = {};
-
-            (
-                state.settings.marketplaces ||
-                []
-            ).forEach(
-                marketplace => {
-                    stokAlokasi[
-                        marketplace.id
-                    ] =
-                        Number(
-                            allocation[
-                                marketplace.id
-                            ]
-                        ) || 0;
-                }
+            const allocationSnapshot = await getDocFromServer(
+                doc(db, 'stock_allocations', product.docId)
             );
+            const allocation = allocationSnapshot.exists()
+                ? allocationSnapshot.data()
+                : {};
+            const stokAlokasi = {};
+            (state.settings.marketplaces || []).forEach(marketplace => {
+                stokAlokasi[marketplace.id] =
+                    Number(allocation[marketplace.id] ?? initialAllocation[marketplace.id]) || 0;
+            });
 
-            const enrichedProduct = {
-                ...product,
-                stokAlokasi
-            };
-
-            const inventoryIndex =
-                state.inventoryPaginated
-                    .findIndex(
-                        item =>
-                            item.docId ===
-                            product.docId
-                    );
+            const enrichedProduct = { ...normalizedProduct, stokAlokasi };
+            const inventoryIndex = state.inventoryPaginated.findIndex(
+                item => item.docId === product.docId
+            );
+            if (inventoryIndex !== -1) state.inventoryPaginated[inventoryIndex] = enrichedProduct;
 
             if (
-                inventoryIndex !== -1
+                uiState.modalType === 'kelolaStok' &&
+                uiState.modalData?.original?.docId === product.docId
             ) {
-                state.inventoryPaginated[
-                    inventoryIndex
-                ] =
-                    enrichedProduct;
+                uiState.modalData.product.stokAlokasi = { ...stokAlokasi };
+                uiState.modalData.original.stokAlokasi = { ...stokAlokasi };
+                uiState.modalData.product.stokFisik = Number(
+                    uiState.modalData.product.stokFisik ?? enrichedProduct.stokFisik
+                ) || 0;
+                uiState.modalData.product.physical_stock = uiState.modalData.product.stokFisik;
             }
-
-            showModal(
-                'kelolaStok',
-                {
-                    product:
-                        JSON.parse(
-                            JSON.stringify(
-                                enrichedProduct
-                            )
-                        ),
-                    original:
-                        enrichedProduct
-                }
-            );
         } catch (error) {
-            console.error(
-                '[INVENTARIS] Gagal membaca alokasi stok:',
-                error
-            );
-
-            alert(
-                'Alokasi stok belum berhasil dimuat. Silakan coba lagi.'
-            );
+            console.warn('[INVENTARIS] Alokasi stok belum dapat dimuat; modal stok tetap bisa digunakan.', error);
+            if (
+                uiState.modalType === 'kelolaStok' &&
+                uiState.modalData?.original?.docId === product.docId
+            ) {
+                uiState.modalData.stockAllocationWarning =
+                    'Alokasi per channel belum bisa dimuat. Kamu tetap bisa mengubah stok fisik. Periksa koneksi/izin sebelum mengubah alokasi.';
+            }
         }
     };
 
@@ -25975,6 +26011,7 @@ BAJU-PUTIH-M</pre>
     <p class="text-sm text-slate-500 mb-6" v-if="uiState.modalData.original">
         {{ uiState.modalData.original.nama }} ({{ uiState.modalData.original.sku }})
     </p>
+    <p v-if="uiState.modalData.stockAllocationWarning" class="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{{ uiState.modalData.stockAllocationWarning }}</p>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div class="space-y-2">
             <h4 class="font-semibold text-slate-700">Stok Master</h4>
@@ -26012,7 +26049,7 @@ BAJU-PUTIH-M</pre>
     </div>
     <div class="flex justify-end gap-3 mt-8 pt-4 border-t">
         <button type="button" @click="hideModal" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Batal</button>
-        <button type="button" @click="saveStockAllocation" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Simpan Perubahan</button>
+        <button type="button" @click="saveStockAllocation" :disabled="isSaving" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 disabled:opacity-50">{{ isSaving ? 'Menyimpan…' : 'Simpan Perubahan' }}</button>
     </div>
 </div>
 
