@@ -216,6 +216,7 @@ const headerAliases = {
     qty: ['qty', 'quantity', 'jumlah', 'kuantitas', 'jumlah produk', 'sku quantity', 'sku sold quantity', 'sku sold qty', 'item quantity', 'product quantity', 'jumlah barang', 'jumlah produk terjual'],
     unitPrice: ['sku unit original price', 'unit original price', 'harga satuan asli sku'],
     subtotalBeforeDiscount: ['sku subtotal before discount', 'subtotal before discount sku', 'subtotal sebelum diskon sku'],
+    returnType: ['cancelation/return type', 'cancellation/return type', 'cancel return type', 'jenis pembatalan pengembalian'],
     status: ['status', 'order status', 'status pesanan', 'status pengiriman', 'status paket']
 };
 
@@ -456,6 +457,7 @@ function parseSelectedSheet() {
             }
         }
         const status = normalizeKey(cellValue(row, columns.status));
+        const returnType = cleanText(cellValue(row, columns.returnType));
         const shippedAt = parseDate(cellValue(row, columns.shippedAt));
         if (!shippedStatusTokens.has(status)) return;
         const rowIdentifiers = [orderId, packageId, trackingNumber].filter(Boolean).map(normalizeKey);
@@ -464,12 +466,18 @@ function parseSelectedSheet() {
             rowIdentifiers.includes(normalizeKey(scan.value))
         );
         if (!wasScanned) return;
+        if (returnType) {
+            rowErrors.value.push({ key: 'row-' + rowNumber, row: rowNumber, message: 'Baris pesanan memiliki status pembatalan/retur (' + returnType + '); periksa melalui alur retur sebelum impor.' });
+            return;
+        }
         const product = findMasterProduct({ sellerSku, platformSkuId, productName, variation });
         const issues = [];
         if (!channel) issues.push('Marketplace tidak cocok dengan pilihan');
         if (!orderId) issues.push('ID Pesanan kosong');
         if (!skuForLookup && !productName) issues.push('Seller SKU dan Nama Produk kosong');
-        if (!Number.isInteger(qtyValue) || qtyValue <= 0) issues.push('Jumlah harus bilangan bulat lebih dari 0');
+        if (!Number.isInteger(qtyValue) || qtyValue <= 0) issues.push(!directQtyText && canDeriveQuantity
+            ? 'Jumlah tidak bisa dihitung dengan pasti dari harga satuan dan subtotal'
+            : 'Jumlah harus bilangan bulat lebih dari 0');
         if (!shippedStatusTokens.has(status)) issues.push('Status pesanan bukan Dikirim/Terkirim/Selesai');
         if (!product) issues.push('Produk/variasi belum cocok dengan master Fashion OS. Samakan Seller SKU atau nama produk dan variasi.');
         else if (!(product.docId || product.id)) issues.push('ID dokumen produk tidak tersedia; muat ulang master produk');
