@@ -12499,6 +12499,7 @@ async function saveStockAllocation() {
         (Number(original.stokAlokasi?.[marketplace.id]) || 0)
     );
     isSaving.value = true;
+    let stockCommitted = false;
 
     try {
         // Terapkan selisih terhadap stok saat modal dibuka ke stok terbaru di server.
@@ -12519,6 +12520,7 @@ async function saveStockAllocation() {
             transaction.update(productRef, { physical_stock: nextStock });
             return nextStock;
         });
+        stockCommitted = true;
 
         // Simpan alokasi terpisah agar kegagalan izin alokasi tidak membatalkan
         // penambahan stok fisik yang sudah berhasil.
@@ -12564,7 +12566,12 @@ async function saveStockAllocation() {
         alert('Stok fisik berhasil diperbarui.' + (allocationChanged ? ' Alokasi channel juga berhasil disimpan.' : ''));
     } catch (error) {
         console.error('[INVENTARIS] Gagal menyimpan stok:', error);
-        alert(error?.message || 'Stok gagal disimpan. Periksa koneksi internet dan izin database.');
+        const detail = error?.message || 'Periksa koneksi internet dan izin database.';
+        alert(
+            stockCommitted
+                ? 'Stok fisik sudah berhasil diperbarui, tetapi alokasi per channel gagal disimpan. Jangan tambahkan stok lagi. Perbaiki alokasi lalu simpan kembali.\n\n' + detail
+                : 'Stok gagal disimpan. Periksa koneksi internet dan izin database.\n\n' + detail
+        );
     } finally {
         isSaving.value = false;
     }
