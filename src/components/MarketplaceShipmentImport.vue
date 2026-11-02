@@ -420,7 +420,7 @@ function parseSelectedSheet() {
         const productName = cleanText(cellValue(row, columns.productName));
         const variationColumnIndex = columns.variation ? headers.indexOf(columns.variation) : -1;
         const variationContinuationColumns = variationColumnIndex >= 0
-            ? headers.slice(variationColumnIndex + 1).filter(header => /^__EMPTY(?:_\\d+)?$/i.test(String(header || '')))
+            ? headers.slice(variationColumnIndex + 1).filter(header => /^__EMPTY(?:_\d+)?$/i.test(String(header || '')))
             : [];
         const variation = [cellValue(row, columns.variation), ...variationContinuationColumns.map(column => cellValue(row, column))]
             .map(cleanText).filter(Boolean).join(', ');
@@ -428,13 +428,13 @@ function parseSelectedSheet() {
         const directQtyText = cleanText(cellValue(row, columns.qty));
         const parseExportNumber = value => {
             if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
-            let text = cleanText(value).replace(/\\s/g, '').replace(/[^0-9,.-]/g, '');
+            let text = cleanText(value).replace(/\s/g, '').replace(/[^0-9,.-]/g, '');
             if (!text) return NaN;
             const comma = text.lastIndexOf(',');
             const dot = text.lastIndexOf('.');
             if (comma >= 0 && dot >= 0) {
                 const decimalSeparator = comma > dot ? ',' : '.';
-                const groupingSeparator = decimalSeparator === ',' ? /\\./g : /,/g;
+                const groupingSeparator = decimalSeparator === ',' ? /\./g : /,/g;
                 text = text.replace(groupingSeparator, '').replace(decimalSeparator, '.');
             } else if (comma >= 0 || dot >= 0) {
                 const separator = comma >= 0 ? ',' : '.';
