@@ -15,7 +15,7 @@ const FieldPath = admin.firestore.FieldPath;
 
 const SUMMARY_COLLECTION = "dashboard_summaries_v2";
 const EVENT_COLLECTION = "dashboard_summary_events_v2";
-const SUMMARY_SCHEMA_VERSION = 2;
+const SUMMARY_SCHEMA_VERSION = 3;
 const SUMMARY_TIME_ZONE = "Asia/Jakarta";
 
 const METRIC_FIELDS = [
@@ -183,6 +183,45 @@ function isReturnedStatus(value) {
 }
 
 function transactionAmounts(data) {
+  const isNewFormat = Object.prototype.hasOwnProperty.call(
+      data || {},
+      "statusDataMarketplace",
+  );
+
+  const qty = (data?.items || []).reduce(
+      (sum, item) => sum + safeNumber(item?.qty),
+      0,
+  );
+
+  const hpp = (data?.items || []).reduce(
+      (sum, item) => (
+        sum +
+        (
+          safeNumber(item?.hpp) *
+          safeNumber(item?.qty)
+        )
+      ),
+      0,
+  );
+
+  if (isNewFormat) {
+    const isMatched =
+      String(data.statusDataMarketplace || "").toLowerCase() === "cocok";
+    const income = isMatched
+      ? safeNumber(data.penghasilanBersihMarketplace)
+      : 0;
+
+    return {
+      gross: income,
+      discount: 0,
+      net: income,
+      hpp,
+      qty,
+      fees: 0,
+      payout: income,
+    };
+  }
+
   const discount = safeNumber(
       data?.diskon?.totalDiscount ??
       data?.totalDiscount ??
@@ -197,14 +236,13 @@ function transactionAmounts(data) {
 
   const itemSubtotal = (data?.items || []).reduce(
       (sum, item) => {
-        const qty = safeNumber(item?.qty);
         const price = safeNumber(
             item?.hargaJualAktual ??
             item?.hargaJual ??
             item?.price ??
             item?.harga,
         );
-        return sum + (price * qty);
+        return sum + (price * safeNumber(item?.qty));
       },
       0,
   );
@@ -223,22 +261,6 @@ function transactionAmounts(data) {
   const net = Number.isFinite(storedTotal) ?
     storedTotal :
     gross - discount;
-
-  const hpp = (data?.items || []).reduce(
-      (sum, item) => (
-        sum +
-        (
-          safeNumber(item?.hpp) *
-          safeNumber(item?.qty)
-        )
-      ),
-      0,
-  );
-
-  const qty = (data?.items || []).reduce(
-      (sum, item) => sum + safeNumber(item?.qty),
-      0,
-  );
 
   const fees = safeNumber(
       data?.biaya?.total ??
@@ -265,6 +287,13 @@ function transactionContribution(
   }
 
   const amounts = transactionAmounts(data);
+  const isNewFormat = Object.prototype.hasOwnProperty.call(
+      data || {},
+      "statusDataMarketplace",
+  );
+  const isMatched =
+    String(data.statusDataMarketplace || "").toLowerCase() === "cocok";
+  const financiallyReady = !isNewFormat || isMatched;
   const settled = settledOverride === null ?
     (
       isSettledStatus(data.statusPencairan) ||
@@ -290,9 +319,9 @@ function transactionContribution(
   const salesDateKey = dateKeyFromValue(data.tanggal);
   if (salesDateKey) {
     const salesMetrics = emptyMetrics();
-    salesMetrics.salesGross = amounts.gross;
-    salesMetrics.salesHpp = amounts.hpp;
-    salesMetrics.salesFees = amounts.fees;
+    salesMetrics.salesGross = financiallyReady ? amounts.gross : 0;
+    salesMetrics.salesHpp = financiallyReady ? amounts.hpp : 0;
+    salesMetrics.salesFees = financiallyReady ? amounts.fees : 0;
     salesMetrics.salesQty = amounts.qty;
     salesMetrics.salesOrders = 1;
 
@@ -303,7 +332,7 @@ function transactionContribution(
     });
   }
 
-  if (settled) {
+  if (settled && financiallyReady) {
     contribution.dateKey = dateKeyFromValue(
         data.tanggalPencairan ||
         data.tanggal,
