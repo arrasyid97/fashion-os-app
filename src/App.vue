@@ -4436,78 +4436,33 @@ async function processBatchOrders() {
         orderIndex++
     ) {
         const order = ordersToProcess[orderIndex];
-            const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
-            
-            const diskon = calculateBestDiscount(order.items, uiState.activeCartChannel);
-            const finalTotal = subtotal - diskon.totalDiscount;
+            const items = order.items.map(item => ({
+    sku: item.sku || '',
+    nama: item.nama || item.product_name || '',
+    qty: Number(item.qty) || 0,
+    hpp: Number(item.hpp) || 0,
+    model_id: item.model_id || item.modelId || '',
+    warna: item.warna || item.color || '',
+    varian: item.varian || item.variant || ''
+}));
 
-            let totalBiaya = 0;
-            const biayaList = [];
-            
-            // Menghitung rasio sisa harga setelah dipotong diskon voucher secara global untuk antrian ini
-            const rasioBersih = subtotal > 0 ? (finalTotal / subtotal) : 1;
-            let totalKomisiProduk = 0;
+const totalHpp = items.reduce(
+    (sum, item) => sum + (item.hpp * item.qty),
+    0
+);
 
-            // LOGIKA TOTAL KOMISI PRODUK TETAP DIJAGA UTUH
-            for (const item of order.items) {
-                const modelId = item.model_id;
-                const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
-                const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
-                if (commissionRate > 0) {
-                    // Komisi Produk (Affiliate) disesuaikan agar dikali ke nilai bersih setelah diskon voucher
-                    totalKomisiProduk += (commissionRate / 100) * ((item.hargaJualAktual * item.qty) * rasioBersih);
-                }
-            }
-
-            if (totalKomisiProduk > 0) {
-                biayaList.push({ name: 'Komisi Produk', value: Math.round(totalKomisiProduk) });
-                totalBiaya += Math.round(totalKomisiProduk);
-            }
-            
-            // Perhitungan biaya admin dan program shopee berdasarkan finalTotal (Omset Bersih) & dibulatkan ke Rupiah utuh
-            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            // Perbaikan hitungan program tambahan massal (Bisa Persen atau Rupiah)
-            if (marketplace.programs && marketplace.programs.length > 0) {
-                marketplace.programs.forEach(p => {
-                    if (p.rate > 0) {
-                        // Jika type == 'fixed' gunakan nominal rupiah langsung, jika tidak hitung persentase dari finalTotal pesanan ini
-                        const val = p.type === 'fixed' ? p.rate : (p.rate / 100) * finalTotal;
-                        biayaList.push({ name: p.name, value: Math.round(val) });
-                        totalBiaya += Math.round(val);
-                    }
-                });
-            }
-
-            const newTransactionData = {
-    marketplaceOrderId: order.marketplaceOrderId,
-
-    // Pesanan pertama mempunyai waktu paling baru
-    // agar urutan di Riwayat Transaksi tetap 1, 2, 3
+const newTransactionData = {
+    marketplaceOrderId: order.marketplaceOrderId || '',
     tanggal: new Date(bulkBaseTime - orderIndex),
-
-    // Identitas dan nomor urutan proses massal
-    bulkBatchId: bulkBatchId,
+    bulkBatchId,
     bulkSequence: orderIndex + 1,
     inputSource: 'bulk_process',
-
-    items: order.items.map(i => ({
-        sku: i.sku,
-        qty: i.qty,
-        hargaJual: i.hargaJualAktual,
-        hpp: i.hpp
-    })),
-
-    subtotal,
-    diskon,
-    total: finalTotal,
+    items,
+    totalHpp,
+    statusDataMarketplace: 'menunggu_data',
+    penghasilanBersihMarketplace: null,
     channel: marketplace.name,
     channelId: uiState.activeCartChannel,
-    biaya: {
-        rincian: biayaList,
-        total: totalBiaya
-    },
     statusPencairan: 'Belum Cair',
     userId: currentUser.value.uid
 };
@@ -6260,18 +6215,35 @@ const dashboardSummaryV2TransactionGlobal =
                     ) || 0
                 ) + discount;
 
-        const net =
-            Number.isFinite(
-                Number(
-                    transaction?.total ??
-                    transaction?.grandTotal
-                )
+        const isNewFormat =
+            Object.prototype.hasOwnProperty.call(
+                transaction || {},
+                'statusDataMarketplace'
+            );
+
+        const isMatched =
+            String(transaction?.statusDataMarketplace || '').toLowerCase() ===
+            'cocok';
+
+        const net = isNewFormat
+            ? (
+                isMatched
+                    ? Number(transaction?.penghasilanBersihMarketplace) || 0
+                    : 0
             )
-                ? Number(
-                    transaction?.total ??
-                    transaction?.grandTotal
+            : (
+                Number.isFinite(
+                    Number(
+                        transaction?.total ??
+                        transaction?.grandTotal
+                    )
                 )
-                : gross - discount;
+                    ? Number(
+                        transaction?.total ??
+                        transaction?.grandTotal
+                    )
+                    : gross - discount
+            );
 
         const fees =
             Number(
@@ -8653,19 +8625,58 @@ const dashboardPremiumData = computed(() => {
         return d >= today && d < tomorrow;
     });
 
-    const omsetHariIni = transaksiHariIni.reduce((sum, t) => {
-        return sum + (t.subtotal || t.total || 0);
+    const isNewTransaction = transaction =>
+        Object.prototype.hasOwnProperty.call(
+            transaction || {},
+            'statusDataMarketplace'
+        );
+
+    const isMarketplaceMatched = transaction =>
+        String(transaction.statusDataMarketplace || '').toLowerCase() ===
+        'cocok';
+
+    const omsetHariIni = transaksiHariIni.reduce((sum, transaction) => {
+        if (isNewTransaction(transaction)) {
+            return sum + (
+                isMarketplaceMatched(transaction)
+                    ? Number(transaction.penghasilanBersihMarketplace) || 0
+                    : 0
+            );
+        }
+
+        return sum + (
+            Number(transaction.subtotal ?? transaction.total) || 0
+        );
     }, 0);
 
-    const hppHariIni = transaksiHariIni.reduce((sum, t) => {
-        return sum + (t.items || []).reduce((s, item) => {
-            return s + ((item.hpp || 0) * (item.qty || 0));
-        }, 0);
+    const hppHariIni = transaksiHariIni.reduce((sum, transaction) => {
+        if (
+            isNewTransaction(transaction) &&
+            !isMarketplaceMatched(transaction)
+        ) {
+            return sum;
+        }
+
+        const hppTransaksi = (transaction.items || []).reduce(
+            (itemSum, item) =>
+                itemSum +
+                ((Number(item.hpp) || 0) * (Number(item.qty) || 0)),
+            0
+        );
+
+        return sum + hppTransaksi;
     }, 0);
 
-    const biayaTransaksiHariIni = transaksiHariIni.reduce((sum, t) => {
-        return sum + (t.biaya?.total || 0);
-    }, 0);
+    const biayaTransaksiHariIni = transaksiHariIni.reduce(
+        (sum, transaction) => {
+            if (isNewTransaction(transaction)) {
+                return sum;
+            }
+
+            return sum + (Number(transaction.biaya?.total) || 0);
+        },
+        0
+    );
 
     const biayaOperasionalHariIni = (
         dashboardTodayData.finance ||
@@ -10134,7 +10145,7 @@ async function executeCompleteTransaction() {
         return alert("Anda harus login untuk menyelesaikan transaksi.");
     }
     const marketplace = getMarketplaceById(uiState.activeCartChannel);
-    const summary = cartSummary.value;
+    
     if (!marketplace || activeCart.value.length === 0) {
         alert("Keranjang kosong atau channel penjualan tidak valid.");
         return;
@@ -10145,63 +10156,30 @@ async function executeCompleteTransaction() {
         return;
     }
 
-    const biayaList = [];
-    let totalBiaya = 0;
+    const items = activeCart.value.map(item => ({
+        sku: item.sku || '',
+        nama: item.nama || item.product_name || '',
+        qty: Number(item.qty) || 0,
+        hpp: Number(item.hpp) || 0,
+        model_id: item.model_id || item.modelId || '',
+        warna: item.warna || item.color || '',
+        varian: item.varian || item.variant || ''
+    }));
 
-    // Menghitung rasio sisa harga setelah dipotong diskon voucher secara global
-    const rasioBersih = summary.subtotal > 0 ? (summary.finalTotal / summary.subtotal) : 1;
-
-    let totalKomisiProduk = 0;
-    for (const item of activeCart.value) {
-        const modelId = item.model_id;
-        const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
-        const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
-
-        if (commissionRate > 0) {
-            // Komisi Produk (Affiliate) disesuaikan agar dikali ke nilai bersih setelah diskon voucher
-            totalKomisiProduk += (commissionRate / 100) * ((item.hargaJualAktual * item.qty) * rasioBersih);
-        }
-    }
-
-    if (totalKomisiProduk > 0) {
-        biayaList.push({ name: 'Komisi Produk', value: Math.round(totalKomisiProduk) });
-        totalBiaya += Math.round(totalKomisiProduk);
-    }
-
-    // Semua biaya admin dan program marketplace dihitung dari summary.finalTotal (Omset Bersih) & dibulatkan ke Rupiah utuh
-    if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: Math.round(val) }); totalBiaya += Math.round(val); }
-    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: Math.round(val) }); totalBiaya += Math.round(val); }
-    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: Math.round(val) }); totalBiaya += Math.round(val); }
-    if (marketplace.programs && marketplace.programs.length > 0) {
-        marketplace.programs.forEach(p => {
-            if (p.rate > 0) {
-                // Jika type == 'fixed' gunakan nominal rupiah langsung, jika tidak hitung persentase dari finalTotal
-                const val = p.type === 'fixed' ? p.rate : (p.rate / 100) * summary.finalTotal;
-                biayaList.push({ name: p.name, value: Math.round(val) });
-                totalBiaya += Math.round(val);
-            }
-        });
-    }
+    const totalHpp = items.reduce(
+        (sum, item) => sum + (item.hpp * item.qty),
+        0
+    );
 
     const newTransactionData = {
         marketplaceOrderId: uiState.pos_order_id,
         tanggal: new Date(),
-        items: activeCart.value.map(i => ({
-    sku: i.sku,
-    qty: i.qty,
-    hargaJual: i.hargaJualAktual,
-    hpp: i.hpp,
-    model_id: i.model_id || i.modelId || '',
-    nama: i.nama || i.product_name || '',
-    warna: i.warna || i.color || '',
-    varian: i.varian || i.variant || ''
-})),
-        subtotal: summary.subtotal,
-        diskon: summary.discount,
-        total: summary.finalTotal,
+        items,
+        totalHpp,
+        statusDataMarketplace: 'menunggu_data',
+        penghasilanBersihMarketplace: null,
         channel: marketplace.name,
         channelId: marketplace.id,
-        biaya: { rincian: biayaList, total: totalBiaya },
         statusPencairan: 'Belum Cair',
         userId: currentUser.value.uid
     };
@@ -12727,16 +12705,48 @@ const transactionDetails = computed(() => {
     if (uiState.modalType !== 'transactionDetail' || !uiState.modalData.id) {
         return null;
     }
+
     const trx = uiState.modalData;
-    const totalHPP = trx.items.reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
-    const totalBiayaMarketplace = (trx.biaya?.total || 0); // Mengambil total yang sudah dihitung
-    const labaBersih = trx.total - totalHPP - totalBiayaMarketplace;
+    const isNewFormat =
+        Object.prototype.hasOwnProperty.call(
+            trx || {},
+            'statusDataMarketplace'
+        );
+
+    const isMatched =
+        String(trx.statusDataMarketplace || '').toLowerCase() === 'cocok';
+
+    const totalHPP = Number(trx.totalHpp) || (trx.items || []).reduce(
+        (sum, item) =>
+            sum +
+            ((Number(item.hpp) || 0) * (Number(item.qty) || 0)),
+        0
+    );
+
+    const totalBiayaMarketplace = isNewFormat
+        ? 0
+        : (Number(trx.biaya?.total) || 0);
+
+    const totalPenghasilan = isNewFormat
+        ? (
+            isMatched
+                ? (Number(trx.penghasilanBersihMarketplace) || 0)
+                : 0
+        )
+        : (Number(trx.total) || 0);
+
+    const labaBersih = isNewFormat && !isMatched
+        ? null
+        : totalPenghasilan - totalHPP - totalBiayaMarketplace;
 
     return {
         ...trx,
         totalHPP,
         totalBiayaMarketplace,
-        labaBersih
+        totalPenghasilan,
+        labaBersih,
+        isNewFormat,
+        isMatched
     };
 });
 
@@ -19490,7 +19500,7 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Omset Bersih</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-green-600">{{ formatCurrency(dashboardKpis.omsetBersih) }}</p>
                         </div>
                     </div>
@@ -19538,7 +19548,7 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Diskon</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Diskon (Data Lama)</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-red-600">-{{ formatCurrency(dashboardKpis.totalDiskon) }}</p>
                         </div>
                     </div>
@@ -19562,7 +19572,7 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi (Data Lama)</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-purple-600">-{{ formatCurrency(dashboardKpis.totalBiayaTransaksi) }}</p>
                         </div>
                     </div>
@@ -19816,7 +19826,7 @@ watch(activePage, (newPage, oldPage) => {
                         <th class="px-6 py-3">ID Pesanan</th>
                         <th class="px-6 py-3">Tanggal</th>
                         <th class="px-6 py-3">Channel</th>
-                        <th class="px-6 py-3">Total</th>
+                        <th class="px-6 py-3">HPP / Total Lama</th>
                         <th class="px-6 py-3">Aksi</th>
                     </tr>
                 </thead>
@@ -19828,7 +19838,15 @@ watch(activePage, (newPage, oldPage) => {
                         <td class="px-6 py-4 font-mono text-xs">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</td>
                         <td class="px-6 py-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
                         <td class="px-6 py-4">{{ trx.channel }}</td>
-                        <td class="px-6 py-4 font-semibold">{{ formatCurrency(trx.total) }}</td>
+                        <td class="px-6 py-4 font-semibold">
+                            {{
+                                formatCurrency(
+                                    Object.prototype.hasOwnProperty.call(trx || {}, 'statusDataMarketplace')
+                                        ? (Number(trx.totalHpp) || 0)
+                                        : (Number(trx.total) || 0)
+                                )
+                            }}
+                        </td>
                         <td class="px-6 py-4 space-x-3">
                             <button @click="openProtectedTransactionDetail(trx)" class="font-semibold text-indigo-600 hover:underline">Detail</button>
                             <button @click="deleteTransaction(trx.id)" class="font-semibold text-red-500 hover:underline">Hapus</button>
@@ -19860,7 +19878,7 @@ watch(activePage, (newPage, oldPage) => {
                         <div v-for="item in activeCart" :key="item.sku" class="flex justify-between items-center py-3 border-b border-slate-200/50 animate-fade-in">
                             <div>
                                 <p class="font-medium text-sm">{{ item.nama }} ({{ item.varian }})</p>
-                                <p class="text-sm text-slate-500">{{ formatCurrency(item.hargaJualAktual) }} &times; {{item.qty}}</p>
+                                <p class="text-sm text-slate-500">HPP {{ formatCurrency(item.hpp) }} × {{ item.qty }}</p>
                             </div>
                             <div class="flex items-center gap-2">
                                 <button @click="updateCartItemQty(item.sku, -1)" class="w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">-</button>
@@ -19872,13 +19890,13 @@ watch(activePage, (newPage, oldPage) => {
                     </div>
                     
                     <div class="border-t border-slate-200/80 pt-4 space-y-2 text-sm">
-                        <div class="flex justify-between"><span>Subtotal</span><span>{{ formatCurrency(cartSummary.subtotal) }}</span></div>
-                        <div v-if="cartSummary.discount.totalDiscount > 0" class="flex justify-between text-green-600">
-                            <span>{{ cartSummary.discount.description }}</span>
-                            <span>-{{ formatCurrency(cartSummary.discount.totalDiscount) }}</span>
+                        <div class="flex justify-between font-bold">
+                            <span>Total HPP Barang</span>
+                            <span>{{ formatCurrency(activeCart.reduce((total, item) => total + ((Number(item.hpp) || 0) * (Number(item.qty) || 0)), 0)) }}</span>
                         </div>
-                        <div class="flex justify-between font-bold text-lg pt-2 mt-2"><span>Total Akhir</span><span>{{ formatCurrency(cartSummary.finalTotal) }}</span></div>
-                        <div class="flex justify-between text-xs text-slate-500"><span>Jumlah Barang</span><span>{{ cartSummary.itemCount }}</span></div>
+                        <div class="flex justify-between text-xs text-slate-500">
+                            <span>Jumlah Barang</span><span>{{ cartSummary.itemCount }}</span>
+                        </div>
                     </div>
                     
                     <button @click="confirmCompleteTransaction" :disabled="activeCart.length === 0 || !isSubscriptionActive" class="mt-6 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-slate-400 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">
@@ -25579,14 +25597,12 @@ SKU-BAJU-PUTIH-S"
     <h3 class="text-2xl font-bold mb-4">Konfirmasi Transaksi</h3>
     <p class="text-slate-600 mb-4">Anda akan menyelesaikan transaksi untuk channel <span class="font-semibold text-slate-800">{{ uiState.modalData.channelName }}</span>.</p>
     <div class="bg-slate-50 p-4 rounded-lg space-y-2 text-sm">
-        <div class="flex justify-between"><span>Subtotal:</span><span>{{ formatCurrency(uiState.modalData.subtotal) }}</span></div>
-        <div v-if="uiState.modalData?.discount?.totalDiscount > 0" class="flex justify-between text-green-600">
-            <span>Diskon ({{ uiState.modalData?.discount?.description }}):</span>
-            <span>-{{ formatCurrency(uiState.modalData?.discount?.totalDiscount) }}</span>
+        <div class="flex justify-between font-bold text-lg">
+            <span>Total HPP Barang:</span>
+            <span>{{ formatCurrency(activeCart.reduce((total, item) => total + ((Number(item.hpp) || 0) * (Number(item.qty) || 0)), 0)) }}</span>
         </div>
-        <div class="flex justify-between text-lg font-bold pt-2 border-t mt-2">
-            <span>Total Belanja:</span>
-            <span>{{ formatCurrency(uiState.modalData.finalTotal) }}</span>
+        <div class="flex justify-between text-slate-500">
+            <span>Jumlah Barang:</span><span>{{ cartSummary.itemCount }}</span>
         </div>
     </div>
     <p class="mt-4 text-sm text-slate-600">Apakah Anda yakin ingin melanjutkan?</p>
@@ -25997,7 +26013,15 @@ BAJU-PUTIH-M</pre>
                             <div class="font-medium text-slate-800">
                                 {{ item.qty }}x {{ getProductBySku(item.sku)?.nama || item.sku }}
                             </div>
-                            <span class="font-semibold text-right">{{ formatCurrency(item.hargaJual * item.qty) }}</span>
+                            <span class="font-semibold text-right">
+                            {{
+                                formatCurrency(
+                                    transactionDetails.isNewFormat
+                                        ? ((Number(item.hpp) || 0) * (Number(item.qty) || 0))
+                                        : ((Number(item.hargaJual) || 0) * (Number(item.qty) || 0))
+                                )
+                            }}
+                        </span>
                         </li>
                     </ul>
                 </div>
@@ -26021,13 +26045,56 @@ BAJU-PUTIH-M</pre>
                 
                 <div class="p-6 rounded-xl border-2 border-indigo-400 bg-indigo-50 text-center shadow-md">
     <p class="text-sm font-medium text-indigo-800">Estimasi Laba Bersih Transaksi Ini:</p>
-    <p class="text-3xl font-extrabold text-indigo-700 my-1">{{ formatCurrency(transactionDetails.labaBersih) }}</p>
-    <p class="text-xs text-indigo-600 font-medium">(Omset Bersih - HPP Terjual - Total Biaya Marketplace)</p>
+    <p
+        v-if="transactionDetails.labaBersih !== null"
+        class="text-3xl font-extrabold text-indigo-700 my-1"
+    >
+        {{ formatCurrency(transactionDetails.labaBersih) }}
+    </p>
+    <p v-else class="text-sm text-amber-700 my-2">
+        Laba menunggu pencocokan data marketplace.
+    </p>
+    <p class="text-xs text-indigo-600 font-medium">
+        {{
+            transactionDetails.isNewFormat
+                ? 'Penghasilan Bersih Marketplace - HPP'
+                : '(Omset Bersih - HPP Terjual - Total Biaya Marketplace)'
+        }}
+    </p>
 </div>
             </div>
 
             <div class="space-y-4">
-                <div class="bg-slate-50 p-4 rounded-xl border">
+                <div
+                    v-if="transactionDetails.isNewFormat"
+                    class="bg-slate-50 p-4 rounded-xl border"
+                >
+                    <h4 class="font-semibold text-slate-700 mb-2">
+                        Ringkasan Transaksi Marketplace
+                    </h4>
+                    <p
+                        v-if="!transactionDetails.isMatched"
+                        class="rounded-lg bg-amber-50 p-3 text-sm text-amber-800"
+                    >
+                        Data marketplace belum dicocokkan. Penghasilan dan laba belum tersedia.
+                    </p>
+                    <ul v-else class="space-y-2 text-sm">
+                        <li class="flex justify-between font-semibold">
+                            <span>Penghasilan Bersih Marketplace</span>
+                            <span>{{ formatCurrency(transactionDetails.totalPenghasilan) }}</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span class="text-slate-600">HPP Barang</span>
+                            <span class="text-red-600">-{{ formatCurrency(transactionDetails.totalHPP) }}</span>
+                        </li>
+                        <li class="flex justify-between font-bold border-t pt-2">
+                            <span>Laba sebelum biaya operasional</span>
+                            <span>{{ formatCurrency(transactionDetails.totalPenghasilan - transactionDetails.totalHPP) }}</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div v-else class="bg-slate-50 p-4 rounded-xl border">
                     <h4 class="font-semibold text-slate-700 mb-2 flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" /></svg>
                         Ringkasan Laba Rugi
