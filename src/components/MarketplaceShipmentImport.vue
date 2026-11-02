@@ -117,7 +117,7 @@ Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berst
                                 <td class="p-3 font-medium">{{ group.orderId }}</td>
                                 <td class="p-3">{{ group.packageId || group.trackingNumber || '—' }}</td>
                                 <td class="p-3">{{ formatDate(group.shippedAt) }}</td>
-                                <td class="p-3">{{ group.items.map(item => item.nama + ' (' + item.qty + ')').join(', ') }}</td>
+                                <td class="p-3"><div v-for="(item, itemIndex) in group.items" :key="item.sku + '-' + itemIndex" class="mb-1 last:mb-0">{{ formatPackageItem(item) }}</div></td>
                                 <td class="p-3">{{ formatCurrency(group.totalHpp) }}</td>
                             </tr>
                         </tbody>
@@ -333,6 +333,27 @@ function formatScanDate(value) {
     return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('id-ID', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
+function formatPackageItem(item) {
+    const color = cleanText(item?.warna || item?.color);
+    const size = cleanText(item?.ukuran || item?.size || item?.varian || item?.variant);
+    const variation = cleanText(item?.variasiEkspor || item?.variation);
+    const details = [];
+    if (color) details.push('Warna: ' + color);
+    if (size && normalizeKey(size) !== normalizeKey(color)) details.push('Ukuran: ' + size);
+
+    if (variation) {
+        const variationParts = variation.split(/[,|/]+/).map(cleanText).filter(Boolean).map(normalizeKey);
+        const explicitParts = [color, size].filter(Boolean).map(normalizeKey);
+        const alreadyRepresented = variationParts.length > 0 && variationParts.every(part =>
+            explicitParts.some(explicit => explicit === part || explicit.includes(part) || part.includes(explicit))
+        );
+        if (!alreadyRepresented) details.push('Variasi ekspor: ' + variation);
+    }
+
+    const suffix = details.length ? ' · ' + details.join(' · ') : '';
+    return item.nama + suffix + ' (' + item.qty + ' pcs)';
+}
+
 function formatCurrency(value) {
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
@@ -505,8 +526,10 @@ function parseSelectedSheet() {
             hpp: Number(product.hpp) || 0,
             docId: product.docId || product.id || '',
             nama: product.nama || product.namaModel || product.product_name || productName || sellerSku || 'Produk',
-            warna: product.warna || product.color || variation || '',
-            varian: product.varian || product.variant || variation || '',
+            warna: product.warna || product.color || '',
+            ukuran: product.ukuran || product.size || product.variant || product.varian || '',
+            varian: product.ukuran || product.size || product.variant || product.varian || '',
+            variasiEkspor: variation || '',
             model_id: product.model_id || product.modelId || ''
         });
     });
@@ -626,7 +649,9 @@ async function importPackages() {
                         model_id: item.model_id,
                         nama: item.nama,
                         warna: item.warna,
-                        varian: item.varian
+                        ukuran: item.ukuran,
+                        varian: item.varian,
+                        variasiEkspor: item.variasiEkspor
                     })),
                     totalHpp: group.totalHpp,
                     statusDataMarketplace: 'menunggu_data',
