@@ -4436,78 +4436,33 @@ async function processBatchOrders() {
         orderIndex++
     ) {
         const order = ordersToProcess[orderIndex];
-            const subtotal = order.items.reduce((sum, item) => sum + (item.hargaJualAktual * item.qty), 0);
-            
-            const diskon = calculateBestDiscount(order.items, uiState.activeCartChannel);
-            const finalTotal = subtotal - diskon.totalDiscount;
+            const items = order.items.map(item => ({
+    sku: item.sku || '',
+    nama: item.nama || item.product_name || '',
+    qty: Number(item.qty) || 0,
+    hpp: Number(item.hpp) || 0,
+    model_id: item.model_id || item.modelId || '',
+    warna: item.warna || item.color || '',
+    varian: item.varian || item.variant || ''
+}));
 
-            let totalBiaya = 0;
-            const biayaList = [];
-            
-            // Menghitung rasio sisa harga setelah dipotong diskon voucher secara global untuk antrian ini
-            const rasioBersih = subtotal > 0 ? (finalTotal / subtotal) : 1;
-            let totalKomisiProduk = 0;
+const totalHpp = items.reduce(
+    (sum, item) => sum + (item.hpp * item.qty),
+    0
+);
 
-            // LOGIKA TOTAL KOMISI PRODUK TETAP DIJAGA UTUH
-            for (const item of order.items) {
-                const modelId = item.model_id;
-                const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
-                const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
-                if (commissionRate > 0) {
-                    // Komisi Produk (Affiliate) disesuaikan agar dikali ke nilai bersih setelah diskon voucher
-                    totalKomisiProduk += (commissionRate / 100) * ((item.hargaJualAktual * item.qty) * rasioBersih);
-                }
-            }
-
-            if (totalKomisiProduk > 0) {
-                biayaList.push({ name: 'Komisi Produk', value: Math.round(totalKomisiProduk) });
-                totalBiaya += Math.round(totalKomisiProduk);
-            }
-            
-            // Perhitungan biaya admin dan program shopee berdasarkan finalTotal (Omset Bersih) & dibulatkan ke Rupiah utuh
-            if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * finalTotal; biayaList.push({ name: 'Administrasi', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: Math.round(val) }); totalBiaya += Math.round(val); }
-            // Perbaikan hitungan program tambahan massal (Bisa Persen atau Rupiah)
-            if (marketplace.programs && marketplace.programs.length > 0) {
-                marketplace.programs.forEach(p => {
-                    if (p.rate > 0) {
-                        // Jika type == 'fixed' gunakan nominal rupiah langsung, jika tidak hitung persentase dari finalTotal pesanan ini
-                        const val = p.type === 'fixed' ? p.rate : (p.rate / 100) * finalTotal;
-                        biayaList.push({ name: p.name, value: Math.round(val) });
-                        totalBiaya += Math.round(val);
-                    }
-                });
-            }
-
-            const newTransactionData = {
-    marketplaceOrderId: order.marketplaceOrderId,
-
-    // Pesanan pertama mempunyai waktu paling baru
-    // agar urutan di Riwayat Transaksi tetap 1, 2, 3
+const newTransactionData = {
+    marketplaceOrderId: order.marketplaceOrderId || '',
     tanggal: new Date(bulkBaseTime - orderIndex),
-
-    // Identitas dan nomor urutan proses massal
-    bulkBatchId: bulkBatchId,
+    bulkBatchId,
     bulkSequence: orderIndex + 1,
     inputSource: 'bulk_process',
-
-    items: order.items.map(i => ({
-        sku: i.sku,
-        qty: i.qty,
-        hargaJual: i.hargaJualAktual,
-        hpp: i.hpp
-    })),
-
-    subtotal,
-    diskon,
-    total: finalTotal,
+    items,
+    totalHpp,
+    statusDataMarketplace: 'menunggu_data',
+    penghasilanBersihMarketplace: null,
     channel: marketplace.name,
     channelId: uiState.activeCartChannel,
-    biaya: {
-        rincian: biayaList,
-        total: totalBiaya
-    },
     statusPencairan: 'Belum Cair',
     userId: currentUser.value.uid
 };
@@ -6260,18 +6215,35 @@ const dashboardSummaryV2TransactionGlobal =
                     ) || 0
                 ) + discount;
 
-        const net =
-            Number.isFinite(
-                Number(
-                    transaction?.total ??
-                    transaction?.grandTotal
-                )
+        const isNewFormat =
+            Object.prototype.hasOwnProperty.call(
+                transaction || {},
+                'statusDataMarketplace'
+            );
+
+        const isMatched =
+            String(transaction?.statusDataMarketplace || '').toLowerCase() ===
+            'cocok';
+
+        const net = isNewFormat
+            ? (
+                isMatched
+                    ? Number(transaction?.penghasilanBersihMarketplace) || 0
+                    : 0
             )
-                ? Number(
-                    transaction?.total ??
-                    transaction?.grandTotal
+            : (
+                Number.isFinite(
+                    Number(
+                        transaction?.total ??
+                        transaction?.grandTotal
+                    )
                 )
-                : gross - discount;
+                    ? Number(
+                        transaction?.total ??
+                        transaction?.grandTotal
+                    )
+                    : gross - discount
+            );
 
         const fees =
             Number(
@@ -8653,19 +8625,58 @@ const dashboardPremiumData = computed(() => {
         return d >= today && d < tomorrow;
     });
 
-    const omsetHariIni = transaksiHariIni.reduce((sum, t) => {
-        return sum + (t.subtotal || t.total || 0);
+    const isNewTransaction = transaction =>
+        Object.prototype.hasOwnProperty.call(
+            transaction || {},
+            'statusDataMarketplace'
+        );
+
+    const isMarketplaceMatched = transaction =>
+        String(transaction.statusDataMarketplace || '').toLowerCase() ===
+        'cocok';
+
+    const omsetHariIni = transaksiHariIni.reduce((sum, transaction) => {
+        if (isNewTransaction(transaction)) {
+            return sum + (
+                isMarketplaceMatched(transaction)
+                    ? Number(transaction.penghasilanBersihMarketplace) || 0
+                    : 0
+            );
+        }
+
+        return sum + (
+            Number(transaction.subtotal ?? transaction.total) || 0
+        );
     }, 0);
 
-    const hppHariIni = transaksiHariIni.reduce((sum, t) => {
-        return sum + (t.items || []).reduce((s, item) => {
-            return s + ((item.hpp || 0) * (item.qty || 0));
-        }, 0);
+    const hppHariIni = transaksiHariIni.reduce((sum, transaction) => {
+        if (
+            isNewTransaction(transaction) &&
+            !isMarketplaceMatched(transaction)
+        ) {
+            return sum;
+        }
+
+        const hppTransaksi = (transaction.items || []).reduce(
+            (itemSum, item) =>
+                itemSum +
+                ((Number(item.hpp) || 0) * (Number(item.qty) || 0)),
+            0
+        );
+
+        return sum + hppTransaksi;
     }, 0);
 
-    const biayaTransaksiHariIni = transaksiHariIni.reduce((sum, t) => {
-        return sum + (t.biaya?.total || 0);
-    }, 0);
+    const biayaTransaksiHariIni = transaksiHariIni.reduce(
+        (sum, transaction) => {
+            if (isNewTransaction(transaction)) {
+                return sum;
+            }
+
+            return sum + (Number(transaction.biaya?.total) || 0);
+        },
+        0
+    );
 
     const biayaOperasionalHariIni = (
         dashboardTodayData.finance ||
@@ -10145,63 +10156,30 @@ async function executeCompleteTransaction() {
         return;
     }
 
-    const biayaList = [];
-    let totalBiaya = 0;
+    const items = activeCart.value.map(item => ({
+        sku: item.sku || '',
+        nama: item.nama || item.product_name || '',
+        qty: Number(item.qty) || 0,
+        hpp: Number(item.hpp) || 0,
+        model_id: item.model_id || item.modelId || '',
+        warna: item.warna || item.color || '',
+        varian: item.varian || item.variant || ''
+    }));
 
-    // Menghitung rasio sisa harga setelah dipotong diskon voucher secara global
-    const rasioBersih = summary.subtotal > 0 ? (summary.finalTotal / summary.subtotal) : 1;
-
-    let totalKomisiProduk = 0;
-    for (const item of activeCart.value) {
-        const modelId = item.model_id;
-        const modelName = (state.settings.modelProduk.find(m => m.id === modelId)?.namaModel || item.nama).split(' ')[0];
-        const commissionRate = state.commissions.perModel[modelName]?.[uiState.activeCartChannel] || 0;
-
-        if (commissionRate > 0) {
-            // Komisi Produk (Affiliate) disesuaikan agar dikali ke nilai bersih setelah diskon voucher
-            totalKomisiProduk += (commissionRate / 100) * ((item.hargaJualAktual * item.qty) * rasioBersih);
-        }
-    }
-
-    if (totalKomisiProduk > 0) {
-        biayaList.push({ name: 'Komisi Produk', value: Math.round(totalKomisiProduk) });
-        totalBiaya += Math.round(totalKomisiProduk);
-    }
-
-    // Semua biaya admin dan program marketplace dihitung dari summary.finalTotal (Omset Bersih) & dibulatkan ke Rupiah utuh
-    if (marketplace.adm > 0) { const val = (marketplace.adm / 100) * summary.finalTotal; biayaList.push({ name: 'Administrasi', value: Math.round(val) }); totalBiaya += Math.round(val); }
-    if (marketplace.perPesanan > 0) { const val = marketplace.perPesanan; biayaList.push({ name: 'Per Pesanan', value: Math.round(val) }); totalBiaya += Math.round(val); }
-    if (marketplace.layanan > 0) { const val = (marketplace.layanan / 100) * summary.finalTotal; biayaList.push({ name: 'Layanan Gratis Ongkir Xtra', value: Math.round(val) }); totalBiaya += Math.round(val); }
-    if (marketplace.programs && marketplace.programs.length > 0) {
-        marketplace.programs.forEach(p => {
-            if (p.rate > 0) {
-                // Jika type == 'fixed' gunakan nominal rupiah langsung, jika tidak hitung persentase dari finalTotal
-                const val = p.type === 'fixed' ? p.rate : (p.rate / 100) * summary.finalTotal;
-                biayaList.push({ name: p.name, value: Math.round(val) });
-                totalBiaya += Math.round(val);
-            }
-        });
-    }
+    const totalHpp = items.reduce(
+        (sum, item) => sum + (item.hpp * item.qty),
+        0
+    );
 
     const newTransactionData = {
         marketplaceOrderId: uiState.pos_order_id,
         tanggal: new Date(),
-        items: activeCart.value.map(i => ({
-    sku: i.sku,
-    qty: i.qty,
-    hargaJual: i.hargaJualAktual,
-    hpp: i.hpp,
-    model_id: i.model_id || i.modelId || '',
-    nama: i.nama || i.product_name || '',
-    warna: i.warna || i.color || '',
-    varian: i.varian || i.variant || ''
-})),
-        subtotal: summary.subtotal,
-        diskon: summary.discount,
-        total: summary.finalTotal,
+        items,
+        totalHpp,
+        statusDataMarketplace: 'menunggu_data',
+        penghasilanBersihMarketplace: null,
         channel: marketplace.name,
         channelId: marketplace.id,
-        biaya: { rincian: biayaList, total: totalBiaya },
         statusPencairan: 'Belum Cair',
         userId: currentUser.value.uid
     };
@@ -12727,16 +12705,48 @@ const transactionDetails = computed(() => {
     if (uiState.modalType !== 'transactionDetail' || !uiState.modalData.id) {
         return null;
     }
+
     const trx = uiState.modalData;
-    const totalHPP = trx.items.reduce((sum, item) => sum + (item.hpp || 0) * item.qty, 0);
-    const totalBiayaMarketplace = (trx.biaya?.total || 0); // Mengambil total yang sudah dihitung
-    const labaBersih = trx.total - totalHPP - totalBiayaMarketplace;
+    const isNewFormat =
+        Object.prototype.hasOwnProperty.call(
+            trx || {},
+            'statusDataMarketplace'
+        );
+
+    const isMatched =
+        String(trx.statusDataMarketplace || '').toLowerCase() === 'cocok';
+
+    const totalHPP = Number(trx.totalHpp) || (trx.items || []).reduce(
+        (sum, item) =>
+            sum +
+            ((Number(item.hpp) || 0) * (Number(item.qty) || 0)),
+        0
+    );
+
+    const totalBiayaMarketplace = isNewFormat
+        ? 0
+        : (Number(trx.biaya?.total) || 0);
+
+    const totalPenghasilan = isNewFormat
+        ? (
+            isMatched
+                ? (Number(trx.penghasilanBersihMarketplace) || 0)
+                : 0
+        )
+        : (Number(trx.total) || 0);
+
+    const labaBersih = isNewFormat && !isMatched
+        ? null
+        : totalPenghasilan - totalHPP - totalBiayaMarketplace;
 
     return {
         ...trx,
         totalHPP,
         totalBiayaMarketplace,
-        labaBersih
+        totalPenghasilan,
+        labaBersih,
+        isNewFormat,
+        isMatched
     };
 });
 
@@ -19860,7 +19870,7 @@ watch(activePage, (newPage, oldPage) => {
                         <div v-for="item in activeCart" :key="item.sku" class="flex justify-between items-center py-3 border-b border-slate-200/50 animate-fade-in">
                             <div>
                                 <p class="font-medium text-sm">{{ item.nama }} ({{ item.varian }})</p>
-                                <p class="text-sm text-slate-500">{{ formatCurrency(item.hargaJualAktual) }} &times; {{item.qty}}</p>
+                                <p class="text-sm text-slate-500">HPP {{ formatCurrency(item.hpp) }} × {{ item.qty }}</p>
                             </div>
                             <div class="flex items-center gap-2">
                                 <button @click="updateCartItemQty(item.sku, -1)" class="w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">-</button>
@@ -19872,13 +19882,13 @@ watch(activePage, (newPage, oldPage) => {
                     </div>
                     
                     <div class="border-t border-slate-200/80 pt-4 space-y-2 text-sm">
-                        <div class="flex justify-between"><span>Subtotal</span><span>{{ formatCurrency(cartSummary.subtotal) }}</span></div>
-                        <div v-if="cartSummary.discount.totalDiscount > 0" class="flex justify-between text-green-600">
-                            <span>{{ cartSummary.discount.description }}</span>
-                            <span>-{{ formatCurrency(cartSummary.discount.totalDiscount) }}</span>
+                        <div class="flex justify-between font-bold">
+                            <span>Total HPP Barang</span>
+                            <span>{{ formatCurrency(activeCart.reduce((total, item) => total + ((Number(item.hpp) || 0) * (Number(item.qty) || 0)), 0)) }}</span>
                         </div>
-                        <div class="flex justify-between font-bold text-lg pt-2 mt-2"><span>Total Akhir</span><span>{{ formatCurrency(cartSummary.finalTotal) }}</span></div>
-                        <div class="flex justify-between text-xs text-slate-500"><span>Jumlah Barang</span><span>{{ cartSummary.itemCount }}</span></div>
+                        <div class="flex justify-between text-xs text-slate-500">
+                            <span>Jumlah Barang</span><span>{{ cartSummary.itemCount }}</span>
+                        </div>
                     </div>
                     
                     <button @click="confirmCompleteTransaction" :disabled="activeCart.length === 0 || !isSubscriptionActive" class="mt-6 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-slate-400 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">
@@ -25579,14 +25589,12 @@ SKU-BAJU-PUTIH-S"
     <h3 class="text-2xl font-bold mb-4">Konfirmasi Transaksi</h3>
     <p class="text-slate-600 mb-4">Anda akan menyelesaikan transaksi untuk channel <span class="font-semibold text-slate-800">{{ uiState.modalData.channelName }}</span>.</p>
     <div class="bg-slate-50 p-4 rounded-lg space-y-2 text-sm">
-        <div class="flex justify-between"><span>Subtotal:</span><span>{{ formatCurrency(uiState.modalData.subtotal) }}</span></div>
-        <div v-if="uiState.modalData?.discount?.totalDiscount > 0" class="flex justify-between text-green-600">
-            <span>Diskon ({{ uiState.modalData?.discount?.description }}):</span>
-            <span>-{{ formatCurrency(uiState.modalData?.discount?.totalDiscount) }}</span>
+        <div class="flex justify-between font-bold text-lg">
+            <span>Total HPP Barang:</span>
+            <span>{{ formatCurrency(activeCart.reduce((total, item) => total + ((Number(item.hpp) || 0) * (Number(item.qty) || 0)), 0)) }}</span>
         </div>
-        <div class="flex justify-between text-lg font-bold pt-2 border-t mt-2">
-            <span>Total Belanja:</span>
-            <span>{{ formatCurrency(uiState.modalData.finalTotal) }}</span>
+        <div class="flex justify-between text-slate-500">
+            <span>Jumlah Barang:</span><span>{{ cartSummary.itemCount }}</span>
         </div>
     </div>
     <p class="mt-4 text-sm text-slate-600">Apakah Anda yakin ingin melanjutkan?</p>
