@@ -10145,7 +10145,7 @@ async function executeCompleteTransaction() {
         return alert("Anda harus login untuk menyelesaikan transaksi.");
     }
     const marketplace = getMarketplaceById(uiState.activeCartChannel);
-    const summary = cartSummary.value;
+    
     if (!marketplace || activeCart.value.length === 0) {
         alert("Keranjang kosong atau channel penjualan tidak valid.");
         return;
