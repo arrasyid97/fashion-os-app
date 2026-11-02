@@ -257,7 +257,7 @@ massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     massUpdateFilterColor: '',
 
     analisisModelLimit: 10,
-    dashboardDateFilter: 'today',
+    dashboardDateFilter: 'this_year',
     dashboardSalesModelFilter: 'all',
     dashboardSalesChannelFilter: 'all',
     salesStatsDateFilter: 'all_time',
