@@ -8614,7 +8614,17 @@ const analisisModelData = computed(() => {
 });
 
 const dashboardWorkflowMetrics = computed(() => {
-    const transactions = (dashboardFilteredData.value.transaksi || []).filter(transaction =>
+    const periodTransactions = filterDataByDate(
+        dashboardPeriodData.transactions || [],
+        uiState.dashboardDateFilter,
+        uiState.dashboardStartDate,
+        uiState.dashboardEndDate,
+        uiState.dashboardStartMonth,
+        uiState.dashboardStartYear,
+        uiState.dashboardEndMonth,
+        uiState.dashboardEndYear
+    );
+    const transactions = periodTransactions.filter(transaction =>
         Object.prototype.hasOwnProperty.call(transaction || {}, 'statusDataMarketplace')
     );
     const matchedTransactions = transactions.filter(transaction =>
@@ -12251,8 +12261,7 @@ async function addMarketplace() {
 
     const newMarketplace = {
         id: `marketplace-${Date.now()}`,
-        name: 'Marketplace Baru',
-        adm: 0, program: 0, layanan: 0, perPesanan: 0, voucher: 0,
+        name: 'Marketplace Baru'
     };
 
     state.settings.marketplaces.push(newMarketplace);
@@ -19042,7 +19051,19 @@ void [
 </div>
 <div v-else class="min-h-screen w-full bg-slate-50 p-4 sm:p-8">
 <div class="max-w-7xl mx-auto space-y-6">
-<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Fashion OS · Business Overview</p><h1 class="mt-1 text-3xl font-bold text-slate-900">Dashboard Bisnis</h1><p class="mt-2 text-sm text-slate-500">Pantau pesanan, HPP, penghasilan marketplace yang sudah cocok, dan dana yang belum cair.</p></div><div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3"><label class="text-sm text-slate-600" for="dashboard-start-date">Periode</label><input id="dashboard-start-date" type="date" v-model="uiState.dashboardStartDate" class="rounded-lg border-slate-300 text-sm"><span class="text-slate-400">s/d</span><input type="date" v-model="uiState.dashboardEndDate" class="rounded-lg border-slate-300 text-sm"></div></header>
+<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Fashion OS · Business Overview</p><h1 class="mt-1 text-3xl font-bold text-slate-900">Dashboard Bisnis</h1><p class="mt-2 text-sm text-slate-500">Pantau pesanan, HPP, penghasilan marketplace yang sudah cocok, dan dana yang belum cair.</p></div><div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
+<label class="text-sm text-slate-600" for="dashboard-period-filter">Periode transaksi</label>
+<select id="dashboard-period-filter" v-model="uiState.dashboardDateFilter" class="rounded-lg border-slate-300 text-sm">
+<option value="today">Hari ini</option><option value="last_7_days">7 hari terakhir</option><option value="last_30_days">30 hari terakhir</option><option value="this_year">Tahun ini</option><option value="by_date_range">Rentang tanggal</option><option value="by_month_range">Rentang bulan</option><option value="by_year_range">Rentang tahun</option><option value="all_time">Semua</option>
+</select>
+<div v-if="uiState.dashboardDateFilter === 'by_date_range'" class="flex items-center gap-2"><input type="date" v-model="uiState.dashboardStartDate" class="rounded-lg border-slate-300 text-sm"><span class="text-slate-400">s/d</span><input type="date" v-model="uiState.dashboardEndDate" class="rounded-lg border-slate-300 text-sm"></div>
+<div v-if="uiState.dashboardDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
+<select v-model.number="uiState.dashboardStartMonth" class="rounded-lg border-slate-300 text-sm"><option v-for="m in 12" :key="'start-' + m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+<input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 rounded-lg border-slate-300 text-sm" placeholder="Tahun"><span class="text-slate-400">s/d</span>
+<select v-model.number="uiState.dashboardEndMonth" class="rounded-lg border-slate-300 text-sm"><option v-for="m in 12" :key="'end-' + m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+<input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 rounded-lg border-slate-300 text-sm" placeholder="Tahun"></div>
+<div v-if="uiState.dashboardDateFilter === 'by_year_range'" class="flex items-center gap-2"><input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 rounded-lg border-slate-300 text-sm" placeholder="Dari tahun"><span class="text-slate-400">s/d</span><input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 rounded-lg border-slate-300 text-sm" placeholder="Sampai tahun"></div>
+</div></header>
 <section class="rounded-3xl bg-slate-900 p-6 text-white shadow-lg"><div><p class="text-sm font-semibold text-indigo-200">Aktivitas pesanan hari ini</p><h2 class="mt-1 text-xl font-bold">Pesanan yang tercatat di Fashion OS</h2><p class="mt-1 text-sm text-slate-300">Penghasilan dihitung setelah data marketplace dicocokkan.</p></div><div v-if="dashboardDataLoading" class="mt-3 text-sm text-slate-300">Memuat data…</div><div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4"><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Pesanan tercatat</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderHariIni) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Menunggu pencocokan</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderMenungguCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Sudah cocok</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Penghasilan cocok hari ini</p><p class="mt-2 text-xl font-bold">{{ formatCurrency(dashboardPremiumData.penghasilanCocok) }}</p></div></div></section>
 <section><div class="mb-3"><h2 class="text-lg font-bold text-slate-900">Ringkasan periode</h2><p class="text-sm text-slate-500">Penghasilan marketplace hanya berasal dari transaksi baru yang sudah cocok.</p></div><div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 <article class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</p><p class="mt-2 text-2xl font-bold text-emerald-700">{{ formatCurrency(dashboardWorkflowMetrics.netIncome) }}</p><p class="mt-2 text-xs text-slate-400">Penghasilan bersih dari pesanan yang sudah cocok.</p></article>
@@ -22056,6 +22077,7 @@ SKU-BAJU-PUTIH-S"
         </button>
     </div>
 </div>
+    <p class="mb-4 text-sm text-slate-500">Atur nama channel saja. Data potongan dan penghasilan bersih dicatat dari laporan marketplace yang dicocokkan dengan transaksi.</p>
     <div class="mb-4">
         <input type="text" v-model="uiState.pengaturanMarketplaceSearch" placeholder="Cari nama marketplace..." class="w-full p-2 border border-slate-300 rounded-md">
     </div>
@@ -22090,7 +22112,7 @@ SKU-BAJU-PUTIH-S"
 </div>
         <button @click="addModelProduk" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm" :disabled="!isSubscriptionActive">+ Tambah Model</button>
     </div>
-    <p class="mb-4 text-sm text-slate-500">Atur nama channel saja. Data potongan dan penghasilan bersih dicatat dari laporan marketplace yang dicocokkan dengan transaksi.</p>
+    
     <div class="mb-4">
         <input type="text" v-model="uiState.pengaturanModelProdukSearch" placeholder="Cari nama model..." class="w-full p-2 border border-slate-300 rounded-md">
     </div>
