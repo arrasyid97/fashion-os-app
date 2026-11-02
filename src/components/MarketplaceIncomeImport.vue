@@ -178,8 +178,8 @@ const shopeeReport = ref(null);
 const pendingTransactions = ref([]);
 const pendingLoading = ref(false);
 const resolutionMessage = ref('');
-const calendarMonth = ref(new Date().toISOString().slice(0, 7));
-const selectedPendingDay = ref(new Date().toISOString().slice(0, 10));
+const calendarMonth = ref(localDateKey(new Date()).slice(0, 7));
+const selectedPendingDay = ref(localDateKey(new Date()));
 const weekDays = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 const calendarDays = computed(() => {
     const [year, month] = calendarMonth.value.split('-').map(Number);
@@ -534,7 +534,8 @@ async function prepareConfirmedIds() {
             const txs = found.filter(tx => norm(tx.marketplaceOrderId) === norm(orderId) && (norm(tx.channelId) === norm(channel?.id) || norm(tx.channel) === norm(channel?.name)));
             const alreadySettled = txs.length > 0 && txs.every(tx => ['sudahcair', 'retur/pengembalian', 'retur', 'baranghilang'].includes(norm(tx.statusPencairan)));
             const blocked = txs.some(tx => ['retur/pengembalian', 'retur', 'baranghilang'].includes(norm(tx.statusPencairan)));
-            return { id: norm(orderId), orderId, transactions: txs, hpp: txs.reduce((sum, tx) => sum + transactionHpp(tx), 0), alreadySettled, error: !txs.length ? 'ID tidak ditemukan' : blocked ? 'Sudah berstatus retur/hilang' : '' };
+            const absentFromReport = shopeeReport.value && !shopeeReport.value.orderIds.some(id => norm(id) === norm(orderId));
+            return { id: norm(orderId), orderId, transactions: txs, hpp: txs.reduce((sum, tx) => sum + transactionHpp(tx), 0), alreadySettled, error: !txs.length ? 'ID tidak ditemukan' : blocked ? 'Sudah berstatus retur/hilang' : absentFromReport ? 'ID tidak ada di tab Seller Fee pada file ini' : '' };
         });
     } catch (error) { manualError.value = error.message || 'ID tidak bisa diperiksa.'; }
     finally { isPreparing.value = false; }
