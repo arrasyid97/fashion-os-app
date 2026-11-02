@@ -18023,6 +18023,7 @@ const bulkSettlementInput = ref(''); // State untuk menampung data paste dari Ex
 // =====================================================
 
 const isSettlementLoading = ref(false);
+const pendingSettlementLoadError = ref('');
 const settlementCurrentPage = ref(1);
 const settlementItemsPerPage = ref(50);
 
@@ -18105,6 +18106,7 @@ async function fetchPendingSettlementData(userId) {
     if (!userId) return;
 
     isSettlementLoading.value = true;
+    pendingSettlementLoadError.value = '';
 
     try {
         await fetchTransactionAndReturnData(
@@ -18115,196 +18117,84 @@ async function fetchPendingSettlementData(userId) {
             true
         );
 
-        if (
-            dataFetched
-                .allTransactionsLoaded
-        ) {
-            state.pendingSettlements =
-                (
-                    state.transaksi || []
-                ).filter(transaction => {
-                    const status =
-                        String(
-                            transaction
-                                .statusPencairan ||
-                            'Belum Cair'
-                        )
-                            .trim()
-                            .toLocaleLowerCase(
-                                'id-ID'
-                            );
-
-                    return (
-                        isActiveExportRecord(
-                            transaction
-                        ) &&
-                        (
-                            status ===
-                                'belum cair' ||
-                            status ===
-                                'waiting'
-                        )
-                    );
-                });
-
-            dataFetched
-                .pendingSettlements =
-                true;
-
-            settlementCurrentPage.value =
-                1;
-
-            console.log(
-                `[INCREMENTAL V4] ${state.pendingSettlements.length} pesanan belum cair dihitung dari cache penjualan lokal.`
-            );
-
-            return;
+        // Cache transaksi lokal membantu menampilkan data lama yang belum memiliki
+        // statusPencairan. Status pending yang tercatat di server tetap diperiksa
+        // langsung agar cache pending-settlements yang kosong/lama tidak menutupi pesanan.
+        const transactionMap = new Map();
+        if (dataFetched.allTransactionsLoaded) {
+            (state.transaksi || []).forEach(transaction => {
+                const status = String(transaction.statusPencairan || 'Belum Cair')
+                    .trim()
+                    .toLocaleLowerCase('id-ID');
+                if (
+                    isActiveExportRecord(transaction) &&
+                    (status === 'belum cair' || status === 'waiting')
+                ) {
+                    transactionMap.set(transaction.id, transaction);
+                }
+            });
         }
 
-        const cachedPendingSettlements =
-            await readModuleCache(
-                'sales',
-                'pending-settlements'
-            );
-
-        if (
-            cachedPendingSettlements &&
-            Array.isArray(
-                cachedPendingSettlements
-                    .transactions
-            )
-        ) {
-            state.pendingSettlements =
-                cachedPendingSettlements
-                    .transactions;
-
-            dataFetched.pendingSettlements =
-                true;
-
-            settlementCurrentPage.value =
-                1;
-
-            console.log(
-                `[APP CACHE] ${state.pendingSettlements.length} pesanan belum cair dimuat tanpa membaca koleksi ulang.`
-            );
-
-            return;
-        }
-
-        // Ambil dua kemungkinan status transaksi belum cair
         const belumCairQuery = query(
             collection(db, 'transactions'),
             where('userId', '==', userId),
             where('statusPencairan', '==', 'Belum Cair')
         );
-
         const waitingQuery = query(
             collection(db, 'transactions'),
             where('userId', '==', userId),
             where('statusPencairan', '==', 'Waiting')
         );
 
-        const [belumCairSnapshot, waitingSnapshot] =
-            await Promise.all([
-                getDocs(belumCairQuery),
-                getDocs(waitingQuery)
-            ]);
-
-        const transactionMap = new Map();
+        const [belumCairSnapshot, waitingSnapshot] = await Promise.all([
+            getDocs(belumCairQuery),
+            getDocs(waitingQuery)
+        ]);
 
         const addSnapshotToMap = snapshot => {
             snapshot.forEach(docSnap => {
                 const data = docSnap.data();
-
                 const transaction = {
-                    id: docSnap.id,
                     ...data,
+                    id: docSnap.id,
                     tanggal: getSettlementDate(data.tanggal),
                     tanggalPencairan: data.tanggalPencairan
                         ? getSettlementDate(data.tanggalPencairan)
                         : null
                 };
-
-                // Jangan masukkan transaksi yang sudah dihapus/diarsipkan
-                if (!isActiveExportRecord(transaction)) return;
-
-                transactionMap.set(transaction.id, transaction);
+                if (isActiveExportRecord(transaction)) {
+                    transactionMap.set(transaction.id, transaction);
+                }
             });
         };
 
+        // Hasil server menjadi sumber utama; data lokal hanya melengkapi transaksi
+        // lama tanpa status yang sudah dimuat penuh.
         addSnapshotToMap(belumCairSnapshot);
         addSnapshotToMap(waitingSnapshot);
 
-        // Pertahankan transaksi lokal yang mungkin baru dibuat ketika
-        // permintaan server masih berjalan.
-        (
-            state.pendingSettlements ||
-            []
-        ).forEach(transaction => {
-            const status =
-                String(
-                    transaction.statusPencairan ||
-                    'Belum Cair'
-                )
-                    .trim()
-                    .toLocaleLowerCase(
-                        'id-ID'
-                    );
-
-            if (
-                isActiveExportRecord(
-                    transaction
-                ) &&
-                (
-                    status ===
-                        'belum cair' ||
-                    status ===
-                        'waiting'
-                )
-            ) {
-                transactionMap.set(
-                    transaction.id,
-                    transaction
-                );
-            }
-        });
-
-        state.pendingSettlements = Array.from(
-            transactionMap.values()
-        );
-
-        dataFetched.pendingSettlements =
-            true;
-
+        state.pendingSettlements = Array.from(transactionMap.values());
+        dataFetched.pendingSettlements = true;
         settlementCurrentPage.value = 1;
 
+        try {
+            await writeModuleCache('sales', 'pending-settlements', {
+                transactions: state.pendingSettlements
+            });
+        } catch (cacheError) {
+            console.warn('Cache pesanan tertunda tidak dapat diperbarui:', cacheError);
+        }
+
         console.log(
-            `Berhasil memuat ${state.pendingSettlements.length} pesanan belum cair.`
+            `Berhasil memuat ${state.pendingSettlements.length} pesanan belum selesai dari server.`
         );
-
-        await writeModuleCache(
-            'sales',
-            'pending-settlements',
-            {
-                transactions:
-                    state.pendingSettlements
-            }
-        );
-
     } catch (error) {
-        console.error(
-            'Gagal mengambil transaksi belum cair:',
-            error
-        );
-
-        state.pendingSettlements = [];
-
-        dataFetched.pendingSettlements =
-            false;
-
-        alert(
-            'Daftar pesanan belum cair gagal dimuat. Silakan muat ulang halaman.'
-        );
+        console.error('Gagal mengambil transaksi belum selesai:', error);
+        dataFetched.pendingSettlements = false;
+        pendingSettlementLoadError.value =
+            'Daftar pesanan belum berhasil dimuat. Periksa koneksi lalu muat ulang Dashboard.';
+        // Pertahankan data terakhir yang tampil. Jangan mengosongkannya sehingga
+        // kartu Dashboard seolah-olah menyatakan tidak ada pesanan.
     } finally {
         isSettlementLoading.value = false;
     }
@@ -19233,7 +19123,7 @@ void [
 <article class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</p><p class="mt-2 text-2xl font-bold text-emerald-700">{{ dashboardWorkflowMetrics.incomeComplete ? formatCurrency(dashboardWorkflowMetrics.netIncome) : 'Lengkapi ringkasan pencairan' }}</p><p class="mt-2 text-xs text-slate-400">{{ dashboardWorkflowMetrics.incomeComplete ? 'Dari penghasilan per-pesanan atau total pencairan periode yang dicatat.' : 'Ada ID sukses tanpa ringkasan total pencairan periode.' }}</p></article>
 <article class="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">HPP Barang Terjual</p><p class="mt-2 text-2xl font-bold text-indigo-700">{{ formatCurrency(dashboardWorkflowMetrics.totalHpp) }}</p><p class="mt-2 text-xs text-slate-400">Modal produk yang tercatat pada transaksi.</p></article>
 <article class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Laba Bersih Usaha</p><p class="mt-2 text-2xl font-bold" :class="dashboardWorkflowMetrics.netProfit >= 0 ? 'text-blue-700' : 'text-red-600'">{{ dashboardWorkflowMetrics.incomeComplete ? formatCurrency(dashboardWorkflowMetrics.netProfit) : 'Belum lengkap' }}</p><p class="mt-2 text-xs text-slate-400">{{ dashboardWorkflowMetrics.incomeComplete ? 'Penghasilan bersih dikurangi HPP pesanan berhasil dan biaya operasional.' : 'Catat total dana dilepas agar laba tidak tampil keliru.' }}</p></article>
-<article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"><div class="flex items-center justify-between gap-2"><p class="text-sm font-medium text-slate-500">Pesanan Belum Selesai</p><button type="button" @click="togglePendingPrivacyMode" class="rounded-full px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">{{ isPendingPrivacyMode ? 'Tampilkan' : 'Sembunyikan' }}</button></div><p class="mt-2 text-2xl font-bold text-amber-700">{{ isPendingPrivacyMode ? '••••••••' : formatNumber(dashboardWorkflowMetrics.pendingOrders) + ' pesanan' }}</p><p class="mt-2 text-xs text-slate-500">{{ isPendingPrivacyMode ? '••' : formatNumber(dashboardWorkflowMetrics.pendingQty) + ' pcs · HPP tertahan ' + formatCurrency(dashboardWorkflowMetrics.pendingHpp) }}</p><p class="mt-1 text-xs text-slate-400">Pesanan di kartu ini belum dikonfirmasi sukses cair, retur, atau hilang.</p></article>
+<article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"><div class="flex items-center justify-between gap-2"><p class="text-sm font-medium text-slate-500">Pesanan Belum Selesai</p><button type="button" @click="togglePendingPrivacyMode" class="rounded-full px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">{{ isPendingPrivacyMode ? 'Tampilkan' : 'Sembunyikan' }}</button></div><p class="mt-2 text-2xl font-bold text-amber-700">{{ isPendingPrivacyMode ? '••••••••' : pendingSettlementLoadError ? 'Gagal dimuat' : isSettlementLoading ? 'Memuat…' : formatNumber(dashboardWorkflowMetrics.pendingOrders) + ' pesanan' }}</p><p class="mt-2 text-xs text-slate-500">{{ isPendingPrivacyMode ? '••' : pendingSettlementLoadError ? pendingSettlementLoadError : isSettlementLoading ? 'Mengambil daftar pesanan tertunda dari server…' : formatNumber(dashboardWorkflowMetrics.pendingQty) + ' pcs · HPP tertahan ' + formatCurrency(dashboardWorkflowMetrics.pendingHpp) }}</p><p class="mt-1 text-xs text-slate-400">Pesanan di kartu ini belum dikonfirmasi sukses cair, retur, atau hilang.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Biaya Operasional</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardWorkflowMetrics.operatingCosts) }}</p><p class="mt-2 text-xs text-slate-400">Pengeluaran usaha pada periode terpilih.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Saldo Kas Berjalan</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardKpis.saldoKas) }}</p><p class="mt-2 text-xs text-slate-400">Saldo kas yang tercatat di Fashion OS.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Unit Stok Tersedia</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p><p class="mt-2 text-xs text-slate-400">Jumlah stok produk yang tercatat.</p></article>
