@@ -213,7 +213,9 @@ const headerAliases = {
     platformSkuId: ['sku id', 'platform sku id'],
     productName: ['product name', 'nama produk', 'nama barang'],
     variation: ['variation', 'nama variasi', 'variasi'],
-    qty: ['qty', 'quantity', 'jumlah', 'kuantitas', 'jumlah produk'],
+    qty: ['qty', 'quantity', 'jumlah', 'kuantitas', 'jumlah produk', 'sku quantity', 'sku sold quantity', 'sku sold qty', 'item quantity', 'product quantity', 'jumlah barang', 'jumlah produk terjual'],
+    unitPrice: ['sku unit original price', 'unit original price', 'harga satuan asli sku'],
+    subtotalBeforeDiscount: ['sku subtotal before discount', 'subtotal before discount sku', 'subtotal sebelum diskon sku'],
     status: ['status', 'order status', 'status pesanan', 'status pengiriman', 'status paket']
 };
 
@@ -393,13 +395,15 @@ function parseSelectedSheet() {
     const headers = Object.keys(usableRecords[0]);
     const columns = Object.fromEntries(Object.keys(headerAliases).map(field => [field, findColumn(headers, field)]));
     const marketplaceSelected = props.marketplaces.find(item => item.id === shipmentChannelId.value);
-    const required = ['orderId', 'sku', 'qty', 'status'];
+    const required = ['orderId', 'sku', 'status'];
     const missing = required.filter(field => !columns[field]);
+    const canDeriveQuantity = Boolean(columns.unitPrice && columns.subtotalBeforeDiscount);
+    if (!columns.qty && !canDeriveQuantity) missing.push('qty');
     if (!columns.channel && !marketplaceSelected) missing.unshift('channel');
     if (missing.length) {
         fileError.value = 'Kolom wajib belum ditemukan: ' + missing.map(field => ({
             channel: 'pilih Marketplace', orderId: 'ID Pesanan', sku: 'Seller SKU/nomor SKU',
-            qty: 'Quantity/Jumlah', status: 'Order Status/Status Pesanan'
+            qty: 'Quantity/Jumlah atau SKU Unit Original Price + SKU Subtotal Before Discount', status: 'Order Status/Status Pesanan'
         }[field])).join(', ') + '. Pastikan memakai ekspor dari menu Pesanan.';
         return;
     }
@@ -414,9 +418,43 @@ function parseSelectedSheet() {
         const sellerSku = cleanText(cellValue(row, columns.sku));
         const platformSkuId = cleanText(cellValue(row, columns.platformSkuId));
         const productName = cleanText(cellValue(row, columns.productName));
-        const variation = cleanText(cellValue(row, columns.variation));
+        const variationColumnIndex = columns.variation ? headers.indexOf(columns.variation) : -1;
+        const variationContinuationColumns = variationColumnIndex >= 0
+            ? headers.slice(variationColumnIndex + 1).filter(header => /^__EMPTY(?:_\\d+)?$/i.test(String(header || '')))
+            : [];
+        const variation = [cellValue(row, columns.variation), ...variationContinuationColumns.map(column => cellValue(row, column))]
+            .map(cleanText).filter(Boolean).join(', ');
         const skuForLookup = sellerSku || platformSkuId;
-        const qtyValue = Number(String(cellValue(row, columns.qty)).replace(',', '.'));
+        const directQtyText = cleanText(cellValue(row, columns.qty));
+        const parseExportNumber = value => {
+            if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+            let text = cleanText(value).replace(/\\s/g, '').replace(/[^0-9,.-]/g, '');
+            if (!text) return NaN;
+            const comma = text.lastIndexOf(',');
+            const dot = text.lastIndexOf('.');
+            if (comma >= 0 && dot >= 0) {
+                const decimalSeparator = comma > dot ? ',' : '.';
+                const groupingSeparator = decimalSeparator === ',' ? /\\./g : /,/g;
+                text = text.replace(groupingSeparator, '').replace(decimalSeparator, '.');
+            } else if (comma >= 0 || dot >= 0) {
+                const separator = comma >= 0 ? ',' : '.';
+                const parts = text.split(separator);
+                if (parts.length === 2 && parts[1].length === 3) text = parts.join('');
+                else text = parts.join('.');
+            }
+            const parsed = Number(text);
+            return Number.isFinite(parsed) ? parsed : NaN;
+        };
+        let qtyValue = directQtyText ? parseExportNumber(directQtyText) : NaN;
+        if ((!Number.isInteger(qtyValue) || qtyValue <= 0) && !directQtyText && canDeriveQuantity) {
+            const unitPrice = parseExportNumber(cellValue(row, columns.unitPrice));
+            const subtotal = parseExportNumber(cellValue(row, columns.subtotalBeforeDiscount));
+            if (unitPrice > 0 && subtotal > 0) {
+                const ratio = subtotal / unitPrice;
+                const roundedRatio = Math.round(ratio);
+                if (roundedRatio > 0 && Math.abs(ratio - roundedRatio) < 0.000001) qtyValue = roundedRatio;
+            }
+        }
         const status = normalizeKey(cellValue(row, columns.status));
         const shippedAt = parseDate(cellValue(row, columns.shippedAt));
         if (!shippedStatusTokens.has(status)) return;
