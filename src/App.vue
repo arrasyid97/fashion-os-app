@@ -69,7 +69,10 @@ import { 
 } from "firebase/auth";
 
 // --- STATE MANAGEMENT ---
-const activePage = ref(localStorage.getItem('lastActivePage') || 'dashboard');
+const storedActivePage = localStorage.getItem('lastActivePage') || 'dashboard';
+const removedPageRoutes = ['promosi', 'audit-data'];
+const activePage = ref(removedPageRoutes.includes(storedActivePage) ? 'dashboard' : storedActivePage);
+if (removedPageRoutes.includes(storedActivePage)) localStorage.setItem('lastActivePage', 'dashboard');
 const isLoading = ref(true);
 const isSaving = ref(false); // Untuk tombol simpan umum
 const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengaturan
@@ -8610,179 +8613,62 @@ const analisisModelData = computed(() => {
     return finalResult;
 });
 
-const dashboardPremiumData = computed(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const transaksiHariIni = (
-        dashboardTodayData.transactions ||
-        []
-    ).filter(t => {
-        const d = new Date(t.tanggal);
-        return d >= today && d < tomorrow;
-    });
-
-    const isNewTransaction = transaction =>
-        Object.prototype.hasOwnProperty.call(
-            transaction || {},
-            'statusDataMarketplace'
-        );
-
-    const isMarketplaceMatched = transaction =>
-        String(transaction.statusDataMarketplace || '').toLowerCase() ===
-        'cocok';
-
-    const omsetHariIni = transaksiHariIni.reduce((sum, transaction) => {
-        if (isNewTransaction(transaction)) {
-            return sum + (
-                isMarketplaceMatched(transaction)
-                    ? Number(transaction.penghasilanBersihMarketplace) || 0
-                    : 0
-            );
-        }
-
-        return sum + (
-            Number(transaction.subtotal ?? transaction.total) || 0
-        );
-    }, 0);
-
-    const hppHariIni = transaksiHariIni.reduce((sum, transaction) => {
-        if (
-            isNewTransaction(transaction) &&
-            !isMarketplaceMatched(transaction)
-        ) {
-            return sum;
-        }
-
-        const hppTransaksi = (transaction.items || []).reduce(
-            (itemSum, item) =>
-                itemSum +
-                ((Number(item.hpp) || 0) * (Number(item.qty) || 0)),
-            0
-        );
-
-        return sum + hppTransaksi;
-    }, 0);
-
-    const biayaTransaksiHariIni = transaksiHariIni.reduce(
-        (sum, transaction) => {
-            if (isNewTransaction(transaction)) {
-                return sum;
-            }
-
-            return sum + (Number(transaction.biaya?.total) || 0);
-        },
+const dashboardWorkflowMetrics = computed(() => {
+    const transactions = (dashboardFilteredData.value.transaksi || []).filter(transaction =>
+        Object.prototype.hasOwnProperty.call(transaction || {}, 'statusDataMarketplace')
+    );
+    const matchedTransactions = transactions.filter(transaction =>
+        String(transaction.statusDataMarketplace || '').trim().toLowerCase() === 'cocok'
+    );
+    const hpp = transaction => (transaction.items || []).reduce(
+        (sum, item) => sum + ((Number(item.hpp) || 0) * (Number(item.qty) || 0)),
         0
     );
-
-    const biayaOperasionalHariIni = (
-        dashboardTodayData.finance ||
-        []
-    )
-    .filter(k => {
-        const d = k.tanggal?.toDate
-            ? k.tanggal.toDate()
-            : (k.tanggal instanceof Date ? k.tanggal : new Date(k.tanggal));
-
-        return d >= today &&
-            d < tomorrow &&
-            (k.jenis === 'pengeluaran' || k.jenis === 'biaya') &&
-            (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) !== 'produksi';
-    })
-    .reduce((sum, k) => sum + (Number(k.jumlah) || 0), 0);
-
-    const profitBersihHariIni =
-    omsetHariIni -
-    hppHariIni -
-    biayaTransaksiHariIni -
-    biayaOperasionalHariIni;
-
-    const produkTerjualHariIni = transaksiHariIni.reduce((sum, t) => {
-        return sum + (t.items || []).reduce((s, item) => {
-            return s + (item.qty || 0);
-        }, 0);
-    }, 0);
-
-    const produkHampirHabis = (state.produk || [])
-        .filter(p => {
-            const stok = p.stokFisik ?? p.physical_stock ?? 0;
-            return stok > 0 && stok <= (state.settings.minStok || 10);
-        })
-        .sort((a, b) => {
-            const stokA = a.stokFisik ?? a.physical_stock ?? 0;
-            const stokB = b.stokFisik ?? b.physical_stock ?? 0;
-            return stokA - stokB;
-        })
-        .slice(0, 5)
-        .map(p => ({
-            nama: p.nama || p.product_name || '-',
-            warna: p.warna || p.color || '-',
-            varian: p.varian || p.variant || '-',
-            stok: p.stokFisik ?? p.physical_stock ?? 0
-        }));
-
-    const batchBelumSelesai = (state.produksi || []).filter(p => {
-        return (p.statusProses || '').toLowerCase() !== 'selesai';
+    const netIncome = matchedTransactions.reduce(
+        (sum, transaction) => sum + (Number(transaction.penghasilanBersihMarketplace) || 0),
+        0
+    );
+    const totalHpp = matchedTransactions.reduce((sum, transaction) => sum + hpp(transaction), 0);
+    const operatingCosts = (dashboardFilteredData.value.keuangan || [])
+        .filter(record =>
+            (record.jenis === 'pengeluaran' || record.jenis === 'biaya') &&
+            (record.tipeBiaya || getExpenseTypeByCategory(record.kategori)) !== 'produksi'
+        )
+        .reduce((sum, record) => sum + (Number(record.jumlah) || 0), 0);
+    const pendingTransactions = matchedTransactions.filter(transaction => {
+        const status = String(transaction.statusPencairan || '').trim().toLowerCase();
+        return !status || status === 'belum cair' || status === 'waiting';
     });
-
-    const maklunTerlambat = batchBelumSelesai.filter(p => {
-        const d = new Date(p.tanggal);
-        const umurHari = Math.floor((today - d) / (1000 * 60 * 60 * 24));
-
-        return (p.produksiType || '').toLowerCase() === 'pemaklun' &&
-            umurHari >= 14;
-    });
-
-    const summaryToday =
-        dashboardSummaryV2.periodReady
-            ? (
-                dashboardSummaryV2.today ||
-                {}
-            )
-            : null;
-
+    const pendingFunds = pendingTransactions.reduce(
+        (sum, transaction) => sum + (Number(transaction.penghasilanBersihMarketplace) || 0),
+        0
+    );
+    const pendingQty = pendingTransactions.reduce(
+        (sum, transaction) => sum + (transaction.items || []).reduce(
+            (itemSum, item) => itemSum + (Number(item.qty) || 0),
+            0
+        ),
+        0
+    );
     return {
-        omsetHariIni:
-            summaryToday
-                ? (
-                    Number(
-                        summaryToday.omsetHariIni
-                    ) || 0
-                )
-                : omsetHariIni,
-        profitBersihHariIni:
-            summaryToday
-                ? (
-                    Number(
-                        summaryToday
-                            .profitBersihHariIni
-                    ) || 0
-                )
-                : profitBersihHariIni,
-        orderHariIni:
-            summaryToday
-                ? (
-                    Number(
-                        summaryToday.orderHariIni
-                    ) || 0
-                )
-                : transaksiHariIni.length,
-        produkTerjualHariIni:
-            summaryToday
-                ? (
-                    Number(
-                        summaryToday
-                            .produkTerjualHariIni
-                    ) || 0
-                )
-                : produkTerjualHariIni,
-        produkHampirHabis,
-        batchBelumSelesai: batchBelumSelesai.length,
-        maklunTerlambat: maklunTerlambat.length
+        netIncome,
+        totalHpp,
+        operatingCosts,
+        netProfit: netIncome - totalHpp - operatingCosts,
+        pendingFunds,
+        pendingQty
     };
+});
+
+const dashboardPremiumData = computed(() => {
+ const now = new Date(); const today = new Date(now.getFullYear(),now.getMonth(),now.getDate()); const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+ const newTransactionsToday=(dashboardTodayData.transactions||[]).filter(transaction=>{const date=transaction?.tanggal?.toDate?transaction.tanggal.toDate():new Date(transaction?.tanggal);return Object.prototype.hasOwnProperty.call(transaction||{},'statusDataMarketplace')&&date>=today&&date<tomorrow;});
+ const isMatched=transaction=>String(transaction?.statusDataMarketplace||'').trim().toLowerCase()==='cocok';
+ const matchedTransactions=newTransactionsToday.filter(isMatched); const pendingTransactions=newTransactionsToday.filter(transaction=>!isMatched(transaction));
+ const produkHampirHabis=(state.produk||[]).filter(product=>{const stock=product.stokFisik??product.physical_stock??0;return stock>0&&stock<=(state.settings.minStok||10);}).sort((a,b)=>(a.stokFisik??a.physical_stock??0)-(b.stokFisik??b.physical_stock??0)).slice(0,5);
+ const batchBelumSelesai=(state.produksi||[]).filter(batch=>(batch.statusProses||'').toLowerCase()!=='selesai');
+ const maklunTerlambat=batchBelumSelesai.filter(batch=>{const date=new Date(batch.tanggal);return(batch.produksiType||'').toLowerCase()==='pemaklun'&&Math.floor((today-date)/(1000*60*60*24))>=14;});
+ return {orderHariIni:newTransactionsToday.length,orderMenungguCocok:pendingTransactions.length,orderCocok:matchedTransactions.length,penghasilanCocok:matchedTransactions.reduce((sum,transaction)=>sum+(Number(transaction.penghasilanBersihMarketplace)||0),0),produkHampirHabis,batchBelumSelesai:batchBelumSelesai.length,maklunTerlambat:maklunTerlambat.length};
 });
 
 
@@ -12759,19 +12645,19 @@ const panduanData = [
         subtitle: 'Tempat mengatur aturan utama sebelum aplikasi dipakai.',
         description: 'Halaman Pengaturan adalah pondasi Fashion OS. Bagian ini wajib dirapikan lebih dulu karena data marketplace, model produk, kategori, rekening, dan PIN akan dipakai oleh halaman lain.',
         steps: [
-            'Isi Aturan Marketplace untuk Shopee, TikTok Shop, Offline, Website, atau channel lain.',
+            'Isi Marketplace untuk Shopee, TikTok Shop, Offline, Website, atau channel lain.',
             'Isi Model Produk agar produk, produksi, stok, laporan, dan ROAS bisa terbaca per model.',
             'Isi kategori biaya dan kategori pemasukan supaya laporan keuangan rapi.',
             'Isi rekening bank jika memakai fitur investasi, pembayaran, atau pencatatan rekening.',
             'Atur PIN keamanan untuk halaman sensitif seperti dashboard, laporan, dan HPP.'
         ],
         tips: [
-            'Aturan Marketplace dan Model Produk wajib diisi sebelum tambah produk.',
+            'Marketplace dan Model Produk wajib diisi sebelum tambah produk.',
             'Jangan hapus model produk yang sudah dipakai transaksi.',
             'Pastikan biaya marketplace sesuai channel agar profit tidak salah.'
         ],
         links: [
-            { label: 'Aturan Marketplace', page: 'pengaturan', tab: 'marketplace', primary: true },
+            { label: 'Marketplace', page: 'pengaturan', tab: 'marketplace', primary: true },
             { label: 'Model Produk', page: 'pengaturan', tab: 'modelproduk', primary: true },
             { label: 'Rekening Bank', page: 'pengaturan', tab: 'rekening', primary: false }
         ]
@@ -12949,30 +12835,7 @@ const panduanData = [
             { label: 'Statistik Penjualan', page: 'statistik-penjualan', primary: false }
         ]
     },
-    {
-        id: 'promosi',
-        icon: '🎁',
-        title: '9. Promosi dan Catatan',
-        badge: 'Marketing',
-        subtitle: 'Untuk mengatur promo, voucher, komisi, dan catatan penting.',
-        description: 'Halaman promosi membantu mencatat aturan promo atau strategi penjualan agar tidak tercecer. Cocok untuk mencatat voucher, promosi per channel, promosi per model, atau catatan campaign.',
-        steps: [
-            'Catat promo yang sedang berjalan.',
-            'Pisahkan promo berdasarkan channel atau model produk.',
-            'Gunakan catatan agar strategi diskon tidak lupa.',
-            'Evaluasi promo dari hasil penjualan dan ROAS.',
-            'Pastikan promo tidak membuat harga jual menjadi boncos.'
-        ],
-        tips: [
-            'Setiap promo sebaiknya punya tanggal mulai dan tanggal selesai.',
-            'Jangan hanya lihat omset, cek juga profit setelah diskon.',
-            'Promo yang bagus harus tetap aman terhadap HPP dan biaya marketplace.'
-        ],
-        links: [
-            { label: 'Buka Promosi', page: 'promosi', primary: true },
-            { label: 'Dashboard ROAS', page: 'roas-dashboard', primary: false }
-        ]
-    }
+
 ];
 
 const panduanAccordion = ref('pengaturan');
@@ -18934,7 +18797,6 @@ watch(activePage, (newPage, oldPage) => {
     <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Proses Massal</a>
     <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">Cek Pencairan Dana</a>
     <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
-    <a href="#" @click.prevent="changePage('audit-data')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'audit-data' }">Cek Kesehatan Data</a>
     <a href="#" @click.prevent="changePage('statistik-penjualan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'statistik-penjualan' }">Statistik Penjualan</a>
 </div>
 
@@ -18949,7 +18811,6 @@ watch(activePage, (newPage, oldPage) => {
 <div v-show="uiState.sidebarGroups.produk" class="ml-4 space-y-1">
     <a href="#" @click.prevent="changePage('inventaris')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'inventaris' }">Inventaris</a>
     <a href="#" @click.prevent="changePage('harga-hpp')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'harga-hpp' }">Harga & HPP</a>
-    <a href="#" @click.prevent="changePage('promosi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'promosi' }">Promosi</a>
 </div>
 
 <button type="button" @click="toggleSidebarGroup('produksi')" class="w-full sidebar-link justify-between">
@@ -19145,557 +19006,24 @@ watch(activePage, (newPage, oldPage) => {
 
     <div v-else>
 
-<div v-if="activePage === 'dashboard'">
-    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+<div v-if="activePage === 'dashboard'" class="min-h-screen w-full bg-slate-50 p-4 sm:p-8">
+<div class="max-w-7xl mx-auto space-y-6">
+<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Fashion OS · Business Overview</p><h1 class="mt-1 text-3xl font-bold text-slate-900">Dashboard Bisnis</h1><p class="mt-2 text-sm text-slate-500">Pantau pesanan, HPP, penghasilan marketplace yang sudah cocok, dan dana yang belum cair.</p></div><div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3"><label class="text-sm text-slate-600" for="dashboard-start-date">Periode</label><input id="dashboard-start-date" type="date" v-model="uiState.dashboardStartDate" class="rounded-lg border-slate-300 text-sm"><span class="text-slate-400">s/d</span><input type="date" v-model="uiState.dashboardEndDate" class="rounded-lg border-slate-300 text-sm"></div></header>
+<section class="rounded-3xl bg-slate-900 p-6 text-white shadow-lg"><div><p class="text-sm font-semibold text-indigo-200">Aktivitas pesanan hari ini</p><h2 class="mt-1 text-xl font-bold">Pesanan yang tercatat di Fashion OS</h2><p class="mt-1 text-sm text-slate-300">Penghasilan dihitung setelah data marketplace dicocokkan.</p></div><div v-if="dashboardDataLoading" class="mt-3 text-sm text-slate-300">Memuat data…</div><div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4"><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Pesanan tercatat</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderHariIni) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Menunggu pencocokan</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderMenungguCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Sudah cocok</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Penghasilan cocok hari ini</p><p class="mt-2 text-xl font-bold">{{ formatCurrency(dashboardPremiumData.penghasilanCocok) }}</p></div></div></section>
+<section><div class="mb-3"><h2 class="text-lg font-bold text-slate-900">Ringkasan periode</h2><p class="text-sm text-slate-500">Penghasilan marketplace hanya berasal dari transaksi baru yang sudah cocok.</p></div><div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+<article class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</p><p class="mt-2 text-2xl font-bold text-emerald-700">{{ formatCurrency(dashboardWorkflowMetrics.netIncome) }}</p><p class="mt-2 text-xs text-slate-400">Penghasilan bersih dari pesanan yang sudah cocok.</p></article>
+<article class="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">HPP Barang Terjual</p><p class="mt-2 text-2xl font-bold text-indigo-700">{{ formatCurrency(dashboardWorkflowMetrics.totalHpp) }}</p><p class="mt-2 text-xs text-slate-400">Modal produk yang tercatat pada transaksi.</p></article>
+<article class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Laba Bersih Usaha</p><p class="mt-2 text-2xl font-bold" :class="dashboardWorkflowMetrics.netProfit >= 0 ? 'text-blue-700' : 'text-red-600'">{{ formatCurrency(dashboardWorkflowMetrics.netProfit) }}</p><p class="mt-2 text-xs text-slate-400">Penghasilan cocok dikurangi HPP dan biaya operasional.</p></article>
+<article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Penghasilan Cocok Belum Cair</p><p class="mt-2 text-2xl font-bold text-amber-700">{{ formatCurrency(dashboardWorkflowMetrics.pendingFunds) }}</p><p class="mt-2 text-xs text-slate-400">{{ formatNumber(dashboardWorkflowMetrics.pendingQty) }} pcs terkait transaksi cocok menunggu pencairan.</p></article>
+<article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Biaya Operasional</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardWorkflowMetrics.operatingCosts) }}</p><p class="mt-2 text-xs text-slate-400">Pengeluaran usaha pada periode terpilih.</p></article>
+<article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Saldo Kas Berjalan</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardKpis.saldoKas) }}</p><p class="mt-2 text-xs text-slate-400">Saldo kas yang tercatat di Fashion OS.</p></article>
+<article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Unit Stok Tersedia</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p><p class="mt-2 text-xs text-slate-400">Jumlah stok produk yang tercatat.</p></article>
+<article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Nilai Stok (HPP)</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardKpis.totalNilaiStokHPP) }}</p><p class="mt-2 text-xs text-slate-400">Modal yang tertanam pada stok.</p></article>
+</div></section>
+<section class="grid grid-cols-1 gap-4 lg:grid-cols-2"><div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div class="flex items-center justify-between gap-3"><div><h2 class="font-bold text-slate-900">Pesanan belum cocok</h2><p class="mt-1 text-sm text-slate-500">Belum masuk perhitungan penghasilan marketplace.</p></div><span class="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">{{ formatNumber(dashboardPremiumData.orderMenungguCocok) }}</span></div><p class="mt-4 text-sm text-slate-600">Cocokkan transaksi dengan data pesanan terkirim sebelum menghitung laba.</p></div><div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 class="font-bold text-slate-900">Stok dan produksi</h2><p class="mt-1 text-sm text-slate-500">Pantau kesiapan barang untuk pesanan berikutnya.</p><div class="mt-4 flex flex-wrap gap-3 text-sm"><span class="rounded-full bg-rose-50 px-3 py-2 text-rose-700">Stok menipis: {{ formatNumber(dashboardPremiumData.produkHampirHabis.length) }}</span><span class="rounded-full bg-indigo-50 px-3 py-2 text-indigo-700">Produksi berjalan: {{ formatNumber(dashboardPremiumData.batchBelumSelesai) }}</span><span class="rounded-full bg-amber-50 px-3 py-2 text-amber-700">Maklun terlambat: {{ formatNumber(dashboardPremiumData.maklunTerlambat) }}</span></div></div></section>
+</div></div>
 
-        <div v-if="state.settings.dashboardPin && isDashboardLocked" class="flex items-center justify-center h-full animate-fade-in">
-            <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
-                 <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                 </div>
-                <h3 class="text-xl font-bold text-slate-800 mb-2">Dashboard Terkunci</h3>
-                <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan Anda untuk melihat data dashboard.</p>
-                <form @submit.prevent="unlockDashboard" class="w-full">
-                    <input type="password" v-model="dashboardPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2">
-                    <p v-if="dashboardPinError" class="text-red-500 text-xs mb-2">{{ dashboardPinError }}</p>
-                    <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka Dashboard</button>
-                </form>
-            </div>
-        </div>
-        
-        <div v-else class="max-w-7xl mx-auto">
-            <div class="flex flex-wrap justify-between items-center mb-8 gap-4 animate-fade-in-up">
-    <div class="flex items-center gap-4">
-        <h2 class="text-3xl font-bold text-slate-800">Dashboard Analitik</h2>
-        <button @click="showModal('dashboardKpiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-            </svg>
-            Informasi
-        </button>
-    </div>
-</div>
-            
-<!-- DASHBOARD PREMIUM HARI INI -->
-<div class="mb-8 space-y-6 animate-fade-in-up">
-
-    <!-- RINGKASAN HARI INI PREMIUM -->
-<div class="bg-slate-950 text-white rounded-3xl shadow-xl p-6 border border-slate-800">
-
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-        <div>
-            <p class="text-sm text-slate-400">Ringkasan Hari Ini</p>
-            <h3 class="text-2xl font-bold">Kondisi Bisnis Sekarang</h3>
-        </div>
-
-        <span class="w-fit text-xs bg-white/10 px-3 py-1.5 rounded-full text-slate-300 border border-white/10">
-            Update otomatis dari transaksi hari ini
-        </span>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
-        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
-            <div class="flex items-center justify-between mb-5">
-                <div class="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
-                    💰
-                </div>
-                <span class="text-xs text-slate-400">Omset</span>
-            </div>
-
-            <p class="text-sm text-slate-300">Omset Hari Ini</p>
-            <p class="text-3xl font-bold mt-2">
-                {{ formatCurrency(dashboardPremiumData.omsetHariIni) }}
-            </p>
-            <p class="text-xs text-slate-400 mt-3">
-                Total penjualan dari transaksi hari ini.
-            </p>
-        </div>
-
-        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
-            <div class="flex items-center justify-between mb-5">
-                <div class="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
-                    📊
-                </div>
-                <span class="text-xs text-slate-400">Estimasi</span>
-            </div>
-
-            <p class="text-sm text-slate-300">Estimasi Laba Hari Ini</p>
-            <p
-                class="text-3xl font-bold mt-2"
-                :class="dashboardPremiumData.profitBersihHariIni >= 0 ? 'text-emerald-300' : 'text-red-300'"
-            >
-                {{ formatCurrency(dashboardPremiumData.profitBersihHariIni) }}
-            </p>
-            <p class="text-xs text-slate-400 mt-3">
-                Setelah HPP, biaya transaksi, dan biaya operasional hari ini.
-            </p>
-        </div>
-
-        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
-            <div class="flex items-center justify-between mb-5">
-                <div class="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
-                    🛒
-                </div>
-                <span class="text-xs text-slate-400">Order</span>
-            </div>
-
-            <p class="text-sm text-slate-300">Order Hari Ini</p>
-            <p class="text-3xl font-bold mt-2">
-                {{ formatNumber(dashboardPremiumData.orderHariIni) }}
-            </p>
-            <p class="text-xs text-slate-400 mt-3">
-                Jumlah transaksi yang masuk hari ini.
-            </p>
-        </div>
-
-        <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
-            <div class="flex items-center justify-between mb-5">
-                <div class="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
-                    📦
-                </div>
-                <span class="text-xs text-slate-400">Produk</span>
-            </div>
-
-            <p class="text-sm text-slate-300">Produk Terjual</p>
-            <p class="text-3xl font-bold mt-2">
-                {{ formatNumber(dashboardPremiumData.produkTerjualHariIni) }} pcs
-            </p>
-            <p class="text-xs text-slate-400 mt-3">
-                Total item yang terjual hari ini.
-            </p>
-        </div>
-
-    </div>
-</div>
-
-    <!-- STATISTIK PENJUALAN PREMIUM -->
-<div v-if="false" class="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
-
-    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5 mb-6">
-        <div>
-            <p class="text-sm text-slate-500">Ringkasan performa produk</p>
-            <h3 class="text-xl font-bold text-slate-800">Statistik Penjualan</h3>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-[520px]">
-            <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Model</label>
-                <select v-model="uiState.dashboardSalesModelFilter" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white">
-                    <option value="all">Semua Model</option>
-                    <option
-                        v-for="model in uniqueRoasModels"
-                        :key="model.namaModel"
-                        :value="model.namaModel"
-                    >
-                        {{ model.namaModel }}
-                    </option>
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Channel</label>
-                <select v-model="uiState.dashboardSalesChannelFilter" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white">
-                    <option value="all">Semua Channel</option>
-                    <option
-                        v-for="channel in state.settings.marketplaces"
-                        :key="channel.id"
-                        :value="channel.name"
-                    >
-                        {{ channel.name }}
-                    </option>
-                </select>
-            </div>
-        </div>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-            <div class="flex items-center justify-between mb-4">
-                <span class="text-2xl">🏆</span>
-                <span class="text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-500">Model</span>
-            </div>
-
-            <p class="text-sm text-slate-500">Model Terlaris</p>
-            <p class="text-xl font-bold text-slate-800 mt-1">
-                {{ dashboardSalesStats.topModels[0]?.name || 'Belum ada data' }}
-            </p>
-            <p class="text-sm text-slate-500 mt-2">
-                {{ dashboardSalesStats.topModels[0] ? formatNumber(dashboardSalesStats.topModels[0].qty) + ' pcs terjual' : 'Belum ada transaksi untuk periode ini.' }}
-            </p>
-        </div>
-
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-            <div class="flex items-center justify-between mb-4">
-                <span class="text-2xl">🎨</span>
-                <span class="text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-500">Warna</span>
-            </div>
-
-            <p class="text-sm text-slate-500">Warna Terlaris</p>
-            <p class="text-xl font-bold text-slate-800 mt-1">
-                {{ dashboardSalesStats.topColors[0]?.name || 'Belum ada data' }}
-            </p>
-            <p class="text-sm text-slate-500 mt-2">
-                {{ dashboardSalesStats.topColors[0] ? formatNumber(dashboardSalesStats.topColors[0].qty) + ' pcs terjual' : 'Belum ada transaksi untuk periode ini.' }}
-            </p>
-        </div>
-
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-            <div class="flex items-center justify-between mb-4">
-                <span class="text-2xl">📏</span>
-                <span class="text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-500">Ukuran</span>
-            </div>
-
-            <p class="text-sm text-slate-500">Ukuran Terlaris</p>
-            <p class="text-xl font-bold text-slate-800 mt-1">
-                {{ dashboardSalesStats.topSizes[0]?.name || 'Belum ada data' }}
-            </p>
-            <p class="text-sm text-slate-500 mt-2">
-                {{ dashboardSalesStats.topSizes[0] ? formatNumber(dashboardSalesStats.topSizes[0].qty) + ' pcs terjual' : 'Belum ada transaksi untuk periode ini.' }}
-            </p>
-        </div>
-
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-            <div class="flex items-center justify-between mb-4">
-                <span class="text-2xl">🏪</span>
-                <span class="text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-500">Channel</span>
-            </div>
-
-            <p class="text-sm text-slate-500">Marketplace Terbaik</p>
-            <p class="text-xl font-bold text-slate-800 mt-1">
-                {{ dashboardSalesStats.topChannels[0]?.name || 'Belum ada data' }}
-            </p>
-            <p class="text-sm text-slate-500 mt-2">
-                {{ dashboardSalesStats.topChannels[0] ? formatCurrency(dashboardSalesStats.topChannels[0].omset) : 'Belum ada transaksi untuk periode ini.' }}
-            </p>
-        </div>
-
-    </div>
-</div>
-
-</div>
-
-<!-- PEMISAH KPI FINAL -->
-<div class="mb-6 mt-10">
-    <div class="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm p-5">
-        <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
-            
-            <div>
-                <p class="text-sm text-slate-500">Laporan Bisnis Final</p>
-                <h3 class="text-2xl font-bold text-slate-800">
-                    Performa Berdasarkan Dana Cair
-                </h3>
-                <p class="text-sm text-slate-500 mt-1">
-                    Data di bawah ini dihitung dari pesanan yang sudah selesai dan dana yang sudah dicairkan.
-                </p>
-            </div>
-
-            <div class="w-full xl:w-auto">
-                <div class="flex flex-wrap items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <select v-model="uiState.dashboardDateFilter" class="w-full sm:w-auto bg-white border-slate-300 text-sm rounded-lg p-2.5 capitalize">
-                        <option value="today">hari ini</option>
-                        <option value="last_7_days">7 hari terakhir</option>
-                        <option value="last_30_days">30 hari terakhir</option>
-                        <option value="this_year">tahun ini</option>
-                        <option value="by_date_range">rentang tanggal</option>
-                        <option value="by_month_range">rentang bulan</option>
-                        <option value="by_year_range">rentang tahun</option>
-                        <option value="all_time">semua</option>
-                    </select>
-
-                    <div v-if="uiState.dashboardDateFilter === 'by_date_range'" class="flex items-center gap-2">
-                        <input type="date" v-model="uiState.dashboardStartDate" class="border-slate-300 text-sm rounded-lg p-2">
-                        <span>s/d</span>
-                        <input type="date" v-model="uiState.dashboardEndDate" class="border-slate-300 text-sm rounded-lg p-2">
-                    </div>
-
-                    <div v-if="uiState.dashboardDateFilter === 'by_month_range'" class="flex flex-wrap items-center gap-2">
-                        <select v-model.number="uiState.dashboardStartMonth" class="border-slate-300 text-sm rounded-lg p-2">
-                            <option v-for="m in 12" :key="m" :value="m">
-                                {{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}
-                            </option>
-                        </select>
-
-                        <input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
-
-                        <span class="mx-2">s/d</span>
-
-                        <select v-model.number="uiState.dashboardEndMonth" class="border-slate-300 text-sm rounded-lg p-2">
-                            <option v-for="m in 12" :key="m" :value="m">
-                                {{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}
-                            </option>
-                        </select>
-
-                        <input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2" placeholder="Tahun">
-                    </div>
-
-                    <div v-if="uiState.dashboardDateFilter === 'by_year_range'" class="flex items-center gap-2">
-                        <input type="number" v-model.number="uiState.dashboardStartYear" placeholder="Dari Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
-                        <span>s/d</span>
-                        <input type="number" v-model.number="uiState.dashboardEndYear" placeholder="Sampai Tahun" class="w-28 border-slate-300 text-sm rounded-lg p-2">
-                    </div>
-                </div>
-
-                <p class="text-xs text-slate-500 mt-2">
-                    Filter ini hanya untuk laporan bisnis final di bawah.
-                </p>
-
-                <div
-                    v-if="dashboardDataLoading"
-                    class="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700"
-                >
-                    Memuat data sesuai periode...
-                    Transaksi:
-                    <strong>{{ dashboardLoadedCounts.transactions }}</strong>,
-                    retur:
-                    <strong>{{ dashboardLoadedCounts.returns }}</strong>,
-                    keuangan:
-                    <strong>{{ dashboardLoadedCounts.finance }}</strong>.
-                </div>
-
-                <div
-                    v-else-if="dashboardDataMessage"
-                    class="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
-                >
-                    {{ dashboardDataMessage }}
-                </div>
-
-                <div
-                    v-else-if="dashboardDataError"
-                    class="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-                >
-                    {{ dashboardDataError }}
-
-                    <button
-                        @click="loadDashboardDataByCurrentFilter(currentUser.uid)"
-                        class="ml-2 font-bold underline"
-                    >
-                        Coba Lagi
-                    </button>
-                </div>
-            </div>
-
-        </div>
-    </div>
-</div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 100ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Saldo Kas Berjalan</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.saldoKas) }}</p>
-                            <p class="text-xs text-slate-400 mt-1">{{ dashboardCashBalance.error ? 'Saldo belum berhasil dimuat' : (dashboardCashBalance.loading ? 'Menghitung saldo seluruh waktu...' : 'Posisi kas saat ini • Tidak mengikuti filter') }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['saldo-kas'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 200ms;">
-                     <div class="flex items-start gap-4">
-                        <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-green-600">{{ formatCurrency(dashboardKpis.omsetBersih) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['omset-bersih'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 300ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-emerald-100 text-emerald-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Laba Kotor</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-emerald-600">{{ formatCurrency(dashboardKpis.labaKotor) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['laba-kotor'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 400ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Laba Bersih</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(dashboardKpis.labaBersih) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['laba-bersih-operasional'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 500ms;">
-    <div class="flex items-start gap-4">
-        <div class="bg-blue-100 text-blue-600 p-3 rounded-lg flex-shrink-0">
-           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
-        </div>
-        <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-medium text-slate-500">Omset Kotor</h3>
-            <p class="kpi-value text-2xl font-bold mt-1 text-blue-600">{{ formatCurrency(dashboardKpis.omsetKotor) }}</p>
-        </div>
-    </div>
-    <button @click="showModal('kpiHelp', kpiExplanations['omset-kotor'])" class="help-icon-button">?</button>
-</div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 600ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Diskon (Data Lama)</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-red-600">-{{ formatCurrency(dashboardKpis.totalDiskon) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['diskon'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 700ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12H5m0 0l4-4m-4 4l4 4m6-10h4m0 0l-4-4m4 4l-4 4" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Total HPP Terjual</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600">-{{ formatCurrency(dashboardKpis.totalHppTerjual) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['hpp-terjual'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 800ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-purple-100 text-purple-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi (Data Lama)</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-purple-600">-{{ formatCurrency(dashboardKpis.totalBiayaTransaksi) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['biaya-transaksi'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 900ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-orange-100 text-orange-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zM7 9h14M7 13h14M7 17h14" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Biaya Operasional</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-orange-600">-{{ formatCurrency(dashboardKpis.totalBiayaOperasional) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['biaya-operasional'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 1000ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-cyan-100 text-cyan-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Total Unit Stok</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-cyan-600">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['total-unit-stok'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 1100ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-amber-100 text-amber-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Total Nilai Stok (HPP)</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-amber-600">{{ formatCurrency(dashboardKpis.totalNilaiStokHPP) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['nilai-stok'])" class="help-icon-button">?</button>
-                </div>
-                <div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-slate-200 shadow-lg relative animate-fade-in-up" style="animation-delay: 1200ms;">
-                    <div class="flex items-start gap-4">
-                        <div class="bg-red-100 text-red-600 p-3 rounded-lg flex-shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l-3 3m3-3l3 3m0 0v-2a4 4 0 014-4h2" /></svg>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Total Nilai Retur</h3>
-                            <p class="kpi-value text-2xl font-bold mt-1 text-red-600">-{{ formatCurrency(dashboardKpis.totalNilaiRetur) }}</p>
-                        </div>
-                    </div>
-                    <button @click="showModal('kpiHelp', kpiExplanations['nilai-retur'])" class="help-icon-button">?</button>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
-                <div class="lg:col-span-3 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 1300ms;">
-                    <h3 class="text-lg font-semibold text-slate-800 mb-4">Laba Kotor vs Biaya Operasional</h3>
-                    <div class="chart-container">
-                        <canvas id="profitExpenseChart"></canvas>
-                    </div>
-                </div>
-                <div class="lg:col-span-2 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 1400ms;">
-                    <h3 class="text-lg font-semibold text-slate-800 mb-4">Penjualan per Channel</h3>
-                    <div class="chart-container">
-                        <canvas id="salesChannelChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="kpi-card bg-white/70 backdrop-blur-sm p-5 rounded-xl border border-yellow-200 shadow-xl relative animate-fade-in-up" style="animation-delay: 50ms;">
-    <div class="flex items-start gap-4">
-        <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-        </div>
-
-        <div class="flex-1 min-w-0">
-            <div class="flex flex-wrap items-center gap-2 pr-7">
-                <h3 class="text-sm font-medium text-slate-500">Dana Gantung (HPP + Laba)</h3>
-                <button
-                    type="button"
-                    @click="togglePendingPrivacyMode"
-                    class="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-yellow-200 bg-yellow-50 text-yellow-700 transition-all hover:bg-yellow-100 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
-                    :title="isPendingPrivacyMode ? 'Tampilkan nominal dan qty Dana Gantung' : 'Samarkan nominal dan qty Dana Gantung'"
-                    :aria-label="isPendingPrivacyMode ? 'Tampilkan nominal dan qty Dana Gantung' : 'Samarkan nominal dan qty Dana Gantung'"
-                    :aria-pressed="!isPendingPrivacyMode"
-                >
-                    <svg v-if="isPendingPrivacyMode" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.6 10.6a2 2 0 002.8 2.8" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.9 4.2A10.7 10.7 0 0112 4c5 0 8.7 4.5 9.6 6a1.8 1.8 0 010 2 18.4 18.4 0 01-2.1 2.7" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.2 6.2A18.7 18.7 0 002.4 10a1.8 1.8 0 000 2C3.3 13.5 7 18 12 18a10.6 10.6 0 004.1-.8" />
-                    </svg>
-                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.4 10a1.8 1.8 0 000 2C3.3 13.5 7 18 12 18s8.7-4.5 9.6-6a1.8 1.8 0 000-2C20.7 8.5 17 4 12 4S3.3 8.5 2.4 10z" />
-                        <circle cx="12" cy="11" r="3" />
-                    </svg>
-                </button>
-            </div>
-
-            <p class="kpi-value text-2xl font-bold mt-1 text-yellow-600" :title="isPendingPrivacyMode ? 'Nilai Dana Gantung sedang disamarkan' : ''">
-                <span v-if="isPendingPrivacyMode" class="pending-private-value">Rp ••••••••</span>
-                <span v-else>{{ formatCurrency(dashboardKpis.danaBelumCair) }}</span>
-            </p>
-            <p class="text-xs text-slate-500 mt-1 font-medium italic">
-                Total:
-                <span class="text-slate-800 font-bold">
-                    <span v-if="isPendingPrivacyMode" class="pending-private-value">••• qty</span>
-                    <span v-else>{{ formatNumber(dashboardKpis.qtyBelumCair) }} qty</span>
-                </span>
-                belum cair
-            </p>
-        </div>
-    </div>
-    <button @click="showModal('kpiHelp', {title: 'Dana Gantung (Piutang)', description: 'Ini adalah estimasi uang bersih (HPP + Laba) yang akan Anda terima dari marketplace. Biaya administrasi sudah dipotong dari angka ini.'})" class="help-icon-button">?</button>
-</div>
-
-    <div v-if="activePage === 'transaksi'">
+<div v-if="activePage === 'transaksi'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
 
@@ -20781,138 +20109,7 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
 
-    <div v-if="activePage === 'promosi'">
-    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
-                <div class="flex items-center gap-4">
-                    <div>
-                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Promosi & Voucher</h2>
-                        <p class="text-slate-500 mt-1">Atur semua diskon dan voucher untuk setiap model produk.</p>
-                    </div>
-                    <button @click="showModal('panduanPromosi')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                        Informasi
-                    </button>
-                </div>
-                <div class="flex gap-3">
-                    <button @click="showModal('voucherUmum')" class="bg-purple-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-purple-700 transition-colors shadow">
-                        Atur Voucher Umum
-                    </button>
-                    <button @click="showNotesModal" class="bg-indigo-100 text-indigo-700 font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2h-2a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2a1 1 0 01-1-1V2a1 1 0 10-2 0v1H9a1 1 0 00-1 1v1H6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd" /></svg>
-                        Catatan
-                    </button>
-                </div>
-            </div>
-
-            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-                <h3 class="text-xl font-semibold text-slate-800 border-b border-slate-200/80 pb-3 mb-4">Daftar Model Produk</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                            <tr>
-                                <th class="px-6 py-3 font-semibold">Nama Model / Produk</th>
-                                <th class="px-6 py-3 font-semibold">SKU</th>
-                                <th class="px-6 py-3 font-semibold">Warna</th>
-                                <th class="px-6 py-3 font-semibold">Ukuran</th>
-                                <th class="px-6 py-3 font-semibold text-center" style="width: 250px;">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="allProductGroups.length === 0">
-                                <td colspan="5" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
-                            </tr>
-                            
-                            <template v-for="group in allProductGroups" :key="group.namaModel">
-                                <tr 
-                                    class="bg-slate-50/50 border-b border-t border-slate-200/80 cursor-pointer hover:bg-slate-100/70" 
-                                    @click="uiState.activeAccordion = uiState.activeAccordion === group.namaModel ? null : group.namaModel"
-                                >
-                                    <td class="px-6 py-4 font-bold text-slate-800">
-                                        <div class="flex items-center">
-                                            <svg class="w-4 h-4 mr-2 transition-transform duration-300" :class="{ 'rotate-90': uiState.activeAccordion === group.namaModel || uiState.activeAccordion === 'voucher-spesifik-' + group.namaModel }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                                            <div>
-                                                {{ group.namaModel }}
-                                                <span class="block text-xs font-normal text-slate-500">{{ group.variants.length }} varian</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                    <td class="px-6 py-3 text-center">
-                                        <button @click.stop="uiState.activeAccordion = (uiState.activeAccordion === 'voucher-spesifik-' + group.namaModel ? group.namaModel : 'voucher-spesifik-' + group.namaModel)" class="font-semibold text-blue-600 hover:underline px-2 py-1 rounded-md bg-blue-50">
-                                            Atur Voucher Spesifik
-                                        </button>
-                                    </td>
-                                </tr>
-
-                                <tr v-if="uiState.activeAccordion === 'voucher-spesifik-' + group.namaModel" class="animate-fade-in">
-                                    <td colspan="5" class="p-4 bg-blue-50/50 border-b-2 border-blue-200">
-                                        <div class="space-y-4">
-                                            <h4 class="text-sm font-bold text-slate-700">Pengaturan Voucher Spesifik untuk Model: {{ group.namaModel }}</h4>
-                                            <p class="text-xs text-slate-500 -mt-3">Diskon ini akan berlaku untuk semua varian di dalam model {{ group.namaModel }}.</p>
-                                            <div v-for="channel in state.settings.marketplaces" :key="channel.id" class="p-3 border border-slate-200 rounded-lg bg-white shadow-sm">
-                                                <p class="font-semibold text-slate-700 mb-3">{{ channel.name }}</p>
-                                                <div class="mt-3">
-                                                    <label class="block text-xs font-medium text-slate-600">Voucher Produk Tertentu</label>
-                                                    <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-500 font-semibold">
-                                                        <span class="pl-1">Min. Belanja (Rp)</span>
-                                                        <span class="pl-1">Diskon (%)</span>
-                                                        <span class="pl-1">Diskon (Rp)</span>
-                                                    </div>
-                                                    <div class="grid grid-cols-3 gap-2">
-                                                        <input type="text" v-model="diskonMinBelanjaComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                                                        <input type="text" v-model="diskonRateComputedUpdated(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                                                        <input type="text" v-model="diskonNominalComputed(group.namaModel, channel.id).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                                                    </div>
-                                                </div>
-                                                <div class="mt-3">
-                                                    <label class="block text-xs font-medium text-slate-600">Diskon Minimal Belanja Bertingkat</label>
-                                                    <div class="mt-2 grid grid-cols-[1fr,1fr,1fr,auto] gap-2 text-xs text-slate-500 font-semibold">
-                                                        <span class="pl-1">Min. Belanja (Rp)</span>
-                                                        <span class="pl-1">Diskon (%)</span>
-                                                        <span class="pl-1">Diskon (Rp)</span>
-                                                    </div>
-                                                    <div class="space-y-2">
-                                                        <div v-for="(tier, index) in state.promotions.perModel[group.namaModel]?.[channel.id]?.diskonBertingkat" :key="index" class="grid grid-cols-[1fr,1fr,1fr,auto] items-center gap-2">
-                                                            <input type="text" v-model="tieredMinComputed(tier).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                                                            <input type="text" v-model="tieredDiskonComputedUpdated(tier).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                                                            <input type="text" v-model="tieredDiskonNominalComputed(tier).value" class="w-full p-1.5 text-sm border border-slate-300 rounded-md">
-                                                            <button @click="removePromotionTier(group.namaModel, channel.id, index)" type="button" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-                                                        </div>
-                                                    </div>
-                                                    <button @click="addPromotionTier(group.namaModel, channel.id)" type="button" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Tingkatan</button>
-                                                </div>
-                                                <div class="flex justify-end mt-4 pt-3 border-t">
-                                                    <button @click="saveModelPromotions(group.namaModel, channel.id)" :disabled="isSaving" class="bg-green-600 text-white font-bold text-xs py-1 px-3 rounded-md hover:bg-green-700 disabled:bg-green-300">
-                                                        Simpan Perubahan {{channel.name}}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                
-                                <template v-if="uiState.activeAccordion === group.namaModel">
-                                    <tr v-for="v in group.variants" :key="v.docId" class="border-b border-slate-200/50 hover:bg-slate-100/70 animate-fade-in">
-                                        <td class="px-6 py-3 pl-12 text-slate-600">{{ v.nama }}</td>
-                                        <td class="px-6 py-3 font-mono text-xs">{{ v.sku }}</td>
-                                        <td class="px-6 py-3 text-slate-600">{{ v.warna }}</td>
-                                        <td class="px-6 py-3 text-slate-600">{{ v.varian }}</td>
-                                        <td class="px-6 py-3"></td> </tr>
-                                </template>
-                            </template>
-                        </tbody>
-                    </table>
-                    </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div v-if="activePage === 'produksi'">
+    <div v-if="activePage === 'produksi'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
 
@@ -22451,83 +21648,6 @@ SKU-BAJU-PUTIH-S"
   </div>
 </div>
 
-<div v-if="activePage === 'audit-data'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto space-y-6">
-
-        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
-            <p class="text-sm text-slate-500">Audit Data</p>
-            <h2 class="text-3xl font-bold text-slate-800 mt-1">Cek Kesehatan Data</h2>
-            <p class="text-slate-500 mt-2 max-w-3xl">
-                Halaman ini membantu mendeteksi data yang berpotensi membuat dashboard, stok, retur, dan laporan menjadi tidak akurat.
-            </p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Total Masalah</p>
-                <p class="text-4xl font-bold text-slate-800 mt-2">{{ dataHealthAudit.summary.total }}</p>
-                <p class="text-xs text-slate-400 mt-2">Jumlah temuan dari data yang sedang dimuat.</p>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-red-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Masalah Serius</p>
-                <p class="text-4xl font-bold text-red-600 mt-2">{{ dataHealthAudit.summary.danger }}</p>
-                <p class="text-xs text-slate-400 mt-2">Sebaiknya dicek lebih dulu.</p>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-yellow-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Peringatan</p>
-                <p class="text-4xl font-bold text-yellow-600 mt-2">{{ dataHealthAudit.summary.warning }}</p>
-                <p class="text-xs text-slate-400 mt-2">Data masih bisa jalan, tapi perlu dirapikan.</p>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
-            <div class="flex items-center justify-between mb-5">
-                <div>
-                    <p class="text-sm text-slate-500">Daftar temuan</p>
-                    <h3 class="text-xl font-bold text-slate-800">Masalah yang perlu dicek</h3>
-                </div>
-            </div>
-
-            <div v-if="dataHealthAudit.issues.length === 0" class="p-8 text-center bg-green-50 border border-green-200 rounded-2xl">
-                <p class="text-2xl">✅</p>
-                <h3 class="font-bold text-green-700 mt-2">Data terlihat sehat</h3>
-                <p class="text-green-600 text-sm mt-1">Belum ada masalah besar yang terdeteksi dari data yang dimuat.</p>
-            </div>
-
-            <div v-else class="space-y-3">
-                <div
-                    v-for="issue in dataHealthAudit.issues"
-                    :key="issue.id"
-                    class="p-4 rounded-2xl border flex flex-col md:flex-row md:items-start md:justify-between gap-4"
-                    :class="issue.level === 'danger' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'"
-                >
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span>{{ issue.level === 'danger' ? '🚨' : '⚠️' }}</span>
-                            <h4 class="font-bold text-slate-800">{{ issue.title }}</h4>
-                        </div>
-
-                        <p class="text-sm text-slate-600 mt-1">{{ issue.description }}</p>
-                        <p class="text-xs text-slate-500 mt-2">
-                            Lokasi data: <strong>{{ issue.location }}</strong>
-                        </p>
-                    </div>
-
-                    <span
-                        class="text-xs font-bold px-3 py-1 rounded-full self-start"
-                        :class="issue.level === 'danger' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'"
-                    >
-                        {{ issue.level === 'danger' ? 'Serius' : 'Peringatan' }}
-                    </span>
-                </div>
-            </div>
-        </div>
-
-    </div>
-</div>
-
 <div v-if="activePage === 'statistik-penjualan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
 
     <div v-if="isStatistikPenjualanLocked" class="flex items-center justify-center min-h-[70vh] animate-fade-in">
@@ -22741,7 +21861,7 @@ SKU-BAJU-PUTIH-S"
                     <li>
                         <button @click="uiState.pengaturanTab = 'marketplace'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'marketplace', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'marketplace'}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /></svg>
-                            Aturan Marketplace
+                            Marketplace
                         </button>
                     </li>
                     <li>
@@ -22907,33 +22027,13 @@ SKU-BAJU-PUTIH-S"
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="text-left text-slate-500">
-                <tr>
-                    <th class="p-2 font-medium">NAMA</th>
-                    <th class="p-2 font-medium">ADMIN</th>
-                    <th class="p-2 font-medium">LAYANAN G XTRA</th>
-                    <th class="p-2 font-medium">PER PESANAN</th>
-                    <th class="p-2 font-medium">PROGRAM</th> <th class="p-2 font-medium text-right">AKSI</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200">
-                <tr v-if="filteredMarketplaces.length === 0">
-                    <td colspan="6" class="p-4 text-center text-slate-500">Tidak ada marketplace yang cocok.</td>
-                </tr>
-                <tr v-for="mp in (filteredMarketplaces || [])" :key="mp.id">
-                    <td class="p-3 font-semibold text-slate-700">{{ mp.name }}</td>
-                    <td class="p-3">{{ mp.adm || 0 }}%</td>
-                    <td class="p-3">{{ mp.layanan || 0 }}%</td>
-                    <td class="p-3">{{ formatCurrency(mp.perPesanan || 0) }}</td>
-                    <td class="p-3">{{ (mp.programs || []).length }} Program</td> <td class="p-3 text-right space-x-4">
-                        <button @click="showModal('editMarketplace', JSON.parse(JSON.stringify(mp)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
-                        <button @click="removeMarketplace(mp.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">
-    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-</button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+<thead class="text-left text-slate-500"><tr><th class="p-2 font-medium">NAMA MARKETPLACE</th><th class="p-2 font-medium text-right">AKSI</th></tr></thead>
+<tbody class="divide-y divide-slate-200">
+<tr v-if="filteredMarketplaces.length === 0"><td colspan="2" class="p-4 text-center text-slate-500">Belum ada channel marketplace. Tambahkan Shopee, TikTok Shop, atau channel lain yang digunakan.</td></tr>
+<tr v-for="mp in (filteredMarketplaces || [])" :key="mp.id"><td class="p-3 font-semibold text-slate-700">{{ mp.name }}</td><td class="p-3 text-right space-x-4">
+<button @click="showModal('editMarketplace', JSON.parse(JSON.stringify(mp)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
+<button @click="removeMarketplace(mp.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">Hapus</button>
+</td></tr></tbody></table>
     </div>
     <div class="flex justify-end pt-4 border-t mt-6">
         <button @click="saveSettingsData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:shadow-none">
@@ -22956,6 +22056,7 @@ SKU-BAJU-PUTIH-S"
 </div>
         <button @click="addModelProduk" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm" :disabled="!isSubscriptionActive">+ Tambah Model</button>
     </div>
+    <p class="mb-4 text-sm text-slate-500">Atur nama channel saja. Data potongan dan penghasilan bersih dicatat dari laporan marketplace yang dicocokkan dengan transaksi.</p>
     <div class="mb-4">
         <input type="text" v-model="uiState.pengaturanModelProdukSearch" placeholder="Cari nama model..." class="w-full p-2 border border-slate-300 rounded-md">
     </div>
@@ -23644,7 +22745,7 @@ SKU-BAJU-PUTIH-S"
 
             <p class="text-slate-700 mt-1 leading-relaxed">
                 Sebelum menambahkan produk, transaksi, produksi, atau laporan, pengguna baru wajib mengisi
-                <strong>Aturan Marketplace</strong> dan <strong>Model Produk</strong> terlebih dahulu.
+                <strong>Marketplace</strong> dan <strong>Model Produk</strong> terlebih dahulu.
                 Dua bagian ini adalah fondasi utama agar harga, HPP, stok, laporan, dan ROAS bisa terbaca dengan benar.
             </p>
 
@@ -23657,7 +22758,7 @@ SKU-BAJU-PUTIH-S"
                             🛒
                         </div>
                         <div>
-                            <h5 class="font-black text-slate-900">A. Isi Aturan Marketplace</h5>
+                            <h5 class="font-black text-slate-900">A. Isi Marketplace</h5>
                             <p class="text-sm text-slate-600 mt-1">
                                 Tambahkan semua channel jualan seperti Shopee, TikTok Shop, Offline, Website, atau marketplace lain.
                             </p>
@@ -23675,7 +22776,7 @@ SKU-BAJU-PUTIH-S"
                             <button 
                                 @click="uiState.pengaturanTab = 'marketplace'; changePage('pengaturan')" 
                                 class="mt-4 w-full bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-xl hover:bg-indigo-700 transition">
-                                Buka Aturan Marketplace →
+                                Buka Marketplace →
                             </button>
                         </div>
                     </div>
@@ -23717,7 +22818,7 @@ SKU-BAJU-PUTIH-S"
             <div class="mt-5 rounded-2xl bg-amber-50 border border-amber-200 p-4">
                 <p class="font-black text-amber-800 mb-1">Urutan yang benar:</p>
                 <p class="text-sm text-amber-800 leading-relaxed">
-                    1. Isi <strong>Aturan Marketplace</strong> → 
+                    1. Isi <strong>Marketplace</strong> → 
                     2. Isi <strong>Model Produk</strong> → 
                     3. Baru masuk ke <strong>Inventaris</strong> untuk tambah produk/SKU.
                 </p>
@@ -26897,91 +25998,13 @@ BAJU-PUTIH-M</pre>
 </div>
 
 
-<div v-if="uiState.modalType === 'editMarketplace'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col">
-    <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-bold text-slate-800">Edit Marketplace</h3>
-        <button @click="uiState.isProgramInfoModalVisible = true" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
-            Informasi
-        </button>
-    </div>
-    <form @submit.prevent="saveMarketplaceEdit" class="space-y-4 overflow-y-auto pr-2">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-slate-700">Nama Marketplace</label>
-                <input type="text" v-model="uiState.modalData.name" class="mt-1 w-full p-2 border rounded-md">
-            </div>
-            <div>
-                <label class="block text-sm font-medium">Administrasi (%)</label>
-                <input type="text" v-model="admComputed" class="w-full p-2 border rounded-md">
-            </div>
-            <div>
-                <label class="block text-sm font-medium">Layanan Gratis Ongkir Xtra (%)</label>
-                <input type="text" v-model="layananComputed" class="w-full p-2 border rounded-md">
-            </div>
-            <div>
-                
-                <label class="block text-sm font-medium">Per Pesanan (Rp)</label>
-                <input type="number" v-model.number="uiState.modalData.perPesanan" class="w-full p-2 border rounded-md">
-            </div>
-        </div>
-
-        <div class="space-y-2 mt-6">
-            <h4 class="font-semibold text-slate-700 mb-2">Program Marketplace</h4>
-            <div v-for="(program, index) in uiState.modalData.programs" :key="program.id || index" class="flex items-center gap-2 mb-2">
-    <input type="text" v-model="program.name" placeholder="Nama Program (misal: Promo Xtra)" class="w-full p-2 border rounded-md text-sm">
-    
-    <select v-model="program.type" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm border p-2 bg-white">
-        <option value="percentage">%</option>
-        <option value="fixed">Rp</option>
-    </select>
-
-    <input type="number" step="any" v-model.number="program.rate" placeholder="Nilai" class="w-24 p-2 border rounded-md text-sm text-right">
-    
-    <button type="button" @click="removeProgram(program.id)" class="text-red-500 hover:text-red-700 text-xl font-bold">×</button>
-</div>
-<button type="button" @click="if (!uiState.modalData.programs) { uiState.modalData.programs = [] }; uiState.modalData.programs.push({ id: 'program-' + Date.now(), name: '', rate: 0, type: 'percentage' })" class="mt-2 text-xs text-blue-600 hover:underline">+ Tambah Program</button>
-        </div>
+<div v-if="uiState.modalType === 'editMarketplace'" class="bg-white rounded-lg shadow-xl p-6 max-w-xl w-full">
+    <h3 class="text-xl font-bold text-slate-800">Edit Marketplace</h3>
+    <p class="mt-2 text-sm text-slate-500">Masukkan nama channel saja. Potongan dan penghasilan bersih mengikuti data marketplace yang dicocokkan dengan transaksi.</p>
+    <form @submit.prevent="saveMarketplaceEdit" class="mt-5 space-y-4">
+        <div><label class="block text-sm font-medium text-slate-700">Nama Marketplace</label><input type="text" v-model.trim="uiState.modalData.name" required class="mt-1 w-full rounded-md border p-2"></div>
+        <div class="flex justify-end gap-3 border-t pt-4"><button type="button" @click="hideModal" class="rounded-lg bg-slate-200 px-4 py-2">Batal</button><button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white" :disabled="!isSubscriptionActive">Simpan</button></div>
     </form>
-    <div class="flex-shrink-0 flex justify-end gap-3 pt-4 border-t mt-4">
-        <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-        <button type="submit" @click="saveMarketplaceEdit" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg" :disabled="!isSubscriptionActive">Simpan Perubahan</button>
-    </div>
-</div>
-
-<div v-if="uiState.isProgramInfoModalVisible" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full">
-        <div class="flex justify-between items-start pb-4 border-b">
-            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
-                Informasi Biaya Program
-            </h3>
-        </div>
-        <div class="space-y-4 text-slate-700 py-4">
-            <p class="text-sm text-slate-600">
-                **Biaya Program** adalah biaya tambahan yang dikenakan oleh platform e-commerce (seperti Shopee, Tokopedia, TikTok Shop) ketika Anda berpartisipasi dalam program promosi khusus.
-            </p>
-            <p class="text-sm text-slate-600">
-                Memasukkan biaya ini dengan benar dan **sangat penting** untuk memastikan kalkulasi laba bersih Anda akurat. Biaya ini berbeda dengan biaya administrasi atau komisi standar.
-            </p>
-            <div class="space-y-2 mt-4">
-                <div class="p-4 bg-slate-50 rounded-lg">
-                    <p class="font-semibold text-slate-700">Contoh Biaya Program:</p>
-                    <ul class="list-disc list-inside ml-4 mt-1 text-sm text-slate-600">
-                        <li>**Live Xtra:** Biaya khusus untuk program Live.</li>
-                        <li>**Cashback Xtra:** Biaya untuk program cashback.</li>
-                        <li>**Program Lainya:** Biaya untuk acara promosi Lainya.</li>
-                    </ul>
-                </div>
-            </div>
-            <p class="mt-4 text-sm text-slate-600 font-semibold">
-                Anda dapat menemukan rincian biaya ini di laporan keuangan atau detail penjualan di setiap platform e-commerce.
-            </p>
-        </div>
-        <div class="flex justify-end gap-3 pt-4 border-t">
-            <button @click="uiState.isProgramInfoModalVisible = false" class="bg-slate-200 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-300">Tutup</button>
-        </div>
-    </div>
 </div>
 
 <div v-if="uiState.modalType === 'addProduksi'" class="bg-white rounded-lg shadow-xl p-6 max-w-6xl w-full h-full md:max-h-[100vh] flex flex-col">
