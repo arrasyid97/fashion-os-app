@@ -1,4 +1,5 @@
 <script setup>
+/* eslint-disable no-unused-vars -- Legacy POS handlers remain for historical transaction screens. */
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
