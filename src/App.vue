@@ -19397,6 +19397,351 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
 
+<div v-if="activePage === 'produksi'">
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
+
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
+                
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
+                    <div class="flex items-center gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Manajemen Produksi</h2>
+        
+        <p class="text-slate-500 mt-1">Lacak semua batch produksi, mulai dari bahan baku hingga produk jadi.</p>
+    </div>
+    <button @click="showModal('produksiInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2 flex-shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+        Informasi
+    </button>
+</div>
+                    <button @click="showModal('addProduksi')" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 shadow transition-colors" :disabled="!isSubscriptionActive">
+    + Buat Batch Produksi
+</button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-slate-50/50 p-4 rounded-xl border">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Laporan & Analisis</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="showModal('analisisModel')" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Analisis Model</button>
+                            <button @click="showModal('ringkasanJadi')" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Ringkasan Jadi</button>
+                            <button @click="showModal('laporanStatus')" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Laporan per Status</button>
+                            <button @click="showModal('laporanSemuanya')" class="flex-1 text-sm bg-emerald-600 text-white font-bold py-2 px-3 rounded-lg hover:bg-emerald-700">Laporan Semuanya</button>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50/50 p-4 rounded-xl border">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Filter & Pencarian batch produksi / kode aktual</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <input v-model="uiState.produksiSearch" type="text" placeholder="Cari..." class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                            <select v-model="uiState.produksiFilterType" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                                <option value="all">Semua Jenis</option>
+                                <option value="pemaklun">Pemaklun</option>
+                                <option value="penjahit">Penjahit</option>
+                            </select>
+                            <select v-model="uiState.produksiFilterStatus" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                                <option value="all">Semua Status</option>
+                                <option value="Dalam Proses">Dalam Proses</option>
+                                <option value="Selesai">Selesai</option>
+                                <option value="Revisi">Revisi</option>
+                                <option value="Ditunda">Ditunda</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <p v-if="filteredProduksiBatches.length === 0" class="md:col-span-2 lg:col-span-3 text-center py-16 text-slate-500">
+                        Batch produksi tidak ditemukan.
+                    </p>
+                    <div v-for="(batch, index) in filteredProduksiBatches" :key="batch.id" 
+                         class="bg-white/80 border border-slate-200 rounded-2xl shadow-lg flex flex-col transform hover:-translate-y-1 transition-all duration-300 animate-fade-in-up"
+                         :style="{ animationDelay: `${index * 50}ms` }">
+                        <div class="p-5 flex-grow">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-bold text-lg text-slate-800">
+                                        {{ batch.produksiType === 'penjahit' ? 'Penjahit' : 'Pemaklun' }}: {{ batch.namaStatus }}
+                                    </p>
+                                    <p class="text-sm font-mono text-slate-500">{{ batch.id }}</p>
+                                </div>
+                                <span class="text-xs font-semibold px-2.5 py-1 rounded-full"
+                                      :class="{
+                                        'bg-green-100 text-green-800': batch.statusProses === 'Selesai',
+                                        'bg-blue-100 text-blue-800': batch.statusProses === 'Dalam Proses',
+                                        'bg-yellow-100 text-yellow-800': batch.statusProses === 'Revisi',
+                                        'bg-gray-100 text-gray-800': batch.statusProses === 'Ditunda',
+                                      }">
+                                    {{ batch.statusProses }}
+                                </span>
+                            </div>
+                            <div class="mt-4 pt-4 border-t border-slate-200/80 space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Tgl. Produksi:</span>
+                                    <span class="font-medium">{{ new Date(batch.tanggal).toLocaleDateString('id-ID') }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Total Kuantitas Jadi:</span>
+                                    <span class="font-medium">{{ batch.totalQty || 0 }} pcs</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Total Biaya Material:</span>
+                                    <span class="font-medium">{{ formatCurrency(batch.totalBiayaMaterial) }}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Total Biaya Jasa:</span>
+                                    <span class="font-medium text-indigo-600">{{ formatCurrency(
+                                        (batch.kainBahan || []).reduce((sum, item) => sum + (item.aktualJadi || 0) * (batch.produksiType === 'penjahit' ? (item.hargaJahitPerPcs || 0) : (item.hargaMaklunPerPcs || 0)), 0)
+                                    ) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-slate-50/50 border-t border-slate-200/80 rounded-b-2xl flex gap-2">
+                            <button @click="showModal('produksiDetail', batch)" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100">Detail</button>
+                            <button @click="showModal('editProduksi', batch)" class="flex-1 text-sm bg-white border border-slate-300 text-slate-700 font-bold py-2 px-3 rounded-lg hover:bg-slate-100" :disabled="!isSubscriptionActive">Edit</button>
+                            <button @click="deleteProduksiBatch(batch.id)" class="flex-1 text-sm bg-red-500 text-white font-bold py-2 px-3 rounded-lg hover:bg-red-600" :disabled="!isSubscriptionActive">Hapus</button>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="uiState.produksiHasMore" class="mt-8 text-center">
+    <button @click="fetchProductionData(currentUser.uid, true)" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-5 rounded-lg hover:bg-slate-100 shadow-sm transition-colors">
+        Muat Lebih Banyak
+    </button>
+</div>
+            </div>
+        </div>
+    </div>
+</div>
+<div v-if="activePage === 'inventaris'">
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
+                    <div class="flex items-center gap-4">
+                        <div>
+                            <h2 class="text-3xl font-bold text-slate-800">Manajemen Inventaris</h2>
+                            <p class="text-slate-500 mt-1">Kelola semua produk, varian, dan stok Anda secara terpusat.</p>
+                        </div>
+                        <button @click="showModal('inventarisInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm">
+                            Informasi
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button
+                            @click="showModal('addStockIn', { sku: '', qty: null, tipe: 'penambahan', alasan: 'Penyesuaian Inventaris' })"
+                            class="bg-yellow-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-yellow-600"
+                            :disabled="!isSubscriptionActive"
+                        >
+                            Penyesuaian Stok
+                        </button>
+                        <button
+                            @click="showModal('addProduct', { sku: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })"
+                            class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700"
+                            :disabled="!isSubscriptionActive"
+                        >
+                            + Tambah Produk Baru
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-6 p-4 bg-slate-50/50 rounded-xl border">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Cari Nama Produk</label>
+                            <input type="text" v-model="uiState.inventorySearch" placeholder="Ketik nama produk..." class="w-full p-2 border border-slate-300 rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Filter Status Stok</label>
+                            <select v-model="uiState.inventoryFilterStock" class="w-full p-2 border border-slate-300 rounded-md">
+                                <option value="all">Semua Status</option>
+                                <option value="aman">Stok Aman</option>
+                                <option value="menipis">Stok Menipis</option>
+                                <option value="habis">Stok Habis</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Urutkan Berdasarkan</label>
+                            <select v-model="uiState.inventorySort" class="w-full p-2 border border-slate-300 rounded-md">
+                                <option value="nama-asc">Nama Produk (A-Z)</option>
+                                <option value="nama-desc">Nama Produk (Z-A)</option>
+                                <option value="stok-desc">Stok Terbanyak</option>
+                                <option value="stok-asc">Stok Terendah</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+                            <tr>
+                                <th class="px-6 py-3">Nama Model</th>
+                                <th class="px-6 py-3">SKU</th>
+                                <th class="px-6 py-3">Warna</th>
+                                <th class="px-6 py-3">Ukuran</th>
+                                <th class="px-6 py-3 text-center">Stok</th>
+                                <th class="px-6 py-3 text-right">Nilai Stok (HPP)</th>
+                                <th class="px-6 py-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="inventoryProductGroups.length === 0">
+                                <td colspan="7" class="text-center py-12 text-slate-500">Produk tidak ditemukan.</td>
+                            </tr>
+
+                            <template v-for="group in inventoryProductGroups" :key="group.groupKey">
+                                <tr
+                                    :ref="el => { if (el) groupRefs[group.groupKey] = el }"
+                                    class="bg-slate-50/50 border-b border-t cursor-pointer hover:bg-slate-100/70"
+                                    @click="toggleInventoryGroup(group)"
+                                >
+                                    <td class="px-6 py-4 font-bold text-slate-800">
+                                        <div class="flex items-center">
+                                            <span class="mr-2">{{ uiState.activeAccordion === group.groupKey ? 'â–¼' : 'â–¶' }}</span>
+                                            <div>
+                                                {{ group.namaModel }}
+                                                <span v-if="group.isLoading" class="block text-xs font-normal text-indigo-500">Memuat varian...</span>
+                                                <span v-else-if="group.isLoaded" class="block text-xs font-normal text-slate-500">{{ group.variants.length }} varian</span>
+                                                <span v-else class="block text-xs font-normal text-slate-400">Klik untuk membuka</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td colspan="3"></td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span v-if="group.isLoaded">{{ formatNumber(group.totalStock) }} pcs</span>
+                                        <span v-else>â€”</span>
+                                    </td>
+                                    <td class="px-6 py-3 text-right">
+                                        <span v-if="group.isLoaded">{{ formatCurrency(group.totalNilaiStok) }}</span>
+                                        <span v-else>â€”</span>
+                                    </td>
+                                    <td class="px-6 py-3 text-center">
+                                        <button
+                                            @click.stop="deleteGroup(group.variants)"
+                                            class="p-2 text-red-500"
+                                            title="Buka grup terlebih dahulu sebelum menghapus"
+                                            :disabled="!isSubscriptionActive || !group.isLoaded"
+                                        >
+                                            Hapus
+                                        </button>
+                                    </td>
+                                </tr>
+
+                                <template v-if="uiState.activeAccordion === group.groupKey">
+                                    <tr v-if="group.isLoading">
+                                        <td colspan="7" class="px-6 py-8 text-center text-indigo-600">Memuat varian {{ group.namaModel }}...</td>
+                                    </tr>
+                                    <tr v-else-if="group.error">
+                                        <td colspan="7" class="px-6 py-6 text-center text-red-600">
+                                            {{ group.error }}
+                                            <button @click.stop="loadInventoryModelProducts(currentUser.uid, group, true)" class="ml-2 underline font-semibold">
+                                                Coba Lagi
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr v-for="product in group.variants" :key="product.docId" class="border-b hover:bg-slate-100/70">
+                                        <td class="px-6 py-3 pl-12">{{ product.nama }}</td>
+                                        <td class="px-6 py-3 font-mono text-xs">{{ product.sku }}</td>
+                                        <td class="px-6 py-3">{{ product.warna }}</td>
+                                        <td class="px-6 py-3">{{ product.varian }}</td>
+                                        <td class="px-6 py-3 text-center">{{ formatNumber(product.stokFisik) }} pcs</td>
+                                        <td class="px-6 py-3 text-right">{{ formatCurrency(product.stokFisik * (product.hpp || 0)) }}</td>
+                                        <td class="px-6 py-3 text-center whitespace-nowrap">
+                                            <button @click.stop="removeProductVariant(product.docId)" class="mr-2 text-red-500" :disabled="!isSubscriptionActive">Hapus</button>
+                                            <button @click.stop="openInventoryStock(product)" class="mr-2 text-blue-600">Kelola Stok</button>
+                                            <button @click.stop="goToAturHarga(product.nama)" class="text-green-600">Atur Harga</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div v-if="activePage === 'harga-hpp'" class="min-h-screen w-full bg-slate-50 p-4 sm:p-8">
+    <div class="mx-auto max-w-7xl">
+        <div class="mb-6">
+            <h2 class="text-3xl font-bold text-slate-800">Harga & HPP Produk</h2>
+            <p class="mt-1 text-slate-500">Atur HPP untuk setiap produk, warna, dan ukuran.</p>
+        </div>
+
+        <div v-if="isHargaHppLocked" class="mx-auto max-w-sm rounded-2xl border bg-white p-6 text-center shadow">
+            <h3 class="mb-2 text-xl font-bold text-slate-800">Halaman Terkunci</h3>
+            <p class="mb-4 text-sm text-slate-600">Masukkan PIN untuk membuka halaman.</p>
+
+            <form @submit.prevent="unlockHargaHpp">
+                <input
+                    type="password"
+                    v-model="uiState.hargaHppPinInput"
+                    placeholder="Masukkan PIN"
+                    class="mb-2 w-full rounded border p-2 text-center"
+                >
+
+                <p v-if="uiState.hargaHppPinError" class="mb-2 text-sm text-red-600">
+                    {{ uiState.hargaHppPinError }}
+                </p>
+
+                <button type="submit" class="w-full rounded bg-indigo-600 p-2 font-bold text-white">
+                    Buka
+                </button>
+            </form>
+        </div>
+
+        <div v-else class="overflow-x-auto rounded-2xl border bg-white p-5 shadow">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-100 text-xs uppercase text-slate-700">
+                    <tr>
+                        <th class="p-3">Nama Produk</th>
+                        <th class="p-3">SKU</th>
+                        <th class="p-3">Warna</th>
+                        <th class="p-3">Ukuran</th>
+                        <th class="p-3">HPP</th>
+                        <th class="p-3">Aksi</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr v-if="!state.produk || state.produk.length === 0">
+                        <td colspan="6" class="p-8 text-center text-slate-500">
+                            Produk belum ditemukan. Periksa halaman Inventaris.
+                        </td>
+                    </tr>
+
+                    <tr v-for="product in state.produk" :key="product.docId" class="border-t">
+                        <td class="p-3">{{ product.nama || '-' }}</td>
+                        <td class="p-3 font-mono">{{ product.sku || '-' }}</td>
+                        <td class="p-3">{{ product.warna || '-' }}</td>
+                        <td class="p-3">{{ product.varian || '-' }}</td>
+
+                        <td class="p-3">
+                            <input
+                                :value="formatInputNumber(product.hpp)"
+                                @input="product.hpp = $event.target.value.trim() === '' ? null : parseInputNumber($event.target.value); markProductAsEdited(product.docId)"
+                                class="w-36 rounded border p-2 text-right"
+                                inputmode="numeric"
+                                placeholder="Masukkan HPP"
+                            >
+                        </td>
+
+                        <td class="p-3">
+                            <button
+                                @click="saveData()"
+                                :disabled="isSaving || !isSubscriptionActive"
+                                class="rounded bg-green-600 px-3 py-2 font-bold text-white disabled:bg-slate-300"
+                            >
+                                {{ isSaving ? 'Menyimpanâ€¦' : 'Simpan HPP' }}
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 <div v-if="activePage === 'gudang-kain'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
