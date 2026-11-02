@@ -3639,10 +3639,27 @@ const laporanKeuanganData = computed(() => {
         const soldHpp = confirmed.reduce((sum, tx) => sum + hppOf(tx), 0);
         const transactionFees = confirmed.reduce((sum, tx) => sum + (Number(tx.biaya?.total ?? tx.totalBiaya) || 0), 0);
         const expenses = records.filter(record => inMonth(asDate(record.tanggal)) && (record.jenis === 'pengeluaran' || record.jenis === 'biaya'));
+        const profitDistributions = records.filter(record =>
+            record.isProfitDistribution === true &&
+            Number(record.periodeLabaTahun || asDate(record.tanggal)?.getFullYear()) === year &&
+            Number(record.periodeLabaBulan || (asDate(record.tanggal)?.getMonth() + 1)) === month
+        );
+        const distributedProfit = profitDistributions.reduce((sum, record) => sum + (Number(record.jumlah) || 0), 0);
         const productionCosts = expenses.filter(record => (record.tipeBiaya || getExpenseTypeByCategory(record.kategori)) === 'produksi').reduce((sum, record) => sum + (Number(record.jumlah) || 0), 0);
         const operatingCosts = expenses.filter(record => (record.tipeBiaya || getExpenseTypeByCategory(record.kategori)) !== 'produksi').reduce((sum, record) => sum + (Number(record.jumlah) || 0), 0);
-        const missingSummary = periodTransactions.some(tx => tx.konfirmasiSuksesCairManual && !payoutRecords.some(record => channelKey(record) === channelKey(tx)));
-        months.push({monthName,payoutAmount,soldHpp,transactionFees,productionCosts,operatingCosts,netProfit:missingSummary?null:payoutAmount-soldHpp-transactionFees-operatingCosts,missingSummary});
+        const isCoveredByPayout = (tx, record) => {
+            if (channelKey(record) !== channelKey(tx)) return false;
+            const date = asDate(tx.tanggalPencairan || tx.tanggalTerkirim || tx.tanggal || tx.createdAt);
+            const dateKey = date ? date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0') : '';
+            const start = String(record.periodeMulai || '').slice(0, 10);
+            const end = String(record.periodeSelesai || '').slice(0, 10);
+            return !!dateKey && !!start && !!end && dateKey >= start && dateKey <= end;
+        };
+        const missingSummary = periodTransactions.some(tx =>
+            tx.konfirmasiSuksesCairManual && !payoutRecords.some(record => isCoveredByPayout(tx, record))
+        );
+        const netProfit = missingSummary ? null : payoutAmount - soldHpp - transactionFees - operatingCosts;
+        months.push({monthName,payoutAmount,soldHpp,transactionFees,productionCosts,operatingCosts,distributedProfit,netProfit,undistributedProfit:netProfit===null?null:netProfit-distributedProfit,missingSummary});
     }
     const yearlyTotals = {
         payoutAmount: months.reduce((sum,item)=>sum+item.payoutAmount,0),
@@ -3651,10 +3668,71 @@ const laporanKeuanganData = computed(() => {
         productionCosts: months.reduce((sum,item)=>sum+item.productionCosts,0),
         operatingCosts: months.reduce((sum,item)=>sum+item.operatingCosts,0),
         netProfit: months.some(item=>item.missingSummary)?null:months.reduce((sum,item)=>sum+item.netProfit,0),
-        missingSummary: months.some(item=>item.missingSummary)
+        missingSummary: months.some(item=>item.missingSummary),
+        distributedProfit: months.reduce((sum,item)=>sum+item.distributedProfit,0),
+        undistributedProfit: months.some(item=>item.missingSummary)?null:months.reduce((sum,item)=>sum+item.undistributedProfit,0)
     };
     return {months,yearlyTotals};
 });
+
+const profitDistributionForm = reactive({
+    month: new Date().getMonth() + 1,
+    recipient: '',
+    amount: null,
+    message: '',
+    error: ''
+});
+const isSavingProfitDistribution = ref(false);
+
+async function saveProfitDistribution() {
+    if (isSavingProfitDistribution.value) return;
+    profitDistributionForm.error = '';
+    profitDistributionForm.message = '';
+    const amount = Math.round(Number(profitDistributionForm.amount) || 0);
+    const available = laporanKeuanganData.value.yearlyTotals.undistributedProfit;
+    if (!currentUser.value?.uid) {
+        profitDistributionForm.error = 'Silakan masuk kembali sebelum mencatat pembagian laba.';
+        return;
+    }
+    if (!profitDistributionForm.recipient || amount <= 0) {
+        profitDistributionForm.error = 'Isi nama penerima dan jumlah yang benar-benar dibayarkan.';
+        return;
+    }
+    if (available === null || available <= 0) {
+        profitDistributionForm.error = 'Laba belum bisa dibagikan karena laporan belum lengkap atau periode masih rugi.';
+        return;
+    }
+    if (amount > available) {
+        profitDistributionForm.error = 'Jumlah melebihi laba yang belum dibagikan tahun ini.';
+        return;
+    }
+    isSavingProfitDistribution.value = true;
+    try {
+        const record = {
+            userId: currentUser.value.uid,
+            jenis: 'pembagian_laba',
+            kategori: 'Pembagian Laba',
+            jumlah: amount,
+            tanggal: new Date(),
+            penerima: profitDistributionForm.recipient.trim(),
+            periodeLabaTahun: Number(uiState.laporanKeuanganTahun),
+            periodeLabaBulan: Number(profitDistributionForm.month),
+            isProfitDistribution: true,
+            status: 'aktif',
+            catatan: 'Pembagian laba yang benar-benar dibayarkan sesuai kesepakatan pemilik usaha dan pemodal.'
+        };
+        const docRef = await firestoreAddDoc(collection(db, 'keuangan'), record);
+        state.keuangan.unshift({ id: docRef.id, ...record });
+        invalidateModuleCache('finance');
+        profitDistributionForm.message = 'Pembagian laba tersimpan. Laba usaha tetap sama; saldo laba belum dibagikan sudah dikurangi.';
+        profitDistributionForm.recipient = '';
+        profitDistributionForm.amount = null;
+    } catch (error) {
+        profitDistributionForm.error = error?.message || 'Pembagian laba gagal disimpan.';
+    } finally {
+        isSavingProfitDistribution.value = false;
+    }
+}
 
 const laporanTransaksiData = computed(() => {
     const year = Number(uiState.laporanTransaksiTahun);
@@ -4465,15 +4543,20 @@ newTransactions.forEach(
 }
 
 function handleMarketplaceImportCompleted(payload) {
+    const upsertById = (list, item) => {
+        const index = (list || []).findIndex(entry => entry.id === item.id);
+        if (index >= 0) list[index] = { ...list[index], ...item };
+        else list.unshift(item);
+    };
     const financeRecords = [
         ...(payload?.keuanganRecord ? [payload.keuanganRecord] : []),
         ...(payload?.keuanganRecords || [])
     ];
     financeRecords.forEach(record => {
         if (!Array.isArray(state.keuangan)) state.keuangan = [];
-        const index = state.keuangan.findIndex(item => item.id === record.id);
-        if (index >= 0) state.keuangan[index] = { ...state.keuangan[index], ...record };
-        else state.keuangan.unshift(record);
+        upsertById(state.keuangan, record);
+        upsertById(dashboardPeriodData.finance, record);
+        if (isDateToday(record.tanggal)) upsertById(dashboardTodayData.finance, record);
     });
     const importedTransactions = payload?.transactions || [];
     if (!importedTransactions.length) return;
@@ -4486,6 +4569,8 @@ function handleMarketplaceImportCompleted(payload) {
         } else {
             state.transaksi.unshift(transaction);
         }
+        upsertById(dashboardPeriodData.transactions, transaction);
+        if (isDateToday(transaction.tanggal)) upsertById(dashboardTodayData.transactions, transaction);
 
         applyDashboardSummaryV2TransactionDelta(
             previousTransaction,
@@ -6602,6 +6687,11 @@ const loadDashboardCashBalanceFromDocuments =
                     'biaya'
                 ) {
                     otherCost += amount;
+                } else if (
+                    finance.jenis ===
+                    'pembagian_laba'
+                ) {
+                    otherCost += amount;
                 }
             }
         );
@@ -8588,16 +8678,8 @@ const analisisModelData = computed(() => {
 });
 
 const dashboardWorkflowMetrics = computed(() => {
-    const periodTransactions = filterDataByDate(
-        dashboardPeriodData.transactions || [],
-        uiState.dashboardDateFilter,
-        uiState.dashboardStartDate,
-        uiState.dashboardEndDate,
-        uiState.dashboardStartMonth,
-        uiState.dashboardStartYear,
-        uiState.dashboardEndMonth,
-        uiState.dashboardEndYear
-    );
+    // Gunakan tanggal hasil filter Dashboard; transaksi yang cair difilter berdasarkan tanggal pencairan.
+    const periodTransactions = dashboardFilteredData.value.transaksi || [];
     const transactions = periodTransactions.filter(transaction =>
         Object.prototype.hasOwnProperty.call(transaction || {}, 'statusDataMarketplace')
     );
@@ -16462,15 +16544,79 @@ const loadDashboardDataByCurrentFilter =
         }
 
         if (summaryLoaded) {
-            dashboardDataMessage.value =
-                'Mode hemat aktif • Data ditampilkan secara lengkap dengan proses pemuatan yang lebih efisien.';
+            // Ringkasan V2 tidak membawa daftar pesanan dan rincian HPP.
+            // Muat transaksi dan keuangan periode aktif agar KPI baru tidak membaca array kosong.
+            const workflowTransactions = new Map();
+            const workflowFinance = new Map();
+            const transactionDateMap = new Map();
+            const updateWorkflowTransactions = documents => {
+                documents.forEach(transaction => workflowTransactions.set(transaction.id, transaction));
+                dashboardPeriodData.transactions = Array.from(workflowTransactions.values());
+                dashboardLoadedCounts.transactions = workflowTransactions.size;
+            };
+            const updateWorkflowFinance = documents => {
+                documents.forEach(record => workflowFinance.set(record.id, record));
+                dashboardPeriodData.finance = Array.from(workflowFinance.values());
+                dashboardLoadedCounts.finance = workflowFinance.size;
+            };
 
-            dashboardDataLoading.value =
-                false;
+            try {
+                await Promise.all([
+                    fetchDashboardQueryBatches({
+                        collectionName: 'transactions',
+                        userId,
+                        dateField: 'tanggal',
+                        range,
+                        mapDocument: mapDashboardTransaction,
+                        onBatch: documents => {
+                            documents.forEach(transaction => transactionDateMap.set(transaction.id, transaction));
+                            updateWorkflowTransactions(documents);
+                        },
+                        isRequestCurrent
+                    }),
+                    range.allTime
+                        ? Promise.resolve(true)
+                        : fetchDashboardQueryBatches({
+                            collectionName: 'transactions',
+                            userId,
+                            dateField: 'tanggalPencairan',
+                            range,
+                            mapDocument: mapDashboardTransaction,
+                            onBatch: updateWorkflowTransactions,
+                            isRequestCurrent
+                        }),
+                    fetchDashboardQueryBatches({
+                        collectionName: 'keuangan',
+                        userId,
+                        dateField: 'tanggal',
+                        range,
+                        mapDocument: mapDashboardFinance,
+                        onBatch: updateWorkflowFinance,
+                        isRequestCurrent
+                    })
+                ]);
 
-            await nextTick();
-            renderCharts();
-
+                if (!isRequestCurrent()) return;
+                if (dashboardRangeContainsToday(range)) {
+                    dashboardTodayData.transactions = Array.from(transactionDateMap.values())
+                        .filter(transaction => isDateToday(transaction.tanggal));
+                    dashboardTodayData.finance = Array.from(workflowFinance.values())
+                        .filter(record => isDateToday(record.tanggal));
+                } else {
+                    await loadDashboardTodayFallback(userId, isRequestCurrent);
+                }
+                dashboardDataMessage.value =
+                    'Mode hemat aktif • Ringkasan dan rincian pesanan periode terpilih sudah dimuat.';
+                dashboardDataLoading.value = false;
+                await nextTick();
+                renderCharts();
+            } catch (error) {
+                if (!isRequestCurrent()) return;
+                console.error('[DASHBOARD] Rincian pesanan marketplace gagal dimuat:', error);
+                dashboardDataError.value =
+                    error?.message || 'Rincian pesanan untuk Dashboard belum berhasil dimuat.';
+                dashboardDataLoading.value = false;
+            }
             return;
         }
 
@@ -21344,6 +21490,23 @@ SKU-BAJU-PUTIH-S"
 <div v-if="activePage === 'laporan-keuangan'" class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
 <div v-if="isLaporanKeuanganLocked" class="mx-auto mt-16 max-w-sm rounded-2xl border bg-white p-8 text-center shadow-xl"><h3 class="text-xl font-bold">Halaman Terkunci</h3><p class="my-3 text-sm text-slate-600">Masukkan PIN keamanan Anda untuk membuka.</p><form @submit.prevent="unlockLaporanKeuangan"><input type="password" v-model="uiState.laporanKeuanganPinInput" placeholder="••••" class="w-full rounded-md border p-2 text-center text-lg"><p v-if="uiState.laporanKeuanganPinError" class="my-2 text-xs text-red-600">{{ uiState.laporanKeuanganPinError }}</p><button type="submit" class="mt-2 w-full rounded-lg bg-indigo-600 py-2.5 font-bold text-white">Buka</button></form></div>
 <div v-else class="mx-auto max-w-7xl space-y-5"><header class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Keuangan</p><h2 class="text-3xl font-bold">Laporan Keuangan</h2><p class="mt-1 text-sm text-slate-600">Pencairan marketplace dicatat satu kali per toko/periode; HPP dihitung dari pesanan yang berhasil dikonfirmasi.</p></div><label class="text-sm font-medium">Tahun <input type="number" v-model.number="uiState.laporanKeuanganTahun" class="ml-2 w-28 rounded-md border p-2"></label></header>
+<section class="grid gap-4 md:grid-cols-3">
+<article class="rounded-xl border bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-500">Dana dilepas</p><p class="mt-1 text-xl font-bold">{{ formatCurrency(laporanKeuanganData.yearlyTotals.payoutAmount) }}</p></article>
+<article class="rounded-xl border bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-500">Laba/rugi setelah HPP dan biaya</p><p class="mt-1 text-xl font-bold" :class="laporanKeuanganData.yearlyTotals.netProfit===null?'text-amber-700':laporanKeuanganData.yearlyTotals.netProfit>=0?'text-emerald-700':'text-red-700'">{{ laporanKeuanganData.yearlyTotals.netProfit===null?'Lengkapi data':formatCurrency(laporanKeuanganData.yearlyTotals.netProfit) }}</p></article>
+<article class="rounded-xl border bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-500">Laba belum dibagikan</p><p class="mt-1 text-xl font-bold text-indigo-700">{{ laporanKeuanganData.yearlyTotals.undistributedProfit===null?'Lengkapi data':formatCurrency(laporanKeuanganData.yearlyTotals.undistributedProfit) }}</p></article>
+</section>
+<section class="rounded-2xl border bg-white p-5 shadow-sm">
+<h3 class="font-bold text-slate-900">Catat pembagian laba</h3>
+<p class="mt-1 text-sm text-slate-600">Masukkan jumlah yang benar-benar dibayarkan kepada teman pemodal sesuai kesepakatan kalian. Catatan ini mengurangi laba yang belum dibagikan, tetapi tidak mengubah laba usaha.</p>
+<div class="mt-4 grid gap-3 sm:grid-cols-3">
+<label class="block"><span class="mb-1 block text-xs font-medium">Bulan laba</span><select v-model.number="profitDistributionForm.month" class="w-full rounded-lg border p-2 text-sm"><option v-for="(month,index) in laporanKeuanganData.months" :key="month.monthName" :value="index+1">{{ month.monthName }}</option></select></label>
+<label class="block"><span class="mb-1 block text-xs font-medium">Nama penerima</span><input v-model.trim="profitDistributionForm.recipient" class="w-full rounded-lg border p-2 text-sm" placeholder="Nama teman pemodal"></label>
+<label class="block"><span class="mb-1 block text-xs font-medium">Jumlah dibayarkan (Rp)</span><input v-model.number="profitDistributionForm.amount" type="number" min="1" step="1" class="w-full rounded-lg border p-2 text-sm" placeholder="Nominal yang benar-benar dibayar"></label>
+</div>
+<button type="button" @click="saveProfitDistribution" :disabled="isSavingProfitDistribution || !profitDistributionForm.recipient || !profitDistributionForm.amount" class="mt-3 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">{{ isSavingProfitDistribution?'Menyimpan…':'Simpan pembagian laba' }}</button>
+<p v-if="profitDistributionForm.message" class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ profitDistributionForm.message }}</p>
+<p v-if="profitDistributionForm.error" class="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ profitDistributionForm.error }}</p>
+</section>
 <div class="overflow-x-auto rounded-2xl border bg-white shadow-sm"><table class="w-full min-w-[860px] text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Bulan</th><th class="p-4 text-right">Total pencairan marketplace</th><th class="p-4 text-right">HPP pesanan berhasil</th><th class="p-4 text-right">Biaya transaksi terdata</th><th class="p-4 text-right">Biaya operasional</th><th class="p-4 text-right">Laba setelah HPP & biaya</th></tr></thead><tbody class="divide-y"><tr v-for="month in laporanKeuanganData.months" :key="month.monthName"><td class="p-4 font-semibold capitalize">{{ month.monthName }}</td><td class="p-4 text-right">{{ formatCurrency(month.payoutAmount) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.soldHpp) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.transactionFees) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.operatingCosts) }}</td><td class="p-4 text-right font-bold" :class="month.netProfit===null?'text-amber-700':month.netProfit>=0?'text-emerald-700':'text-red-700'">{{ month.netProfit===null?'Lengkapi total pencairan':formatCurrency(month.netProfit) }}</td></tr></tbody><tfoot class="border-t-2 bg-slate-50 font-bold"><tr><td class="p-4">TOTAL {{ uiState.laporanKeuanganTahun }}</td><td class="p-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.payoutAmount) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.soldHpp) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.transactionFees) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.operatingCosts) }}</td><td class="p-4 text-right">{{ laporanKeuanganData.yearlyTotals.netProfit===null?'Lengkapi total pencairan':formatCurrency(laporanKeuanganData.yearlyTotals.netProfit) }}</td></tr></tfoot></table></div>
 <p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Masukkan total dana dilepas dari ringkasan marketplace di halaman Impor Pesanan Terkirim. Jika total pencairan belum dicatat, laba ditampilkan sebagai belum lengkap agar tidak keliru dianggap Rp0.</p></div></div>
 
