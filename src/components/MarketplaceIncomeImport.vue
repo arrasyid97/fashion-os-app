@@ -62,8 +62,8 @@
                 </table>
             </div>
             <p v-if="manualRows.length" class="mt-3 text-xs text-slate-500">Total payout Shopee dicatat sebagai satu pemasukan untuk periode laporan. Fashion OS tidak membuat nilai penghasilan per pesanan dari angka agregat.</p>
-            <button v-if="manualRows.some(row => !row.error && !row.alreadySettled)" type="button" @click="saveConfirmedIds" :disabled="isSavingManual || manualRows.some(row => row.error)" class="mt-4 rounded-lg bg-emerald-600 px-5 py-3 font-bold text-white disabled:bg-slate-300">
-                {{ isSavingManual ? 'Menyimpan…' : 'Konfirmasi ID sukses cair' }}
+            <button v-if="manualRows.length || shopeeReport" type="button" @click="saveConfirmedIds" :disabled="isSavingManual || manualRows.some(row => row.error)" class="mt-4 rounded-lg bg-emerald-600 px-5 py-3 font-bold text-white disabled:bg-slate-300">
+                {{ isSavingManual ? 'Menyimpan…' : manualRows.some(row => !row.alreadySettled) ? 'Konfirmasi ID sukses cair' : 'Simpan total pencairan Shopee' }}
             </button>
             <p v-if="manualMessage" class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ manualMessage }}</p>
         </div>
