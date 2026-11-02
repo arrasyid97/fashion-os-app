@@ -3,6 +3,8 @@ import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
+import MarketplaceShipmentImport from './components/MarketplaceShipmentImport.vue';
+import MarketplaceIncomeImport from './components/MarketplaceIncomeImport.vue';
 
 // Impor dari file konfigurasi Firebase Anda
 
@@ -70,9 +72,15 @@ import { 
 
 // --- STATE MANAGEMENT ---
 const storedActivePage = localStorage.getItem('lastActivePage') || 'dashboard';
-const removedPageRoutes = ['promosi', 'audit-data'];
-const activePage = ref(removedPageRoutes.includes(storedActivePage) ? 'dashboard' : storedActivePage);
-if (removedPageRoutes.includes(storedActivePage)) localStorage.setItem('lastActivePage', 'dashboard');
+const removedPageRoutes = ['promosi', 'audit-data', 'bulk_process_legacy'];
+const activePage = ref(
+    storedActivePage === 'bulk_process_legacy'
+        ? 'bulk_process'
+        : (removedPageRoutes.includes(storedActivePage) ? 'dashboard' : storedActivePage)
+);
+if (removedPageRoutes.includes(storedActivePage)) {
+    localStorage.setItem('lastActivePage', activePage.value);
+}
 const isLoading = ref(true);
 const isSaving = ref(false); // Untuk tombol simpan umum
 const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengaturan
@@ -589,10 +597,10 @@ const onboardingSteps = [
     },
     {
         title: 'Mulai Input Penjualan',
-        subtitle: 'Gunakan Kasir POS atau Proses Massal.',
-        description: 'Untuk input satuan gunakan Kasir POS. Untuk pesanan banyak gunakan Proses Massal. Setelah itu, pantau audit pencairan dan retur agar data tetap rapi.',
+        subtitle: 'Gunakan Kasir POS untuk penjualan langsung dan impor pesanan marketplace yang sudah terkirim.',
+        description: 'Untuk transaksi marketplace, pindahkan hasil scan dan ekspor pengiriman melalui Google Sheets, lalu impor hanya paket yang sudah terkonfirmasi terkirim. Pantau penghasilan aktual setelah data keuangan marketplace tersedia.',
         pageName: 'bulk_process',
-        pageLabel: 'Buka Proses Massal'
+        pageLabel: 'Buka Impor Pesanan Terkirim'
     },
     {
         title: 'Pantau Keuangan dan Laporan',
@@ -1493,19 +1501,6 @@ try {
                         userId
                     )
                 );
-
-                dataPromises.push(
-                    fetchTransactionAndReturnData(
-                        userId
-                    )
-                );
-
-                dataPromises.push(
-                    fetchNotesData(
-                        userId
-                    )
-                );
-
                 break;
 
             case 'inventaris':
@@ -4533,6 +4528,55 @@ newTransactions.forEach(
     } finally {
         uiState.is_processing_scan = false;
     }
+}
+
+function handleMarketplaceImportCompleted(payload) {
+    const importedTransactions = payload?.transactions || [];
+    if (!importedTransactions.length) return;
+
+    importedTransactions.forEach(transaction => {
+        const transactionIndex = (state.transaksi || []).findIndex(item => item.id === transaction.id);
+        const previousTransaction = transactionIndex >= 0 ? state.transaksi[transactionIndex] : null;
+        if (previousTransaction) {
+            state.transaksi[transactionIndex] = transaction;
+        } else {
+            state.transaksi.unshift(transaction);
+        }
+
+        applyDashboardSummaryV2TransactionDelta(
+            previousTransaction,
+            transaction
+        );
+
+        const settlementStatus = String(transaction.statusPencairan || '').trim().toLowerCase();
+        const isPendingSettlement = !settlementStatus ||
+            settlementStatus === 'belum cair' ||
+            settlementStatus === 'waiting';
+        const pendingIndex = (state.pendingSettlements || []).findIndex(item => item.id === transaction.id);
+        if (isPendingSettlement) {
+            if (pendingIndex >= 0) state.pendingSettlements[pendingIndex] = transaction;
+            else state.pendingSettlements.unshift(transaction);
+        } else if (pendingIndex >= 0) {
+            state.pendingSettlements.splice(pendingIndex, 1);
+        }
+    });
+
+    if (!payload.financeUpdate && payload.stockDeltas) {
+        Object.entries(payload.stockDeltas).forEach(([productId, quantity]) => {
+            const product = (state.produk || []).find(item => (item.docId || item.id) === productId);
+            const paginatedProduct = (state.inventoryPaginated || []).find(item => (item.docId || item.id) === productId);
+            if (product) {
+                product.stokFisik = (Number(product.stokFisik ?? product.physical_stock) || 0) - Number(quantity || 0);
+                product.physical_stock = product.stokFisik;
+            }
+            if (paginatedProduct) {
+                paginatedProduct.stokFisik = (Number(paginatedProduct.stokFisik ?? paginatedProduct.physical_stock) || 0) - Number(quantity || 0);
+                paginatedProduct.physical_stock = paginatedProduct.stokFisik;
+            }
+        });
+    }
+
+    invalidateModuleCache('transactions');
 }
 
 function showNotesModal() {
@@ -12747,26 +12791,25 @@ const panduanData = [
     {
         id: 'penjualan',
         icon: '🛒',
-        title: '5. Penjualan',
-        badge: 'Transaksi',
-        subtitle: 'Untuk input transaksi harian dari offline, marketplace, atau toko sendiri.',
-        description: 'Modul penjualan dipakai untuk mencatat order masuk, mengurangi stok, membaca omset, dan menyiapkan data laporan.',
+        title: '5. Pesanan dan Penjualan',
+        badge: 'Marketplace',
+        subtitle: 'Pesanan marketplace diproses setelah cocok dengan data pengiriman.',
+        description: 'Untuk Shopee dan TikTok Shop, scan ID paket di Google Sheets, cocokkan dengan ekspor pesanan terkirim, lalu impor hanya paket yang benar-benar terkirim. Fashion OS mengambil SKU dan HPP dari master produk.',
         steps: [
-            'Gunakan Kasir POS untuk input transaksi satuan.',
-            'Gunakan Proses Massal untuk memproses banyak pesanan sekaligus.',
-            'Scan SKU atau cari produk agar input lebih cepat.',
-            'Isi channel penjualan supaya biaya marketplace terbaca.',
-            'Pantau transaksi agar stok dan laporan tetap sinkron.'
+            'Scan ID paket atau resi ke tab SCAN_SHOPEE atau SCAN_TIKTOK di Google Sheets.',
+            'Tempel ekspor pesanan terkirim ke tab DATA_SHOPEE atau DATA_TIKTOK.',
+            'Jalankan menu Fashion OS di Google Sheets dan periksa tab SIAP_IMPORT.',
+            'Unduh file Google Sheets dan impor tab SIAP_IMPORT ke Fashion OS.',
+            'Saat data keuangan tersedia, impor SIAP_PENGHASILAN untuk mencocokkan penghasilan bersih dan pencairan.'
         ],
         tips: [
-            'Untuk pesanan banyak, gunakan Proses Massal agar lebih cepat.',
-            'Pastikan SKU sudah benar sebelum transaksi disimpan.',
-            'Pisahkan channel Shopee, TikTok, Offline, dan Website supaya laporan rapi.'
+            'Gunakan ID Paket atau No Resi agar kiriman yang terbagi dalam beberapa paket tidak tertukar.',
+            'Pesanan belum terkirim atau batal tidak akan dibuat sebagai transaksi.',
+            'Impor berulang akan melewati paket yang sudah tercatat.'
         ],
         links: [
-            { label: 'Kasir POS', page: 'transaksi', primary: true },
-            { label: 'Proses Massal', page: 'bulk_process', primary: true },
-            { label: 'Audit Data', page: 'audit-data', primary: false }
+            { label: 'Kasir POS untuk penjualan langsung', page: 'transaksi', primary: false },
+            { label: 'Impor Pesanan Terkirim', page: 'bulk_process', primary: true }
         ]
     },
     {
@@ -18824,7 +18867,7 @@ void [
 
 <div v-show="uiState.sidebarGroups.penjualan" class="ml-4 space-y-1">
     <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">Kasir (POS)</a>
-    <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Proses Massal</a>
+    <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Impor Pesanan Terkirim</a>
     <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">Cek Pencairan Dana</a>
     <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
     <a href="#" @click.prevent="changePage('statistik-penjualan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'statistik-penjualan' }">Statistik Penjualan</a>
@@ -19292,6 +19335,24 @@ void [
 </div>
 
 <div v-if="activePage === 'bulk_process'">
+    <div class="mx-auto max-w-7xl space-y-6 p-4 sm:p-8">
+        <MarketplaceShipmentImport
+            :products="state.produk || []"
+            :marketplaces="state.settings.marketplaces || []"
+            :user-id="currentUser?.uid || ''"
+            :subscription-active="isSubscriptionActive"
+            @completed="handleMarketplaceImportCompleted"
+        />
+        <MarketplaceIncomeImport
+            :marketplaces="state.settings.marketplaces || []"
+            :user-id="currentUser?.uid || ''"
+            :subscription-active="isSubscriptionActive"
+            @completed="handleMarketplaceImportCompleted"
+        />
+    </div>
+</div>
+
+<div v-if="activePage === 'bulk_process_legacy'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
         <div class="max-w-7xl mx-auto">
 
@@ -22925,14 +22986,14 @@ SKU-BAJU-PUTIH-S"
                             <div class="flex-1">
                                 <h4 class="font-black text-slate-900 text-lg">Mulai Proses Penjualan</h4>
                                 <p class="text-slate-600 mt-1">
-                                    Gunakan Kasir POS untuk input manual, Proses Massal untuk pesanan banyak, lalu pantau retur dan audit pencairan.
+                                    Gunakan Kasir POS untuk penjualan langsung. Untuk marketplace, cocokkan scan paket dengan ekspor terkirim lalu impor hasilnya.
                                 </p>
                                 <div class="flex flex-wrap gap-3 mt-4">
                                     <button @click="changePage('transaksi')" class="bg-slate-900 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-800">
                                         Kasir POS
                                     </button>
                                     <button @click="changePage('bulk_process')" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">
-                                        Proses Massal
+                                        Impor Pesanan Terkirim
                                     </button>
                                     <button @click="changePage('retur')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">
                                         Retur
@@ -23066,8 +23127,8 @@ SKU-BAJU-PUTIH-S"
 
                 <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
                     <div class="text-3xl mb-4">⚡</div>
-                    <h4 class="font-black text-slate-900 text-lg">Proses Massal</h4>
-                    <p class="text-slate-600 text-sm mt-2">Proses banyak pesanan dengan input massal agar kerja lebih cepat.</p>
+                    <h4 class="font-black text-slate-900 text-lg">Impor Pesanan Terkirim</h4>
+                    <p class="text-slate-600 text-sm mt-2">Impor paket yang sudah cocok dengan data pesanan terkirim dari marketplace.</p>
                     <button @click="changePage('bulk_process')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
                 </div>
 
