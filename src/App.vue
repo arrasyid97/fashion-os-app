@@ -19500,7 +19500,7 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Omset Bersih</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-green-600">{{ formatCurrency(dashboardKpis.omsetBersih) }}</p>
                         </div>
                     </div>
@@ -19548,7 +19548,7 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Diskon</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Diskon (Data Lama)</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-red-600">-{{ formatCurrency(dashboardKpis.totalDiskon) }}</p>
                         </div>
                     </div>
@@ -19572,7 +19572,7 @@ watch(activePage, (newPage, oldPage) => {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi</h3>
+                            <h3 class="text-sm font-medium text-slate-500">Biaya Transaksi (Data Lama)</h3>
                             <p class="kpi-value text-2xl font-bold mt-1 text-purple-600">-{{ formatCurrency(dashboardKpis.totalBiayaTransaksi) }}</p>
                         </div>
                     </div>
@@ -19826,7 +19826,7 @@ watch(activePage, (newPage, oldPage) => {
                         <th class="px-6 py-3">ID Pesanan</th>
                         <th class="px-6 py-3">Tanggal</th>
                         <th class="px-6 py-3">Channel</th>
-                        <th class="px-6 py-3">Total</th>
+                        <th class="px-6 py-3">HPP / Total Lama</th>
                         <th class="px-6 py-3">Aksi</th>
                     </tr>
                 </thead>
@@ -19838,7 +19838,15 @@ watch(activePage, (newPage, oldPage) => {
                         <td class="px-6 py-4 font-mono text-xs">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</td>
                         <td class="px-6 py-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
                         <td class="px-6 py-4">{{ trx.channel }}</td>
-                        <td class="px-6 py-4 font-semibold">{{ formatCurrency(trx.total) }}</td>
+                        <td class="px-6 py-4 font-semibold">
+                            {{
+                                formatCurrency(
+                                    Object.prototype.hasOwnProperty.call(trx || {}, 'statusDataMarketplace')
+                                        ? (Number(trx.totalHpp) || 0)
+                                        : (Number(trx.total) || 0)
+                                )
+                            }}
+                        </td>
                         <td class="px-6 py-4 space-x-3">
                             <button @click="openProtectedTransactionDetail(trx)" class="font-semibold text-indigo-600 hover:underline">Detail</button>
                             <button @click="deleteTransaction(trx.id)" class="font-semibold text-red-500 hover:underline">Hapus</button>
@@ -26005,7 +26013,15 @@ BAJU-PUTIH-M</pre>
                             <div class="font-medium text-slate-800">
                                 {{ item.qty }}x {{ getProductBySku(item.sku)?.nama || item.sku }}
                             </div>
-                            <span class="font-semibold text-right">{{ formatCurrency(item.hargaJual * item.qty) }}</span>
+                            <span class="font-semibold text-right">
+                            {{
+                                formatCurrency(
+                                    transactionDetails.isNewFormat
+                                        ? ((Number(item.hpp) || 0) * (Number(item.qty) || 0))
+                                        : ((Number(item.hargaJual) || 0) * (Number(item.qty) || 0))
+                                )
+                            }}
+                        </span>
                         </li>
                     </ul>
                 </div>
@@ -26029,13 +26045,56 @@ BAJU-PUTIH-M</pre>
                 
                 <div class="p-6 rounded-xl border-2 border-indigo-400 bg-indigo-50 text-center shadow-md">
     <p class="text-sm font-medium text-indigo-800">Estimasi Laba Bersih Transaksi Ini:</p>
-    <p class="text-3xl font-extrabold text-indigo-700 my-1">{{ formatCurrency(transactionDetails.labaBersih) }}</p>
-    <p class="text-xs text-indigo-600 font-medium">(Omset Bersih - HPP Terjual - Total Biaya Marketplace)</p>
+    <p
+        v-if="transactionDetails.labaBersih !== null"
+        class="text-3xl font-extrabold text-indigo-700 my-1"
+    >
+        {{ formatCurrency(transactionDetails.labaBersih) }}
+    </p>
+    <p v-else class="text-sm text-amber-700 my-2">
+        Laba menunggu pencocokan data marketplace.
+    </p>
+    <p class="text-xs text-indigo-600 font-medium">
+        {{
+            transactionDetails.isNewFormat
+                ? 'Penghasilan Bersih Marketplace - HPP'
+                : '(Omset Bersih - HPP Terjual - Total Biaya Marketplace)'
+        }}
+    </p>
 </div>
             </div>
 
             <div class="space-y-4">
-                <div class="bg-slate-50 p-4 rounded-xl border">
+                <div
+                    v-if="transactionDetails.isNewFormat"
+                    class="bg-slate-50 p-4 rounded-xl border"
+                >
+                    <h4 class="font-semibold text-slate-700 mb-2">
+                        Ringkasan Transaksi Marketplace
+                    </h4>
+                    <p
+                        v-if="!transactionDetails.isMatched"
+                        class="rounded-lg bg-amber-50 p-3 text-sm text-amber-800"
+                    >
+                        Data marketplace belum dicocokkan. Penghasilan dan laba belum tersedia.
+                    </p>
+                    <ul v-else class="space-y-2 text-sm">
+                        <li class="flex justify-between font-semibold">
+                            <span>Penghasilan Bersih Marketplace</span>
+                            <span>{{ formatCurrency(transactionDetails.totalPenghasilan) }}</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span class="text-slate-600">HPP Barang</span>
+                            <span class="text-red-600">-{{ formatCurrency(transactionDetails.totalHPP) }}</span>
+                        </li>
+                        <li class="flex justify-between font-bold border-t pt-2">
+                            <span>Laba sebelum biaya operasional</span>
+                            <span>{{ formatCurrency(transactionDetails.totalPenghasilan - transactionDetails.totalHPP) }}</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div v-else class="bg-slate-50 p-4 rounded-xl border">
                     <h4 class="font-semibold text-slate-700 mb-2 flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" /></svg>
                         Ringkasan Laba Rugi
