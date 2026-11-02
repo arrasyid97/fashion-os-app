@@ -207,9 +207,7 @@ function transactionAmounts(data) {
   if (isNewFormat) {
     const isMatched =
       String(data.statusDataMarketplace || "").toLowerCase() === "cocok";
-    const income = isMatched
-      ? safeNumber(data.penghasilanBersihMarketplace)
-      : 0;
+    const income = isMatched ? safeNumber(data.penghasilanBersihMarketplace) : 0;
 
     return {
       gross: income,
