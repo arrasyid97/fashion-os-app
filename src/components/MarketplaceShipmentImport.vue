@@ -5,38 +5,67 @@
                 <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Operasional Marketplace</p>
                 <h1 class="mt-1 text-3xl font-bold text-slate-900">Impor Pesanan Terkirim</h1>
                 <p class="mt-2 max-w-3xl text-sm text-slate-600">
-                    Impor tab hasil pencocokan Google Sheets. Hanya paket berstatus terkirim yang akan menjadi transaksi dan mengurangi stok.
-                    HPP diambil dari master produk saat impor.
+Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berstatus Dikirim dari Shopee atau TikTok. Fashion OS mencocokkan ID dan membaca produk, variasi, jumlah, serta HPP dari master produk.
                 </p>
             </header>
 
             <section class="rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
-                <h2 class="font-bold text-indigo-950">Alur kerja</h2>
+                <h2 class="font-bold text-indigo-950">Alur pencatatan pesanan</h2>
                 <ol class="mt-3 list-inside list-decimal space-y-1 text-sm text-indigo-900">
-                    <li>Scan ID paket atau resi di Google Sheets.</li>
-                    <li>Tempel ekspor pesanan terkirim Shopee/TikTok, lalu cocokkan ID scan, SKU, jumlah, dan status.</li>
-                    <li>Unduh file hasil pencocokan, kemudian pilih tab <strong>SIAP_IMPORT</strong> di file Excel.</li>
-                    <li>Periksa hasil validasi di sini. Transaksi yang diimpor akan masuk dengan status menunggu data penghasilan marketplace.</li>
+                    <li>Scan ID pesanan yang paketnya siap dikirim. Scan hanya menyimpan ID sementara, belum membuat transaksi atau mengurangi stok.</li>
+                    <li>Setelah data pengiriman tersedia, unggah ekspor menu Dikirim dari marketplace yang sama.</li>
+                    <li>Fashion OS mencocokkan ID scan dengan ekspor, lalu membaca SKU, nama/variasi produk, dan jumlah dari file.</li>
+                    <li>Hanya pesanan yang cocok dan berstatus sudah dikirim yang diimpor. Laporan penghasilan diunggah kemudian pada tahap keuangan.</li>
                 </ol>
-                <p class="mt-3 text-xs text-indigo-800">
-                    Gunakan kolom: Channel, ID Pesanan, ID Paket, No Resi, Tanggal Terkirim, SKU, Qty, Status.
-                    Status yang diterima: Terkirim, Dikirim, Shipped, Delivered, Selesai, atau Siap Import.
-                </p>
+                <p class="mt-3 text-xs text-indigo-800">Antrean scan disimpan di browser/perangkat ini. Pastikan menggunakan browser yang sama sampai ekspor Dikirim diimpor.</p>
+            </section>
+            <section class="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
+                <div class="flex flex-wrap items-end gap-3">
+                    <label class="block min-w-48">
+                        <span class="mb-1 block text-sm font-medium text-slate-700">Marketplace yang discan</span>
+                        <select v-model="scanChannelId" class="w-full rounded-lg border border-slate-300 p-2">
+                            <option value="">Pilih marketplace</option>
+                            <option v-for="marketplace in marketplaces" :key="marketplace.id" :value="marketplace.id">{{ marketplace.name }}</option>
+                        </select>
+                    </label>
+                    <label class="block min-w-64 flex-1">
+                        <span class="mb-1 block text-sm font-medium text-slate-700">Scan ID Pesanan / Paket / Resi</span>
+                        <input ref="scanInput" v-model="scanInputValue" @keydown.enter.prevent="addScannedPackage" autocomplete="off" placeholder="Arahkan scanner ke barcode, lalu tekan Enter" class="w-full rounded-lg border border-slate-300 p-2">
+                    </label>
+                    <button type="button" @click="addScannedPackage" :disabled="!scanInputValue.trim() || !scanChannelId" class="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white disabled:bg-slate-300">Tambah scan</button>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-sm text-slate-600">{{ scanQueue.length }} ID tersimpan · {{ matchedPackages.length }} cocok dengan file</p>
+                    <button type="button" @click="clearScanQueue" :disabled="!scanQueue.length" class="text-sm font-semibold text-red-600 disabled:text-slate-300">Kosongkan antrean</button>
+                </div>
+                <div v-if="scanQueue.length" class="mt-3 max-h-52 overflow-auto rounded-lg border border-slate-200">
+                    <div v-for="scan in scanQueue" :key="scan.id" class="flex items-center justify-between gap-3 border-b p-3 last:border-b-0">
+                        <div class="min-w-0">
+                            <p class="truncate font-mono text-sm font-semibold">{{ scan.value }}</p>
+                            <p class="text-xs text-slate-500">{{ scan.channelName }} · {{ formatScanDate(scan.scannedAt) }}</p>
+                        </div>
+                        <button type="button" @click="removeScan(scan.id)" class="shrink-0 text-sm text-red-600">Hapus</button>
+                    </div>
+                </div>
             </section>
 
             <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h2 class="font-bold text-slate-900">1. Siapkan file hasil pencocokan</h2>
-                        <p class="mt-1 text-sm text-slate-500">Bisa berupa .xlsx atau .csv dari Google Sheets.</p>
+                        <h2 class="font-bold text-slate-900">Unggah ekspor pesanan Dikirim</h2>
+                        <p class="mt-1 text-sm text-slate-500">Pilih file asli dari Seller Center. Fashion OS akan membaca kolom produk dan jumlah secara otomatis.</p>
                     </div>
-                    <button type="button" @click="downloadTemplate" class="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50">
-                        Unduh Template
-                    </button>
                 </div>
                 <div class="mt-4 grid gap-4 md:grid-cols-[1fr_1fr]">
                     <label class="block">
-                        <span class="mb-1 block text-sm font-medium text-slate-700">File hasil pencocokan</span>
+                        <span class="mb-1 block text-sm font-medium text-slate-700">Marketplace pada file</span>
+                        <select v-model="shipmentChannelId" @change="parseSelectedSheet" class="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                            <option value="">Pilih marketplace</option>
+                            <option v-for="marketplace in marketplaces" :key="marketplace.id" :value="marketplace.id">{{ marketplace.name }}</option>
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-slate-700">File ekspor pesanan Dikirim</span>
                         <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" @change="handleFile" class="block w-full rounded-lg border border-slate-300 p-2 text-sm">
                     </label>
                     <label v-if="sheetNames.length > 1" class="block">
@@ -50,20 +79,20 @@
                 <p v-if="fileError" class="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ fileError }}</p>
             </section>
 
-            <section v-if="packages.length || rowErrors.length" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <section v-if="scanQueue.length || packages.length || rowErrors.length" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h2 class="font-bold text-slate-900">2. Periksa data sebelum impor</h2>
-                        <p class="mt-1 text-sm text-slate-500">Pastikan channel, ID pesanan, SKU, jumlah, dan status pengiriman sudah benar.</p>
+                        <p class="mt-1 text-sm text-slate-500">Hanya data yang ID-nya sudah discan dan ditemukan di file yang akan diimpor.</p>
                     </div>
                     <div class="flex flex-wrap gap-2 text-xs font-semibold">
-                        <span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">{{ packages.length }} paket valid</span>
+                        <span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">{{ packages.length }} pesanan terbaca</span>
                         <span class="rounded-full bg-red-100 px-3 py-1 text-red-800">{{ rowErrors.length }} baris bermasalah</span>
                     </div>
                 </div>
 
                 <div v-if="rowErrors.length" class="mt-4 max-h-56 overflow-auto rounded-xl border border-red-200 bg-red-50 p-3">
-                    <p class="mb-2 text-sm font-semibold text-red-800">Perbaiki baris ini di Google Sheets, lalu unggah ulang:</p>
+                    <p class="mb-2 text-sm font-semibold text-red-800">Periksa data ekspor atau cocokkan produk dengan master Fashion OS:</p>
                     <ul class="list-inside list-disc space-y-1 text-xs text-red-700">
                         <li v-for="issue in rowErrors.slice(0, 100)" :key="issue.key">Baris {{ issue.row }}: {{ issue.message }}</li>
                     </ul>
@@ -83,17 +112,17 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            <tr v-for="group in packages.slice(0, 100)" :key="group.key">
+                            <tr v-for="group in matchedPackages.slice(0, 100)" :key="group.key">
                                 <td class="p-3">{{ group.channelName }}</td>
                                 <td class="p-3 font-medium">{{ group.orderId }}</td>
                                 <td class="p-3">{{ group.packageId || group.trackingNumber || '—' }}</td>
                                 <td class="p-3">{{ formatDate(group.shippedAt) }}</td>
-                                <td class="p-3">{{ group.items.length }} SKU · {{ group.items.reduce((sum, item) => sum + item.qty, 0) }} pcs</td>
+                                <td class="p-3">{{ group.items.map(item => item.nama + ' (' + item.qty + ')').join(', ') }}</td>
                                 <td class="p-3">{{ formatCurrency(group.totalHpp) }}</td>
                             </tr>
                         </tbody>
                     </table>
-                    <p v-if="packages.length > 100" class="p-3 text-xs text-slate-500">Pratinjau menampilkan 100 paket pertama.</p>
+                    <p v-if="matchedPackages.length > 100" class="p-3 text-xs text-slate-500">Pratinjau menampilkan 100 pesanan pertama yang cocok.</p>
                 </div>
 
                 <div v-if="importError" class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ importError }}</div>
@@ -101,8 +130,8 @@
 
                 <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
                     <p class="max-w-2xl text-xs text-slate-500">Baris bermasalah menghentikan seluruh impor agar data tidak masuk setengah-setengah. Pesanan yang pernah tercatat akan dilewati sebagai duplikat.</p>
-                    <button type="button" @click="importPackages" :disabled="!canImport" class="rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300">
-                        {{ isImporting ? 'Mengimpor…' : 'Impor paket valid' }}
+                    <button type="button" @click="importPackages"  :disabled="!canImport" class="rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300">
+                        {{ isImporting ? 'Mengimpor…' : 'Impor pesanan yang cocok' }}
                     </button>
                 </div>
             </section>
@@ -112,7 +141,7 @@
 
 <script setup>
 /* global defineProps, defineEmits */
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase.js';
 import { collection, doc, getDocs, increment, query, where, writeBatch } from 'firebase/firestore';
@@ -126,6 +155,11 @@ const props = defineProps({
 const emit = defineEmits(['completed']);
 
 const fileInput = ref(null);
+const scanInput = ref(null);
+const scanInputValue = ref('');
+const scanChannelId = ref('');
+const shipmentChannelId = ref('');
+const scanQueue = ref([]);
 const fileName = ref('');
 const fileError = ref('');
 const importError = ref('');
@@ -137,13 +171,31 @@ const packages = ref([]);
 const rowErrors = ref([]);
 const isImporting = ref(false);
 
+const scanStorageKey = computed(() => `fashion-os-package-scan-queue:${props.userId || 'anonymous'}`);
+const matchedPackages = computed(() => packages.value.filter(group => scanQueue.value.some(scan => scanMatchesGroup(group, scan))));
+const ambiguousScans = computed(() => scanQueue.value.filter(scan =>
+    matchedPackages.value.filter(group => scanMatchesGroup(group, scan)).length > 1
+));
 const canImport = computed(() =>
     !isImporting.value &&
     props.subscriptionActive &&
     Boolean(props.userId) &&
-    packages.value.length > 0 &&
-    rowErrors.value.length === 0
+    matchedPackages.value.length > 0 &&
+    rowErrors.value.length === 0 &&
+    ambiguousScans.value.length === 0
 );
+onMounted(() => {
+    loadScanQueue();
+    if (props.marketplaces.length) {
+        if (!scanChannelId.value) scanChannelId.value = props.marketplaces[0].id;
+        if (!shipmentChannelId.value) shipmentChannelId.value = props.marketplaces[0].id;
+    }
+});
+watch(() => props.userId, loadScanQueue);
+watch(scanQueue, queue => {
+    if (!props.userId) return;
+    try { localStorage.setItem(scanStorageKey.value, JSON.stringify(queue)); } catch (error) { console.warn('Antrean scan tidak dapat disimpan:', error); }
+}, { deep: true });
 
 const normalizeHeader = value => String(value || '')
     .normalize('NFD')
@@ -153,13 +205,16 @@ const normalizeHeader = value => String(value || '')
 
 const headerAliases = {
     channel: ['channel', 'marketplace', 'platform', 'nama marketplace', 'nama channel'],
-    orderId: ['id pesanan', 'id pesanan marketplace', 'order id', 'orderid', 'order sn', 'ordersn', 'nomor pesanan', 'no pesanan', 'nomor order'],
-    packageId: ['id paket', 'package id', 'packageid', 'package sn', 'packagesn', 'shipment id', 'id pengiriman', 'nomor paket'],
-    trackingNumber: ['no resi', 'nomor resi', 'resi', 'tracking number', 'tracking no', 'awb', 'airway bill', 'nomor resi pengiriman'],
-    shippedAt: ['tanggal terkirim', 'tanggal dikirim', 'tanggal pengiriman', 'tanggal kirim', 'shipped at', 'shipped date', 'ship date', 'waktu pengiriman'],
-    sku: ['sku', 'sku penjual', 'seller sku', 'seller product sku', 'product sku', 'kode sku'],
+    orderId: ['id pesanan', 'id pesanan marketplace', 'no pesanan', 'nomor pesanan', 'order id', 'orderid', 'order sn', 'ordersn'],
+    packageId: ['id paket', 'package id', 'packageid', 'package sn', 'packagesn', 'shipment id', 'nomor paket'],
+    trackingNumber: ['no resi', 'nomor resi', 'resi', 'tracking id', 'tracking number', 'tracking no', 'awb'],
+    shippedAt: ['tanggal terkirim', 'tanggal dikirim', 'waktu dikirim', 'shipped time', 'waktu pengiriman diatur', 'waktu pengiriman', 'waktu pesanan selesai', 'tanggal pengiriman'],
+    sku: ['sku', 'seller sku', 'nomor referensi sku', 'sku penjual', 'kode sku'],
+    platformSkuId: ['sku id', 'platform sku id'],
+    productName: ['product name', 'nama produk', 'nama barang'],
+    variation: ['variation', 'nama variasi', 'variasi'],
     qty: ['qty', 'quantity', 'jumlah', 'kuantitas', 'jumlah produk'],
-    status: ['status', 'status pesanan', 'status pengiriman', 'shipping status', 'shipment status', 'order status']
+    status: ['status', 'order status', 'status pesanan', 'status pengiriman', 'status paket']
 };
 
 const findColumn = (headers, field) => {
@@ -188,8 +243,8 @@ function parseDate(value) {
 }
 
 const shippedStatusTokens = new Set([
-    'terkirim', 'dikirim', 'sudahdikirim', 'pesanandikirim', 'sedangdikirim', 'shipped', 'delivered',
-    'selesai', 'completed', 'pesananselesai', 'siapimport', 'readytoimport'
+    'terkirim', 'dikirim', 'sudahdikirim', 'pesanandikirim', 'sedangdikirim', 'shipped',
+    'intransit', 'dalampengiriman', 'awaitingcollection', 'delivered', 'selesai', 'completed'
 ]);
 
 function channelFor(value) {
@@ -201,6 +256,78 @@ function channelFor(value) {
     if (key.startsWith('tiktok')) return props.marketplaces.find(channel => normalizeKey(channel.name).startsWith('tiktok'));
     if (key.startsWith('shopee')) return props.marketplaces.find(channel => normalizeKey(channel.name).startsWith('shopee'));
     return null;
+}
+
+function findMasterProduct({ sellerSku, platformSkuId, productName, variation }) {
+    const norm = normalizeKey;
+    const skuKeys = [sellerSku, platformSkuId].filter(Boolean).map(norm);
+    const fields = product => [
+        product.sku, product.sellerSku, product.marketplaceSku, product.externalSku,
+        product.model_id, product.modelId, product.tiktokSkuId, product.shopeeSkuId
+    ].filter(Boolean).map(norm);
+    const direct = props.products.filter(product => fields(product).some(key => skuKeys.includes(key)));
+    if (direct.length === 1) return direct[0];
+    const sourceNames = [sellerSku, productName].filter(Boolean).map(norm);
+    const nameMatches = props.products.filter(product => [
+        product.nama, product.namaModel, product.namaProduk, product.product_name, product.modelName, product.nama_model
+    ].filter(Boolean).map(norm).some(name => sourceNames.includes(name)));
+    const variationKey = norm(variation);
+    const variantMatches = nameMatches.filter(product => {
+        const partKeys = [product.warna, product.color, product.varian, product.variant, product.ukuran, product.size]
+            .filter(Boolean).map(norm);
+        return !variationKey || partKeys.length === 0 || partKeys.some(part => variationKey.includes(part));
+    });
+    if (variantMatches.length === 1) return variantMatches[0];
+    if (nameMatches.length === 1) return nameMatches[0];
+    return null;
+}
+
+function loadScanQueue() {
+    if (!props.userId) { scanQueue.value = []; return; }
+    try {
+        const saved = JSON.parse(localStorage.getItem(scanStorageKey.value) || '[]');
+        scanQueue.value = Array.isArray(saved) ? saved.filter(scan => scan?.value && scan?.channelId) : [];
+    } catch { scanQueue.value = []; }
+}
+
+function addScannedPackage() {
+    const value = cleanText(scanInputValue.value);
+    const marketplace = props.marketplaces.find(item => item.id === scanChannelId.value);
+    if (!value || !marketplace) return;
+    if (scanQueue.value.some(scan => normalizeKey(scan.value) === normalizeKey(value) && scan.channelId === marketplace.id)) {
+        importError.value = 'ID pesanan ini sudah tersimpan di antrean.';
+        scanInputValue.value = '';
+        scanInput.value?.focus();
+        return;
+    }
+    scanQueue.value.push({
+        id: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        value, channelId: marketplace.id, channelName: marketplace.name, scannedAt: new Date().toISOString()
+    });
+    importError.value = '';
+    importMessage.value = '';
+    scanInputValue.value = '';
+    scanInput.value?.focus();
+}
+
+function removeScan(scanId) {
+    scanQueue.value = scanQueue.value.filter(scan => scan.id !== scanId);
+}
+
+function clearScanQueue() {
+    if (window.confirm('Hapus semua ID pesanan dari antrean scan di browser ini?')) scanQueue.value = [];
+}
+
+function scanMatchesGroup(group, scan) {
+    if (normalizeKey(group.channelId) !== normalizeKey(scan.channelId)) return false;
+    const scanned = normalizeKey(scan.value);
+    return [group.orderId, ...(group.packageIds || []), ...(group.trackingNumbers || [])]
+        .filter(Boolean).some(identifier => normalizeKey(identifier) === scanned);
+}
+
+function formatScanDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('id-ID', { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
 
 function formatCurrency(value) {
@@ -219,16 +346,6 @@ function formatDate(value) {
     }).format(value);
 }
 
-function downloadTemplate() {
-    const sheet = XLSX.utils.aoa_to_sheet([
-        ['Channel', 'ID Pesanan', 'ID Paket', 'No Resi', 'Tanggal Terkirim', 'SKU', 'Qty', 'Status']
-    ]);
-    sheet['!cols'] = [{ wch: 16 }, { wch: 24 }, { wch: 24 }, { wch: 24 }, { wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 16 }];
-    const book = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(book, sheet, 'SIAP_IMPORT');
-    XLSX.writeFile(book, 'Template_Impor_Pesanan_Terkirim.xlsx');
-}
-
 async function handleFile(event) {
     const file = event.target.files?.[0];
     resetPreview();
@@ -241,7 +358,7 @@ async function handleFile(event) {
         if (!parsedBook.SheetNames?.length) throw new Error('File tidak berisi tab yang dapat dibaca.');
         workbook.value = parsedBook;
         sheetNames.value = parsedBook.SheetNames;
-        selectedSheet.value = parsedBook.SheetNames.find(name => normalizeKey(name) === 'siapimport') || parsedBook.SheetNames[0];
+        selectedSheet.value = parsedBook.SheetNames.find(name => normalizeKey(name) === 'orderskuList'.toLowerCase()) || parsedBook.SheetNames.find(name => normalizeKey(name) === 'orders') || parsedBook.SheetNames[0];
         parseSelectedSheet();
     } catch (error) {
         fileError.value = error.message || 'File gagal dibaca.';
@@ -268,96 +385,96 @@ function parseSelectedSheet() {
     const sheet = workbook.value?.Sheets?.[selectedSheet.value];
     if (!sheet) return;
     const records = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
-    if (!records.length) {
-        fileError.value = 'Tab ini kosong. Pastikan baris pertama berisi nama kolom dan ada data pesanan di bawahnya.';
+    const usableRecords = records.filter(row => Object.values(row).some(value => cleanText(value)));
+    if (!usableRecords.length) {
+        fileError.value = 'File ekspor ini kosong. Pilih periode dan status Dikirim yang berisi pesanan.';
         return;
     }
-
-    const headers = Object.keys(records[0]);
+    const headers = Object.keys(usableRecords[0]);
     const columns = Object.fromEntries(Object.keys(headerAliases).map(field => [field, findColumn(headers, field)]));
-    const required = ['channel', 'orderId', 'shippedAt', 'sku', 'qty', 'status'];
+    const marketplaceSelected = props.marketplaces.find(item => item.id === shipmentChannelId.value);
+    const required = ['orderId', 'sku', 'qty', 'status'];
     const missing = required.filter(field => !columns[field]);
+    if (!columns.channel && !marketplaceSelected) missing.unshift('channel');
     if (missing.length) {
         fileError.value = 'Kolom wajib belum ditemukan: ' + missing.map(field => ({
-            channel: 'Channel', orderId: 'ID Pesanan', shippedAt: 'Tanggal Terkirim',
-            sku: 'SKU', qty: 'Qty', status: 'Status'
-        }[field])).join(', ') + '. Unduh template untuk melihat nama kolom yang benar.';
+            channel: 'pilih Marketplace', orderId: 'ID Pesanan', sku: 'Seller SKU/nomor SKU',
+            qty: 'Quantity/Jumlah', status: 'Order Status/Status Pesanan'
+        }[field])).join(', ') + '. Pastikan memakai ekspor dari menu Pesanan.';
         return;
     }
-
     const grouped = new Map();
-    records.forEach((row, index) => {
+    usableRecords.forEach((row, index) => {
         const rowNumber = index + 2;
-        const channelText = cleanText(cellValue(row, columns.channel));
+        const channelText = cleanText(cellValue(row, columns.channel)) || marketplaceSelected?.name || '';
+        const channel = channelFor(channelText);
         const orderId = cleanText(cellValue(row, columns.orderId));
         const packageId = cleanText(cellValue(row, columns.packageId));
         const trackingNumber = cleanText(cellValue(row, columns.trackingNumber));
-        const sku = cleanText(cellValue(row, columns.sku));
-        const status = normalizeKey(cellValue(row, columns.status));
+        const sellerSku = cleanText(cellValue(row, columns.sku));
+        const platformSkuId = cleanText(cellValue(row, columns.platformSkuId));
+        const productName = cleanText(cellValue(row, columns.productName));
+        const variation = cleanText(cellValue(row, columns.variation));
+        const skuForLookup = sellerSku || platformSkuId;
         const qtyValue = Number(String(cellValue(row, columns.qty)).replace(',', '.'));
+        const status = normalizeKey(cellValue(row, columns.status));
         const shippedAt = parseDate(cellValue(row, columns.shippedAt));
-        const channel = channelFor(channelText);
-        const product = props.products.find(item => normalizeKey(item.sku) === normalizeKey(sku));
+        if (!shippedStatusTokens.has(status)) return;
+        const rowIdentifiers = [orderId, packageId, trackingNumber].filter(Boolean).map(normalizeKey);
+        const wasScanned = scanQueue.value.some(scan =>
+            normalizeKey(scan.channelId) === normalizeKey(channel?.id || '') &&
+            rowIdentifiers.includes(normalizeKey(scan.value))
+        );
+        if (!wasScanned) return;
+        const product = findMasterProduct({ sellerSku, platformSkuId, productName, variation });
         const issues = [];
-
-        if (!channel) issues.push('Channel tidak cocok dengan daftar Marketplace di Fashion OS');
+        if (!channel) issues.push('Marketplace tidak cocok dengan pilihan');
         if (!orderId) issues.push('ID Pesanan kosong');
-        if (!sku) issues.push('SKU kosong');
-        if (!Number.isInteger(qtyValue) || qtyValue <= 0) issues.push('Qty harus bilangan bulat lebih dari 0');
-        if (!shippedStatusTokens.has(status)) issues.push('Status bukan status terkirim yang diizinkan');
-        if (!shippedAt) issues.push('Tanggal Terkirim kosong atau formatnya tidak dikenali');
-        if (!product) issues.push('SKU tidak ditemukan di master produk');
-        else if (!product.docId && !product.id) issues.push('ID dokumen produk tidak tersedia; muat ulang data master produk');
+        if (!skuForLookup && !productName) issues.push('Seller SKU dan Nama Produk kosong');
+        if (!Number.isInteger(qtyValue) || qtyValue <= 0) issues.push('Jumlah harus bilangan bulat lebih dari 0');
+        if (!shippedStatusTokens.has(status)) issues.push('Status pesanan bukan Dikirim/Terkirim/Selesai');
+        if (!product) issues.push('Produk/variasi belum cocok dengan master Fashion OS. Samakan Seller SKU atau nama produk dan variasi.');
+        else if (!(product.docId || product.id)) issues.push('ID dokumen produk tidak tersedia; muat ulang master produk');
         else if (!(Number(product.hpp) > 0)) issues.push('HPP produk belum diisi atau masih 0');
-
         if (issues.length) {
             rowErrors.value.push({ key: 'row-' + rowNumber, row: rowNumber, message: issues.join('; ') });
             return;
         }
-
-        const effectivePackageId = packageId || trackingNumber;
-        const packageKey = [channel.id, orderId, effectivePackageId || orderId].map(normalizeKey).join('|');
-        if (!grouped.has(packageKey)) {
-            grouped.set(packageKey, {
-                key: packageKey,
-                channelId: channel.id,
-                channelName: channel.name,
-                orderId,
-                packageId,
-                trackingNumber,
-                shippedAt,
-                itemsBySku: new Map()
-            });
-        }
-
-        const group = grouped.get(packageKey);
-        const lineKey = normalizeKey(sku);
-        if (group.itemsBySku.has(lineKey)) {
-            group.itemsBySku.get(lineKey).qty += qtyValue;
-        } else {
-            group.itemsBySku.set(lineKey, {
-                sku: product.sku,
-                qty: qtyValue,
-                hpp: Number(product.hpp) || 0,
-                docId: product.docId || product.id || '',
-                nama: product.nama || product.product_name || '',
-                model_id: product.model_id || product.modelId || '',
-                warna: product.warna || product.color || '',
-                varian: product.varian || product.variant || ''
-            });
-        }
+        const key = [channel.id, orderId, packageId || trackingNumber].map(normalizeKey).join('|');
+        if (!grouped.has(key)) grouped.set(key, {
+            key, channelId: channel.id, channelName: channel.name, orderId,
+            packageIds: [], trackingNumbers: [], shippedAt: shippedAt || null, itemsByProduct: new Map()
+        });
+        const group = grouped.get(key);
+        if (packageId && !group.packageIds.some(value => normalizeKey(value) === normalizeKey(packageId))) group.packageIds.push(packageId);
+        if (trackingNumber && !group.trackingNumbers.some(value => normalizeKey(value) === normalizeKey(trackingNumber))) group.trackingNumbers.push(trackingNumber);
+        if (!group.shippedAt && shippedAt) group.shippedAt = shippedAt;
+        const productKey = [product.docId || product.id || product.sku, variation].map(normalizeKey).join('|');
+        if (group.itemsByProduct.has(productKey)) group.itemsByProduct.get(productKey).qty += qtyValue;
+        else group.itemsByProduct.set(productKey, {
+            sku: product.sku || sellerSku || platformSkuId,
+            platformSellerSku: sellerSku,
+            platformSkuId,
+            qty: qtyValue,
+            hpp: Number(product.hpp) || 0,
+            docId: product.docId || product.id || '',
+            nama: product.nama || product.namaModel || product.product_name || productName || sellerSku || 'Produk',
+            warna: product.warna || product.color || variation || '',
+            varian: product.varian || product.variant || variation || '',
+            model_id: product.model_id || product.modelId || ''
+        });
     });
-
     packages.value = Array.from(grouped.values()).map(group => {
-        const items = Array.from(group.itemsBySku.values());
+        const items = Array.from(group.itemsByProduct.values());
         return {
             ...group,
             items,
-            totalHpp: items.reduce((sum, item) => sum + (item.hpp * item.qty), 0)
+            packageId: group.packageIds[0] || '',
+            trackingNumber: group.trackingNumbers[0] || '',
+            totalHpp: items.reduce((sum, item) => sum + item.hpp * item.qty, 0)
         };
     }).sort((a, b) => a.channelName.localeCompare(b.channelName) || a.orderId.localeCompare(b.orderId));
 }
-
 async function fetchExistingTransactions(orderIds) {
     const uniqueIds = Array.from(new Set(orderIds));
     const existing = [];
@@ -389,10 +506,12 @@ async function importPackages() {
     importMessage.value = '';
     isImporting.value = true;
     try {
-        const existing = await fetchExistingTransactions(packages.value.map(group => group.orderId));
+        const selectedPackages = matchedPackages.value;
+        if (ambiguousScans.value.length) throw new Error('Satu ID scan cocok dengan beberapa paket. Gunakan ID Paket atau No Resi untuk membedakannya.');
+        const existing = await fetchExistingTransactions(selectedPackages.map(group => group.orderId));
         const duplicates = [];
         const ambiguous = [];
-        const toImport = packages.value.filter(group => {
+        const toImport = selectedPackages.filter(group => {
             const matchingOrders = existing.filter(transaction =>
                 normalizeKey(transaction.marketplaceOrderId) === normalizeKey(group.orderId) &&
                 (normalizeKey(transaction.channelId) === normalizeKey(group.channelId) || normalizeKey(transaction.channel) === normalizeKey(group.channelName))
@@ -422,7 +541,9 @@ async function importPackages() {
             throw new Error('Ada ID pesanan yang sudah pernah tercatat tanpa ID paket, jadi sistem tidak bisa memastikan ini bukan kiriman ganda (' + list + '). Periksa transaksi lama terlebih dahulu.');
         }
         if (!toImport.length) {
-            importMessage.value = 'Semua paket pada file sudah pernah diimpor. Tidak ada transaksi atau pengurangan stok baru.';
+            importMessage.value = 'Semua pesanan yang cocok sudah pernah diimpor. Tidak ada transaksi atau pengurangan stok baru.';
+            const duplicateKeys = new Set(duplicates.map(group => group.key));
+            scanQueue.value = scanQueue.value.filter(scan => !selectedPackages.some(group => duplicateKeys.has(group.key) && scanMatchesGroup(group, scan)));
             return;
         }
 
@@ -432,7 +553,7 @@ async function importPackages() {
             if (!window.confirm('Stok Fashion OS kurang untuk sebagian paket. Karena paket pada file sudah terkonfirmasi terkirim, impor akan tetap mencatat penjualan dan stok dapat menjadi minus.\n\n' + details + '\n\nLanjutkan impor?')) return;
         }
 
-        const batchId = 'SHEET-' + Date.now();
+        const batchId = 'MARKETPLACE-SHIPMENT-' + Date.now();
         let importedCount = 0;
         const chunkSize = 25;
 
@@ -445,10 +566,12 @@ async function importPackages() {
                 const transactionData = {
                     marketplaceOrderId: group.orderId,
                     externalPackageId: group.packageId || '',
+                    externalPackageIds: group.packageIds || [],
                     trackingNumber: group.trackingNumber || '',
-                    tanggal: group.shippedAt,
-                    tanggalTerkirim: group.shippedAt,
-                    inputSource: 'google_sheets_shipped_import',
+                    trackingNumbers: group.trackingNumbers || [],
+                    tanggal: group.shippedAt || new Date(),
+                    tanggalTerkirim: group.shippedAt || null,
+                    inputSource: 'marketplace_shipped_export',
                     importBatchId: batchId,
                     items: group.items.map(item => ({
                         sku: item.sku,
@@ -484,6 +607,8 @@ async function importPackages() {
 
         importMessage.value = `${importedCount} paket berhasil diimpor. ${duplicates.length} paket duplikat dilewati tanpa mengurangi stok lagi.`;
         if (duplicates.length) importMessage.value += ' Duplikat: ' + duplicates.slice(0, 8).map(group => group.orderId).join(', ');
+        const completedIds = new Set([...toImport, ...duplicates].map(group => group.key));
+        scanQueue.value = scanQueue.value.filter(scan => !selectedPackages.some(group => completedIds.has(group.key) && scanMatchesGroup(group, scan)));
     } catch (error) {
         console.error('Gagal mengimpor pesanan terkirim:', error);
         importError.value = error?.message || 'Impor gagal. Tidak ada perubahan yang berhasil diproses pada paket terakhir.';
