@@ -18605,6 +18605,27 @@ watch(activePage, (newPage, oldPage) => {
     }
 });
 
+
+// Helper lama dipertahankan agar data/fitur historis tetap kompatibel.
+// Fitur yang sudah dikeluarkan dari tampilan tidak dipanggil pada alur baru.
+void [
+    addPromotionTier,
+    removePromotionTier,
+    kpiExplanations,
+    dashboardSalesStats,
+    tieredDiskonComputedUpdated,
+    diskonRateComputedUpdated,
+    tieredDiskonNominalComputed,
+    diskonNominalComputed,
+    dataHealthAudit,
+    layananComputed,
+    admComputed,
+    removeProgram,
+    saveModelPromotions,
+    tieredMinComputed,
+    diskonMinBelanjaComputed,
+    showNotesModal
+];
 </script>
 
 <template>
@@ -19006,7 +19027,20 @@ watch(activePage, (newPage, oldPage) => {
 
     <div v-else>
 
-<div v-if="activePage === 'dashboard'" class="min-h-screen w-full bg-slate-50 p-4 sm:p-8">
+<div v-if="activePage === 'dashboard'">
+<div v-if="state.settings.dashboardPin && isDashboardLocked" class="flex min-h-[70vh] items-center justify-center">
+    <div class="w-full max-w-sm rounded-2xl border bg-white p-8 text-center shadow-xl">
+        <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-2xl text-indigo-700">🔒</div>
+        <h2 class="text-xl font-bold text-slate-900">Dashboard Terkunci</h2>
+        <p class="mb-4 mt-2 text-sm text-slate-500">Masukkan PIN keamanan untuk melihat ringkasan bisnis.</p>
+        <form @submit.prevent="unlockDashboard">
+            <input type="password" v-model="dashboardPinInput" placeholder="Masukkan PIN" class="w-full rounded-lg border p-3 text-center">
+            <p v-if="dashboardPinError" class="mt-2 text-sm text-red-600">{{ dashboardPinError }}</p>
+            <button type="submit" class="mt-3 w-full rounded-lg bg-indigo-600 p-3 font-bold text-white">Buka Dashboard</button>
+        </form>
+    </div>
+</div>
+<div v-else class="min-h-screen w-full bg-slate-50 p-4 sm:p-8">
 <div class="max-w-7xl mx-auto space-y-6">
 <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Fashion OS · Business Overview</p><h1 class="mt-1 text-3xl font-bold text-slate-900">Dashboard Bisnis</h1><p class="mt-2 text-sm text-slate-500">Pantau pesanan, HPP, penghasilan marketplace yang sudah cocok, dan dana yang belum cair.</p></div><div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3"><label class="text-sm text-slate-600" for="dashboard-start-date">Periode</label><input id="dashboard-start-date" type="date" v-model="uiState.dashboardStartDate" class="rounded-lg border-slate-300 text-sm"><span class="text-slate-400">s/d</span><input type="date" v-model="uiState.dashboardEndDate" class="rounded-lg border-slate-300 text-sm"></div></header>
 <section class="rounded-3xl bg-slate-900 p-6 text-white shadow-lg"><div><p class="text-sm font-semibold text-indigo-200">Aktivitas pesanan hari ini</p><h2 class="mt-1 text-xl font-bold">Pesanan yang tercatat di Fashion OS</h2><p class="mt-1 text-sm text-slate-300">Penghasilan dihitung setelah data marketplace dicocokkan.</p></div><div v-if="dashboardDataLoading" class="mt-3 text-sm text-slate-300">Memuat data…</div><div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4"><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Pesanan tercatat</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderHariIni) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Menunggu pencocokan</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderMenungguCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Sudah cocok</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Penghasilan cocok hari ini</p><p class="mt-2 text-xl font-bold">{{ formatCurrency(dashboardPremiumData.penghasilanCocok) }}</p></div></div></section>
@@ -19014,14 +19048,14 @@ watch(activePage, (newPage, oldPage) => {
 <article class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</p><p class="mt-2 text-2xl font-bold text-emerald-700">{{ formatCurrency(dashboardWorkflowMetrics.netIncome) }}</p><p class="mt-2 text-xs text-slate-400">Penghasilan bersih dari pesanan yang sudah cocok.</p></article>
 <article class="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">HPP Barang Terjual</p><p class="mt-2 text-2xl font-bold text-indigo-700">{{ formatCurrency(dashboardWorkflowMetrics.totalHpp) }}</p><p class="mt-2 text-xs text-slate-400">Modal produk yang tercatat pada transaksi.</p></article>
 <article class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Laba Bersih Usaha</p><p class="mt-2 text-2xl font-bold" :class="dashboardWorkflowMetrics.netProfit >= 0 ? 'text-blue-700' : 'text-red-600'">{{ formatCurrency(dashboardWorkflowMetrics.netProfit) }}</p><p class="mt-2 text-xs text-slate-400">Penghasilan cocok dikurangi HPP dan biaya operasional.</p></article>
-<article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Penghasilan Cocok Belum Cair</p><p class="mt-2 text-2xl font-bold text-amber-700">{{ formatCurrency(dashboardWorkflowMetrics.pendingFunds) }}</p><p class="mt-2 text-xs text-slate-400">{{ formatNumber(dashboardWorkflowMetrics.pendingQty) }} pcs terkait transaksi cocok menunggu pencairan.</p></article>
+<article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"><div class="flex items-center justify-between gap-2"><p class="text-sm font-medium text-slate-500">Penghasilan Cocok Belum Cair</p><button type="button" @click="togglePendingPrivacyMode" class="rounded-full px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">{{ isPendingPrivacyMode ? 'Tampilkan' : 'Sembunyikan' }}</button></div><p class="mt-2 text-2xl font-bold text-amber-700">{{ isPendingPrivacyMode ? '••••••••' : formatCurrency(dashboardWorkflowMetrics.pendingFunds) }}</p><p class="mt-2 text-xs text-slate-400">{{ isPendingPrivacyMode ? '••' : formatNumber(dashboardWorkflowMetrics.pendingQty) }} pcs terkait transaksi cocok menunggu pencairan.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Biaya Operasional</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardWorkflowMetrics.operatingCosts) }}</p><p class="mt-2 text-xs text-slate-400">Pengeluaran usaha pada periode terpilih.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Saldo Kas Berjalan</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardKpis.saldoKas) }}</p><p class="mt-2 text-xs text-slate-400">Saldo kas yang tercatat di Fashion OS.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Unit Stok Tersedia</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p><p class="mt-2 text-xs text-slate-400">Jumlah stok produk yang tercatat.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Nilai Stok (HPP)</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardKpis.totalNilaiStokHPP) }}</p><p class="mt-2 text-xs text-slate-400">Modal yang tertanam pada stok.</p></article>
 </div></section>
 <section class="grid grid-cols-1 gap-4 lg:grid-cols-2"><div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div class="flex items-center justify-between gap-3"><div><h2 class="font-bold text-slate-900">Pesanan belum cocok</h2><p class="mt-1 text-sm text-slate-500">Belum masuk perhitungan penghasilan marketplace.</p></div><span class="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">{{ formatNumber(dashboardPremiumData.orderMenungguCocok) }}</span></div><p class="mt-4 text-sm text-slate-600">Cocokkan transaksi dengan data pesanan terkirim sebelum menghitung laba.</p></div><div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 class="font-bold text-slate-900">Stok dan produksi</h2><p class="mt-1 text-sm text-slate-500">Pantau kesiapan barang untuk pesanan berikutnya.</p><div class="mt-4 flex flex-wrap gap-3 text-sm"><span class="rounded-full bg-rose-50 px-3 py-2 text-rose-700">Stok menipis: {{ formatNumber(dashboardPremiumData.produkHampirHabis.length) }}</span><span class="rounded-full bg-indigo-50 px-3 py-2 text-indigo-700">Produksi berjalan: {{ formatNumber(dashboardPremiumData.batchBelumSelesai) }}</span><span class="rounded-full bg-amber-50 px-3 py-2 text-amber-700">Maklun terlambat: {{ formatNumber(dashboardPremiumData.maklunTerlambat) }}</span></div></div></section>
-</div></div>
+</div></div></div>
 
 <div v-if="activePage === 'transaksi'">
     <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
