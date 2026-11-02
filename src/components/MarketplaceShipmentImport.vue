@@ -577,8 +577,10 @@ async function importPackages() {
     try {
         const selectedPackages = matchedPackages.value;
         if (ambiguousScans.value.length) throw new Error('Satu ID scan cocok dengan beberapa paket. Gunakan ID Paket atau No Resi untuk membedakannya.');
+        const batchId = 'MARKETPLACE-SHIPMENT-' + Date.now();
         const existing = await fetchExistingTransactions(selectedPackages.map(group => group.orderId));
         const duplicates = [];
+        const repairs = [];
         const ambiguous = [];
         const toImport = selectedPackages.filter(group => {
             const matchingOrders = existing.filter(transaction =>
@@ -586,14 +588,30 @@ async function importPackages() {
                 (normalizeKey(transaction.channelId) === normalizeKey(group.channelId) || normalizeKey(transaction.channel) === normalizeKey(group.channelName))
             );
             const pkgKey = normalizeKey(group.packageId || group.trackingNumber);
-            if (pkgKey && matchingOrders.some(transaction =>
-                normalizeKey(transaction.externalPackageId || transaction.trackingNumber) === pkgKey
-            )) {
-                duplicates.push(group);
+            const exactPackage = pkgKey
+                ? matchingOrders.find(transaction =>
+                    normalizeKey(transaction.externalPackageId || transaction.trackingNumber) === pkgKey
+                )
+                : null;
+            if (exactPackage) {
+                const hasCurrentShipmentData =
+                    exactPackage.inputSource === 'marketplace_shipped_export' &&
+                    Boolean(exactPackage.statusDataMarketplace) &&
+                    Array.isArray(exactPackage.items) &&
+                    exactPackage.items.length > 0;
+                if (hasCurrentShipmentData) duplicates.push(group);
+                else repairs.push({ group, transaction: exactPackage });
                 return false;
             }
             if (!pkgKey && matchingOrders.length) {
-                duplicates.push(group);
+                const existingTransaction = matchingOrders[0];
+                const hasCurrentShipmentData =
+                    existingTransaction.inputSource === 'marketplace_shipped_export' &&
+                    Boolean(existingTransaction.statusDataMarketplace) &&
+                    Array.isArray(existingTransaction.items) &&
+                    existingTransaction.items.length > 0;
+                if (hasCurrentShipmentData) duplicates.push(group);
+                else repairs.push({ group, transaction: existingTransaction });
                 return false;
             }
             if (pkgKey && matchingOrders.some(transaction =>
@@ -609,10 +627,58 @@ async function importPackages() {
             const list = ambiguous.slice(0, 5).map(group => group.orderId).join(', ');
             throw new Error('Ada ID pesanan yang sudah pernah tercatat tanpa ID paket, jadi sistem tidak bisa memastikan ini bukan kiriman ganda (' + list + '). Periksa transaksi lama terlebih dahulu.');
         }
+
+        let repairedCount = 0;
+        const repairChunkSize = 25;
+        for (let offset = 0; offset < repairs.length; offset += repairChunkSize) {
+            const chunk = repairs.slice(offset, offset + repairChunkSize);
+            const batch = writeBatch(db);
+            const repaired = chunk.map(({ group, transaction }) => {
+                const repairData = {
+                    marketplaceOrderId: group.orderId,
+                    externalPackageId: group.packageId || transaction.externalPackageId || '',
+                    externalPackageIds: group.packageIds || transaction.externalPackageIds || [],
+                    trackingNumber: group.trackingNumber || transaction.trackingNumber || '',
+                    trackingNumbers: group.trackingNumbers || transaction.trackingNumbers || [],
+                    tanggal: transaction.tanggal || group.shippedAt || new Date(),
+                    tanggalTerkirim: group.shippedAt || transaction.tanggalTerkirim || transaction.tanggal || null,
+                    inputSource: 'marketplace_shipped_export',
+                    importBatchId: transaction.importBatchId || batchId,
+                    items: group.items.map(item => ({
+                        sku: item.sku,
+                        qty: item.qty,
+                        hpp: item.hpp,
+                        model_id: item.model_id,
+                        nama: item.nama,
+                        warna: item.warna,
+                        ukuran: item.ukuran,
+                        varian: item.varian,
+                        variasiEkspor: item.variasiEkspor
+                    })),
+                    totalHpp: group.totalHpp,
+                    statusDataMarketplace: transaction.statusDataMarketplace || 'menunggu_data',
+                    penghasilanBersihMarketplace: transaction.penghasilanBersihMarketplace ?? null,
+                    channel: group.channelName,
+                    channelId: group.channelId,
+                    statusPencairan: transaction.statusPencairan || 'Belum Cair',
+                    userId: props.userId
+                };
+                batch.update(doc(db, 'transactions', transaction.id), repairData);
+                return { ...transaction, ...repairData, id: transaction.id };
+            });
+            await batch.commit();
+            repairedCount += repaired.length;
+            emit('completed', { transactions: repaired, stockDeltas: {} });
+        }
+
         if (!toImport.length) {
-            importMessage.value = 'Semua pesanan yang cocok sudah pernah diimpor. Tidak ada transaksi atau pengurangan stok baru.';
-            const duplicateKeys = new Set(duplicates.map(group => group.key));
-            scanQueue.value = scanQueue.value.filter(scan => !selectedPackages.some(group => duplicateKeys.has(group.key) && scanMatchesGroup(group, scan)));
+            if (repairedCount) {
+                importMessage.value = repairedCount + ' transaksi lama diperbarui dengan detail produk, ukuran, warna, dan HPP. Stok tidak dikurangi lagi.';
+            } else {
+                importMessage.value = 'Semua pesanan yang cocok sudah pernah diimpor dan datanya sudah lengkap. Tidak ada transaksi atau pengurangan stok baru.';
+            }
+            const completedKeys = new Set([...duplicates, ...repairs.map(item => item.group)].map(group => group.key));
+            scanQueue.value = scanQueue.value.filter(scan => !selectedPackages.some(group => completedKeys.has(group.key) && scanMatchesGroup(group, scan)));
             return;
         }
 
@@ -622,7 +688,6 @@ async function importPackages() {
             if (!window.confirm('Stok Fashion OS kurang untuk sebagian paket. Karena paket pada file sudah terkonfirmasi terkirim, impor akan tetap mencatat penjualan dan stok dapat menjadi minus.\n\n' + details + '\n\nLanjutkan impor?')) return;
         }
 
-        const batchId = 'MARKETPLACE-SHIPMENT-' + Date.now();
         let importedCount = 0;
         const chunkSize = 25;
 
@@ -676,9 +741,12 @@ async function importPackages() {
             emit('completed', { transactions: saved, stockDeltas: Object.fromEntries(stockDeltas) });
         }
 
-        importMessage.value = `${importedCount} paket berhasil diimpor. ${duplicates.length} paket duplikat dilewati tanpa mengurangi stok lagi.`;
-        if (duplicates.length) importMessage.value += ' Duplikat: ' + duplicates.slice(0, 8).map(group => group.orderId).join(', ');
-        const completedIds = new Set([...toImport, ...duplicates].map(group => group.key));
+        const messageParts = [];
+        if (importedCount) messageParts.push(importedCount + ' paket baru berhasil diimpor.');
+        if (repairedCount) messageParts.push(repairedCount + ' transaksi lama diperbarui dengan detail produk, ukuran, warna, dan HPP; stok tidak dikurangi lagi.');
+        if (duplicates.length) messageParts.push(duplicates.length + ' paket lengkap dilewati sebagai duplikat tanpa mengurangi stok.');
+        importMessage.value = messageParts.join(' ');
+        const completedIds = new Set([...toImport, ...duplicates, ...repairs.map(item => item.group)].map(group => group.key));
         scanQueue.value = scanQueue.value.filter(scan => !selectedPackages.some(group => completedIds.has(group.key) && scanMatchesGroup(group, scan)));
     } catch (error) {
         console.error('Gagal mengimpor pesanan terkirim:', error);

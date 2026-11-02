@@ -8681,8 +8681,10 @@ const analisisModelData = computed(() => {
 const dashboardWorkflowMetrics = computed(() => {
     // Gunakan tanggal hasil filter Dashboard; transaksi yang cair difilter berdasarkan tanggal pencairan.
     const periodTransactions = dashboardFilteredData.value.transaksi || [];
+    // Legacy marketplace transactions may not have statusDataMarketplace yet.
     const transactions = periodTransactions.filter(transaction =>
-        Object.prototype.hasOwnProperty.call(transaction || {}, 'statusDataMarketplace')
+        Boolean(String(transaction?.marketplaceOrderId || '').trim()) &&
+        Boolean(String(transaction?.channelId || transaction?.channel || '').trim())
     );
     const matchedTransactions = transactions.filter(transaction =>
         String(transaction.statusDataMarketplace || '').trim().toLowerCase() === 'cocok'
@@ -8692,7 +8694,7 @@ const dashboardWorkflowMetrics = computed(() => {
         String(transaction.statusDataMarketplace || '').trim().toLowerCase() === 'id_sukses_terkonfirmasi'
     );
     const successfulTransactions = [...matchedTransactions, ...manuallyConfirmedTransactions];
-    const hpp = transaction => (transaction.items || []).reduce(
+    const hpp = transaction => Number(transaction.totalHpp) || (transaction.items || []).reduce(
         (sum, item) => sum + ((Number(item.hpp) || 0) * (Number(item.qty) || 0)), 0
     );
     const incomeRecords = (dashboardFilteredData.value.keuangan || []).filter(record => record.isMarketplaceIncomeReport === true);
