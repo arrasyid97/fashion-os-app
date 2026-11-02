@@ -112,7 +112,7 @@ const aliases = {
     orderId: ['id pesanan', 'id pesanan marketplace', 'order id', 'orderid', 'order sn', 'ordersn', 'nomor pesanan', 'no pesanan'],
     packageId: ['id paket', 'package id', 'packageid', 'package sn', 'packagesn', 'shipment id', 'id pengiriman', 'nomor paket'],
     tracking: ['no resi', 'nomor resi', 'resi', 'tracking number', 'tracking no', 'awb', 'airway bill'],
-    netIncome: ['penghasilan bersih', 'net income', 'net payout', ''dana diterima', 'jumlah pencairan', 'seller income', 'income after deduction'],
+    netIncome: ['penghasilan bersih', 'net income', 'net payout', 'dana diterima', 'jumlah pencairan', 'seller income', 'income after deduction'],
     payoutStatus: ['status pencairan', 'payout status', 'status dana'],
     paidAt: ['tanggal pencairan', 'tanggal cair', 'payout date', 'paid at', 'tanggal dana diterima']
 };
