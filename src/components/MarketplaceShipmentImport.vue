@@ -111,6 +111,7 @@
 </template>
 
 <script setup>
+/* global defineProps, defineEmits */
 import { computed, ref } from 'vue';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase.js';
