@@ -8722,13 +8722,32 @@ const dashboardWorkflowMetrics = computed(() => {
         .reduce((sum, record) => sum + (Number(record.jumlah) || 0), 0);
     // Pesanan tertunda adalah backlog seluruh waktu, bukan hanya transaksi
     // yang tanggalnya masuk ke filter periode KPI.
-    const pendingTransactions = (state.pendingSettlements || []).filter(transaction => {
-        if (!isActiveExportRecord(transaction)) return false;
-        if (!String(transaction.marketplaceOrderId || '').trim()) return false;
-        if (!String(transaction.channelId || transaction.channel || '').trim()) return false;
-        const status = String(transaction.statusPencairan || 'Belum Cair').trim().toLocaleLowerCase('id-ID');
-        return status === 'belum cair' || status === 'waiting';
-    });
+    const finalStatuses = new Set([
+    'sudahcair',
+    'retur',
+    'returpengembalian',
+    'dikembalikan',
+    'pengembalian',
+    'baranghilang',
+    'hilang',
+    'dibatalkan',
+    'batal',
+    'cancelled',
+    'canceled'
+]);
+
+const pendingTransactions = (state.pendingSettlements || []).filter(transaction => {
+    if (!isActiveExportRecord(transaction)) return false;
+    if (!String(transaction.marketplaceOrderId || '').trim()) return false;
+    if (!String(transaction.channelId || transaction.channel || '').trim()) return false;
+
+    const status = String(transaction.statusPencairan || '')
+        .trim()
+        .toLocaleLowerCase('id-ID')
+        .replace(/[\s/_-]+/g, '');
+
+    return !finalStatuses.has(status);
+});
     const matchedPendingTransactions = pendingTransactions.filter(transaction =>
         String(transaction.statusDataMarketplace || '').trim().toLowerCase() === 'cocok'
     );
@@ -18108,6 +18127,33 @@ async function fetchPendingSettlementData(userId) {
     isSettlementLoading.value = true;
     pendingSettlementLoadError.value = '';
 
+    const finalStatuses = new Set([
+        'sudahcair',
+        'retur',
+        'returpengembalian',
+        'dikembalikan',
+        'pengembalian',
+        'baranghilang',
+        'hilang',
+        'dibatalkan',
+        'batal',
+        'cancelled',
+        'canceled'
+    ]);
+
+    const isPendingMarketplaceOrder = transaction => {
+        if (!isActiveExportRecord(transaction)) return false;
+        if (!String(transaction.marketplaceOrderId || '').trim()) return false;
+        if (!String(transaction.channelId || transaction.channel || '').trim()) return false;
+
+        const status = String(transaction.statusPencairan || '')
+            .trim()
+            .toLocaleLowerCase('id-ID')
+            .replace(/[\s/_-]+/g, '');
+
+        return !finalStatuses.has(status);
+    };
+
     try {
         await fetchTransactionAndReturnData(
             userId,
@@ -18117,19 +18163,11 @@ async function fetchPendingSettlementData(userId) {
             true
         );
 
-        // Cache transaksi lokal membantu menampilkan data lama yang belum memiliki
-        // statusPencairan. Status pending yang tercatat di server tetap diperiksa
-        // langsung agar cache pending-settlements yang kosong/lama tidak menutupi pesanan.
         const transactionMap = new Map();
+
         if (dataFetched.allTransactionsLoaded) {
             (state.transaksi || []).forEach(transaction => {
-                const status = String(transaction.statusPencairan || 'Belum Cair')
-                    .trim()
-                    .toLocaleLowerCase('id-ID');
-                if (
-                    isActiveExportRecord(transaction) &&
-                    (status === 'belum cair' || status === 'waiting')
-                ) {
+                if (isPendingMarketplaceOrder(transaction)) {
                     transactionMap.set(transaction.id, transaction);
                 }
             });
@@ -18140,15 +18178,27 @@ async function fetchPendingSettlementData(userId) {
             where('userId', '==', userId),
             where('statusPencairan', '==', 'Belum Cair')
         );
+
         const waitingQuery = query(
             collection(db, 'transactions'),
             where('userId', '==', userId),
             where('statusPencairan', '==', 'Waiting')
         );
 
-        const [belumCairSnapshot, waitingSnapshot] = await Promise.all([
+        const shippedExportQuery = query(
+            collection(db, 'transactions'),
+            where('userId', '==', userId),
+            where('inputSource', '==', 'marketplace_shipped_export')
+        );
+
+        const [
+            belumCairSnapshot,
+            waitingSnapshot,
+            shippedExportSnapshot
+        ] = await Promise.all([
             getDocs(belumCairQuery),
-            getDocs(waitingQuery)
+            getDocs(waitingQuery),
+            getDocs(shippedExportQuery)
         ]);
 
         const addSnapshotToMap = snapshot => {
@@ -18162,16 +18212,16 @@ async function fetchPendingSettlementData(userId) {
                         ? getSettlementDate(data.tanggalPencairan)
                         : null
                 };
-                if (isActiveExportRecord(transaction)) {
+
+                if (isPendingMarketplaceOrder(transaction)) {
                     transactionMap.set(transaction.id, transaction);
                 }
             });
         };
 
-        // Hasil server menjadi sumber utama; data lokal hanya melengkapi transaksi
-        // lama tanpa status yang sudah dimuat penuh.
         addSnapshotToMap(belumCairSnapshot);
         addSnapshotToMap(waitingSnapshot);
+        addSnapshotToMap(shippedExportSnapshot);
 
         state.pendingSettlements = Array.from(transactionMap.values());
         dataFetched.pendingSettlements = true;
@@ -18193,13 +18243,10 @@ async function fetchPendingSettlementData(userId) {
         dataFetched.pendingSettlements = false;
         pendingSettlementLoadError.value =
             'Daftar pesanan belum berhasil dimuat. Periksa koneksi lalu muat ulang Dashboard.';
-        // Pertahankan data terakhir yang tampil. Jangan mengosongkannya sehingga
-        // kartu Dashboard seolah-olah menyatakan tidak ada pesanan.
     } finally {
         isSettlementLoading.value = false;
     }
 }
-
 async function processBulkSettlement(targetStatus = 'Sudah Cair') {
     if (!bulkSettlementInput.value.trim()) {
         return alert("Tempelkan daftar ID Pesanan terlebih dahulu.");
@@ -19598,7 +19645,17 @@ SKU-BAJU-PUTIH-S"
                                 >
                                     <td class="px-6 py-4 font-bold text-slate-800">
                                         <div class="flex items-center">
-                                            <span class="mr-2">{{ uiState.activeAccordion === group.groupKey ? 'â–¼' : 'â–¶' }}</span>
+                                            <svg
+    class="mr-2 h-4 w-4 shrink-0 text-slate-500 transition-transform"
+    :class="{ 'rotate-90': uiState.activeAccordion === group.groupKey }"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    aria-hidden="true"
+>
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+</svg>
                                             <div>
                                                 {{ group.namaModel }}
                                                 <span v-if="group.isLoading" class="block text-xs font-normal text-indigo-500">Memuat varian...</span>
@@ -19610,11 +19667,11 @@ SKU-BAJU-PUTIH-S"
                                     <td colspan="3"></td>
                                     <td class="px-6 py-3 text-center">
                                         <span v-if="group.isLoaded">{{ formatNumber(group.totalStock) }} pcs</span>
-                                        <span v-else>â€”</span>
+                                        <span v-else>-</span>
                                     </td>
                                     <td class="px-6 py-3 text-right">
                                         <span v-if="group.isLoaded">{{ formatCurrency(group.totalNilaiStok) }}</span>
-                                        <span v-else>â€”</span>
+                                        <span v-else>-</span>
                                     </td>
                                     <td class="px-6 py-3 text-center">
                                         <button
@@ -19662,84 +19719,101 @@ SKU-BAJU-PUTIH-S"
         </div>
     </div>
 </div>
-<div v-if="activePage === 'harga-hpp'" class="min-h-screen w-full bg-slate-50 p-4 sm:p-8">
+<div v-if="activePage === 'harga-hpp'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
     <div class="mx-auto max-w-7xl">
-        <div class="mb-6">
-            <h2 class="text-3xl font-bold text-slate-800">Harga & HPP Produk</h2>
-            <p class="mt-1 text-slate-500">Atur HPP untuk setiap produk, warna, dan ukuran.</p>
-        </div>
-
-        <div v-if="isHargaHppLocked" class="mx-auto max-w-sm rounded-2xl border bg-white p-6 text-center shadow">
-            <h3 class="mb-2 text-xl font-bold text-slate-800">Halaman Terkunci</h3>
-            <p class="mb-4 text-sm text-slate-600">Masukkan PIN untuk membuka halaman.</p>
-
-            <form @submit.prevent="unlockHargaHpp">
-                <input
-                    type="password"
-                    v-model="uiState.hargaHppPinInput"
-                    placeholder="Masukkan PIN"
-                    class="mb-2 w-full rounded border p-2 text-center"
-                >
-
-                <p v-if="uiState.hargaHppPinError" class="mb-2 text-sm text-red-600">
-                    {{ uiState.hargaHppPinError }}
+        <section class="rounded-2xl border border-slate-200 bg-white/70 p-6 shadow-xl backdrop-blur-sm sm:p-8">
+            <div class="mb-6 border-b border-slate-200 pb-6">
+                <h2 class="text-3xl font-bold text-slate-800">Harga & HPP Produk</h2>
+                <p class="mt-1 text-slate-500">
+                    Atur HPP untuk setiap produk, warna, dan ukuran.
                 </p>
+            </div>
 
-                <button type="submit" class="w-full rounded bg-indigo-600 p-2 font-bold text-white">
-                    Buka
-                </button>
-            </form>
-        </div>
+            <div v-if="isHargaHppLocked" class="mx-auto max-w-sm rounded-2xl border bg-white p-6 text-center shadow">
+                <h3 class="mb-2 text-xl font-bold text-slate-800">Halaman Terkunci</h3>
+                <p class="mb-4 text-sm text-slate-600">Masukkan PIN untuk membuka halaman.</p>
 
-        <div v-else class="overflow-x-auto rounded-2xl border bg-white p-5 shadow">
-            <table class="w-full text-left text-sm">
-                <thead class="bg-slate-100 text-xs uppercase text-slate-700">
-                    <tr>
-                        <th class="p-3">Nama Produk</th>
-                        <th class="p-3">SKU</th>
-                        <th class="p-3">Warna</th>
-                        <th class="p-3">Ukuran</th>
-                        <th class="p-3">HPP</th>
-                        <th class="p-3">Aksi</th>
-                    </tr>
-                </thead>
+                <form @submit.prevent="unlockHargaHpp">
+                    <input
+                        type="password"
+                        v-model="uiState.hargaHppPinInput"
+                        placeholder="Masukkan PIN"
+                        class="mb-2 w-full rounded border p-2 text-center"
+                    >
 
-                <tbody>
-                    <tr v-if="!state.produk || state.produk.length === 0">
-                        <td colspan="6" class="p-8 text-center text-slate-500">
-                            Produk belum ditemukan. Periksa halaman Inventaris.
-                        </td>
-                    </tr>
+                    <p v-if="uiState.hargaHppPinError" class="mb-2 text-sm text-red-600">
+                        {{ uiState.hargaHppPinError }}
+                    </p>
 
-                    <tr v-for="product in state.produk" :key="product.docId" class="border-t">
-                        <td class="p-3">{{ product.nama || '-' }}</td>
-                        <td class="p-3 font-mono">{{ product.sku || '-' }}</td>
-                        <td class="p-3">{{ product.warna || '-' }}</td>
-                        <td class="p-3">{{ product.varian || '-' }}</td>
+                    <button type="submit" class="w-full rounded-lg bg-indigo-600 p-2 font-bold text-white">
+                        Buka
+                    </button>
+                </form>
+            </div>
 
-                        <td class="p-3">
-                            <input
-                                :value="formatInputNumber(product.hpp)"
-                                @input="product.hpp = $event.target.value.trim() === '' ? null : parseInputNumber($event.target.value); markProductAsEdited(product.docId)"
-                                class="w-36 rounded border p-2 text-right"
-                                inputmode="numeric"
-                                placeholder="Masukkan HPP"
+            <div v-else>
+                <div class="mb-4">
+                    <h3 class="text-xl font-semibold text-slate-800">Daftar HPP per Varian</h3>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Isi HPP setiap varian. Nilai ini menjadi modal barang pada transaksi.
+                    </p>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                    <table class="w-full min-w-[760px] text-left text-sm">
+                        <thead class="bg-slate-100 text-xs uppercase text-slate-700">
+                            <tr>
+                                <th class="p-3">Nama Produk</th>
+                                <th class="p-3">SKU</th>
+                                <th class="p-3">Warna</th>
+                                <th class="p-3">Ukuran</th>
+                                <th class="p-3">HPP</th>
+                                <th class="p-3">Aksi</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr v-if="!state.produk || state.produk.length === 0">
+                                <td colspan="6" class="p-8 text-center text-slate-500">
+                                    Produk belum ditemukan. Periksa halaman Inventaris.
+                                </td>
+                            </tr>
+
+                            <tr
+                                v-for="product in state.produk"
+                                :key="product.docId || product.sku || product.nama"
+                                class="border-t border-slate-200"
                             >
-                        </td>
+                                <td class="p-3 font-medium text-slate-800">{{ product.nama || '-' }}</td>
+                                <td class="p-3 font-mono">{{ product.sku || '-' }}</td>
+                                <td class="p-3">{{ product.warna || '-' }}</td>
+                                <td class="p-3">{{ product.varian || '-' }}</td>
 
-                        <td class="p-3">
-                            <button
-                                @click="saveData()"
-                                :disabled="isSaving || !isSubscriptionActive"
-                                class="rounded bg-green-600 px-3 py-2 font-bold text-white disabled:bg-slate-300"
-                            >
-                                {{ isSaving ? 'Menyimpanâ€¦' : 'Simpan HPP' }}
-                            </button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                                <td class="p-3">
+                                    <input
+                                        :value="formatInputNumber(product.hpp)"
+                                        @input="product.hpp = $event.target.value.trim() === '' ? null : parseInputNumber($event.target.value); markProductAsEdited(product.docId)"
+                                        class="w-36 rounded-lg border border-slate-300 p-2 text-right"
+                                        inputmode="numeric"
+                                        placeholder="Masukkan HPP"
+                                    >
+                                </td>
+
+                                <td class="p-3">
+                                    <button
+                                        @click="saveData()"
+                                        :disabled="isSaving || !isSubscriptionActive"
+                                        class="rounded-lg bg-green-600 px-4 py-2 font-bold text-white disabled:bg-slate-300"
+                                    >
+                                        {{ isSaving ? 'Menyimpan...' : 'Simpan HPP' }}
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
 <div v-if="activePage === 'gudang-kain'">
