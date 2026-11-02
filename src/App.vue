@@ -5,6 +5,7 @@ import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import MarketplaceShipmentImport from './components/MarketplaceShipmentImport.vue';
 import MarketplaceIncomeImport from './components/MarketplaceIncomeImport.vue';
+import MarketplaceTransactionHistory from './components/MarketplaceTransactionHistory.vue';
 
 // Impor dari file konfigurasi Firebase Anda
 
@@ -3613,140 +3614,64 @@ async function submitAddProduct() {
 
 
 const laporanKeuanganData = computed(() => {
-    const year = uiState.laporanKeuanganTahun;
-    
+    const year = Number(uiState.laporanKeuanganTahun);
+    const transactions = state.transaksi || [];
+    const records = state.keuangan || [];
+    const asDate = value => value?.toDate ? value.toDate() : value instanceof Date ? value : value?.seconds ? new Date(value.seconds * 1000) : value ? new Date(value) : null;
+    const channelKey = item => String(item.channelId || item.channel || '').trim().toLowerCase();
+    const statusOf = tx => String(tx.statusPencairan || '').trim().toLowerCase().replace(/\s+/g, '');
+    const hppOf = tx => Number(tx.totalHpp) || (tx.items || []).reduce((sum, item) => sum + (Number(item.hpp) || 0) * (Number(item.qty) || 0), 0);
     const months = [];
-
-    const dataTransaksiMentah = state.transaksi || [];
-    const dataKeuanganMentah = state.keuangan || [];
-
-    for (let i = 1; i <= 12; i++) {
-        
-        const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
-
-        let data = null;
-
-        const trxBulanIni = dataTransaksiMentah.filter(t => {
-            const d = new Date(t.tanggal);
-            return d.getFullYear() === year && (d.getMonth() + 1) === i && t.statusPencairan === 'Sudah Cair';
-        });
-
-        const biayaBulanIni = dataKeuanganMentah.filter(k => {
-    const d = k.tanggal?.toDate
-        ? k.tanggal.toDate()
-        : (k.tanggal instanceof Date ? k.tanggal : new Date(k.tanggal));
-
-    return d.getFullYear() === year &&
-        (d.getMonth() + 1) === i &&
-        (k.jenis === 'pengeluaran' || k.jenis === 'biaya');
-});
-
-        const biayaProduksi = biayaBulanIni
-            .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) === 'produksi')
-            .reduce((sum, k) => sum + (k.jumlah || 0), 0);
-
-        const biayaOperasional = biayaBulanIni
-            .filter(k => (k.tipeBiaya || getExpenseTypeByCategory(k.kategori)) !== 'produksi')
-            .reduce((sum, k) => sum + (k.jumlah || 0), 0);
-
-        if (!data) {
-            const omsetKotor = trxBulanIni.reduce((sum, t) => sum + (t.subtotal || 0), 0);
-            const diskon = trxBulanIni.reduce((sum, t) => sum + (t.diskon?.totalDiscount || 0), 0);
-            const omsetBersih = omsetKotor - diskon;
-            const hppTerjual = trxBulanIni.reduce((sum, t) => {
-                return sum + (t.items || []).reduce((s, item) => s + (item.hpp || 0) * item.qty, 0);
-            }, 0);
-            const biayaTransaksi = trxBulanIni.reduce((sum, t) => sum + (t.biaya?.total || 0), 0);
-            const labaKotor = omsetBersih - hppTerjual;
-
-            data = { omsetKotor, omsetBersih, labaKotor, biayaTransaksi };
-        }
-
-        const labaBersihFinal =
-    (data.labaKotor || 0) -
-    (data.biayaTransaksi || 0) -
-    biayaOperasional;
-
-        months.push({
-            monthName,
-            omsetKotor: data.omsetKotor || 0,
-            omsetBersih: data.omsetBersih || 0,
-            labaKotor: data.labaKotor || 0,
-            labaBersih: labaBersihFinal,
-            totalBiayaProduksi: biayaProduksi,
-            totalBiayaOperasional: biayaOperasional,
-            totalBiayaTransaksi: data.biayaTransaksi || 0,
-        });
+    for (let month = 1; month <= 12; month++) {
+        const monthName = new Date(year, month - 1, 1).toLocaleString('id-ID', { month: 'long' });
+        const inMonth = date => date && date.getFullYear() === year && date.getMonth() + 1 === month;
+        const payoutRecords = records.filter(record => record.isMarketplaceIncomeReport === true && inMonth(asDate(record.periodeSelesai || record.tanggal)));
+        const payoutChannels = new Set(payoutRecords.map(channelKey));
+        const periodTransactions = transactions.filter(tx => inMonth(asDate(tx.tanggalPencairan || tx.tanggalTerkirim || tx.tanggal || tx.createdAt)));
+        const confirmed = periodTransactions.filter(tx => statusOf(tx) === 'sudahcair' || tx.konfirmasiSuksesCairManual || String(tx.statusDataMarketplace || '').trim().toLowerCase() === 'cocok');
+        const aggregatePayout = payoutRecords.reduce((sum, record) => sum + (Number(record.jumlah ?? record.amount ?? record.nominal) || 0), 0);
+        const perOrderIncome = confirmed.reduce((sum, tx) => {
+            if (tx.konfirmasiSuksesCairManual || payoutChannels.has(channelKey(tx))) return sum;
+            return sum + (Number(tx.penghasilanBersihMarketplace) || (Object.prototype.hasOwnProperty.call(tx, 'statusDataMarketplace') ? 0 : Math.max(0, (Number(tx.total) || 0) - (Number(tx.biaya?.total ?? tx.totalBiaya) || 0))));
+        }, 0);
+        const payoutAmount = aggregatePayout + perOrderIncome;
+        const soldHpp = confirmed.reduce((sum, tx) => sum + hppOf(tx), 0);
+        const transactionFees = confirmed.reduce((sum, tx) => sum + (Number(tx.biaya?.total ?? tx.totalBiaya) || 0), 0);
+        const expenses = records.filter(record => inMonth(asDate(record.tanggal)) && (record.jenis === 'pengeluaran' || record.jenis === 'biaya'));
+        const productionCosts = expenses.filter(record => (record.tipeBiaya || getExpenseTypeByCategory(record.kategori)) === 'produksi').reduce((sum, record) => sum + (Number(record.jumlah) || 0), 0);
+        const operatingCosts = expenses.filter(record => (record.tipeBiaya || getExpenseTypeByCategory(record.kategori)) !== 'produksi').reduce((sum, record) => sum + (Number(record.jumlah) || 0), 0);
+        const missingSummary = periodTransactions.some(tx => tx.konfirmasiSuksesCairManual && !payoutRecords.some(record => channelKey(record) === channelKey(tx)));
+        months.push({monthName,payoutAmount,soldHpp,transactionFees,productionCosts,operatingCosts,netProfit:missingSummary?null:payoutAmount-soldHpp-transactionFees-operatingCosts,missingSummary});
     }
-
     const yearlyTotals = {
-        omsetKotor: months.reduce((sum, m) => sum + m.omsetKotor, 0),
-        omsetBersih: months.reduce((sum, m) => sum + m.omsetBersih, 0),
-        labaKotor: months.reduce((sum, m) => sum + m.labaKotor, 0),
-        labaBersih: months.reduce((sum, m) => sum + m.labaBersih, 0),
-        totalBiayaProduksi: months.reduce((sum, m) => sum + m.totalBiayaProduksi, 0),
-        totalBiayaOperasional: months.reduce((sum, m) => sum + m.totalBiayaOperasional, 0),
-        totalBiayaTransaksi: months.reduce((sum, m) => sum + m.totalBiayaTransaksi, 0),
+        payoutAmount: months.reduce((sum,item)=>sum+item.payoutAmount,0),
+        soldHpp: months.reduce((sum,item)=>sum+item.soldHpp,0),
+        transactionFees: months.reduce((sum,item)=>sum+item.transactionFees,0),
+        productionCosts: months.reduce((sum,item)=>sum+item.productionCosts,0),
+        operatingCosts: months.reduce((sum,item)=>sum+item.operatingCosts,0),
+        netProfit: months.some(item=>item.missingSummary)?null:months.reduce((sum,item)=>sum+item.netProfit,0),
+        missingSummary: months.some(item=>item.missingSummary)
     };
-
-    return { months, yearlyTotals };
+    return {months,yearlyTotals};
 });
 
 const laporanTransaksiData = computed(() => {
-    const year = uiState.laporanTransaksiTahun;
-    
+    const year = Number(uiState.laporanTransaksiTahun);
+    const all = state.transaksi || [];
+    const asDate = value => value?.toDate ? value.toDate() : value instanceof Date ? value : value?.seconds ? new Date(value.seconds * 1000) : value ? new Date(value) : null;
+    const qtyOf = tx => (tx.items || []).reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+    const hppOf = tx => Number(tx.totalHpp) || (tx.items || []).reduce((sum, item) => sum + (Number(item.hpp) || 0) * (Number(item.qty) || 0), 0);
+    const statusOf = tx => String(tx.statusPencairan || '').trim().toLowerCase().replace(/\s+/g, '');
     const months = [];
-    const dataTransaksiMentah = state.transaksi || [];
-
-    for (let i = 1; i <= 12; i++) {
-        
-        const monthName = new Date(year, i - 1, 1).toLocaleString('id-ID', { month: 'long' });
-        
-        let data = null;
-
-        // Jika data dari server kosong, hitung manual secara real-time di lokal
-        if (!data) {
-            const trxBulanIni = dataTransaksiMentah.filter(t => {
-                const d = new Date(t.tanggal);
-                return d.getFullYear() === year && (d.getMonth() + 1) === i && t.statusPencairan === 'Sudah Cair';
-            });
-
-            const totalQty = trxBulanIni.reduce((sum, t) => sum + (t.items || []).reduce((s, item) => s + item.qty, 0), 0);
-            const omsetKotor = trxBulanIni.reduce((sum, t) => sum + (t.subtotal || 0), 0);
-            const totalDiskon = trxBulanIni.reduce((sum, t) => sum + (t.diskon?.totalDiscount || 0), 0);
-            const omsetBersih = omsetKotor - totalDiskon;
-            const hppTerjual = trxBulanIni.reduce((sum, t) => sum + (t.items || []).reduce((s, item) => s + (item.hpp || 0) * item.qty, 0), 0);
-            const biayaTransaksi = trxBulanIni.reduce((sum, t) => sum + (t.biaya?.total || 0), 0);
-            const labaKotor = omsetBersih - hppTerjual;
-
-            data = { totalQty, omsetKotor, totalDiskon, nilaiRetur: 0, omsetBersih, hppTerjual, biayaTransaksi, labaKotor };
-        }
-
-        months.push({
-            monthName: monthName,
-            totalQty: data.totalQty || 0,
-            omsetKotor: data.omsetKotor || 0,
-            totalDiskon: data.totalDiskon || 0,
-            totalNilaiRetur: data.nilaiRetur || 0,
-            omsetBersih: data.omsetBersih || 0,
-            totalHppTerjual: data.hppTerjual || 0,
-            totalBiayaTransaksi: data.biayaTransaksi || 0,
-            labaKotor: data.labaKotor || 0,
-        });
+    for (let month=1; month<=12; month++) {
+        const monthName = new Date(year,month-1,1).toLocaleString('id-ID',{month:'long'});
+        const rows = all.filter(tx => { const date=asDate(tx.tanggalTerkirim||tx.tanggal||tx.createdAt); return date&&date.getFullYear()===year&&date.getMonth()+1===month; });
+        const successful = rows.filter(tx => statusOf(tx)==='sudahcair' || ['cocok','id_sukses_terkonfirmasi'].includes(String(tx.statusDataMarketplace||'').toLowerCase()));
+        const pending = rows.filter(tx => !['sudahcair','retur/pengembalian','retur','baranghilang'].includes(statusOf(tx)));
+        months.push({monthName,totalOrders:rows.length,totalQty:rows.reduce((sum,tx)=>sum+qtyOf(tx),0),totalHpp:rows.reduce((sum,tx)=>sum+hppOf(tx),0),successfulOrders:successful.length,pendingOrders:pending.length});
     }
-    
-    const yearlyTotals = {
-        totalQty: months.reduce((sum, m) => sum + m.totalQty, 0),
-        omsetKotor: months.reduce((sum, m) => sum + m.omsetKotor, 0),
-        totalDiskon: months.reduce((sum, m) => sum + m.totalDiskon, 0),
-        totalNilaiRetur: months.reduce((sum, m) => sum + m.totalNilaiRetur, 0),
-        omsetBersih: months.reduce((sum, m) => sum + m.omsetBersih, 0),
-        totalHppTerjual: months.reduce((sum, m) => sum + m.totalHppTerjual, 0),
-        totalBiayaTransaksi: months.reduce((sum, m) => sum + m.totalBiayaTransaksi, 0),
-        labaKotor: months.reduce((sum, m) => sum + m.labaKotor, 0),
-    };
-
-    return { months, yearlyTotals };
+    const yearlyTotals={totalOrders:months.reduce((sum,item)=>sum+item.totalOrders,0),totalQty:months.reduce((sum,item)=>sum+item.totalQty,0),totalHpp:months.reduce((sum,item)=>sum+item.totalHpp,0),successfulOrders:months.reduce((sum,item)=>sum+item.successfulOrders,0),pendingOrders:months.reduce((sum,item)=>sum+item.pendingOrders,0)};
+    return {months,yearlyTotals};
 });
 
 const roasResults = computed(() => {
@@ -4536,6 +4461,16 @@ newTransactions.forEach(
 }
 
 function handleMarketplaceImportCompleted(payload) {
+    const financeRecords = [
+        ...(payload?.keuanganRecord ? [payload.keuanganRecord] : []),
+        ...(payload?.keuanganRecords || [])
+    ];
+    financeRecords.forEach(record => {
+        if (!Array.isArray(state.keuangan)) state.keuangan = [];
+        const index = state.keuangan.findIndex(item => item.id === record.id);
+        if (index >= 0) state.keuangan[index] = { ...state.keuangan[index], ...record };
+        else state.keuangan.unshift(record);
+    });
     const importedTransactions = payload?.transactions || [];
     if (!importedTransactions.length) return;
 
@@ -8665,43 +8600,57 @@ const dashboardWorkflowMetrics = computed(() => {
     const matchedTransactions = transactions.filter(transaction =>
         String(transaction.statusDataMarketplace || '').trim().toLowerCase() === 'cocok'
     );
+    const manuallyConfirmedTransactions = transactions.filter(transaction =>
+        transaction.konfirmasiSuksesCairManual === true ||
+        String(transaction.statusDataMarketplace || '').trim().toLowerCase() === 'id_sukses_terkonfirmasi'
+    );
+    const successfulTransactions = [...matchedTransactions, ...manuallyConfirmedTransactions];
     const hpp = transaction => (transaction.items || []).reduce(
-        (sum, item) => sum + ((Number(item.hpp) || 0) * (Number(item.qty) || 0)),
-        0
+        (sum, item) => sum + ((Number(item.hpp) || 0) * (Number(item.qty) || 0)), 0
     );
-    const netIncome = matchedTransactions.reduce(
-        (sum, transaction) => sum + (Number(transaction.penghasilanBersihMarketplace) || 0),
-        0
-    );
-    const totalHpp = matchedTransactions.reduce((sum, transaction) => sum + hpp(transaction), 0);
+    const incomeRecords = (dashboardFilteredData.value.keuangan || []).filter(record => record.isMarketplaceIncomeReport === true);
+    const txDate = transaction => {
+        const value = transaction.tanggalPencairan || transaction.tanggalTerkirim || transaction.tanggal;
+        return value?.toDate ? value.toDate() : value instanceof Date ? value : value?.seconds ? new Date(value.seconds * 1000) : value ? new Date(value) : null;
+    };
+    const coveredByPayoutSummary = transaction => incomeRecords.some(record => {
+        if (String(record.channelId || '') !== String(transaction.channelId || '')) return false;
+        const date = txDate(transaction);
+        const start = String(record.periodeMulai || '').slice(0, 10);
+        const end = String(record.periodeSelesai || '').slice(0, 10);
+        if (!date || !start || !end || Number.isNaN(date.getTime())) return false;
+        const key = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+        return key >= start && key <= end;
+    });
+    const transactionIncome = matchedTransactions.filter(transaction => !coveredByPayoutSummary(transaction))
+        .reduce((sum, transaction) => sum + (Number(transaction.penghasilanBersihMarketplace) || 0), 0);
+    const payoutIncome = incomeRecords.reduce((sum, record) => sum + (Number(record.jumlah ?? record.amount ?? record.nominal) || 0), 0);
+    const netIncome = transactionIncome + payoutIncome;
+    const totalHpp = successfulTransactions.reduce((sum, transaction) => sum + hpp(transaction), 0);
     const operatingCosts = (dashboardFilteredData.value.keuangan || [])
-        .filter(record =>
-            (record.jenis === 'pengeluaran' || record.jenis === 'biaya') &&
-            (record.tipeBiaya || getExpenseTypeByCategory(record.kategori)) !== 'produksi'
-        )
+        .filter(record => (record.jenis === 'pengeluaran' || record.jenis === 'biaya') &&
+            (record.tipeBiaya || getExpenseTypeByCategory(record.kategori)) !== 'produksi')
         .reduce((sum, record) => sum + (Number(record.jumlah) || 0), 0);
-    const pendingTransactions = matchedTransactions.filter(transaction => {
+    const pendingTransactions = transactions.filter(transaction => {
         const status = String(transaction.statusPencairan || '').trim().toLowerCase();
         return !status || status === 'belum cair' || status === 'waiting';
     });
-    const pendingFunds = pendingTransactions.reduce(
-        (sum, transaction) => sum + (Number(transaction.penghasilanBersihMarketplace) || 0),
-        0
+    const matchedPendingTransactions = pendingTransactions.filter(transaction =>
+        String(transaction.statusDataMarketplace || '').trim().toLowerCase() === 'cocok'
     );
-    const pendingQty = pendingTransactions.reduce(
-        (sum, transaction) => sum + (transaction.items || []).reduce(
-            (itemSum, item) => itemSum + (Number(item.qty) || 0),
-            0
-        ),
-        0
+    const pendingFunds = matchedPendingTransactions.reduce(
+        (sum, transaction) => sum + (Number(transaction.penghasilanBersihMarketplace) || 0), 0
     );
+    const pendingQty = pendingTransactions.reduce((sum, transaction) => sum + (transaction.items || []).reduce(
+        (itemSum, item) => itemSum + (Number(item.qty) || 0), 0
+    ), 0);
+    const pendingHpp = pendingTransactions.reduce((sum, transaction) => sum + hpp(transaction), 0);
+    const incomeComplete = !manuallyConfirmedTransactions.some(transaction => !coveredByPayoutSummary(transaction));
     return {
-        netIncome,
-        totalHpp,
-        operatingCosts,
-        netProfit: netIncome - totalHpp - operatingCosts,
-        pendingFunds,
-        pendingQty
+        netIncome, totalHpp, operatingCosts,
+        netProfit: incomeComplete ? netIncome - totalHpp - operatingCosts : null,
+        incomeComplete, pendingFunds, pendingQty, pendingOrders: pendingTransactions.length,
+        pendingHpp, pendingMatchedOrders: matchedPendingTransactions.length
     };
 });
 
@@ -18873,8 +18822,8 @@ void [
 </button>
 
 <div v-show="uiState.sidebarGroups.penjualan" class="ml-4 space-y-1">
-    <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">Kasir (POS)</a>
     <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Impor Pesanan Terkirim</a>
+    <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">Riwayat Transaksi</a>
     <a href="#" @click.prevent="changePage('rekonsiliasi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'rekonsiliasi' }">Cek Pencairan Dana</a>
     <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
     <a href="#" @click.prevent="changePage('statistik-penjualan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'statistik-penjualan' }">Statistik Penjualan</a>
@@ -19116,10 +19065,10 @@ void [
 </div></header>
 <section class="rounded-3xl bg-slate-900 p-6 text-white shadow-lg"><div><p class="text-sm font-semibold text-indigo-200">Aktivitas pesanan hari ini</p><h2 class="mt-1 text-xl font-bold">Pesanan yang tercatat di Fashion OS</h2><p class="mt-1 text-sm text-slate-300">Penghasilan dihitung setelah data marketplace dicocokkan.</p></div><div v-if="dashboardDataLoading" class="mt-3 text-sm text-slate-300">Memuat data…</div><div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4"><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Pesanan tercatat</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderHariIni) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Menunggu pencocokan</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderMenungguCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Sudah cocok</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Penghasilan cocok hari ini</p><p class="mt-2 text-xl font-bold">{{ formatCurrency(dashboardPremiumData.penghasilanCocok) }}</p></div></div></section>
 <section><div class="mb-3"><h2 class="text-lg font-bold text-slate-900">Ringkasan periode</h2><p class="text-sm text-slate-500">Penghasilan marketplace hanya berasal dari transaksi baru yang sudah cocok.</p></div><div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-<article class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</p><p class="mt-2 text-2xl font-bold text-emerald-700">{{ formatCurrency(dashboardWorkflowMetrics.netIncome) }}</p><p class="mt-2 text-xs text-slate-400">Penghasilan bersih dari pesanan yang sudah cocok.</p></article>
+<article class="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</p><p class="mt-2 text-2xl font-bold text-emerald-700">{{ dashboardWorkflowMetrics.incomeComplete ? formatCurrency(dashboardWorkflowMetrics.netIncome) : 'Lengkapi ringkasan pencairan' }}</p><p class="mt-2 text-xs text-slate-400">{{ dashboardWorkflowMetrics.incomeComplete ? 'Dari penghasilan per-pesanan atau total pencairan periode yang dicatat.' : 'Ada ID sukses tanpa ringkasan total pencairan periode.' }}</p></article>
 <article class="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">HPP Barang Terjual</p><p class="mt-2 text-2xl font-bold text-indigo-700">{{ formatCurrency(dashboardWorkflowMetrics.totalHpp) }}</p><p class="mt-2 text-xs text-slate-400">Modal produk yang tercatat pada transaksi.</p></article>
-<article class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Laba Bersih Usaha</p><p class="mt-2 text-2xl font-bold" :class="dashboardWorkflowMetrics.netProfit >= 0 ? 'text-blue-700' : 'text-red-600'">{{ formatCurrency(dashboardWorkflowMetrics.netProfit) }}</p><p class="mt-2 text-xs text-slate-400">Penghasilan cocok dikurangi HPP dan biaya operasional.</p></article>
-<article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"><div class="flex items-center justify-between gap-2"><p class="text-sm font-medium text-slate-500">Penghasilan Cocok Belum Cair</p><button type="button" @click="togglePendingPrivacyMode" class="rounded-full px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">{{ isPendingPrivacyMode ? 'Tampilkan' : 'Sembunyikan' }}</button></div><p class="mt-2 text-2xl font-bold text-amber-700">{{ isPendingPrivacyMode ? '••••••••' : formatCurrency(dashboardWorkflowMetrics.pendingFunds) }}</p><p class="mt-2 text-xs text-slate-400">{{ isPendingPrivacyMode ? '••' : formatNumber(dashboardWorkflowMetrics.pendingQty) }} pcs terkait transaksi cocok menunggu pencairan.</p></article>
+<article class="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Laba Bersih Usaha</p><p class="mt-2 text-2xl font-bold" :class="dashboardWorkflowMetrics.netProfit >= 0 ? 'text-blue-700' : 'text-red-600'">{{ dashboardWorkflowMetrics.incomeComplete ? formatCurrency(dashboardWorkflowMetrics.netProfit) : 'Belum lengkap' }}</p><p class="mt-2 text-xs text-slate-400">{{ dashboardWorkflowMetrics.incomeComplete ? 'Penghasilan bersih dikurangi HPP pesanan berhasil dan biaya operasional.' : 'Catat total dana dilepas agar laba tidak tampil keliru.' }}</p></article>
+<article class="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"><div class="flex items-center justify-between gap-2"><p class="text-sm font-medium text-slate-500">Pesanan Belum Selesai</p><button type="button" @click="togglePendingPrivacyMode" class="rounded-full px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">{{ isPendingPrivacyMode ? 'Tampilkan' : 'Sembunyikan' }}</button></div><p class="mt-2 text-2xl font-bold text-amber-700">{{ isPendingPrivacyMode ? '••••••••' : formatNumber(dashboardWorkflowMetrics.pendingOrders) + ' pesanan' }}</p><p class="mt-2 text-xs text-slate-500">{{ isPendingPrivacyMode ? '••' : formatNumber(dashboardWorkflowMetrics.pendingQty) + ' pcs · HPP tertahan ' + formatCurrency(dashboardWorkflowMetrics.pendingHpp) }}</p><p class="mt-1 text-xs text-slate-400">{{ dashboardWorkflowMetrics.pendingMatchedOrders }} pesanan punya nilai per-pesanan cocok dan masih menunggu pencairan.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Biaya Operasional</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardWorkflowMetrics.operatingCosts) }}</p><p class="mt-2 text-xs text-slate-400">Pengeluaran usaha pada periode terpilih.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Saldo Kas Berjalan</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatCurrency(dashboardKpis.saldoKas) }}</p><p class="mt-2 text-xs text-slate-400">Saldo kas yang tercatat di Fashion OS.</p></article>
 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-sm font-medium text-slate-500">Unit Stok Tersedia</p><p class="mt-2 text-2xl font-bold text-slate-800">{{ formatNumber(dashboardKpis.totalUnitStok) }} pcs</p><p class="mt-2 text-xs text-slate-400">Jumlah stok produk yang tercatat.</p></article>
@@ -19129,216 +19078,7 @@ void [
 </div></div></div>
 
 <div v-if="activePage === 'transaksi'">
-    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-        <div class="max-w-7xl mx-auto">
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                
-                <div class="lg:col-span-2 space-y-8">
-    <div class="animate-fade-in-up">
-        <div class="flex items-center gap-4">
-            <h2 class="text-3xl font-bold text-slate-800">Kasir (Point of Sale)</h2>
-            <button @click="showModal('panduanPOS')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                Panduan
-            </button>
-        </div>
-        <p class="text-slate-500 mt-1">Scan atau ketik produk, lalu scan atau ketik ID Resi untuk menyelesaikan transaksi.</p>
-    </div>
-
-    <div class="relative z-20 bg-white/70 backdrop-blur-sm p-4 rounded-xl border shadow-lg animate-fade-in-up" style="animation-delay: 100ms;">
-        <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Cari di Sini</label>
-        <div class="relative flex items-center gap-2">
-            <form @submit.prevent="handlePosSubmit" class="flex-grow">
-                <input 
-    type="text" 
-    v-model="uiState.pos_scan_input" 
-    @input="handlePosSearch" 
-    :disabled="!uiState.activeCartChannel || !!uiState.pos_order_id" 
-    placeholder="Scan/Ketik Produk atau Resi..." 
-    class="w-full p-4 text-lg border-2 border-slate-300 rounded-lg shadow-inner" 
-    @keyup.enter="handlePosScanEnter"
-    autocomplete="off"
->
-                <div v-if="uiState.posSearchRecommendations.length > 0" class="absolute w-full mt-1 bg-white border rounded-lg shadow-lg">
-                    <div v-for="p in uiState.posSearchRecommendations" :key="p.sku" @click="selectPosRecommendation(p)" class="p-3 hover:bg-slate-100 cursor-pointer border-b">
-                        <p class="font-semibold">{{ p.nama }} - {{ p.varian }}</p>
-                        <p class="text-xs text-slate-500">SKU: {{ p.sku }}</p>
-                    </div>
-                </div>
-            </form>
-            <button @click="handlePosSubmit" :disabled="activeCart.length === 0 || !uiState.pos_scan_input || !!uiState.pos_order_id" class="bg-indigo-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400">
-                Jadikan ID Pesanan
-            </button>
-        </div>
-        <div v-if="uiState.pos_order_id" class="mt-3 p-2 bg-green-50 text-green-800 rounded-md border border-green-200">
-            <span class="text-sm font-semibold">ID Pesanan Tercatat:</span>
-            <span class="font-mono ml-2">{{ uiState.pos_order_id }}</span>
-            <span class="text-xs italic ml-2">(Keranjang terkunci)</span>
-        </div>
-    </div>
-
-    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-        <div class="flex flex-wrap justify-between items-center mb-4 pb-4 border-b border-slate-200/80">
-            <h3 class="text-xl font-semibold text-slate-800">Riwayat Transaksi</h3>
-            <div class="flex items-center gap-2">
-                <select v-model="uiState.posDateFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                    <option value="today">hari ini</option>
-                    <option value="last_7_days">7 hari terakhir</option>
-                    <option value="last_30_days">30 hari terakhir</option>
-                    <option value="this_year">tahun ini</option>
-                    <option value="by_date_range">rentang tanggal</option>
-                    <option value="by_month_range">rentang bulan</option>
-                    <option value="by_year_range">rentang tahun</option>
-                    <option value="all_time">semua</option>
-                </select>
-                <select v-model="uiState.posChannelFilter" class="w-full bg-white border border-slate-300 text-sm rounded-lg p-2.5 shadow-sm capitalize">
-                    <option value="all">Semua Channel</option>
-                    <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
-                </select>
-                <button @click="requestProtectedExport(() => exportTransactionsToExcel())" class="bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 text-sm h-[42px] flex-shrink-0">Export</button>
-            </div>
-        </div>
-        <div class="mb-4 space-y-2">
-            <div v-if="uiState.posDateFilter === 'by_date_range'" class="flex items-center gap-2 animate-fade-in">
-                <input type="date" v-model="uiState.posStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                <span>s/d</span>
-                <input type="date" v-model="uiState.posEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-            </div>
-            <div v-if="uiState.posDateFilter === 'by_month_range'" class="flex items-center gap-2 animate-fade-in">
-                <select v-model.number="uiState.posStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                    <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
-                </select>
-                <input type="number" v-model.number="uiState.posStartYear" placeholder="Tahun" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-                <span>s/d</span>
-                <select v-model.number="uiState.posEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                    <option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option>
-                </select>
-                <input type="number" v-model.number="uiState.posEndYear" placeholder="Tahun" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-            </div>
-            <div v-if="uiState.posDateFilter === 'by_year_range'" class="flex items-center gap-2 animate-fade-in">
-                <input type="number" v-model.number="uiState.posStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-                <span>s/d</span>
-                <input type="number" v-model.number="uiState.posEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-            </div>
-        </div>
-        <div
-            v-if="transactionHistoryLoading"
-            class="mb-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700"
-        >
-            Menampilkan
-            <strong>{{ transactionHistoryLoadedCount }}</strong>
-            transaksi. Data berikutnya sedang dimuat otomatis...
-        </div>
-
-        <div
-            v-else-if="transactionHistoryMessage"
-            class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
-        >
-            {{ transactionHistoryMessage }}
-        </div>
-
-        <div
-            v-else-if="transactionHistoryError"
-            class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-        >
-            {{ transactionHistoryError }}
-
-            <button
-                @click="loadTransactionHistoryByCurrentFilter(currentUser.uid)"
-                class="ml-2 font-bold underline"
-            >
-                Coba Lagi
-            </button>
-        </div>
-
-        <div class="overflow-x-auto max-h-96">
-            <table class="w-full text-sm text-left text-slate-500">
-                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50 sticky top-0">
-                    <tr>
-                        <th class="px-6 py-3">ID Pesanan</th>
-                        <th class="px-6 py-3">Tanggal</th>
-                        <th class="px-6 py-3">Channel</th>
-                        <th class="px-6 py-3">HPP / Total Lama</th>
-                        <th class="px-6 py-3">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200/50">
-                    <tr v-if="!transactionHistoryLoading && filteredTransaksi.length === 0">
-                        <td colspan="5" class="text-center py-4">Belum ada transaksi pada periode ini.</td>
-                    </tr>
-                    <tr v-for="trx in filteredTransaksi" :key="trx.id" class="hover:bg-slate-50/50">
-                        <td class="px-6 py-4 font-mono text-xs">{{ trx.marketplaceOrderId || trx.id.slice(-6) }}</td>
-                        <td class="px-6 py-4">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }}</td>
-                        <td class="px-6 py-4">{{ trx.channel }}</td>
-                        <td class="px-6 py-4 font-semibold">
-                            {{
-                                formatCurrency(
-                                    Object.prototype.hasOwnProperty.call(trx || {}, 'statusDataMarketplace')
-                                        ? (Number(trx.totalHpp) || 0)
-                                        : (Number(trx.total) || 0)
-                                )
-                            }}
-                        </td>
-                        <td class="px-6 py-4 space-x-3">
-                            <button @click="openProtectedTransactionDetail(trx)" class="font-semibold text-indigo-600 hover:underline">Detail</button>
-                            <button @click="deleteTransaction(trx.id)" class="font-semibold text-red-500 hover:underline">Hapus</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-                <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 lg:sticky lg:top-8 animate-fade-in-up" style="animation-delay: 300ms;">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Pilih Channel Penjualan</label>
-                        <select v-model="uiState.activeCartChannel" @change="uiState.pos_order_id = ''; state.carts[uiState.activeCartChannel] = []" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
-                            <option v-for="mp in state.settings.marketplaces" :key="mp.id" :value="mp.id">{{ mp.name }}</option>
-                        </select>
-                    </div>
-
-                    <div class="text-center mb-4 pb-4 border-b border-slate-200/80">
-                        <p class="font-semibold text-slate-700">{{ getMarketplaceById(uiState.activeCartChannel)?.name || 'Pilih Channel' }}</p>
-                        <h2 class="text-2xl font-bold text-slate-800">{{ state.settings.brandName }}</h2>
-                        <p class="text-sm text-slate-500">{{ new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}</p>
-                    </div>
-
-                    <h3 class="text-lg font-bold mb-2 text-slate-800">Keranjang</h3>
-                    <div class="mb-4 max-h-60 overflow-y-auto pr-2">
-                        <p v-if="activeCart.length === 0" class="text-center py-8 text-slate-500">Keranjang kosong</p>
-                        <div v-for="item in activeCart" :key="item.sku" class="flex justify-between items-center py-3 border-b border-slate-200/50 animate-fade-in">
-                            <div>
-                                <p class="font-medium text-sm">{{ item.nama }} ({{ item.varian }})</p>
-                                <p class="text-sm text-slate-500">HPP {{ formatCurrency(item.hpp) }} × {{ item.qty }}</p>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <button @click="updateCartItemQty(item.sku, -1)" class="w-6 h-6 rounded-full bg-red-100 text-red-700 font-bold flex items-center justify-center">-</button>
-                                <span class="font-bold w-6 text-center">{{ item.qty }}</span>
-                                <button @click="updateCartItemQty(item.sku, 1)" class="w-6 h-6 rounded-full bg-green-100 text-green-700 font-bold flex items-center justify-center">+</button>
-                                <button @click="removeFromCart(item.sku)" class="ml-2 text-slate-400 hover:text-red-600 font-bold text-xl">&times;</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="border-t border-slate-200/80 pt-4 space-y-2 text-sm">
-                        <div class="flex justify-between font-bold">
-                            <span>Total HPP Barang</span>
-                            <span>{{ formatCurrency(activeCart.reduce((total, item) => total + ((Number(item.hpp) || 0) * (Number(item.qty) || 0)), 0)) }}</span>
-                        </div>
-                        <div class="flex justify-between text-xs text-slate-500">
-                            <span>Jumlah Barang</span><span>{{ cartSummary.itemCount }}</span>
-                        </div>
-                    </div>
-                    
-                    <button @click="confirmCompleteTransaction" :disabled="activeCart.length === 0 || !isSubscriptionActive" class="mt-6 w-full bg-indigo-600 text-white font-bold py-3 rounded-lg disabled:bg-slate-400 hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">
-    Selesaikan Transaksi
-</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <MarketplaceTransactionHistory :transactions="state.transaksi || []" :marketplaces="state.settings.marketplaces || []" />
 </div>
 
 <div v-if="activePage === 'bulk_process'">
@@ -21285,82 +21025,11 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
 
-<div v-if="activePage === 'laporan-transaksi'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
-    
-    <div v-if="isLaporanTransaksiLocked" class="flex items-center justify-center h-full animate-fade-in">
-        <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
-            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-            </div>
-            <h3 class="text-xl font-bold text-slate-800 mb-2">Halaman Terkunci</h3>
-            <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan Anda untuk membuka.</p>
-            <form @submit.prevent="unlockLaporanTransaksi" class="w-full">
-                <input type="password" v-model="uiState.laporanTransaksiPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2">
-                <p v-if="uiState.laporanTransaksiPinError" class="text-red-500 text-xs mb-2">{{ uiState.laporanTransaksiPinError }}</p>
-                <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka</button>
-            </form>
-        </div>
-    </div>
-
-    <div v-else class="max-w-7xl mx-auto">
-        <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
-            <div>
-                <h2 class="text-3xl font-bold text-slate-800">Laporan Transaksi Tahunan</h2>
-                <p class="text-slate-500 mt-1">Analisis performa penjualan bulanan Anda secara mendetail.</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <label for="tahun-laporan-trx" class="text-sm font-medium">Pilih Tahun:</label>
-                <input type="number" id="tahun-laporan-trx" v-model.number="uiState.laporanTransaksiTahun" class="w-32 p-2 border border-slate-300 rounded-md shadow-sm">
-            </div>
-        </div>
-
-        <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                        <tr>
-                            <th class="px-6 py-4 font-semibold">Bulan</th>
-                            <th class="px-6 py-4 font-semibold text-center">QTY Terjual</th>
-                            <th class="px-6 py-4 font-semibold text-right">Omset Kotor</th>
-                            <th class="px-6 py-4 font-semibold text-right">Diskon</th>
-                            <th class="px-6 py-4 font-semibold text-right">Retur</th>
-                            <th class="px-6 py-4 font-semibold text-right bg-blue-100 text-blue-800">Omset Bersih</th>
-                            <th class="px-6 py-4 font-semibold text-right">HPP Terjual</th>
-                            <th class="px-6 py-4 font-semibold text-right">Biaya Transaksi</th>
-                            <th class="px-6 py-4 font-semibold text-right bg-green-100 text-green-800">Laba Kotor</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200/50">
-                        <tr v-for="month in laporanTransaksiData.months" :key="month.monthName" class="hover:bg-slate-50/50">
-                            <td class="px-6 py-4 font-semibold text-slate-800">{{ month.monthName }}</td>
-                            <td class="px-6 py-4 text-center font-bold text-slate-800">{{ formatNumber(month.totalQty) }} pcs</td>
-                            <td class="px-6 py-4 text-right">{{ formatCurrency(month.omsetKotor) }}</td>
-                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalDiskon) }}</td>
-                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalNilaiRetur) }}</td>
-                            <td class="px-6 py-4 text-right font-semibold text-blue-800">{{ formatCurrency(month.omsetBersih) }}</td>
-                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalHppTerjual) }}</td>
-                            <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaTransaksi) }}</td>
-                            <td class="px-6 py-4 text-right font-bold" :class="month.labaKotor >= 0 ? 'text-green-600' : 'text-red-600'">{{ formatCurrency(month.labaKotor) }}</td>
-                        </tr>
-                    </tbody>
-                    <tfoot class="border-t-2 border-slate-300 bg-slate-100/80">
-                        <tr class="font-bold text-slate-900">
-                            <td class="px-6 py-4">TOTAL {{ uiState.laporanTransaksiTahun }}</td>
-                            <td class="px-6 py-4 text-center text-lg">{{ formatNumber(laporanTransaksiData.yearlyTotals.totalQty) }} pcs</td>
-                            <td class="px-6 py-4 text-right">{{ formatCurrency(laporanTransaksiData.yearlyTotals.omsetKotor) }}</td>
-                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalDiskon) }}</td>
-                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalNilaiRetur) }}</td>
-                            <td class="px-6 py-4 text-right font-semibold text-blue-800">{{ formatCurrency(laporanTransaksiData.yearlyTotals.omsetBersih) }}</td>
-                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalHppTerjual) }}</td>
-                            <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalBiayaTransaksi) }}</td>
-                            <td class="px-6 py-4 text-right text-lg" :class="laporanTransaksiData.yearlyTotals.labaKotor >= 0 ? 'text-green-700' : 'text-red-700'">{{ formatCurrency(laporanTransaksiData.yearlyTotals.labaKotor) }}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
+<div v-if="activePage === 'laporan-transaksi'" class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
+<div v-if="isLaporanTransaksiLocked" class="mx-auto mt-16 max-w-sm rounded-2xl border bg-white p-8 text-center shadow-xl"><h3 class="text-xl font-bold">Halaman Terkunci</h3><p class="my-3 text-sm text-slate-600">Masukkan PIN keamanan Anda untuk membuka.</p><form @submit.prevent="unlockLaporanTransaksi"><input type="password" v-model="uiState.laporanTransaksiPinInput" placeholder="••••" class="w-full rounded-md border p-2 text-center text-lg"><p v-if="uiState.laporanTransaksiPinError" class="my-2 text-xs text-red-600">{{ uiState.laporanTransaksiPinError }}</p><button type="submit" class="mt-2 w-full rounded-lg bg-indigo-600 py-2.5 font-bold text-white">Buka</button></form></div>
+<div v-else class="mx-auto max-w-7xl space-y-5"><header class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Operasional</p><h2 class="text-3xl font-bold">Laporan Transaksi</h2><p class="mt-1 text-sm text-slate-600">Ringkasan pesanan berdasarkan tanggal terkirim. Total pencairan marketplace ada di Laporan Keuangan.</p></div><label class="text-sm font-medium">Tahun <input type="number" v-model.number="uiState.laporanTransaksiTahun" class="ml-2 w-28 rounded-md border p-2"></label></header>
+<div class="overflow-x-auto rounded-2xl border bg-white shadow-sm"><table class="w-full min-w-[760px] text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Bulan</th><th class="p-4 text-right">Pesanan diproses</th><th class="p-4 text-right">Qty tercatat</th><th class="p-4 text-right">HPP transaksi</th><th class="p-4 text-right">Dana dikonfirmasi</th><th class="p-4 text-right">Belum selesai</th></tr></thead><tbody class="divide-y"><tr v-for="month in laporanTransaksiData.months" :key="month.monthName"><td class="p-4 font-semibold capitalize">{{ month.monthName }}</td><td class="p-4 text-right">{{ formatNumber(month.totalOrders) }}</td><td class="p-4 text-right">{{ formatNumber(month.totalQty) }} pcs</td><td class="p-4 text-right">{{ formatCurrency(month.totalHpp) }}</td><td class="p-4 text-right text-emerald-700">{{ formatNumber(month.successfulOrders) }}</td><td class="p-4 text-right text-amber-700">{{ formatNumber(month.pendingOrders) }}</td></tr></tbody><tfoot class="border-t-2 bg-slate-50 font-bold"><tr><td class="p-4">TOTAL {{ uiState.laporanTransaksiTahun }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.totalOrders) }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.totalQty) }} pcs</td><td class="p-4 text-right">{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalHpp) }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.successfulOrders) }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.pendingOrders) }}</td></tr></tfoot></table></div>
+<p class="rounded-lg bg-indigo-50 p-3 text-xs text-indigo-900">Transaksi tetap tersimpan setelah antrean scan dibersihkan. Ringkasan ini menghitung data operasional dan HPP; total dana marketplace tidak dibagi ke setiap pesanan.</p></div></div>
 
 <div v-if="activePage === 'roas-dashboard'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
     <div class="max-w-7xl mx-auto animate-fade-in-up">
@@ -21659,85 +21328,11 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
 
-<div v-if="activePage === 'laporan-keuangan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-    
-    <div v-if="isLaporanKeuanganLocked" class="flex items-center justify-center h-full animate-fade-in">
-        <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
-            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-            </div>
-            <h3 class="text-xl font-bold text-slate-800 mb-2">Halaman Terkunci</h3>
-            <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan Anda untuk membuka.</p>
-            <form @submit.prevent="unlockLaporanKeuangan" class="w-full">
-                <input type="password" v-model="uiState.laporanKeuanganPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2">
-                <p v-if="uiState.laporanKeuanganPinError" class="text-red-500 text-xs mb-2">{{ uiState.laporanKeuanganPinError }}</p>
-                <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka</button>
-            </form>
-        </div>
-    </div>
-
-    <div v-else class="max-w-7xl mx-auto">
-    <div class="flex flex-wrap justify-between items-center gap-4 mb-8 animate-fade-in-up">
-        <div>
-            <h2 class="text-3xl font-bold text-slate-800">Laporan Keuangan Tahunan</h2>
-            <p class="text-slate-500 mt-1">Lihat ringkasan performa bisnis Anda dari bulan ke bulan.</p>
-        </div>
-        <div class="flex items-center gap-3">
-            <label for="tahun-laporan" class="text-sm font-medium">Pilih Tahun:</label>
-            <input type="number" id="tahun-laporan" v-model.number="uiState.laporanKeuanganTahun" class="w-32 p-2 border border-slate-300 rounded-md shadow-sm">
-        </div>
-    </div>
-
-    <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
-                <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-                    <tr>
-                        <th class="px-6 py-4 font-semibold">Bulan</th>
-                        <th class="px-6 py-4 font-semibold text-right">Omset Kotor</th>
-                        <th class="px-6 py-4 font-semibold text-right">Omset Bersih</th>
-                        <th class="px-6 py-4 font-semibold text-right">Laba Kotor</th>
-                        <th class="px-6 py-4 font-semibold text-right">Biaya Transaksi</th>
-                        <th class="px-6 py-4 font-semibold text-right">Biaya Produksi</th>
-                        <th class="px-6 py-4 font-semibold text-right">Biaya Operasional</th>
-                        <th class="px-6 py-4 font-semibold text-right bg-indigo-100 text-indigo-800">Laba Bersih</th>
-                    </tr>
-                </thead>
-
-                <tbody class="divide-y divide-slate-200/50">
-                    <tr v-for="month in laporanKeuanganData.months" :key="month.monthName" class="hover:bg-slate-50/50">
-                        <td class="px-6 py-4 font-semibold text-slate-800">{{ month.monthName }}</td>
-                        <td class="px-6 py-4 text-right">{{ formatCurrency(month.omsetKotor) }}</td>
-                        <td class="px-6 py-4 text-right">{{ formatCurrency(month.omsetBersih) }}</td>
-                        <td class="px-6 py-4 text-right">{{ formatCurrency(month.labaKotor) }}</td>
-                        <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaTransaksi || 0) }}</td>
-                        <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaProduksi || 0) }}</td>
-                        <td class="px-6 py-4 text-right text-red-600">-{{ formatCurrency(month.totalBiayaOperasional || 0) }}</td>
-                        <td class="px-6 py-4 text-right font-bold" :class="month.labaBersih >= 0 ? 'text-green-600' : 'text-red-600'">
-                            {{ formatCurrency(month.labaBersih) }}
-                        </td>
-                    </tr>
-                </tbody>
-
-                <tfoot class="border-t-2 border-slate-300 bg-slate-100/80">
-                    <tr class="font-bold text-slate-900">
-                        <td class="px-6 py-4">TOTAL {{ uiState.laporanKeuanganTahun }}</td>
-                        <td class="px-6 py-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.omsetKotor) }}</td>
-                        <td class="px-6 py-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.omsetBersih) }}</td>
-                        <td class="px-6 py-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.labaKotor) }}</td>
-                        <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.totalBiayaTransaksi || 0) }}</td>
-                        <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.totalBiayaProduksi || 0) }}</td>
-                        <td class="px-6 py-4 text-right text-red-700">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.totalBiayaOperasional || 0) }}</td>
-                        <td class="px-6 py-4 text-right text-lg" :class="laporanKeuanganData.yearlyTotals.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">
-                            {{ formatCurrency(laporanKeuanganData.yearlyTotals.labaBersih) }}
-                        </td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    </div>
-  </div>
-</div>
+<div v-if="activePage === 'laporan-keuangan'" class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+<div v-if="isLaporanKeuanganLocked" class="mx-auto mt-16 max-w-sm rounded-2xl border bg-white p-8 text-center shadow-xl"><h3 class="text-xl font-bold">Halaman Terkunci</h3><p class="my-3 text-sm text-slate-600">Masukkan PIN keamanan Anda untuk membuka.</p><form @submit.prevent="unlockLaporanKeuangan"><input type="password" v-model="uiState.laporanKeuanganPinInput" placeholder="••••" class="w-full rounded-md border p-2 text-center text-lg"><p v-if="uiState.laporanKeuanganPinError" class="my-2 text-xs text-red-600">{{ uiState.laporanKeuanganPinError }}</p><button type="submit" class="mt-2 w-full rounded-lg bg-indigo-600 py-2.5 font-bold text-white">Buka</button></form></div>
+<div v-else class="mx-auto max-w-7xl space-y-5"><header class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Keuangan</p><h2 class="text-3xl font-bold">Laporan Keuangan</h2><p class="mt-1 text-sm text-slate-600">Pencairan marketplace dicatat satu kali per toko/periode; HPP dihitung dari pesanan yang berhasil dikonfirmasi.</p></div><label class="text-sm font-medium">Tahun <input type="number" v-model.number="uiState.laporanKeuanganTahun" class="ml-2 w-28 rounded-md border p-2"></label></header>
+<div class="overflow-x-auto rounded-2xl border bg-white shadow-sm"><table class="w-full min-w-[860px] text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Bulan</th><th class="p-4 text-right">Total pencairan marketplace</th><th class="p-4 text-right">HPP pesanan berhasil</th><th class="p-4 text-right">Biaya transaksi terdata</th><th class="p-4 text-right">Biaya operasional</th><th class="p-4 text-right">Laba setelah HPP & biaya</th></tr></thead><tbody class="divide-y"><tr v-for="month in laporanKeuanganData.months" :key="month.monthName"><td class="p-4 font-semibold capitalize">{{ month.monthName }}</td><td class="p-4 text-right">{{ formatCurrency(month.payoutAmount) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.soldHpp) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.transactionFees) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.operatingCosts) }}</td><td class="p-4 text-right font-bold" :class="month.netProfit===null?'text-amber-700':month.netProfit>=0?'text-emerald-700':'text-red-700'">{{ month.netProfit===null?'Lengkapi total pencairan':formatCurrency(month.netProfit) }}</td></tr></tbody><tfoot class="border-t-2 bg-slate-50 font-bold"><tr><td class="p-4">TOTAL {{ uiState.laporanKeuanganTahun }}</td><td class="p-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.payoutAmount) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.soldHpp) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.transactionFees) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.operatingCosts) }}</td><td class="p-4 text-right">{{ laporanKeuanganData.yearlyTotals.netProfit===null?'Lengkapi total pencairan':formatCurrency(laporanKeuanganData.yearlyTotals.netProfit) }}</td></tr></tfoot></table></div>
+<p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Masukkan total dana dilepas dari ringkasan marketplace di halaman Impor Pesanan Terkirim. Jika total pencairan belum dicatat, laba ditampilkan sebagai belum lengkap agar tidak keliru dianggap Rp0.</p></div></div>
 
 <div v-if="activePage === 'statistik-penjualan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
 

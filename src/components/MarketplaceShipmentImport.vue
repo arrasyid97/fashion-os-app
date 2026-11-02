@@ -15,7 +15,7 @@ Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berst
                     <li>Scan ID pesanan yang paketnya siap dikirim. Scan hanya menyimpan ID sementara, belum membuat transaksi atau mengurangi stok.</li>
                     <li>Setelah data pengiriman tersedia, unggah ekspor menu Dikirim dari marketplace yang sama.</li>
                     <li>Fashion OS mencocokkan ID scan dengan ekspor, lalu membaca SKU, nama/variasi produk, dan jumlah dari file.</li>
-                    <li>Hanya pesanan yang cocok dan berstatus sudah dikirim yang diimpor. Laporan penghasilan diunggah kemudian pada tahap keuangan.</li>
+                    <li>Hanya pesanan yang cocok dan berstatus sudah dikirim yang diimpor. Setelah dana dilepas, tempel ID sukses pada bagian konfirmasi dan catat total pencairan periode tanpa mengunggah file.</li>
                 </ol>
                 <p class="mt-3 text-xs text-indigo-800">Antrean scan disimpan di browser/perangkat ini. Pastikan menggunakan browser yang sama sampai ekspor Dikirim diimpor.</p>
             </section>

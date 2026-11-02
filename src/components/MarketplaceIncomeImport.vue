@@ -2,43 +2,15 @@
     <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div>
             <p class="text-sm font-semibold uppercase tracking-wide text-emerald-700">Tahap keuangan</p>
-            <h2 class="mt-1 text-xl font-bold text-slate-900">Cocokkan Penghasilan Marketplace</h2>
+            <h2 class="mt-1 text-xl font-bold text-slate-900">Konfirmasi Pesanan Berhasil</h2>
             <p class="mt-2 max-w-3xl text-sm text-slate-600">
-                Tempel ID pesanan yang sudah kamu pastikan berhasil cair. Fashion OS akan mencari transaksi yang dibuat dari pesanan terkirim dan mengeluarkannya dari daftar tertunda.
+                Pilih marketplace atau toko, tempel ID pesanan yang sudah kamu pastikan berhasil cair, lalu cocokkan dengan transaksi di Fashion OS. Tidak perlu mengunggah file penghasilan.
             </p>
         </div>
 
-        <div class="mt-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">
-            Untuk Shopee, unggah laporan “Dana sudah dilepas” agar total pencairan dan periode tersimpan satu kali. Tempel hanya ID yang sudah kamu saring sebagai penjualan sukses. File “Seller Fee” membantu memeriksa ID, tetapi nilai total pencairan tidak dibagi-bagikan ke tiap pesanan.
-        </div>
-
-        
-        <div class="mt-4 grid gap-4 md:grid-cols-[1fr_1fr]">
-            <label class="block">
-                <span class="mb-1 block text-sm font-medium text-slate-700">Marketplace</span>
-                <select v-model="selectedMarketplaceId" @change="parseSelectedSheet" class="w-full rounded-lg border border-slate-300 p-2 text-sm">
-                    <option value="">Pilih marketplace</option>
-                    <option v-for="marketplace in marketplaces" :key="marketplace.id" :value="marketplace.id">{{ marketplace.name }}</option>
-                </select>
-            </label>
-            <label class="block">
-                <span class="mb-1 block text-sm font-medium text-slate-700">File data penghasilan</span>
-                <input type="file" accept=".xlsx,.xls,.csv" @change="handleFile" class="block w-full rounded-lg border border-slate-300 p-2 text-sm">
-            </label>
-            <label v-if="sheetNames.length > 1" class="block">
-                <span class="mb-1 block text-sm font-medium text-slate-700">Tab yang diimpor</span>
-                <select v-model="selectedSheet" @change="parseSelectedSheet" class="w-full rounded-lg border border-slate-300 p-2 text-sm">
-                    <option v-for="name in sheetNames" :key="name" :value="name">{{ name }}</option>
-                </select>
-            </label>
-        </div>
-        <p v-if="fileName" class="mt-2 text-xs text-slate-500">File: {{ fileName }}</p>
-        <p v-if="fileError" class="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ fileError }}</p>
-
-        <div v-if="shopeeReport" class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
-            <p class="font-semibold">Laporan Shopee dikenali dari tab Summary dan Seller Fee.</p>
-            <p class="mt-1">Periode: {{ shopeeReport.periodStart || '—' }} sampai {{ shopeeReport.periodEnd || '—' }} · Total yang dilepas: {{ formatCurrency(shopeeReport.totalReleased) }}</p>
-            <p class="mt-1 text-xs">Ditemukan {{ shopeeReport.orderIds.length }} ID di Seller Fee. ID dengan biaya nol tetap bisa dipilih jika kamu sudah memastikan pesanan itu sukses.</p>
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+            <label class="block"><span class="mb-1 block text-sm font-medium text-slate-700">Marketplace / nama toko</span><select v-model="selectedMarketplaceId" class="w-full rounded-lg border border-slate-300 p-2 text-sm"><option value="">Pilih marketplace / toko</option><option v-for="marketplace in marketplaces" :key="marketplace.id" :value="marketplace.id">{{ marketplace.name }}</option></select></label>
+            <p class="self-end rounded-lg bg-amber-50 p-3 text-xs text-amber-900">ID yang tidak ditempel tetap berstatus belum selesai. Fashion OS tidak menebak nilai penghasilan per pesanan dari ID saja.</p>
         </div>
 
         <div class="mt-5 rounded-xl border border-slate-200 p-4">
@@ -61,60 +33,25 @@
                     </tbody>
                 </table>
             </div>
-            <p v-if="manualRows.length" class="mt-3 text-xs text-slate-500">Total payout Shopee dicatat sebagai satu pemasukan untuk periode laporan. Fashion OS tidak membuat nilai penghasilan per pesanan dari angka agregat.</p>
-            <button v-if="manualRows.length || shopeeReport" type="button" @click="saveConfirmedIds" :disabled="isSavingManual || manualRows.some(row => row.error)" class="mt-4 rounded-lg bg-emerald-600 px-5 py-3 font-bold text-white disabled:bg-slate-300">
-                {{ isSavingManual ? 'Menyimpan…' : manualRows.some(row => !row.alreadySettled) ? 'Konfirmasi ID sukses cair' : 'Simpan total pencairan Shopee' }}
+            <p v-if="manualRows.length" class="mt-3 text-xs text-slate-500">Konfirmasi ID mengubah status saja. Penghasilan/laba periode dihitung setelah total dana dilepas dicatat pada kotak di bawah.</p>
+            <button v-if="manualRows.length" type="button" @click="saveConfirmedIds" :disabled="isSavingManual || manualRows.some(row => row.error) || manualRows.every(row => row.alreadySettled)" class="mt-4 rounded-lg bg-emerald-600 px-5 py-3 font-bold text-white disabled:bg-slate-300">
+                {{ isSavingManual ? 'Menyimpan…' : 'Konfirmasi dana sudah dilepas' }}
             </button>
+            <div class="mt-5 rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+                <h3 class="font-semibold text-slate-900">Catat total pencairan periode (tanpa unggah file)</h3>
+                <p class="mt-1 text-xs text-slate-600">Masukkan nilai “Total yang Dilepas” dari ringkasan marketplace. Simpan satu kali untuk toko dan periode yang sama. Nilai tidak dibagi ke tiap pesanan.</p>
+                <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                    <label class="block"><span class="mb-1 block text-xs">Periode mulai</span><input v-model="payoutPeriodStart" type="date" class="w-full rounded-lg border p-2 text-sm"></label>
+                    <label class="block"><span class="mb-1 block text-xs">Periode selesai</span><input v-model="payoutPeriodEnd" type="date" class="w-full rounded-lg border p-2 text-sm"></label>
+                    <label class="block"><span class="mb-1 block text-xs">Total dana dilepas (Rp)</span><input v-model="payoutAmount" type="number" min="0" step="1" class="w-full rounded-lg border p-2 text-sm" placeholder="Contoh: 3345930"></label>
+                </div>
+                <button type="button" @click="savePayoutSummary" :disabled="isSavingPayout || !selectedMarketplaceId || !payoutAmount || Number(payoutAmount) <= 0 || payoutPeriodStart > payoutPeriodEnd" class="mt-3 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">{{ isSavingPayout ? 'Menyimpan…' : 'Simpan total pencairan periode' }}</button>
+                <p v-if="payoutSummaryMessage" class="mt-3 rounded-lg bg-white p-3 text-sm text-emerald-800">{{ payoutSummaryMessage }}</p>
+                <p v-if="payoutSummaryError" class="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ payoutSummaryError }}</p>
+            </div>
             <p v-if="manualMessage" class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ manualMessage }}</p>
         </div>
 
-        <div v-if="rows.length || rowErrors.length" class="mt-5">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h3 class="font-bold text-slate-900">Periksa sebelum menyimpan</h3>
-                    <p class="mt-1 text-xs text-slate-500">Setiap ID pesanan harus cocok dengan transaksi yang diimpor dari file pesanan terkirim.</p>
-                </div>
-                <div class="flex gap-2 text-xs font-semibold">
-                    <span class="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">{{ rows.length }} baris siap</span>
-                    <span class="rounded-full bg-red-100 px-3 py-1 text-red-800">{{ rowErrors.length }} bermasalah</span>
-                </div>
-            </div>
-
-            <div v-if="rowErrors.length" class="mt-4 max-h-48 overflow-auto rounded-xl border border-red-200 bg-red-50 p-3">
-                <ul class="list-inside list-disc space-y-1 text-xs text-red-700">
-                    <li v-for="issue in rowErrors.slice(0, 100)" :key="issue.key">Baris {{ issue.row }}: {{ issue.message }}</li>
-                </ul>
-                <p v-if="rowErrors.length > 100" class="mt-2 text-xs text-red-700">Dan {{ rowErrors.length - 100 }} masalah lainnya.</p>
-            </div>
-
-            <div v-if="rows.length" class="mt-4 overflow-x-auto rounded-xl border border-slate-200">
-                <table class="w-full min-w-[700px] text-left text-sm">
-                    <thead class="bg-slate-50 text-xs uppercase text-slate-500">
-                        <tr><th class="p-3">Channel</th><th class="p-3">ID Pesanan</th><th class="p-3">Penjualan Kotor</th><th class="p-3">Potongan</th><th class="p-3">Penghasilan Bersih</th><th class="p-3">Pencairan</th></tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr v-for="row in rows.slice(0, 100)" :key="row.key">
-                            <td class="p-3">{{ row.channelName }}</td>
-                            <td class="p-3 font-medium">{{ row.orderId }}</td>
-                            <td class="p-3">{{ formatCurrency(row.grossIncome) }}</td>
-                            <td class="p-3">{{ formatCurrency(row.marketplaceFeesTotal) }}</td>
-                            <td class="p-3 font-semibold text-emerald-700">{{ formatCurrency(row.netIncome) }}</td>
-                            <td class="p-3">{{ row.payoutStatus }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <p v-if="importError" class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ importError }}</p>
-            <p v-if="importMessage" class="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ importMessage }}</p>
-
-            <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                <p class="max-w-2xl text-xs text-slate-500">Impor ulang memperbarui data keuangan transaksi yang sama dan tidak membuat transaksi baru.</p>
-                <button type="button" @click="saveIncome" :disabled="!canSave" class="rounded-lg bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300">
-                    {{ isSaving ? 'Menyimpan…' : 'Simpan Penghasilan' }}
-                </button>
-            </div>
-        </div>
         <div class="mt-5 rounded-2xl border border-red-100 bg-white p-5">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div><h3 class="font-bold text-slate-900">Pesanan belum terselesaikan</h3><p class="mt-1 text-sm text-slate-500">Kalender menandai tanggal transaksi yang masih menunggu konfirmasi dana.</p></div>
@@ -175,6 +112,12 @@ const manualMessage = ref('');
 const isPreparing = ref(false);
 const isSavingManual = ref(false);
 const shopeeReport = ref(null);
+const payoutAmount = ref('');
+const payoutPeriodStart = ref(localDateKey(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+const payoutPeriodEnd = ref(localDateKey(new Date()));
+const isSavingPayout = ref(false);
+const payoutSummaryMessage = ref('');
+const payoutSummaryError = ref('');
 const pendingTransactions = ref([]);
 const pendingLoading = ref(false);
 const resolutionMessage = ref('');
@@ -545,43 +488,61 @@ async function saveConfirmedIds() {
     isSavingManual.value = true; manualError.value = ''; manualMessage.value = '';
     try {
         const ready = manualRows.value.filter(row => !row.alreadySettled);
-        const channel = marketplaceById(selectedMarketplaceId.value);
+        if (!ready.length) { manualMessage.value = 'Semua ID pada daftar ini sudah pernah dikonfirmasi.'; return; }
+        const updated = [];
         for (let offset = 0; offset < ready.length; offset += 50) {
-            const batch = writeBatch(db);
+            const batch = writeBatch(db), saved = [];
             ready.slice(offset, offset + 50).forEach(row => row.transactions.forEach(tx => {
-                batch.update(doc(db, 'transactions', tx.id), {
+                const update = {
                     statusPencairan: 'Sudah Cair',
-                    statusDataMarketplace: 'cocok',
-                    penghasilanBersihMarketplace: Number(tx.penghasilanBersihMarketplace) || 0,
-                    sumberDataKeuangan: tx.penghasilanBersihMarketplace ? tx.sumberDataKeuangan : 'konfirmasi_id_sukses',
-                    tanggalPencairan: new Date(),
+                    statusDataMarketplace: 'id_sukses_terkonfirmasi',
+                    sumberDataKeuangan: 'konfirmasi_id_sukses',
+                    tanggalPencairan: new Date(payoutPeriodEnd.value + 'T12:00:00'),
+                    periodePencairanMulai: payoutPeriodStart.value,
+                    periodePencairanSelesai: payoutPeriodEnd.value,
                     konfirmasiSuksesCairManual: true
-                });
+                };
+                batch.update(doc(db, 'transactions', tx.id), update);
+                saved.push({ ...tx, ...update, id: tx.id });
             }));
             await batch.commit();
+            updated.push(...saved);
         }
-        const report = shopeeReport.value;
-        if (report && report.totalReleased && report.periodStart && report.periodEnd) {
-            const safeChannel = norm(channel?.id || report.channelId).replace(/[^a-z0-9]/g, '');
-            const safeStart = report.periodStart.replace(/[^0-9]/g, '');
-            const safeEnd = report.periodEnd.replace(/[^0-9]/g, '');
-            const financeId = 'marketplace-income-' + safeChannel + '-' + safeStart + '-' + safeEnd;
-            await setDoc(doc(db, 'keuangan', financeId), {
-                userId: props.userId, jenis: 'pemasukan_lain', kategori: 'Penghasilan Marketplace',
-                jumlah: report.totalReleased, amount: report.totalReleased, nominal: report.totalReleased,
-                tanggal: parseDate(report.periodEnd) || new Date(), periodeMulai: report.periodStart, periodeSelesai: report.periodEnd,
-                channel: channel?.name || report.channelName, channelId: channel?.id || report.channelId,
-                sumber: 'laporan_penghasilan_marketplace', catatan: 'Total yang Dilepas Shopee. Disimpan satu kali per marketplace dan periode laporan.',
-                status: 'aktif', isMarketplaceIncomeReport: true
-            }, { merge: true });
-        }
-        manualMessage.value = ready.length + ' ID pesanan dikonfirmasi. ID yang tidak ditempel tetap tertunda.' + (report ? ' Total pencairan periode tersimpan satu kali.' : '');
-        manualRows.value = [];
-        pastedOrderIds.value = '';
+        const readyIds = ready.map(row => row.orderId);
+        manualRows.value = manualRows.value.map(row => readyIds.includes(row.orderId) ? { ...row, alreadySettled: true } : row);
+        manualMessage.value = readyIds.length + ' ID dikonfirmasi berhasil. Data tetap tersimpan di Riwayat Transaksi; nilai penghasilan per pesanan tidak dibuat dari ID saja.';
         await loadPendingTransactions();
-        emit('completed', { financeUpdate: true, confirmedOrderIds: ready.map(row => row.orderId) });
-    } catch (error) { manualError.value = error?.message || 'Konfirmasi ID gagal disimpan.'; }
-    finally { isSavingManual.value = false; }
+        emit('completed', { transactions: updated, financeUpdate: true });
+    } catch (error) {
+        manualError.value = error?.message || 'Konfirmasi ID gagal disimpan.';
+    } finally { isSavingManual.value = false; }
+}
+async function savePayoutSummary() {
+    if (isSavingPayout.value || !selectedMarketplaceId.value || !payoutAmount.value || Number(payoutAmount.value) <= 0 || payoutPeriodStart.value > payoutPeriodEnd.value) return;
+    isSavingPayout.value = true; payoutSummaryError.value = ''; payoutSummaryMessage.value = '';
+    try {
+        const marketplace = marketplaceById(selectedMarketplaceId.value);
+        const safeChannel = String(marketplace.id || marketplace.name).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const start = payoutPeriodStart.value.replace(/[^0-9]/g, '');
+        const end = payoutPeriodEnd.value.replace(/[^0-9]/g, '');
+        const id = 'marketplace-income-' + safeChannel + '-' + start + '-' + end;
+        const amount = Math.round(Number(payoutAmount.value));
+        const record = {
+            id, userId: props.userId, jenis: 'pemasukan_lain', kategori: 'Penghasilan Marketplace',
+            jumlah: amount, amount, nominal: amount,
+            tanggal: new Date(payoutPeriodEnd.value + 'T12:00:00'),
+            periodeMulai: payoutPeriodStart.value, periodeSelesai: payoutPeriodEnd.value,
+            channel: marketplace.name, channelId: marketplace.id,
+            sumber: 'ringkasan_pencairan_manual',
+            catatan: 'Total dana dilepas dari ringkasan marketplace; disimpan satu kali per toko dan periode.',
+            status: 'aktif', isMarketplaceIncomeReport: true
+        };
+        await setDoc(doc(db, 'keuangan', id), record, { merge: true });
+        payoutSummaryMessage.value = 'Total pencairan ' + formatCurrency(amount) + ' tersimpan untuk ' + marketplace.name + '. Periode sama akan memperbarui catatan ini, bukan menggandakannya.';
+        emit('completed', { financeUpdate: true, keuanganRecord: record });
+    } catch (error) {
+        payoutSummaryError.value = error?.message || 'Total pencairan gagal disimpan.';
+    } finally { isSavingPayout.value = false; }
 }
 async function markReturned(orderId, channelId) {
     if (!window.confirm('Konfirmasi bahwa pesanan ini sedang/terbukti retur? Ini tidak mengembalikan stok. Stok retur harus dicatat di Manajemen Retur setelah barang diterima.')) return;
