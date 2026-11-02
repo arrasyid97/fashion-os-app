@@ -8252,20 +8252,6 @@ const sortedProduk = computed(() => {
     });
 });
 
-const commissionModelComputed = (modelName, channelId) => computed({
-    get() {
-        return state.commissions.perModel[modelName]?.[channelId] ? state.commissions.perModel[modelName][channelId] + '%' : '';
-    },
-    set(newValue) {
-        if (!state.commissions.perModel[modelName]) {
-            state.commissions.perModel[modelName] = {};
-        }
-        // [PERBAIKAN SINI]: Set nilai PURE number, bukan string dengan '%'
-        state.commissions.perModel[modelName][channelId] = parsePercentageInput(newValue);
-    }
-});
-
-
 const filteredPurchaseOrders = computed(() => {
     let orders = [...state.purchaseOrders];
 
@@ -10406,33 +10392,6 @@ const serviceFee = getMarketplaceFeeValue(mp.layanan, calculatedPrice);
             perOrderFee
         }
     };
-}
-
-async function saveCommissionSettings() {
-    if (!currentUser.value) {
-        return alert("Aksi tidak diizinkan.");
-    }
-
-    isSaving.value = true;
-    try {
-        const userId = currentUser.value.uid;
-        const commissionsRef = doc(db, "product_commissions", userId)
-        
-        // Langsung simpan state komisi saat ini ke database
-        await setDoc(commissionsRef, {
-            perModel: JSON.parse(JSON.stringify(state.commissions.perModel)) || {},
-            userId: userId
-        }, { merge: true });
-
-        alert('Pengaturan komisi berhasil disimpan!');
-        uiState.activeAccordion = null; // Menutup panel setelah simpan
-
-    } catch (error) {
-        console.error("Gagal menyimpan pengaturan komisi:", error);
-        alert("Gagal menyimpan pengaturan komisi.");
-    } finally {
-        isSaving.value = false;
-    }
 }
 
 async function recordBagiHasilPayment() {
