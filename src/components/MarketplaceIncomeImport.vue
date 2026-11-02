@@ -1,7 +1,7 @@
 <template>
     <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div>
-            <p class="text-sm font-semibold uppercase tracking-wide text-emerald-700">Tahap keuangan</p>
+            <p class="text-sm font-semibold uppercase tracking-wide text-emerald-700">Konfirmasi dana</p>
             <h2 class="mt-1 text-xl font-bold text-slate-900">Konfirmasi Pesanan Berhasil</h2>
             <p class="mt-2 max-w-3xl text-sm text-slate-600">
                 Pilih marketplace atau toko, tempel ID pesanan yang sudah kamu pastikan berhasil cair, lalu cocokkan dengan transaksi di Fashion OS. Tidak perlu mengunggah file penghasilan.
@@ -195,6 +195,7 @@ function chosenMarketplace(sourceName) {
     return props.marketplaces.find(m => key.includes('tiktok') && norm(m.name).includes('tiktok')) ||
         props.marketplaces.find(m => key.includes('shopee') && norm(m.name).includes('shopee')) || null;
 }
+// eslint-disable-next-line no-unused-vars
 function handleFile(event) {
     const file = event.target.files?.[0];
     fileError.value = ''; importError.value = ''; importMessage.value = '';
@@ -378,6 +379,7 @@ function parseGeneric(sheet) {
     });
     pushErrorsAndRows(result, errors);
 }
+// eslint-disable-next-line no-unused-vars
 async function saveIncome() {
     if (!canSave.value) return;
     isSaving.value = true; importError.value = ''; importMessage.value = '';

@@ -4170,6 +4170,8 @@ async function proceedToPartnerPayment() {
     }
 }
 
+// eslint-disable-next-line no-unused-vars
+
 function handlePosSubmit() {
     if (uiState.pos_order_id) {
         alert("Selesaikan transaksi saat ini terlebih dahulu!");
@@ -4208,6 +4210,7 @@ function handlePosSearch() {
 }
 
 // PASTIKAN FUNGSI INI ADA (dari panduan sebelumnya)
+// eslint-disable-next-line no-unused-vars
 function selectPosRecommendation(product) {
     if (uiState.pos_order_id) {
         alert("Selesaikan transaksi saat ini terlebih dahulu!");
@@ -9318,6 +9321,8 @@ function requestProtectedExport(action) {
     return requestPinProtectedAction('exportData', action, 'melakukan export data');
 }
 
+// eslint-disable-next-line no-unused-vars
+
 function openProtectedTransactionDetail(transaction) {
     return requestPinProtectedAction(
         'transactionDetail',
@@ -9994,6 +9999,8 @@ function addProductToCart(product, qty = 1) {
     }
 }
 
+// eslint-disable-next-line no-unused-vars
+
 function updateCartItemQty(sku, delta) {
     const item = activeCart.value.find(i => i.sku === sku);
     if (item) {
@@ -10005,6 +10012,7 @@ function removeFromCart(sku) {
     const itemIndex = activeCart.value.findIndex(i => i.sku === sku);
     if (itemIndex > -1) activeCart.value.splice(itemIndex, 1);
 }
+// eslint-disable-next-line no-unused-vars
 function confirmCompleteTransaction() {
     if (!uiState.pos_order_id) {
         return alert("Harap scan resi atau masukkan ID Pesanan Marketplace terlebih dahulu.");
@@ -10592,6 +10600,8 @@ function renderCharts() {
         options: { responsive: true, maintainAspectRatio: false } 
     });
 }
+
+// eslint-disable-next-line no-unused-vars
 
 async function exportTransactionsToExcel() {
     // 1. Ambil data yang sudah difilter dari tabel (filteredTransaksi sudah ada di kode Anda)
@@ -12875,6 +12885,8 @@ function openPanduanLink(link) {
         changePage(link.page);
     }
 }
+
+// eslint-disable-next-line no-unused-vars
 
 async function deleteTransaction(transactionId) {
     if (!confirm(`Anda yakin ingin menghapus transaksi ID: ${transactionId}? Stok produk akan dikembalikan.`)) {

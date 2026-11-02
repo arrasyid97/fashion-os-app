@@ -11,6 +11,7 @@
 </section></div></div>
 </template>
 <script setup>
+/* global defineProps */
 import {computed,ref} from 'vue';
 const props=defineProps({transactions:{type:Array,default:()=>[]},marketplaces:{type:Array,default:()=>[]}});
 const search=ref(''),channelFilter=ref('all'),statusFilter=ref('all'),norm=v=>String(v??'').trim().toLowerCase().replace(/[^a-z0-9]/g,'');
