@@ -40,7 +40,7 @@
             </button>
             <div class="mt-5 rounded-lg border border-indigo-100 bg-indigo-50 p-4">
                 <h3 class="font-semibold text-slate-900">Catat total pencairan periode (tanpa unggah file)</h3>
-                <p class="mt-1 text-xs text-slate-600">Masukkan nilai “Total yang Dilepas” dari ringkasan marketplace. Simpan satu kali untuk toko dan periode yang sama. Nilai tidak dibagi ke tiap pesanan.</p>
+                <p class="mt-1 text-xs text-slate-600">Masukkan nilai “Total yang Dilepas” dari ringkasan marketplace. Nilai baru masuk ke dashboard dan laporan setelah tombol simpan ditekan. Simpan satu kali untuk toko dan periode yang sama; nilai tidak dibagi ke tiap pesanan.</p>
                 <div class="mt-3 grid gap-3 sm:grid-cols-3">
                     <label class="block"><span class="mb-1 block text-xs">Periode mulai</span><input v-model="payoutPeriodStart" type="date" class="w-full rounded-lg border p-2 text-sm"></label>
                     <label class="block"><span class="mb-1 block text-xs">Periode selesai</span><input v-model="payoutPeriodEnd" type="date" class="w-full rounded-lg border p-2 text-sm"></label>
@@ -48,7 +48,8 @@
                 </div>
                 <button type="button" @click="savePayoutSummary" :disabled="isSavingPayout || !selectedMarketplaceId || !payoutAmount || Number(payoutAmount) <= 0 || payoutPeriodStart > payoutPeriodEnd" class="mt-3 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">{{ isSavingPayout ? 'Menyimpan…' : 'Simpan total pencairan periode' }}</button>
                 <div v-if="manualRows.length && payoutAmount && !manualRows.some(row => row.error)" class="mt-4 rounded-lg border p-4" :class="Number(payoutAmount) - manualRows.reduce((sum,row) => sum + row.hpp,0) >= 0 ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'">
-                    <p class="text-sm font-semibold">Selisih dana dilepas dikurangi HPP pesanan yang cocok</p>
+                    <p class="text-xs font-bold uppercase tracking-wide">Pratinjau saja · belum tersimpan</p>
+                    <p class="mt-1 text-sm font-semibold">Perkiraan selisih dana dilepas dikurangi HPP pesanan yang cocok</p>
                     <p class="mt-1 text-2xl font-bold" :class="Number(payoutAmount) - manualRows.reduce((sum,row) => sum + row.hpp,0) >= 0 ? 'text-emerald-700' : 'text-red-700'">{{ formatCurrency(Number(payoutAmount) - manualRows.reduce((sum,row) => sum + row.hpp,0)) }} · {{ Number(payoutAmount) - manualRows.reduce((sum,row) => sum + row.hpp,0) >= 0 ? 'Laba' : 'Rugi' }}</p>
                     <p class="mt-1 text-xs text-slate-600">Perkiraan ini benar jika semua ID sukses dari periode yang sama sudah diperiksa. Belum termasuk biaya operasional lain. Setelah tersimpan, perhitungan lengkap masuk ke Laporan Keuangan.</p>
                 </div>
