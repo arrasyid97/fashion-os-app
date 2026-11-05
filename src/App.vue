@@ -375,7 +375,7 @@ massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     pengaturanModelProdukSearch: '',
     pos_scan_input: '', // Untuk input scan di halaman POS
     pos_order_id: '',   // Untuk menyimpan ID pesanan yang di-scan   
-    posDateFilter: 'today',
+    posDateFilter: 'all_time',
     posStartDate: '',
     posEndDate: '',
     posBulan: new Date().getMonth() + 1,
