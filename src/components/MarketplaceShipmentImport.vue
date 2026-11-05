@@ -29,10 +29,10 @@ Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berst
                         </select>
                     </label>
                     <label class="block min-w-64 flex-1">
-                        <span class="mb-1 block text-sm font-medium text-slate-700">Scan ID Pesanan / Paket / Resi</span>
-                        <input ref="scanInput" v-model="scanInputValue" @keydown.enter.prevent="addScannedPackage" autocomplete="off" placeholder="Arahkan scanner ke barcode, lalu tekan Enter" class="w-full rounded-lg border border-slate-300 p-2">
+                        <span class="mb-1 block text-sm font-medium text-slate-700">Scan atau tempel ID Pesanan / Paket / Resi</span>
+                        <input ref="scanInput" v-model="scanInputValue" @paste="pasteScannedPackages" @keydown.enter.prevent="addScannedPackage" autocomplete="off" placeholder="Tempel daftar ID dari Sheet, atau scan satu per satu (otomatis tersimpan saat tekan Enter)" class="w-full rounded-lg border border-slate-300 p-2">
+                        <span class="mt-1 block text-xs text-slate-500">Bisa tempel beberapa ID sekaligus dari satu kolom Google Sheet atau Excel. Saat memakai scanner, arahkan ke kolom ini; tiap scan otomatis tersimpan saat scanner mengirim Enter.</span>
                     </label>
-                    <button type="button" @click="addScannedPackage" :disabled="!scanInputValue.trim() || !scanChannelId" class="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white disabled:bg-slate-300">Tambah scan</button>
                 </div>
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
                     <p class="text-sm text-slate-600">{{ scanQueue.length }} ID tersimpan · {{ matchedPackages.length }} cocok dengan file</p>
@@ -129,8 +129,9 @@ Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berst
                 <div v-if="importMessage" class="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ importMessage }}</div>
 
                 <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                    <p v-if="importDisabledReason" class="w-full rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{{ importDisabledReason }}</p>
                     <p class="max-w-2xl text-xs text-slate-500">Baris bermasalah menghentikan seluruh impor agar data tidak masuk setengah-setengah. Pesanan yang pernah tercatat akan dilewati sebagai duplikat.</p>
-                    <button type="button" @click="importPackages"  :disabled="!canImport" class="rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300">
+                    <button type="button" @click="importPackages" :disabled="!canImport" class="rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300">
                         {{ isImporting ? 'Mengimpor…' : 'Impor pesanan yang cocok' }}
                     </button>
                 </div>
@@ -184,6 +185,15 @@ const canImport = computed(() =>
     rowErrors.value.length === 0 &&
     ambiguousScans.value.length === 0
 );
+const importDisabledReason = computed(() => {
+    if (isImporting.value) return 'Impor sedang berjalan. Tunggu sampai proses selesai.';
+    if (!props.userId) return 'Akun belum siap atau sesi sudah berakhir. Muat ulang halaman dan pastikan Anda sudah masuk.';
+    if (!props.subscriptionActive) return 'Langganan Fashion OS tidak aktif atau belum terbaca. Karena itu impor masih dikunci; status ini berbeda dari paket Blaze Firebase.';
+    if (rowErrors.value.length) return 'Impor dikunci karena ada ' + rowErrors.value.length + ' baris bermasalah. Periksa pesan kesalahan di atas.';
+    if (ambiguousScans.value.length) return 'Ada ID scan yang cocok dengan lebih dari satu paket. Gunakan ID paket atau resi agar tidak salah memilih.';
+    if (!matchedPackages.value.length) return 'Belum ada ID scan yang cocok dengan file. Pastikan marketplace pilihan sama dan ID ada di file ekspor.';
+    return '';
+});
 onMounted(() => {
     loadScanQueue();
     if (props.marketplaces.length) {
@@ -293,24 +303,57 @@ function loadScanQueue() {
     } catch { scanQueue.value = []; }
 }
 
-function addScannedPackage() {
-    const value = cleanText(scanInputValue.value);
+function queueScannedValues(values) {
     const marketplace = props.marketplaces.find(item => item.id === scanChannelId.value);
-    if (!value || !marketplace) return;
-    if (scanQueue.value.some(scan => normalizeKey(scan.value) === normalizeKey(value) && scan.channelId === marketplace.id)) {
-        importError.value = 'ID pesanan ini sudah tersimpan di antrean.';
-        scanInputValue.value = '';
-        scanInput.value?.focus();
-        return;
+    const cleanedValues = Array.from(new Set(values.map(cleanText).filter(Boolean)));
+    if (!marketplace) {
+        importError.value = 'Pilih marketplace yang sesuai sebelum menempel atau scan ID.';
+        return { added: 0, duplicates: cleanedValues.length };
     }
-    scanQueue.value.push({
-        id: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        value, channelId: marketplace.id, channelName: marketplace.name, scannedAt: new Date().toISOString()
+    let added = 0;
+    let duplicates = 0;
+    const knownIds = new Set(scanQueue.value
+        .filter(scan => scan.channelId === marketplace.id)
+        .map(scan => normalizeKey(scan.value)));
+    cleanedValues.forEach(value => {
+        const key = normalizeKey(value);
+        if (!key || knownIds.has(key)) {
+            duplicates += 1;
+            return;
+        }
+        knownIds.add(key);
+        scanQueue.value.push({
+            id: `scan-${Date.now()}-${added}-${Math.random().toString(36).slice(2, 8)}`,
+            value, channelId: marketplace.id, channelName: marketplace.name, scannedAt: new Date().toISOString()
+        });
+        added += 1;
     });
     importError.value = '';
-    importMessage.value = '';
+    importMessage.value = added
+        ? added + ' ID berhasil ditambahkan' + (duplicates ? '; ' + duplicates + ' ID duplikat dilewati.' : '.')
+        : 'Tidak ada ID baru yang ditambahkan; ID tersebut sudah ada di antrean.';
+    return { added, duplicates };
+}
+
+function addScannedPackage() {
+    const value = cleanText(scanInputValue.value);
+    if (!value) return;
+    queueScannedValues([value]);
     scanInputValue.value = '';
-    scanInput.value?.focus();
+    nextTick(() => scanInput.value?.focus());
+}
+
+function pasteScannedPackages(event) {
+    const pastedText = event.clipboardData?.getData('text');
+    if (!pastedText) return;
+    event.preventDefault();
+    const values = pastedText
+        .split(/[\r\n\t,;]+/)
+        .map(cleanText)
+        .filter(value => value && !['idpesanan', 'orderid', 'marketplaceorderid'].includes(normalizeKey(value)));
+    queueScannedValues(values);
+    scanInputValue.value = '';
+    nextTick(() => scanInput.value?.focus());
 }
 
 function removeScan(scanId) {
