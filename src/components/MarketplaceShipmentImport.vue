@@ -628,8 +628,7 @@ async function importPackages() {
         const needsLegacyStatusRepair = transaction =>
             transaction?.inputSource === 'marketplace_shipped_export' &&
             normalizeKey(transaction.statusPencairan) === 'sudahcair' &&
-            transaction.konfirmasiSuksesCairManual !== true &&
-            normalizeKey(transaction.statusDataMarketplace) !== 'cocok';
+            transaction.konfirmasiSuksesCairManual !== true;
 
         const toImport = selectedPackages.filter(group => {
             const matchingOrders = existing.filter(transaction =>
