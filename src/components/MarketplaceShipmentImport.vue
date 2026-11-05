@@ -145,7 +145,7 @@ Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berst
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase.js';
-import { collection, doc, getDocs, increment, query, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, increment, query, where, writeBatch } from 'firebase/firestore';
 
 const props = defineProps({
     products: { type: Array, default: () => [] },
@@ -625,6 +625,12 @@ async function importPackages() {
         const duplicates = [];
         const repairs = [];
         const ambiguous = [];
+        const needsLegacyStatusRepair = transaction =>
+            transaction?.inputSource === 'marketplace_shipped_export' &&
+            normalizeKey(transaction.statusPencairan) === 'sudahcair' &&
+            transaction.konfirmasiSuksesCairManual !== true &&
+            normalizeKey(transaction.statusDataMarketplace) !== 'cocok';
+
         const toImport = selectedPackages.filter(group => {
             const matchingOrders = existing.filter(transaction =>
                 normalizeKey(transaction.marketplaceOrderId) === normalizeKey(group.orderId) &&
@@ -642,8 +648,8 @@ async function importPackages() {
                     Boolean(exactPackage.statusDataMarketplace) &&
                     Array.isArray(exactPackage.items) &&
                     exactPackage.items.length > 0;
-                if (hasCurrentShipmentData) duplicates.push(group);
-                else repairs.push({ group, transaction: exactPackage });
+                if (hasCurrentShipmentData && !needsLegacyStatusRepair(exactPackage)) duplicates.push(group);
+                else repairs.push({ group, transaction: exactPackage, resetUnconfirmedPaid: needsLegacyStatusRepair(exactPackage) });
                 return false;
             }
             if (!pkgKey && matchingOrders.length) {
@@ -653,8 +659,8 @@ async function importPackages() {
                     Boolean(existingTransaction.statusDataMarketplace) &&
                     Array.isArray(existingTransaction.items) &&
                     existingTransaction.items.length > 0;
-                if (hasCurrentShipmentData) duplicates.push(group);
-                else repairs.push({ group, transaction: existingTransaction });
+                if (hasCurrentShipmentData && !needsLegacyStatusRepair(existingTransaction)) duplicates.push(group);
+                else repairs.push({ group, transaction: existingTransaction, resetUnconfirmedPaid: needsLegacyStatusRepair(existingTransaction) });
                 return false;
             }
             if (pkgKey && matchingOrders.some(transaction =>
@@ -671,12 +677,19 @@ async function importPackages() {
             throw new Error('Ada ID pesanan yang sudah pernah tercatat tanpa ID paket, jadi sistem tidak bisa memastikan ini bukan kiriman ganda (' + list + '). Periksa transaksi lama terlebih dahulu.');
         }
 
+        const paidStatusRepairs = repairs.filter(item => item.resetUnconfirmedPaid);
+        const stockRepairNeeded = paidStatusRepairs.some(item => item.transaction.stockDeductionApplied !== true);
+        if (stockRepairNeeded && !window.confirm('Pesanan ini tersimpan sebagai “Dana dilepas” tanpa konfirmasi manual. Fashion OS akan mengembalikannya ke “Belum Cair” dan mengurangi stok untuk pesanan ini satu kali. Lanjutkan?')) {
+            return;
+        }
+
         let repairedCount = 0;
         const repairChunkSize = 25;
         for (let offset = 0; offset < repairs.length; offset += repairChunkSize) {
             const chunk = repairs.slice(offset, offset + repairChunkSize);
             const batch = writeBatch(db);
-            const repaired = chunk.map(({ group, transaction }) => {
+            const stockRepairDeltas = new Map();
+            const repaired = chunk.map(({ group, transaction, resetUnconfirmedPaid }) => {
                 const repairData = {
                     marketplaceOrderId: group.orderId,
                     externalPackageId: group.packageId || transaction.externalPackageId || '',
@@ -703,12 +716,30 @@ async function importPackages() {
                     penghasilanBersihMarketplace: transaction.penghasilanBersihMarketplace ?? null,
                     channel: group.channelName,
                     channelId: group.channelId,
-                    statusPencairan: transaction.statusPencairan || 'Belum Cair',
+                    statusPencairan: resetUnconfirmedPaid ? 'Belum Cair' : (transaction.statusPencairan || 'Belum Cair'),
+                    ...(resetUnconfirmedPaid ? { tanggalPencairan: null, konfirmasiSuksesCairManual: false } : {}),
                     userId: props.userId
                 };
+                if (resetUnconfirmedPaid && transaction.stockDeductionApplied !== true) {
+                    group.items.forEach(item => {
+                        if (item.docId) stockRepairDeltas.set(item.docId, (stockRepairDeltas.get(item.docId) || 0) + item.qty);
+                    });
+                    repairData.stockDeductionApplied = true;
+                }
                 batch.update(doc(db, 'transactions', transaction.id), repairData);
                 return { ...transaction, ...repairData, id: transaction.id };
             });
+            for (const [productId, qty] of stockRepairDeltas) {
+                const productRef = doc(db, 'products', productId);
+                const productSnapshot = await getDoc(productRef);
+                if (!productSnapshot.exists()) throw new Error('Produk untuk koreksi stok tidak ditemukan: ' + productId);
+                const productData = productSnapshot.data() || {};
+                const currentStock = Number(productData.physical_stock ?? productData.stokFisik) || 0;
+                const nextStock = currentStock - qty;
+                const stockUpdate = { physical_stock: nextStock };
+                if (Object.prototype.hasOwnProperty.call(productData, 'stokFisik')) stockUpdate.stokFisik = nextStock;
+                batch.update(productRef, stockUpdate);
+            }
             await batch.commit();
             repairedCount += repaired.length;
             emit('completed', { transactions: repaired, stockDeltas: {} });
@@ -716,7 +747,7 @@ async function importPackages() {
 
         if (!toImport.length) {
             if (repairedCount) {
-                importMessage.value = repairedCount + ' transaksi lama diperbarui dengan detail produk, ukuran, warna, dan HPP. Stok tidak dikurangi lagi.';
+                importMessage.value = repairedCount + ' transaksi lama diperbarui. Status pencairan tanpa konfirmasi manual dikembalikan ke Belum Cair; koreksi stok hanya dilakukan satu kali.';
             } else {
                 importMessage.value = 'Semua pesanan yang cocok sudah pernah diimpor dan datanya sudah lengkap. Tidak ada transaksi atau pengurangan stok baru.';
             }
@@ -767,6 +798,7 @@ async function importPackages() {
                     channel: group.channelName,
                     channelId: group.channelId,
                     statusPencairan: 'Belum Cair',
+                    stockDeductionApplied: true,
                     userId: props.userId
                 };
                 const transactionRef = doc(collection(db, 'transactions'));
