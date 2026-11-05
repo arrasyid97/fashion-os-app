@@ -1,28 +1,25 @@
 <template>
-    <div class="min-h-screen bg-slate-50 p-4 sm:p-8">
+    <div class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/70 p-4 sm:p-8">
         <div class="mx-auto max-w-7xl space-y-6">
-            <header>
-                <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Operasional Marketplace</p>
-                <h1 class="mt-1 text-3xl font-bold text-slate-900">Impor Pesanan Terkirim</h1>
-                <p class="mt-2 max-w-3xl text-sm text-slate-600">
-Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berstatus Dikirim dari Shopee atau TikTok. Fashion OS mencocokkan ID dan membaca produk, variasi, jumlah, serta HPP dari master produk.
-                </p>
+            <header class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex flex-wrap items-start justify-between gap-5 p-6 sm:p-8">
+                    <div class="max-w-3xl">
+                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Operasional marketplace</p>
+                        <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-900">Impor Pesanan Terkirim</h1>
+                        <p class="mt-2 text-sm leading-6 text-slate-600">Cocokkan ID hasil scan dengan ekspor pesanan Dikirim. Fashion OS membaca produk, variasi, jumlah, dan HPP dari data marketplace serta master produk.</p>
+                    </div>
+                    <span class="rounded-full border border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-800">Tanpa input SKU manual</span>
+                </div>
+                <div class="grid border-t border-slate-100 bg-slate-50/80 sm:grid-cols-3">
+                    <div class="flex items-center gap-3 border-b border-slate-100 p-4 sm:border-b-0 sm:border-r sm:px-6"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">1</span><div><p class="text-sm font-semibold text-slate-900">Catat ID</p><p class="text-xs text-slate-500">Scan atau tempel banyak ID</p></div></div>
+                    <div class="flex items-center gap-3 border-b border-slate-100 p-4 sm:border-b-0 sm:border-r sm:px-6"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">2</span><div><p class="text-sm font-semibold text-slate-900">Unggah ekspor</p><p class="text-xs text-slate-500">Pilih file Dikirim dari toko yang sama</p></div></div>
+                    <div class="flex items-center gap-3 p-4 sm:px-6"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">3</span><div><p class="text-sm font-semibold text-slate-900">Periksa & impor</p><p class="text-xs text-slate-500">Pastikan produk dan HPP sudah cocok</p></div></div>
+                </div>
             </header>
-
-            <section class="rounded-2xl border border-indigo-100 bg-indigo-50 p-5">
-                <h2 class="font-bold text-indigo-950">Alur pencatatan pesanan</h2>
-                <ol class="mt-3 list-inside list-decimal space-y-1 text-sm text-indigo-900">
-                    <li>Scan ID pesanan yang paketnya siap dikirim. Scan hanya menyimpan ID sementara, belum membuat transaksi atau mengurangi stok.</li>
-                    <li>Setelah data pengiriman tersedia, unggah ekspor menu Dikirim dari marketplace yang sama.</li>
-                    <li>Fashion OS mencocokkan ID scan dengan ekspor, lalu membaca SKU, nama/variasi produk, dan jumlah dari file.</li>
-                    <li>Hanya pesanan yang cocok dan berstatus sudah dikirim yang diimpor. Setelah dana dilepas, tempel ID sukses pada bagian konfirmasi dan catat total pencairan periode tanpa mengunggah file.</li>
-                </ol>
-                <p class="mt-3 text-xs text-indigo-800">Antrean scan disimpan di browser/perangkat ini. Pastikan menggunakan browser yang sama sampai ekspor Dikirim diimpor.</p>
-            </section>
-            <section class="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
+            <section class="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm ring-1 ring-indigo-50 sm:p-6">
                 <div class="flex flex-wrap items-end gap-3">
                     <label class="block min-w-48">
-                        <span class="mb-1 block text-sm font-medium text-slate-700">Marketplace yang discan</span>
+                        <span class="mb-1 block text-sm font-semibold text-slate-800">Marketplace yang discan</span>
                         <select v-model="scanChannelId" class="w-full rounded-lg border border-slate-300 p-2">
                             <option value="">Pilih marketplace</option>
                             <option v-for="marketplace in marketplaces" :key="marketplace.id" :value="marketplace.id">{{ marketplace.name }}</option>
@@ -52,7 +49,8 @@ Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berst
             <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h2 class="font-bold text-slate-900">Unggah ekspor pesanan Dikirim</h2>
+                        <p class="text-xs font-bold uppercase tracking-wide text-indigo-600">Langkah 2</p>
+                        <h2 class="mt-1 text-lg font-bold text-slate-900">Unggah ekspor pesanan Dikirim</h2>
                         <p class="mt-1 text-sm text-slate-500">Pilih file asli dari Seller Center. Fashion OS akan membaca kolom produk dan jumlah secara otomatis.</p>
                     </div>
                 </div>
@@ -82,7 +80,8 @@ Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berst
             <section v-if="scanQueue.length || packages.length || rowErrors.length" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h2 class="font-bold text-slate-900">2. Periksa data sebelum impor</h2>
+                        <p class="text-xs font-bold uppercase tracking-wide text-indigo-600">Langkah 3</p>
+                        <h2 class="mt-1 text-lg font-bold text-slate-900">Periksa data sebelum impor</h2>
                         <p class="mt-1 text-sm text-slate-500">Hanya data yang ID-nya sudah discan dan ditemukan di file yang akan diimpor.</p>
                     </div>
                     <div class="flex flex-wrap gap-2 text-xs font-semibold">
