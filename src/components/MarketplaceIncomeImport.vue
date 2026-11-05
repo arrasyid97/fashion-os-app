@@ -12,6 +12,7 @@
             <label class="block"><span class="mb-1 block text-sm font-medium text-slate-700">Marketplace / nama toko</span><select v-model="selectedMarketplaceId" class="w-full rounded-lg border border-slate-300 p-2 text-sm"><option value="">Pilih marketplace / toko</option><option v-for="marketplace in marketplaces" :key="marketplace.id" :value="marketplace.id">{{ marketplace.name }}</option></select></label>
             <p class="self-end rounded-lg bg-amber-50 p-3 text-xs text-amber-900">ID yang tidak ditempel tetap berstatus belum selesai. Fashion OS tidak menebak nilai penghasilan per pesanan dari ID saja.</p>
         </div>
+        <p v-if="!selectedMarketplaceId" class="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Pilih marketplace / nama toko di atas terlebih dahulu agar tombol pemeriksaan dan penyimpanan pencairan aktif.</p>
 
         <div class="mt-5 rounded-xl border border-slate-200 p-4">
             <h3 class="font-bold text-slate-900">Konfirmasi ID pesanan sukses cair</h3>
@@ -87,7 +88,7 @@
 
 <script setup>
 /* global defineProps, defineEmits */
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase.js';
 import { collection, getDocs, query, where, writeBatch, doc, setDoc } from 'firebase/firestore';
@@ -106,6 +107,11 @@ const workbook = ref(null);
 const sheetNames = ref([]);
 const selectedSheet = ref('');
 const selectedMarketplaceId = ref('');
+watch(() => props.marketplaces, list => {
+    if (!selectedMarketplaceId.value && Array.isArray(list) && list.length === 1) {
+        selectedMarketplaceId.value = list[0].id;
+    }
+}, { immediate: true });
 const rows = ref([]);
 const rowErrors = ref([]);
 const isSaving = ref(false);
