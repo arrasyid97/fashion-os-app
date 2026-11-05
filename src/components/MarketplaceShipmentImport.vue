@@ -142,7 +142,7 @@ Scan ID pesanan saat paket siap dikirim. Setelah itu unggah ekspor pesanan berst
 
 <script setup>
 /* global defineProps, defineEmits */
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase.js';
 import { collection, doc, getDocs, increment, query, where, writeBatch } from 'firebase/firestore';
