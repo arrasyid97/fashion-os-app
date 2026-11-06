@@ -9812,7 +9812,7 @@ function changePage(pageName) {
 
         langganan: 'bantuan',
         'panduan-baru': 'bantuan',
-        'barcode-generator': 'bantuan',
+        
         panduan: 'bantuan',
         tentang: 'bantuan'
     };
@@ -12856,94 +12856,90 @@ const panduanData = [
     {
         id: 'pengaturan',
         icon: '⚙️',
-        title: '1. Pengaturan',
+        title: '1. Siapkan data dasar',
         badge: 'Fondasi',
-        subtitle: 'Tempat mengatur aturan utama sebelum aplikasi dipakai.',
-        description: 'Halaman Pengaturan adalah pondasi Fashion OS. Bagian ini wajib dirapikan lebih dulu karena data marketplace, model produk, kategori, rekening, dan PIN akan dipakai oleh halaman lain.',
+        subtitle: 'Atur channel dan model sebelum mencatat produk.',
+        description: 'Mulai dengan membuat marketplace atau channel penjualan dan daftar model produk. Nama model digunakan sebagai induk; warna dan ukuran dicatat sebagai varian tersendiri.',
         steps: [
-            'Isi Marketplace untuk Shopee, TikTok Shop, Offline, Website, atau channel lain.',
-            'Isi Model Produk agar produk, produksi, stok, laporan, dan ROAS bisa terbaca per model.',
-            'Isi kategori biaya dan kategori pemasukan supaya laporan keuangan rapi.',
-            'Isi rekening bank jika memakai fitur investasi, pembayaran, atau pencatatan rekening.',
-            'Atur PIN keamanan untuk halaman sensitif seperti dashboard, laporan, dan HPP.'
+            'Tambahkan marketplace atau channel yang benar-benar digunakan.',
+            'Buat nama model produk, misalnya Sauna atau Aurelia.',
+            'Tambahkan kategori keuangan dan rekening bila digunakan.',
+            'Periksa pengaturan sebelum mulai mencatat stok dan transaksi.'
         ],
         tips: [
-            'Marketplace dan Model Produk wajib diisi sebelum tambah produk.',
-            'Jangan hapus model produk yang sudah dipakai transaksi.',
-            'Pastikan biaya marketplace sesuai channel agar profit tidak salah.'
+            'Gunakan nama model yang konsisten di semua varian.',
+            'Jangan membuat satu nama model untuk setiap kombinasi warna dan ukuran.',
+            'Pastikan channel pesanan sama dengan marketplace yang dipilih saat impor.'
         ],
         links: [
             { label: 'Marketplace', page: 'pengaturan', tab: 'marketplace', primary: true },
-            { label: 'Model Produk', page: 'pengaturan', tab: 'modelproduk', primary: true },
-            { label: 'Rekening Bank', page: 'pengaturan', tab: 'rekening', primary: false }
+            { label: 'Model Produk', page: 'pengaturan', tab: 'modelproduk', primary: true }
         ]
     },
     {
         id: 'produk',
         icon: '📦',
-        title: '2. Inventaris Produk',
+        title: '2. Inventaris dan HPP',
         badge: 'Produk & Stok',
-        subtitle: 'Tempat membuat produk, SKU, warna, ukuran, dan stok.',
-        description: 'Inventaris dipakai untuk menyimpan semua data produk per varian. Data ini akan terhubung ke penjualan, retur, barcode, produksi, harga, HPP, dan laporan.',
+        subtitle: 'Simpan stok dan modal untuk setiap varian produk.',
+        description: 'Daftar Model Produk menyimpan model beserta warna dan ukuran. Saat menambahkan produk inventaris, pilih model lalu pilih atau ketik varian yang sesuai. Fashion OS membuat SKU internal otomatis untuk membedakan stok tiap varian.',
         steps: [
-            'Tambahkan produk berdasarkan model produk yang sudah dibuat.',
-            'Isi SKU yang rapi dan singkat untuk setiap warna dan ukuran.',
-            'Isi warna, ukuran, stok fisik, dan data varian lain.',
-            'Gunakan fitur stok untuk memantau produk yang aman, menipis, atau habis.',
-            'Gunakan barcode agar proses scan produk lebih cepat.'
+            'Buat model dan varian warna/ukuran di Daftar Model Produk.',
+            'Di Inventaris, pilih model lalu pilih varian yang tepat.',
+            'Masukkan jumlah stok dan HPP/modal per pcs untuk varian tersebut.',
+            'Periksa stok dan nilai persediaan sebelum mengimpor pesanan.'
         ],
         tips: [
-            'Gunakan pola SKU yang konsisten, contoh ARL-HTM-M.',
-            'Satu varian sebaiknya satu SKU.',
-            'Jangan membuat SKU terlalu panjang agar mudah discan dan dicari.'
+            'Pastikan model, warna, dan ukuran pada inventaris sama dengan data produk marketplace.',
+            'SKU internal dibuat oleh Fashion OS; pencocokan pesanan memakai data produk/SKU marketplace dan master varian.',
+            'Impor pesanan yang cocok akan mengurangi stok sesuai jumlah pcs yang tercatat.'
         ],
         links: [
+            { label: 'Daftar Model Produk', page: 'pengaturan', tab: 'modelproduk', primary: true },
             { label: 'Buka Inventaris', page: 'inventaris', primary: true },
-            { label: 'Panduan Barcode', page: 'barcode-generator', primary: false }
+            { label: 'Harga & HPP', page: 'harga-hpp', primary: false }
         ]
     },
     {
         id: 'harga',
         icon: '🏷️',
         title: '3. Harga & HPP',
-        badge: 'Profit',
-        subtitle: 'Tempat mengisi modal produk dan harga jual per channel.',
-        description: 'Halaman Harga & HPP sangat penting karena menjadi dasar perhitungan laba, margin, laporan keuangan, dashboard, dan ROAS.',
+        badge: 'Modal Produk',
+        subtitle: 'Pastikan HPP per varian tercatat dengan benar.',
+        description: 'HPP adalah modal produk per pcs dan menjadi dasar nilai persediaan serta perhitungan HPP pesanan. Total pencairan marketplace dicatat terpisah; Fashion OS tidak menebak pendapatan dari harga jual atau ID pesanan.',
         steps: [
-            'Isi HPP atau modal produk untuk setiap SKU.',
-            'Isi harga jual per channel marketplace.',
-            'Pastikan harga jual sesuai biaya tiap marketplace.',
-            'Gunakan data ini untuk membaca laba dan harga aman.',
-            'Update HPP jika ada perubahan biaya produksi atau pembelian.'
+            'Periksa nilai HPP untuk setiap varian produk.',
+            'Perbarui HPP jika biaya pembelian atau produksi berubah.',
+            'Gunakan harga jual per channel sebagai acuan penetapan harga bila fitur tersebut dipakai.',
+            'Gunakan Statistik Penjualan untuk melihat jumlah pcs dan HPP produk terjual.'
         ],
         tips: [
-            'Jangan mulai iklan sebelum HPP dan harga jual lengkap.',
-            'HPP kosong bisa membuat laporan profit tidak akurat.',
-            'Harga per marketplace bisa berbeda karena potongan biaya berbeda.'
+            'HPP yang belum diisi atau keliru akan memengaruhi nilai modal persediaan dan HPP transaksi.',
+            'Pencairan baru masuk ke ringkasan setelah total pencairan periode disimpan.',
+            'Laba periode dihitung dari pencairan yang tersimpan dikurangi HPP pesanan yang sudah dikonfirmasi dan biaya operasional.'
         ],
         links: [
             { label: 'Buka Harga & HPP', page: 'harga-hpp', primary: true },
-            { label: 'Kalkulator ROAS', page: 'roas-calculator', primary: false }
+            { label: 'Statistik Penjualan', page: 'statistik-penjualan', primary: false }
         ]
     },
     {
         id: 'produksi',
         icon: '🏭',
-        title: '4. Produksi, Gudang Kain, dan Supplier',
-        badge: 'Produksi',
-        subtitle: 'Untuk mencatat kain, maklun, supplier, aktual jadi, dan pembelian barang.',
-        description: 'Modul produksi membantu bisnis fashion mencatat proses dari bahan sampai barang jadi. Cocok untuk brand yang produksi sendiri, maklun, atau mengambil barang dari supplier.',
+        title: '4. Produksi dan pengadaan',
+        badge: 'Operasional',
+        subtitle: 'Kelola bahan, produksi, pemasok, dan barang jadi.',
+        description: 'Catat bahan kain, proses maklun, hasil produksi aktual, serta pembelian dari supplier agar ketersediaan stok dan biaya produk mudah ditelusuri.',
         steps: [
-            'Catat batch produksi berdasarkan model produk.',
-            'Isi kain, warna kain, yard, aktual jadi, biaya maklun, dan status pembayaran.',
-            'Pantau Gudang Kain untuk melihat penggunaan dan kebutuhan bahan.',
-            'Gunakan Supplier untuk mencatat penerimaan barang atau pembelian produk.',
-            'Pantau status proses dan status pembayaran supaya produksi tidak tercecer.'
+            'Catat batch produksi berdasarkan model dan kebutuhan bahan.',
+            'Isi penggunaan kain, biaya maklun, dan hasil produksi aktual.',
+            'Catat barang masuk melalui produksi atau supplier.',
+            'Periksa jumlah stok barang jadi setelah proses selesai.'
         ],
         tips: [
-            'Isi model produk dulu sebelum mencatat produksi.',
-            'Aktual jadi harus dicatat agar stok produksi lebih jelas.',
-            'Supplier cocok dipakai jika barang masuk bukan dari produksi sendiri.'
+            'Gunakan hasil produksi aktual saat mencatat jumlah barang jadi.',
+            'Pastikan biaya produksi tercermin pada HPP produk yang sesuai.',
+            'Catat penerimaan barang agar jumlah inventaris tetap akurat.'
         ],
         links: [
             { label: 'Buka Produksi', page: 'produksi', primary: true },
@@ -12954,103 +12950,121 @@ const panduanData = [
     {
         id: 'penjualan',
         icon: '🛒',
-        title: '5. Pesanan dan Penjualan',
+        title: '5. Impor pesanan terkirim',
         badge: 'Marketplace',
-        subtitle: 'Pesanan marketplace diproses setelah cocok dengan data pengiriman.',
-        description: 'Untuk Shopee dan TikTok Shop, scan ID paket di Google Sheets, cocokkan dengan ekspor pesanan terkirim, lalu impor hanya paket yang benar-benar terkirim. Fashion OS mengambil SKU dan HPP dari master produk.',
+        subtitle: 'Impor hanya pesanan yang cocok dengan ekspor marketplace.',
+        description: 'Gunakan halaman Impor Pesanan Terkirim untuk menempel atau memindai banyak ID pesanan/paket, mengunggah file ekspor asli dari Seller Center, lalu memeriksa hasil pencocokan sebelum transaksi disimpan.',
         steps: [
-            'Scan ID paket atau resi ke tab SCAN_SHOPEE atau SCAN_TIKTOK di Google Sheets.',
-            'Tempel ekspor pesanan terkirim ke tab DATA_SHOPEE atau DATA_TIKTOK.',
-            'Jalankan menu Fashion OS di Google Sheets dan periksa tab SIAP_IMPORT.',
-            'Unduh file Google Sheets dan impor tab SIAP_IMPORT ke Fashion OS.',
-            'Saat data keuangan tersedia, impor SIAP_PENGHASILAN untuk mencocokkan penghasilan bersih dan pencairan.'
+            'Pilih marketplace yang sesuai dan tempel atau pindai ID pesanan/paket.',
+            'Unggah ekspor pesanan Dikirim dari marketplace yang sama.',
+            'Periksa pratinjau, jumlah produk, varian, HPP, dan baris yang bermasalah.',
+            'Impor pesanan yang cocok setelah semua data penting sudah benar.',
+            'Periksa Riwayat Transaksi; impor ulang akan melewati transaksi duplikat.'
         ],
         tips: [
-            'Gunakan ID Paket atau No Resi agar kiriman yang terbagi dalam beberapa paket tidak tertukar.',
-            'Pesanan belum terkirim atau batal tidak akan dibuat sebagai transaksi.',
-            'Impor berulang akan melewati paket yang sudah tercatat.'
+            'Cocokkan data varian dan stok inventaris jika produk marketplace belum terdeteksi.',
+            'Baris bermasalah perlu diperiksa sebelum impor agar transaksi tidak tercatat setengah.',
+            'Impor pesanan mencatat transaksi dan mengurangi stok berdasarkan jumlah barang.'
         ],
         links: [
-            { label: 'Kasir POS untuk penjualan langsung', page: 'transaksi', primary: false },
-            { label: 'Impor Pesanan Terkirim', page: 'bulk_process', primary: true }
+            { label: 'Impor Pesanan Terkirim', page: 'bulk_process', primary: true },
+            { label: 'Riwayat Transaksi', page: 'transaksi', primary: false }
         ]
     },
     {
-        id: 'retur',
-        icon: '↩️',
-        title: '6. Retur',
-        badge: 'Pengembalian',
-        subtitle: 'Untuk mencatat produk yang kembali dan menjaga laporan tetap akurat.',
-        description: 'Retur dipakai saat ada pesanan kembali, batal, gagal kirim, atau pengembalian produk. Data retur penting agar stok, omset, HPP, dan profit tidak salah.',
+        id: 'pencairan',
+        icon: '✅',
+        title: '6. Konfirmasi pencairan',
+        badge: 'Dana Marketplace',
+        subtitle: 'Konfirmasi status pesanan dan simpan total pencairan secara terpisah.',
+        description: 'Halaman Konfirmasi Pesanan Berhasil memiliki dua tindakan yang berbeda. Konfirmasi ID mengubah status pesanan setelah pencairan dipastikan. Total dana dilepas dari ringkasan marketplace dicatat untuk toko dan rentang tanggal, lalu baru masuk ke dashboard setelah disimpan.',
         steps: [
-            'Cari transaksi atau produk yang mengalami retur.',
-            'Isi alasan retur dan jumlah produk yang kembali.',
-            'Pastikan stok kembali sesuai kondisi barang.',
-            'Pantau dampak retur ke laporan dan profit.',
-            'Gunakan catatan retur untuk evaluasi kualitas produk atau pengiriman.'
+            'Pilih marketplace/toko dan tempel ID pesanan yang sudah dipastikan sukses cair.',
+            'Periksa ID di Fashion OS, lalu konfirmasi dana sudah dilepas.',
+            'Masukkan tanggal awal, tanggal akhir, dan Total yang Dilepas dari ringkasan marketplace.',
+            'Tekan Simpan total pencairan periode agar nilai masuk ke dashboard dan laporan.',
+            'Tangani pesanan hilang, retur, atau masalah lain melalui Penanganan Pesanan.'
         ],
         tips: [
-            'Retur jangan dicatat manual di luar sistem agar laporan tetap sinkron.',
-            'Pisahkan retur karena pembeli, seller, gagal kirim, atau alasan lain.',
-            'Cek kembali stok setelah retur disimpan.'
+            'Konfirmasi ID saja tidak menyimpan total pendapatan periode.',
+            'Simpan total pencairan satu kali untuk toko dan periode yang sama; nilainya tidak dibagi ke tiap pesanan.',
+            'Periksa periode transaksi pada dashboard karena tanggal pesanan dan tanggal pencairan bisa berbeda.'
         ],
         links: [
-            { label: 'Buka Retur', page: 'retur', primary: true },
-            { label: 'Laporan Transaksi', page: 'laporan-transaksi', primary: false }
+            { label: 'Konfirmasi Pesanan Berhasil', page: 'konfirmasi-berhasil', primary: true },
+            { label: 'Penanganan Pesanan', page: 'retur', primary: false },
+            { label: 'Riwayat Transaksi', page: 'transaksi', primary: false }
         ]
     },
     {
         id: 'keuangan',
         icon: '💰',
-        title: '7. Keuangan dan Laporan',
-        badge: 'Kontrol Profit',
-        subtitle: 'Untuk mencatat pemasukan, pengeluaran, transaksi, dan profit.',
-        description: 'Modul keuangan membantu membaca kondisi bisnis secara lebih jelas. Dari sini pengguna bisa melihat uang masuk, uang keluar, laba, dan laporan transaksi.',
+        title: '7. Dashboard dan laporan keuangan',
+        badge: 'Pemantauan',
+        subtitle: 'Baca pencairan, HPP, biaya, dan hasil usaha berdasarkan periode.',
+        description: 'Dashboard merangkum pesanan, status pencocokan, pencairan tersimpan, HPP, biaya operasional, dan laba. Laporan Keuangan menjadi tempat meninjau arus uang serta biaya yang telah dicatat.',
         steps: [
-            'Catat pemasukan lain di luar penjualan jika ada.',
-            'Catat pengeluaran operasional dan produksi.',
-            'Cek Laporan Transaksi untuk melihat data order.',
-            'Cek Laporan Keuangan untuk melihat laba dan biaya.',
-            'Gunakan Dashboard untuk ringkasan performa bisnis.'
+            'Pilih periode transaksi yang ingin ditinjau pada dashboard.',
+            'Pastikan pencairan marketplace sudah disimpan untuk periode tersebut.',
+            'Catat biaya operasional di halaman Keuangan.',
+            'Tinjau laba periode dan rincian transaksi di laporan.'
         ],
         tips: [
-            'Pisahkan biaya produksi dan biaya operasional.',
-            'Catat pengeluaran rutin agar laba bersih tidak terlihat terlalu besar.',
-            'Gunakan filter tanggal untuk membaca performa harian, bulanan, atau custom.'
+            'Pesanan yang belum dikonfirmasi tetap terlihat sebagai pesanan belum selesai.',
+            'Filter tanggal mengikuti tanggal pesanan atau tanggal pencairan sesuai KPI-nya.',
+            'Nilai pencairan, HPP, dan laba memiliki dasar perhitungan yang berbeda.'
         ],
         links: [
-            { label: 'Keuangan', page: 'keuangan', primary: true },
+            { label: 'Dashboard', page: 'dashboard', primary: true },
+            { label: 'Keuangan', page: 'keuangan', primary: false },
             { label: 'Laporan Keuangan', page: 'laporan-keuangan', primary: true },
-            { label: 'Laporan Transaksi', page: 'laporan-transaksi', primary: false },
-            { label: 'Dashboard', page: 'dashboard', primary: false }
+            { label: 'Laporan Transaksi', page: 'laporan-transaksi', primary: false }
         ]
     },
     {
-        id: 'roas',
-        icon: '📊',
-        title: '8. Dashboard ROAS dan Kalkulator ROAS',
-        badge: 'Iklan',
-        subtitle: 'Untuk membaca performa iklan, BEP, profit, dan target ROAS.',
-        description: 'Modul ROAS dipakai untuk membantu mengambil keputusan iklan. Pengguna bisa membaca omset, HPP, diskon, biaya marketplace, biaya iklan, laba, dan target ROAS.',
+        id: 'modal-bagi-hasil',
+        icon: '🤝',
+        title: '8. Modal dan bagi hasil',
+        badge: 'Kerja Sama',
+        subtitle: 'Pisahkan pencatatan modal, biaya, laba, dan pembayaran bagi hasil.',
+        description: 'Halaman Modal & Bagi Hasil mencatat setoran modal awal dan tambahan sebagai modal, bukan pendapatan penjualan. Laba periode dihitung setelah pencairan, HPP pesanan berhasil, dan biaya operasional tersedia.',
         steps: [
-            'Pilih periode tanggal yang ingin dianalisis.',
-            'Pilih channel penjualan atau semua channel.',
-            'Pilih model produk atau semua model.',
-            'Isi biaya iklan, diskon, pajak, dan biaya operasional jika dibutuhkan.',
-            'Baca ROAS, profit, dan target iklan sebelum scale budget.'
+            'Catat mitra pemodal dan setoran modal awal beserta porsi yang disepakati.',
+            'Catat tambahan modal secara terpisah saat dana benar-benar diterima.',
+            'Catat rencana pengeluaran atau keputusan usaha serta hasil persetujuannya bila fitur itu digunakan.',
+            'Hitung laba periode berdasarkan pencairan tersimpan, HPP, dan biaya operasional.',
+            'Catat pembayaran bagi hasil dan pengembalian pokok modal sebagai transaksi terpisah.'
         ],
         tips: [
-            'ROAS akan lebih akurat jika transaksi, HPP, dan biaya marketplace sudah lengkap.',
-            'Analisis per model lebih aman daripada hanya melihat semua produk.',
-            'Gunakan Kalkulator ROAS untuk simulasi sebelum menjalankan iklan.'
+            'Modal masuk bukan penghasilan penjualan dan tidak menambah laba.',
+            'Pengembalian modal mengurangi saldo pokok yang belum kembali; pembayaran bagi hasil dicatat terpisah.',
+            'Simpan dasar periode dan nominal yang disepakati agar riwayatnya jelas bagi kedua pihak.'
         ],
         links: [
-            { label: 'Dashboard ROAS', page: 'roas-dashboard', primary: true },
-            { label: 'Kalkulator ROAS', page: 'roas-calculator', primary: true },
-            { label: 'Statistik Penjualan', page: 'statistik-penjualan', primary: false }
+            { label: 'Modal & Bagi Hasil', page: 'investasi', primary: true },
+            { label: 'Laporan Keuangan', page: 'laporan-keuangan', primary: false }
         ]
     },
-
+    {
+        id: 'statistik',
+        icon: '📈',
+        title: '9. Statistik Penjualan',
+        badge: 'Analisis Produk',
+        subtitle: 'Bandingkan model dan varian berdasarkan jumlah terjual dan HPP.',
+        description: 'Statistik Penjualan membantu melihat performa per model, warna, dan ukuran. Gunakan filter periode, model, dan channel untuk memahami produk yang paling banyak terjual.',
+        steps: [
+            'Pilih periode, model, dan channel yang ingin dianalisis.',
+            'Bandingkan jumlah pcs terjual dan HPP per varian.',
+            'Gunakan grafik untuk melihat tren produk dari waktu ke waktu.'
+        ],
+        tips: [
+            'Statistik membutuhkan transaksi yang tercatat di Fashion OS.',
+            'Pastikan data varian dan kuantitas pada transaksi sudah sesuai.'
+        ],
+        links: [
+            { label: 'Buka Statistik Penjualan', page: 'statistik-penjualan', primary: true }
+        ]
+    }
 ];
 
 const panduanAccordion = ref('pengaturan');
@@ -19197,16 +19211,7 @@ void [
         class="sidebar-link"
         :class="{ 'sidebar-link-active': activePage === 'panduan-baru' }">
         Panduan Pengguna Baru
-    </a>
-
-    <a href="#"
-        @click.prevent="changePage('barcode-generator')"
-        class="sidebar-link"
-        :class="{ 'sidebar-link-active': activePage === 'barcode-generator' }">
-        Panduan Barcode
-    </a>
-
-    <a href="#"
+    </a><a href="#"
         @click.prevent="changePage('panduan')"
         class="sidebar-link"
         :class="{ 'sidebar-link-active': activePage === 'panduan' }">
@@ -20237,1515 +20242,6 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
 
-<div v-if="activePage === 'barcode-generator'">
-    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-        <div class="max-w-4xl mx-auto">
-            <div class="text-center mb-12 animate-fade-in-up">
-                <h2 class="text-3xl md:text-4xl font-extrabold text-slate-800">
-                    <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Panduan Mencetak Barcode</span>
-                </h2>
-                <p class="text-lg text-slate-600 mt-4 max-w-2xl mx-auto">
-                    Ikuti panduan lengkap ini untuk mencetak label barcode produk Anda menggunakan aplikasi pihak ketiga.
-                </p>
-            </div>
-            <div class="space-y-10">
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 100ms;">
-                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 1: Persiapan Awal Kertas & Kalibrasi Printer</h3>
-                    <div class="space-y-6">
-                        <div>
-                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 1: Membeli Kertas Label</h4>
-                            <p class="text-slate-700">
-                                Sebelum memulai, pastikan Anda telah membeli kertas label khusus barcode. Anda bisa mencarinya di marketplace dengan kata kunci **"label thermal 33x15mm 2 line"**. Panduan ini menggunakan ukuran tersebut sebagai contoh, namun Anda bisa menyesuaikan pengaturan di aplikasi atau PC jika Anda menggunakan ukuran lain.
-                            </p>
-                        </div>
-                        <div>
-                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 2: Mengkalibrasi Printer</h4>
-                            <p class="text-slate-700">
-                                Kalibrasi penting untuk memastikan printer mengenali ukuran kertas dan mencetak dengan presisi.
-                            </p>
-                            <ul class="list-disc list-inside ml-4 space-y-2 text-slate-700 mt-2">
-                                <li>
-                                    <p class="font-bold">Untuk Printer Xprinter XP-D4601B:</p>
-                                    <ol class="list-decimal list-inside ml-4">
-                                        <li>Matikan printer (posisi **OFF**).</li>
-                                        <li>Tekan dan tahan tombol bulat di atas printer, lalu hidupkan printer (posisi **ON**).</li>
-                                        <li>Jangan lepas tombol sampai lampu indikator berkedip merah sebanyak **lima kali**. Setelah itu, lepaskan tombol.</li>
-                                        <li>Printer akan menyesuaikan diri. Untuk menguji, tekan tombol bulat satu kali. Jika printer mengeluarkan satu baris dengan dua label kosong, kalibrasi berhasil.</li>
-                                    </ol>
-                                </li>
-                                <li>
-                                    <p class="font-bold">Untuk Printer Lain:</p>
-                                    <p>Silakan cari panduan kalibrasi di Google atau YouTube sesuai merek dan model printer Anda.</p>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 2: Pengaturan di Aplikasi "Print Label"</h3>
-                    <div class="space-y-6">
-                        <div>
-                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 1: Menginstal Aplikasi</h4>
-                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                                <li>Cari aplikasi **"Print Label"** di Google Play Store.</li>
-                                <li>Jika tidak dapat diinstal, coba cari dan instal dari **GetApps**.</li>
-                            </ol>
-                        </div>
-                        <div>
-                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 2: Menghubungkan ke Printer</h4>
-                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                                <li>Di layar utama, klik **ikon gambar printer** di pojok kanan atas.</li>
-                                <li>Pada halaman **"Set bluetooth connection"**, klik tombol **"Search"**.</li>
-                                <li>Setelah nama printer Anda muncul, klik nama tersebut untuk menghubungkannya.</li>
-                            </ol>
-                        </div>
-                        <div>
-                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 3: Mengatur Ukuran Label</h4>
-                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                                <li>Kembali ke menu utama dan klik **"New Label"**.</li>
-                                <li>Pilih **"Gap paper"** dan **"Rectangle"**. Atur **Width** menjadi **33** mm dan **Height** menjadi **15** mm (sesuaikan jika kertas Anda berbeda).</li>
-                                <li>Klik tombol **"NEW LABEL"**.</li>
-                            </ol>
-                        </div>
-                        <div>
-                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 4: Menambahkan Barcode</h4>
-                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                                <li>Di halaman editor, klik ikon **"BarCode"** di bagian bawah.</li>
-                                <li>Edit konten teks di bawah barcode dengan **SKU** produk Anda.</li>
-                            </ol>
-                        </div>
-                        <div>
-                            <h4 class="text-xl font-bold text-slate-800 mb-2">Langkah 5: Meninjau dan Mencetak</h4>
-                            <ol class="list-decimal list-inside space-y-2 text-slate-700">
-                                <li>Klik **"Print"**, lalu atur **"Print direction"** (0 atau 180) dan **"Print density"** (misalnya, 5)jika kurang jelas barcodenya naikan angka densitynya dan atur sesuai keinginan.</li>
-                                <li>Atur **"Number of prints"** sesuai jumlah salinan yang Anda inginkan, lalu klik **"OK"**.</li>
-                            </ol>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 700ms;">
-                    <h3 class="text-2xl font-bold text-indigo-700 mb-4">Bagian 3: Jika Hasil Cetak Tidak Pas</h3>
-                    <p class="text-slate-600 mb-4">
-                        Jika hasil cetak masih kurang presisi, Anda perlu mengatur ulang konfigurasi printer langsung dari PC atau laptop Anda.
-                    </p>
-                    <ol class="list-decimal list-inside space-y-4 text-slate-700">
-                        <li>
-                            <p class="font-bold">Buka Pengaturan Printer:</p>
-                            <ul class="list-disc list-inside ml-4">
-                                <li>Pada PC atau laptop Anda, buka menu **Bluetooth & devices**.</li>
-                                <li>Pilih perangkat printer Anda, lalu klik **Printer properties** atau **Printing preferences**.</li>
-                            </ul>
-                        </li>
-                        <li>
-                            <p class="font-bold">Atur Ukuran Kertas di Tab "Page Setup":</p>
-                            <ul class="list-disc list-inside ml-4">
-                                <li>Pilih tab **Page Setup**, lalu klik tombol **New**.</li>
-                                <li>Beri nama **Label_33x15mm** di kolom **Stock Name**.</li>
-                                <li>Di bagian **Label size**, atur **Width** menjadi **33.0 mm** dan **Height** menjadi **15.0 mm**.</li>
-                                <li>Di bagian **Exposed liner width**, atur kolom **Left** dan **Right** menjadi **2.0 mm**.</li>
-                                <li>Klik **OK**.</li>
-                            </ul>
-                        </li>
-                        <li>
-                            <p class="font-bold">Atur Tipe Kertas di Tab "Stock":</p>
-                            <ul class="list-disc list-inside ml-4">
-                                <li>Pilih tab **Stock**.</li>
-                                <li>Di bagian **Media Settings**, atur **Method** menjadi **Direct Thermal** dan **Type** menjadi **Labels with gaps**.</li>
-                                <li>Atur **Gap Height** menjadi **2.0 mm** dan **Gap Offset** menjadi **0.0 mm**.</li>
-                                <li>Di bagian **Media Handling**, atur **Post-Print Action** ke **Tear Off** dan **Feed Offset** ke **0.0 mm**.</li>
-                            </ul>
-                        </li>
-                        <li>
-                            <p class="font-bold">Simpan Pengaturan:</p>
-                            <ul class="list-disc list-inside ml-4">
-                                <li>Di bagian bawah, pastikan kotak **"Use current printer settings"** sudah dicentang.</li>
-                                <li>Klik **Apply**, lalu klik **OK**.</li>
-                            </ul>
-                        </li>
-                    </ol>
-                    <p class="text-sm font-semibold text-red-600 mt-6">
-                        Catatan: Disarankan memiliki printer khusus untuk cetak barcode dan printer terpisah untuk mencetak resi pengiriman agar lebih efisien dan nyaman.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div v-if="activePage === 'retur'">
-    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-        <div class="max-w-7xl mx-auto">
-            
-            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
-                
-                <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
-                    <div>
-                        <h2 class="text-3xl font-bold text-slate-800">Penanganan Pesanan</h2>
-                        <p class="text-slate-500 mt-1">Kelola retur dan catatan masalah produk dari transaksi pelanggan.</p>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <button @click="showModal('panduanRetur')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
-                            Informasi
-                        </button>
-                        <button @click="showModal('addRetur', { tanggal: new Date().toISOString().split('T')[0], transactionIdSearch: '', foundTransaction: null, items: [] })" class="bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 shadow transition-colors" :disabled="!isSubscriptionActive">
-                            + Tambah Retur
-                        </button>
-                    </div>
-                </div>
-
-                <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                    <div class="relative">
-                        <label for="retur-search" class="block text-sm font-medium text-slate-700 mb-1">Cari (ID Retur, SKU, Nama, Alasan)</label>
-                        <input 
-                            v-model="uiState.returPageSearchQuery"
-                            @input="handleReturPageSearch"
-                            type="text" 
-                            id="retur-search" 
-                            placeholder="Ketik untuk mencari data retur..." 
-                            class="w-full p-2 border border-slate-300 rounded-md shadow-sm"
-                            autocomplete="off"
-                        >
-                        <div v-if="uiState.returPageSearchRecommendations.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                            <div 
-                                v-for="(rec, index) in uiState.returPageSearchRecommendations" 
-                                :key="index" 
-                                @click="selectReturPageRecommendation(rec)" 
-                                class="p-2 px-3 hover:bg-slate-100 cursor-pointer text-sm"
-                            >
-                                {{ rec }}
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <label for="retur-date-filter" class="block text-sm font-medium text-slate-700 mb-1">Filter Berdasarkan Tanggal</label>
-                        <div class="flex items-center gap-2">
-                            <select v-model="uiState.returPageDateFilter" id="retur-date-filter" class="w-full p-2 border border-slate-300 rounded-md shadow-sm capitalize">
-                                <option value="today">hari ini</option>
-                                <option value="last_7_days">1 minggu terakhir</option>
-                                <option value="last_30_days">1 bulan terakhir</option>
-                                <option value="this_year">1 tahun terakhir</option>
-                                <option value="by_date_range">rentang tanggal</option>
-                                <option value="by_month_range">rentang bulan</option>
-                                <option value="by_year_range">rentang tahun</option>
-                                <option value="all_time">semua</option>
-                            </select>
-                            <button @click="requestProtectedExport(() => exportReturToExcel())" id="export-retur-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 h-10 flex-shrink-0">Export</button>
-                        </div>
-                        <div v-if="uiState.returPageDateFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
-                            <input type="date" v-model="uiState.returPageStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                            <span>s/d</span>
-                            <input type="date" v-model="uiState.returPageEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
-                        </div>
-                        <div v-if="uiState.returPageDateFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
-                            <select v-model.number="uiState.returPageStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                            <input type="number" v-model.number="uiState.returPageStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-                            <span class="mx-2">s/d</span>
-                            <select v-model.number="uiState.returPageEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
-                            <input type="number" v-model.number="uiState.returPageEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
-                        </div>
-                        <div v-if="uiState.returPageDateFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
-                            <input type="number" v-model.number="uiState.returPageStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-                            <span class="text-slate-500">s/d</span>
-                            <input type="number" v-model.number="uiState.returPageEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
-                        </div>
-                    </div>
-                </div>
-
-                <div
-                    v-if="returnHistoryLoading"
-                    class="mb-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700"
-                >
-                    Menampilkan
-                    <strong>{{ returnHistoryLoadedCount }}</strong>
-                    data retur. Data berikutnya sedang dimuat otomatis...
-                </div>
-
-                <div
-                    v-else-if="returnHistoryMessage"
-                    class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
-                >
-                    {{ returnHistoryMessage }}
-                </div>
-
-                <div
-                    v-else-if="returnHistoryError"
-                    class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-                >
-                    {{ returnHistoryError }}
-
-                    <button
-                        @click="loadReturnHistoryByCurrentFilter(currentUser.uid)"
-                        class="ml-2 font-bold underline"
-                    >
-                        Coba Lagi
-                    </button>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left text-slate-500">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
-    <tr>
-        <th class="px-6 py-3">Tanggal</th>
-        
-        <th class="px-6 py-3">ID Pesanan</th> 
-        
-        <th class="px-6 py-3">Asal Toko</th>
-        <th class="px-6 py-3">Produk</th>
-        <th class="px-6 py-3 text-center">Qty</th>
-        <th class="px-6 py-3">Alasan</th>
-        <th class="px-6 py-3 text-center">Aksi</th>
-    </tr>
-</thead>
-                        <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="!returnHistoryLoading && filteredRetur.length === 0">
-                                <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
-                            </tr>
-                            <tr v-for="(item, index) in filteredRetur" :key="`${item.returnDocId}-${item.sku}-${index}`" class="hover:bg-slate-50/50">
-    <td class="px-6 py-4 whitespace-nowrap">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
-    
-    <td class="px-6 py-4 font-mono text-xs font-bold text-indigo-600">
-        {{ getTransactionDisplayId(item.originalTransactionId) }}
-    </td>
-
-    <td class="px-6 py-4">{{ getMarketplaceById(item.channelId)?.name || 'N/A' }}</td>
-                                <td class="px-6 py-4">
-                                    <p class="font-semibold text-slate-800">{{ getProductBySku(item.sku)?.nama || 'Produk tidak ditemukan' }}</p>
-                                    <p class="font-mono text-xs text-slate-500">{{ item.sku }}</p>
-                                </td>
-                                <td class="px-6 py-4 font-medium text-center">{{ item.qty }}</td>
-                                <td class="px-6 py-4">{{ item.alasan }}</td>
-                                <td class="px-6 py-4 text-center space-x-2">
-                                    <button @click="deleteReturnItem(item)" class="text-xs text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-            </div>
-        </div>
-    </div>
-</div>
-
-<div v-if="activePage === 'mitra'">
-    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-        
-        <div v-if="currentUser && !userProfile.data?.isPartner" class="flex items-center justify-center h-full animate-fade-in">
-            <div class="bg-white p-8 rounded-2xl shadow-xl border text-center max-w-md">
-                <h3 class="text-2xl font-bold text-slate-800 mb-4">Jadilah Mitra & Dapatkan Penghasilan</h3>
-                <p class="text-slate-600 mb-6">Dapatkan komisi dari setiap pelanggan yang Anda ajak. Jadilah bagian dari tim kami untuk mengembangkan Fashion OS bersama.</p>
-                <button @click="showModal('registerPartner')" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">
-                    Daftar Menjadi Mitra
-                </button>
-            </div>
-        </div>
-        
-        <div v-else-if="userProfile.data?.isPartner" class="max-w-7xl mx-auto">
-            <div class="flex justify-between items-center mb-8 animate-fade-in-up">
-    <div>
-        <h2 class="text-3xl font-bold text-slate-800">Dashboard Mitra</h2>
-        <p class="text-slate-500 mt-1">Pantau kinerja dan penghasilan Anda di sini.</p>
-    </div>
-    <a :href="`https://wa.me/${nomorWhatsAppAdmin}`" target="_blank" class="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-colors shadow-lg flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.487 5.235 3.487 8.413 0 6.557-5.338 11.892-11.894 11.892-1.99 0-3.903-.52-5.687-1.475L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.886-.001 2.267.655 4.398 1.905 6.344l-1.332 4.869 4.869-1.332z"/></svg>
-        Hubungi Admin
-    </a>
-</div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-                <!-- Kolom Kode Rujukan -->
-                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 animate-fade-in-up flex flex-col justify-center" style="animation-delay: 100ms;">
-                    <h4 class="text-sm font-medium text-slate-500">Kode Rujukan Anda</h4>
-                    <p class="font-mono font-bold text-indigo-600 mt-2 break-all" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ userProfile.data.referralCode }}</p>
-                </div>
-
-                <!-- Kolom Total Pendapatan -->
-                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 200ms;">
-                    <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
-                    </div>
-                    <div class="min-w-0">
-                        <h4 class="text-sm font-medium text-slate-500">Total Pendapatan</h4>
-                        <p class="font-bold text-slate-800 mt-1" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ formatCurrency(totalRevenue) }}</p>
-                    </div>
-                </div>
-
-                <!-- Kolom Tersedia untuk Dicairkan -->
-                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 300ms;">
-                    <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                    </div>
-                    <div class="min-w-0">
-                        <h4 class="text-sm font-medium text-slate-500">Tersedia Dicairkan</h4>
-                        <p class="font-bold text-green-600 mt-1" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ formatCurrency(availableForWithdrawal) }}</p>
-                    </div>
-                </div>
-                
-                <!-- Kolom Sedang Diproses -->
-                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 400ms;">
-                    <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <div class="min-w-0">
-                        <h4 class="text-sm font-medium text-slate-500">Sedang Diproses</h4>
-                        <p class="font-bold text-yellow-600 mt-1" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ formatCurrency(totalProcessingCommission) }}</p>
-                    </div>
-                </div>
-
-                <!-- Kolom Sudah Dicairkan -->
-                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 500ms;">
-                    <div class="bg-cyan-100 text-cyan-600 p-3 rounded-lg flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </div>
-                    <div class="min-w-0">
-                        <h4 class="text-sm font-medium text-slate-500">Sudah Dicairkan</h4>
-                        <p class="font-bold text-slate-800 mt-1" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ formatCurrency(totalWithdrawn) }}</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 600ms;">
-                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-slate-800">Riwayat Komisi (Siap Dicairkan)</h3>
-                    <button @click="handleCashoutRequest" :disabled="totalUnpaidCommission === 0 || isSaving" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-lg shadow-green-500/20 hover:bg-green-700 transition-colors disabled:bg-slate-400 disabled:shadow-none">
-                        <span v-if="isSaving">Mengajukan...</span>
-                        <span v-else>Cairkan Semua Komisi</span>
-                    </button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left text-slate-500">
-                         <thead class="text-xs text-slate-700 uppercase bg-slate-50/50">
-                            <tr>
-                                <th class="px-6 py-3">Tanggal</th>
-                                <th class="px-6 py-3">Pelanggan Rujukan</th>
-                                <th class="px-6 py-3 text-right">Jumlah Komisi</th>
-                                <th class="px-6 py-3 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="unpaidCommissions.length === 0">
-                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada komisi yang siap dicairkan.</td>
-                            </tr>
-                            <tr v-for="com in unpaidCommissions" :key="com.id" class="hover:bg-slate-50/50">
-                                <td class="px-6 py-4">{{ new Date(com.createdAt.seconds * 1000).toLocaleDateString('id-ID') }}</td>
-                                <td class="px-6 py-4">{{ com.referredUserEmail }}</td>
-                                <td class="px-6 py-4 text-right font-bold text-green-600">{{ formatCurrency(com.commissionAmount) }}</td>
-                                <td class="px-6 py-4 text-center">
-                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 capitalize">{{ com.status }}</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="mt-8 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 700ms;">
-                 <h3 class="text-lg font-semibold text-slate-800 mb-4">Pencairan Sedang Diproses</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left text-slate-500">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-50/50">
-    <tr>
-        <th class="px-6 py-3">Tanggal Pengajuan</th>
-        <th class="px-6 py-3">ID Pencairan</th> <th class="px-6 py-3">Pelanggan Rujukan</th>
-        <th class="px-6 py-3 text-right">Jumlah Komisi</th>
-        <th class="px-6 py-3 text-center">Status</th>
-    </tr>
-</thead>
-                        <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="processingCommissions.length === 0">
-                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada pencairan yang sedang diproses.</td>
-                            </tr>
-                            <tr v-for="com in processingCommissions" :key="com.id" class="hover:bg-slate-50/50">
-    <td class="px-6 py-4">{{ new Date(com.createdAt.seconds * 1000).toLocaleDateString('id-ID') }}</td>
-    <td class="px-6 py-4 font-mono text-xs">{{ com.withdrawalId }}</td> <td class="px-6 py-4">{{ com.referredUserEmail }}</td>
-    <td class="px-6 py-4 text-right font-bold text-yellow-600">{{ formatCurrency(com.commissionAmount) }}</td>
-    <td class="px-6 py-4 text-center">
-        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">Processing</span>
-    </td>
-</tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div v-if="activePage === 'laporan-transaksi'" class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
-<div v-if="isLaporanTransaksiLocked" class="mx-auto mt-16 max-w-sm rounded-2xl border bg-white p-8 text-center shadow-xl"><h3 class="text-xl font-bold">Halaman Terkunci</h3><p class="my-3 text-sm text-slate-600">Masukkan PIN keamanan Anda untuk membuka.</p><form @submit.prevent="unlockLaporanTransaksi"><input type="password" v-model="uiState.laporanTransaksiPinInput" placeholder="••••" class="w-full rounded-md border p-2 text-center text-lg"><p v-if="uiState.laporanTransaksiPinError" class="my-2 text-xs text-red-600">{{ uiState.laporanTransaksiPinError }}</p><button type="submit" class="mt-2 w-full rounded-lg bg-indigo-600 py-2.5 font-bold text-white">Buka</button></form></div>
-<div v-else class="mx-auto max-w-7xl space-y-5"><header class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Operasional</p><h2 class="text-3xl font-bold">Laporan Transaksi</h2><p class="mt-1 text-sm text-slate-600">Ringkasan pesanan berdasarkan tanggal terkirim. Total pencairan marketplace ada di Laporan Keuangan.</p></div><label class="text-sm font-medium">Tahun <input type="number" v-model.number="uiState.laporanTransaksiTahun" class="ml-2 w-28 rounded-md border p-2"></label></header>
-<div class="overflow-x-auto rounded-2xl border bg-white shadow-sm"><table class="w-full min-w-[760px] text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Bulan</th><th class="p-4 text-right">Pesanan diproses</th><th class="p-4 text-right">Qty tercatat</th><th class="p-4 text-right">HPP transaksi</th><th class="p-4 text-right">Dana dikonfirmasi</th><th class="p-4 text-right">Belum selesai</th></tr></thead><tbody class="divide-y"><tr v-for="month in laporanTransaksiData.months" :key="month.monthName"><td class="p-4 font-semibold capitalize">{{ month.monthName }}</td><td class="p-4 text-right">{{ formatNumber(month.totalOrders) }}</td><td class="p-4 text-right">{{ formatNumber(month.totalQty) }} pcs</td><td class="p-4 text-right">{{ formatCurrency(month.totalHpp) }}</td><td class="p-4 text-right text-emerald-700">{{ formatNumber(month.successfulOrders) }}</td><td class="p-4 text-right text-amber-700">{{ formatNumber(month.pendingOrders) }}</td></tr></tbody><tfoot class="border-t-2 bg-slate-50 font-bold"><tr><td class="p-4">TOTAL {{ uiState.laporanTransaksiTahun }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.totalOrders) }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.totalQty) }} pcs</td><td class="p-4 text-right">{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalHpp) }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.successfulOrders) }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.pendingOrders) }}</td></tr></tfoot></table></div>
-<p class="rounded-lg bg-indigo-50 p-3 text-xs text-indigo-900">Transaksi tetap tersimpan setelah antrean scan dibersihkan. Ringkasan ini menghitung data operasional dan HPP; total dana marketplace tidak dibagi ke setiap pesanan.</p></div></div>
-
-<div v-if="activePage === 'roas-dashboard'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto animate-fade-in-up">
-
-        <div class="mb-8">
-            <h2 class="text-3xl font-bold text-slate-800">Dashboard ROAS Iklan</h2>
-            <p class="text-slate-500 mt-1">
-                Pantau performa iklan berdasarkan data POS, HPP produk, biaya marketplace, dan anggaran iklan.
-            </p>
-        </div>
-
-        <div class="bg-white p-6 rounded-2xl shadow border border-slate-200 mb-6">
-            <h3 class="text-lg font-bold text-slate-800 mb-4">Filter & Anggaran</h3>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Periode</label>
-                    <select v-model="uiState.roasDashboard.dateFilter" class="mt-1 w-full p-2 border rounded-lg">
-                        <option value="today">Hari Ini</option>
-                        <option value="last_7_days">7 Hari Terakhir</option>
-                        <option value="last_30_days">30 Hari Terakhir</option>
-                        <option value="this_month">Bulan Ini</option>
-                        <option value="all_time">Semua Data</option>
-                    </select>
-                </div>
-
-<div>
-    <label class="block text-sm font-medium text-slate-700">Channel Penjualan</label>
-    <select v-model="uiState.roasDashboard.channelId" class="mt-1 w-full p-2 border rounded-lg">
-        <option value="all">Semua Channel</option>
-        <option
-            v-for="channel in state.settings.marketplaces"
-            :key="channel.id"
-            :value="channel.id"
-        >
-            {{ channel.name }}
-        </option>
-    </select>
-</div>
-
-<div>
-    <label class="block text-sm font-medium text-slate-700">Model Produk</label>
-    <select v-model="uiState.roasDashboard.selectedModelId" class="mt-1 w-full p-2 border rounded-lg">
-        <option value="all">Semua Model</option>
-        <option
-    v-for="model in uniqueRoasModels"
-    :key="model.namaModel"
-    :value="model.namaModel"
->
-    {{ model.namaModel }}
-</option>
-    </select>
-</div>
-
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Biaya Iklan</label>
-                    <input type="number" v-model.number="uiState.roasDashboard.adSpend" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 100000">
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Pajak (%)</label>
-                    <input type="number" v-model.number="uiState.roasDashboard.taxPercent" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 0.5">
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
-            <div class="bg-white p-5 rounded-2xl shadow border">
-                <p class="text-sm text-slate-500">Omset</p>
-                <p class="text-2xl font-bold text-slate-800">{{ formatCurrency(roasDashboardData.omset) }}</p>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl shadow border">
-                <p class="text-sm text-slate-500">ROAS</p>
-                <p class="text-2xl font-bold text-blue-700">{{ roasDashboardData.roas.toFixed(2) }}x</p>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl shadow border">
-                <p class="text-sm text-slate-500">Rugi ROAS (BEP)</p>
-                <p class="text-2xl font-bold text-orange-600">{{ roasDashboardData.bepRoas.toFixed(2) }}x</p>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl shadow border">
-                <p class="text-sm text-slate-500">Status</p>
-                <p class="text-xl font-bold" :class="roasDashboardData.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">
-                    {{ roasDashboardData.status }}
-                </p>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded-2xl shadow border">
-                <h3 class="text-lg font-bold text-slate-800 mb-4">Ringkasan Penjualan</h3>
-
-                <div class="space-y-3">
-                    <div class="flex justify-between border-b pb-2">
-                        <span>Total Order</span>
-                        <strong>{{ roasDashboardData.totalOrder }}</strong>
-                    </div>
-                    <div class="flex justify-between border-b pb-2">
-                        <span>Qty Terjual</span>
-                        <strong>{{ formatNumber(roasDashboardData.qtyTerjual) }} pcs</strong>
-                    </div>
-                    <div class="flex justify-between border-b pb-2">
-                        <span>Omset</span>
-                        <strong>{{ formatCurrency(roasDashboardData.omset) }}</strong>
-                    </div>
-                    <div class="flex justify-between border-b pb-2">
-                        <span>Laba Kotor</span>
-                        <strong>{{ formatCurrency(roasDashboardData.labaKotor) }}</strong>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Margin Bersih</span>
-                        <strong>{{ roasDashboardData.marginBersih.toFixed(2) }}%</strong>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow border">
-                <h3 class="text-lg font-bold text-slate-800 mb-4">Rincian Biaya</h3>
-
-                <div class="space-y-3">
-                    <div class="flex justify-between border-b pb-2">
-                        <div class="flex justify-between border-b pb-2">
-    <span>Diskon</span>
-
-    <strong class="text-red-600">
-        -{{ formatCurrency(roasDashboardData.discount) }}
-    </strong>
-</div>
-                        <span>HPP Terjual</span>
-                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.totalHpp) }}</strong>
-                    </div>
-                
-                    <div class="flex justify-between border-b pb-2">
-                        <span>Biaya Marketplace</span>
-                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaMarketplace) }}</strong>
-                    </div>
-                    <div class="flex justify-between border-b pb-2">
-                        <span>Biaya Iklan</span>
-                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaIklan) }}</strong>
-                    </div>
-                    <div class="flex justify-between border-b pb-2">
-                        <span>Biaya Operasional</span>
-                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaOperasional) }}</strong>
-                    </div>
-                    <div class="flex justify-between border-b pb-2">
-                        <span>Estimasi Pajak</span>
-                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.pajak) }}</strong>
-                    </div>
-                    <div class="flex justify-between pt-2 text-lg">
-                        <span class="font-bold">Laba Setelah Iklan</span>
-                        <strong :class="roasDashboardData.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">
-                            {{ formatCurrency(roasDashboardData.labaBersih) }}
-                            <p class="text-xs text-slate-500 mt-1">
-    Belum termasuk biaya operasional.
-</p>
-                        </strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </div>
-</div>
-
-<div v-if="activePage === 'roas-calculator'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto animate-fade-in-up">
-        <div class="mb-8">
-            <h2 class="text-3xl font-bold text-slate-800">Kalkulator Target ROAS Iklan</h2>
-            <p class="text-slate-500 mt-1">Tentukan target ROAS Anda agar iklan tidak merugi dan mencapai target profit.</p>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            
-            <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 space-y-4 lg:sticky lg:top-8">
-                <div class="flex items-center justify-between border-b pb-3">
-                    <h3 class="text-xl font-bold text-slate-800">1. Masukkan Data</h3>
-                    <button @click="showModal('roasInputInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Harga Jual / AOV</label>
-                    <input type="number" v-model.number="uiState.roasCalculator.hargaJual" class="mt-1 w-full p-2 border rounded-md font-semibold">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Modal Produk (HPP)</label>
-                    <input type="number" v-model.number="uiState.roasCalculator.modalProduk" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Biaya Packing & Lainnya</label>
-                    <input type="number" v-model.number="uiState.roasCalculator.biayaPacking" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Biaya Admin Marketplace (Rp)</label>
-                    <input type="number" v-model.number="uiState.roasCalculator.biayaAdminMarketplace" class="mt-1 w-full p-2 border rounded-md">
-                </div>
-            </div>
-
-            <div class="lg:col-span-2 space-y-6">
-                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
-                    <div class="flex items-center justify-between border-b pb-3 mb-4">
-                        <h3 class="text-xl font-bold text-slate-800">2. Hasil Perhitungan</h3>
-                        <button @click="showModal('roasResultInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
-                    </div>
-                    <div v-if="roasResults.error" class="p-4 bg-red-100 text-red-700 border border-red-200 rounded-lg">
-                        {{ roasResults.error }}
-                    </div>
-                    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                        <div class="p-4 bg-slate-50 rounded-lg border">
-                            <p class="text-sm font-medium text-slate-500">Profit Kotor / Penjualan</p>
-                            <p class="text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(roasResults.profitKotor) }}</p>
-                        </div>
-                        <div class="p-4 bg-yellow-100 rounded-lg border border-yellow-300">
-                            <p class="text-sm font-medium text-yellow-800">ROAS Impas (BEP)</p>
-                            <p class="text-2xl font-bold mt-1 text-yellow-900">{{ roasResults.breakEvenROAS.toFixed(2) }}</p>
-                            <p class="text-xs text-yellow-700">ROAS minimum agar tidak rugi</p>
-                        </div>
-                        <div class="p-4 bg-slate-50 rounded-lg border">
-                            <p class="text-sm font-medium text-slate-500">Margin Profit Kotor</p>
-                            <p class="text-2xl font-bold mt-1 text-indigo-600">{{ roasResults.profitMargin.toFixed(1) }}%</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
-                    <h3 class="text-xl font-bold text-slate-800 border-b pb-3 mb-4">3. Target ROAS (untuk Profit)</h3>
-                    <p class="text-sm text-slate-600 mb-4">Untuk mendapatkan margin profit bersih dari penjualan, Anda harus mencapai target ROAS berikut:</p>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="text-left bg-slate-100">
-                                <tr>
-                                    <th class="p-3 font-semibold text-slate-600">Target Profit Margin</th>
-                                    <th class="p-3 font-semibold text-slate-600 text-center">Target ROAS yang Dibutuhkan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="target in roasResults.targets" :key="target.margin" class="border-b">
-                                    <td class="p-3">Target profit **{{ target.margin }}%** dari Harga Jual</td>
-                                    <td class="p-3 text-center font-bold text-lg" :class="target.roas > roasResults.breakEvenROAS ? 'text-green-600' : 'text-slate-500'">
-                                        <span v-if="isFinite(target.roas)">{{ target.roas.toFixed(2) }}</span>
-                                        <span v-else>Tidak Mungkin</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
-                    <div class="flex items-center justify-between border-b pb-3 mb-4">
-    <h3 class="text-xl font-bold text-slate-800">4. Simulasi Iklan dengan Budget</h3>
-    <button @click="showModal('roasSimulationInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
-</div>
-                    <div class="max-w-md mb-6">
-                        <label class="block text-sm font-medium text-slate-700">Masukkan Estimasi Budget Iklan (per bulan)</label>
-                        <input type="number" v-model.number="uiState.roasCalculator.estimasiBiayaIklan" class="mt-1 w-full p-2 border rounded-md font-semibold">
-                    </div>
-
-                    <div v-if="roasResults.error">
-                        <p class="text-slate-500 text-center py-4">Silakan lengkapi data produk di atas terlebih dahulu.</p>
-                    </div>
-                    <div v-else class="overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead class="text-left bg-slate-100">
-                                <tr>
-                                    <th class="p-3 font-semibold text-slate-600">Skenario</th>
-                                    <th class="p-3 font-semibold text-slate-600 text-center">Target ROAS</th>
-                                    <th class="p-3 font-semibold text-slate-600 text-center">Estimasi Order</th>
-                                    <th class="p-3 font-semibold text-slate-600 text-right">Estimasi Omset</th>
-                                    <th class="p-3 font-semibold text-slate-600 text-right bg-indigo-100 text-indigo-800">Estimasi Laba Bersih<br><span class="font-normal text-xs">(Setelah Biaya Iklan)</span></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="sim in roasSimulationResults" :key="sim.scenario" class="border-b">
-                                    <td class="p-3 font-semibold">{{ sim.scenario }}</td>
-                                    <td class="p-3 text-center text-lg font-bold" :class="{'text-yellow-700': sim.scenario.includes('Impas'), 'text-green-700': sim.scenario.includes('Target')}">
-                                        <div v-if="sim.scenario.includes('Kustom')" class="w-24 mx-auto">
-                                            <input type="number" step="0.1" v-model.number="uiState.roasCalculator.customRoasTarget" class="w-full p-1 text-center border rounded-md">
-                                        </div>
-                                        <span v-else>{{ typeof sim.targetRoas === 'number' ? sim.targetRoas.toFixed(2) : sim.targetRoas }}</span>
-                                    </td>
-                                    <td class="p-3 text-center">{{ sim.estimasiOrder.toFixed(0) }} order</td>
-                                    <td class="p-3 text-right">{{ formatCurrency(sim.estimasiOmset) }}</td>
-                                    <td class="p-3 text-right text-lg font-bold" :class="sim.estimasiLabaBersih >= 0 ? 'text-green-600' : 'text-red-600'">
-                                        {{ formatCurrency(sim.estimasiLabaBersih) }}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </div>
-</div>
-
-<div v-if="activePage === 'laporan-keuangan'" class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-<div v-if="isLaporanKeuanganLocked" class="mx-auto mt-16 max-w-sm rounded-2xl border bg-white p-8 text-center shadow-xl"><h3 class="text-xl font-bold">Halaman Terkunci</h3><p class="my-3 text-sm text-slate-600">Masukkan PIN keamanan Anda untuk membuka.</p><form @submit.prevent="unlockLaporanKeuangan"><input type="password" v-model="uiState.laporanKeuanganPinInput" placeholder="••••" class="w-full rounded-md border p-2 text-center text-lg"><p v-if="uiState.laporanKeuanganPinError" class="my-2 text-xs text-red-600">{{ uiState.laporanKeuanganPinError }}</p><button type="submit" class="mt-2 w-full rounded-lg bg-indigo-600 py-2.5 font-bold text-white">Buka</button></form></div>
-<div v-else class="mx-auto max-w-7xl space-y-5"><header class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Keuangan</p><h2 class="text-3xl font-bold">Laporan Keuangan</h2><p class="mt-1 text-sm text-slate-600">Pencairan marketplace dicatat satu kali per toko/periode; HPP dihitung dari pesanan yang berhasil dikonfirmasi.</p></div><label class="text-sm font-medium">Tahun <input type="number" v-model.number="uiState.laporanKeuanganTahun" class="ml-2 w-28 rounded-md border p-2"></label></header>
-<section class="grid gap-4 md:grid-cols-3">
-<article class="rounded-xl border bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-500">Dana dilepas</p><p class="mt-1 text-xl font-bold">{{ formatCurrency(laporanKeuanganData.yearlyTotals.payoutAmount) }}</p></article>
-<article class="rounded-xl border bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-500">Laba/rugi setelah HPP dan biaya</p><p class="mt-1 text-xl font-bold" :class="laporanKeuanganData.yearlyTotals.netProfit===null?'text-amber-700':laporanKeuanganData.yearlyTotals.netProfit>=0?'text-emerald-700':'text-red-700'">{{ laporanKeuanganData.yearlyTotals.netProfit===null?'Lengkapi data':formatCurrency(laporanKeuanganData.yearlyTotals.netProfit) }}</p></article>
-<article class="rounded-xl border bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-500">Laba belum dibagikan</p><p class="mt-1 text-xl font-bold text-indigo-700">{{ laporanKeuanganData.yearlyTotals.undistributedProfit===null?'Lengkapi data':formatCurrency(laporanKeuanganData.yearlyTotals.undistributedProfit) }}</p></article>
-</section>
-<section class="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5">
-<h3 class="font-bold text-slate-900">Catat bagi hasil dan pengembalian modal</h3>
-<p class="mt-1 text-sm text-slate-600">Gunakan halaman Modal &amp; Bagi Hasil agar setiap pembayaran tertaut ke periode, laba, persentase kesepakatan, dan nominal yang benar-benar dibayarkan. Pembayaran modal dan bagi hasil tidak mengubah laba usaha.</p>
-<button type="button" @click="changePage('investasi')" class="mt-3 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white">Buka Modal &amp; Bagi Hasil</button>
-</section>
-<div class="overflow-x-auto rounded-2xl border bg-white shadow-sm"><table class="w-full min-w-[720px] text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Bulan</th><th class="p-4 text-right">Total pencairan marketplace</th><th class="p-4 text-right">HPP pesanan berhasil</th><th class="p-4 text-right">Biaya operasional</th><th class="p-4 text-right">Laba setelah HPP & biaya</th></tr></thead><tbody class="divide-y"><tr v-for="month in laporanKeuanganData.months" :key="month.monthName"><td class="p-4 font-semibold capitalize">{{ month.monthName }}</td><td class="p-4 text-right">{{ formatCurrency(month.payoutAmount) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.soldHpp) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.operatingCosts) }}</td><td class="p-4 text-right font-bold" :class="month.netProfit===null?'text-amber-700':month.netProfit>=0?'text-emerald-700':'text-red-700'">{{ month.netProfit===null?'Lengkapi total pencairan':formatCurrency(month.netProfit) }}</td></tr></tbody><tfoot class="border-t-2 bg-slate-50 font-bold"><tr><td class="p-4">TOTAL {{ uiState.laporanKeuanganTahun }}</td><td class="p-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.payoutAmount) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.soldHpp) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.operatingCosts) }}</td><td class="p-4 text-right">{{ laporanKeuanganData.yearlyTotals.netProfit===null?'Lengkapi total pencairan':formatCurrency(laporanKeuanganData.yearlyTotals.netProfit) }}</td></tr></tfoot></table></div>
-<p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Masukkan total dana dilepas dari ringkasan marketplace di halaman Impor Pesanan Terkirim. Jika total pencairan belum dicatat, laba ditampilkan sebagai belum lengkap agar tidak keliru dianggap Rp0.</p></div></div>
-
-<div v-if="activePage === 'statistik-penjualan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-
-    <div v-if="isStatistikPenjualanLocked" class="flex items-center justify-center min-h-[70vh] animate-fade-in">
-        <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
-            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-            </div>
-            <h3 class="text-xl font-bold text-slate-800 mb-2">Statistik Penjualan Terkunci</h3>
-            <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan untuk melihat statistik penjualan.</p>
-            <form @submit.prevent="unlockStatistikPenjualan" class="w-full">
-                <input type="password" v-model="uiState.statistikPenjualanPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2" autocomplete="current-password">
-                <p v-if="uiState.statistikPenjualanPinError" class="text-red-500 text-xs mb-2">{{ uiState.statistikPenjualanPinError }}</p>
-                <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka Statistik Penjualan</button>
-            </form>
-        </div>
-    </div>
-
-    <div v-else class="max-w-7xl mx-auto space-y-6">
-
-        <div class="bg-white/90 backdrop-blur-sm rounded-3xl border border-slate-200 shadow-xl p-6">
-            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-                <div>
-                    <p class="text-sm text-slate-500">Analisis performa produk</p>
-                    <h2 class="text-3xl font-bold text-slate-800 mt-1">Statistik Penjualan</h2>
-                    <p class="text-slate-500 mt-2 max-w-2xl">
-                        Pantau jumlah pesanan, HPP, serta model dan varian yang paling banyak terjual.
-                    </p>
-                </div>
-
-                <div class="w-full lg:w-[760px] space-y-3">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1">Periode</label>
-                            <select v-model="uiState.salesStatsDateFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
-                                <option value="all_time">Semua</option>
-                                <option value="today">Hari Ini</option>
-                                <option value="last_7_days">7 Hari Terakhir</option>
-                                <option value="last_30_days">30 Hari Terakhir</option>
-                                <option value="this_month">Bulan Ini</option>
-                                <option value="last_month">Bulan Lalu</option>
-                                <option value="this_year">Tahun Ini</option>
-                                <option value="custom_dates">Rentang tanggal</option>
-                                <option value="month_range">Rentang bulan</option>
-                                <option value="year">Pilih tahun</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1">Model</label>
-                            <select v-model="uiState.salesStatsModelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
-                                <option value="all">Semua Model</option>
-                                <option v-for="model in salesStatsModelOptions" :key="model.namaModel" :value="model.namaModel">{{ model.namaModel }}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1">Channel</label>
-                            <select v-model="uiState.salesStatsChannelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
-                                <option value="all">Semua Channel</option>
-                                <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.name">{{ channel.name }}</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div v-if="uiState.salesStatsDateFilter === 'custom_dates'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
-                        <label class="block text-xs font-semibold text-slate-600">Tanggal mulai<input v-model="uiState.salesStatsStartDate" type="date" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
-                        <label class="block text-xs font-semibold text-slate-600">Tanggal selesai<input v-model="uiState.salesStatsEndDate" type="date" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
-                    </div>
-                    <div v-if="uiState.salesStatsDateFilter === 'month_range'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
-                        <label class="block text-xs font-semibold text-slate-600">Bulan mulai<input v-model="uiState.salesStatsStartMonth" type="month" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
-                        <label class="block text-xs font-semibold text-slate-600">Bulan selesai<input v-model="uiState.salesStatsEndMonth" type="month" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
-                    </div>
-                    <div v-if="uiState.salesStatsDateFilter === 'year'" class="max-w-xs rounded-xl bg-slate-50 p-3">
-                        <label class="block text-xs font-semibold text-slate-600">Tahun<select v-model.number="uiState.salesStatsYear" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"><option v-for="year in Array.from({ length: new Date().getFullYear() - 2000 + 1 }, (_, index) => 2000 + index)" :key="year" :value="year">{{ year }}</option></select></label>
-                    </div>
-                    <p v-if="salesPerformanceStats.dateRangeInvalid" class="text-xs text-red-600">Periksa rentang periode yang dipilih.</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Total Order</p>
-                <p class="text-3xl font-bold text-slate-800 mt-2">{{ formatNumber(salesPerformanceStats.totalOrder) }}</p>
-                <p class="text-xs text-slate-400 mt-2">Jumlah transaksi sesuai filter.</p>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Total Produk Terjual</p>
-                <p class="text-3xl font-bold text-cyan-600 mt-2">{{ formatNumber(salesPerformanceStats.totalQty) }} pcs</p>
-                <p class="text-xs text-slate-400 mt-2">Total qty produk yang terjual.</p>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Total HPP</p>
-                <p class="text-3xl font-bold text-orange-600 mt-2">{{ formatCurrency(salesPerformanceStats.totalHpp) }}</p>
-                <p class="text-xs text-slate-400 mt-2">Total modal produk pada pesanan sesuai filter.</p>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Rata-rata HPP per pcs</p>
-                <p class="text-3xl font-bold text-orange-600 mt-2">{{ formatCurrency(salesPerformanceStats.averageHppPerUnit) }}</p>
-                <p class="text-xs text-slate-400 mt-2">Total HPP dibagi jumlah pcs terjual.</p>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Model Terlaris</p>
-                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topModels[0]?.name || 'Belum ada data' }}</p>
-                <p class="text-sm text-slate-500 mt-2">
-                    {{ salesPerformanceStats.topModels[0] ? formatNumber(salesPerformanceStats.topModels[0].qty) + ' pcs terjual' : '-' }}
-                </p>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Warna Terlaris</p>
-                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topColors[0]?.name || 'Belum ada data' }}</p>
-                <p class="text-sm text-slate-500 mt-2">
-                    {{ salesPerformanceStats.topColors[0] ? formatNumber(salesPerformanceStats.topColors[0].qty) + ' pcs terjual' : '-' }}
-                </p>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Ukuran Terlaris</p>
-                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topSizes[0]?.name || 'Belum ada data' }}</p>
-                <p class="text-sm text-slate-500 mt-2">
-                    {{ salesPerformanceStats.topSizes[0] ? formatNumber(salesPerformanceStats.topSizes[0].qty) + ' pcs terjual' : '-' }}
-                </p>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Channel Pesanan Terbanyak</p>
-                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topChannels[0]?.name || 'Belum ada data' }}</p>
-                <p class="text-sm text-slate-500 mt-2">
-                    {{ salesPerformanceStats.topChannels[0] ? formatNumber(salesPerformanceStats.topChannels[0].order) + ' order · ' + formatNumber(salesPerformanceStats.topChannels[0].qty) + ' pcs' : '-' }}
-                </p>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
-            <div class="flex items-center justify-between gap-4 mb-5">
-                <div>
-                    <p class="text-sm text-slate-500">Ranking produk</p>
-                    <h3 class="text-xl font-bold text-slate-800">Performa Produk per SKU</h3>
-                </div>
-                <p class="text-sm text-slate-400">20 SKU dengan pcs terjual terbanyak</p>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50 text-slate-500 text-left">
-                        <tr>
-                            <th class="px-4 py-3 font-semibold">SKU</th>
-                            <th class="px-4 py-3 font-semibold">Model</th>
-                            <th class="px-4 py-3 font-semibold">Warna</th>
-                            <th class="px-4 py-3 font-semibold">Ukuran</th>
-                            <th class="px-4 py-3 font-semibold text-right">Qty Terjual</th>
-                            <th class="px-4 py-3 font-semibold text-right">HPP / pcs</th>
-                            <th class="px-4 py-3 font-semibold text-right">Total HPP</th>
-                        </tr>
-                    </thead>
-
-                    <tbody class="divide-y divide-slate-100">
-                        <tr v-if="salesPerformanceStats.topProducts.length === 0">
-                            <td colspan="7" class="px-4 py-6 text-center text-slate-500">
-                                Belum ada data penjualan untuk filter ini.
-                            </td>
-                        </tr>
-
-                        <tr v-for="item in salesPerformanceStats.topProducts" :key="item.sku + '|' + item.model + '|' + item.color + '|' + item.size" class="hover:bg-slate-50">
-                            <td class="px-4 py-3 text-blue-600 font-mono">{{ item.sku }}</td>
-                            <td class="px-4 py-3 font-semibold text-slate-800">{{ item.model }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ item.color }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ item.size }}</td>
-                            <td class="px-4 py-3 text-right font-bold">{{ formatNumber(item.qty) }}</td>
-                            <td class="px-4 py-3 text-right text-orange-600">{{ formatCurrency(item.hppPerUnit) }}</td>
-                            <td class="px-4 py-3 text-right font-bold text-orange-700">{{ formatCurrency(item.hpp) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <section class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <p class="text-sm font-medium text-indigo-600">Tren penjualan</p>
-                    <h3 class="text-xl font-bold text-slate-800">Model dan varian yang meningkat</h3>
-                    <p class="mt-1 text-sm text-slate-500">Perbandingan pcs terjual per model, warna, dan ukuran.</p>
-                </div>
-                <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                    {{ salesPerformanceStats.hasComparison ? 'Periode aktif vs periode sebelumnya' : 'Pcs pada periode aktif' }}
-                </span>
-            </div>
-            <div v-if="salesPerformanceStats.variantTrend.length" class="mt-5 w-full" :style="{ height: Math.max(280, salesPerformanceStats.variantTrend.length * 48) + 'px' }">
-                <canvas ref="salesStatsChartCanvas" aria-label="Grafik pcs terjual berdasarkan model, warna, dan ukuran" role="img"></canvas>
-            </div>
-            <div v-else class="mt-5 rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
-                Belum ada data penjualan yang sesuai filter untuk ditampilkan pada grafik.
-            </div>
-        </section>
-
-    </div>
-</div>
-
-
-
-<div v-if="activePage === 'pengaturan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto">
-        
-        <div class="mb-8 animate-fade-in-up">
-            <h2 class="text-3xl font-bold text-slate-800">Pengaturan Aplikasi</h2>
-            <p class="text-slate-500 mt-1">Kelola semua konfigurasi inti untuk bisnis Anda di sini.</p>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-            
-            <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-lg border border-slate-200 lg:sticky lg:top-8 animate-fade-in-up" style="animation-delay: 100ms;">
-                <h3 class="text-xl font-bold text-slate-800 mb-4 px-3">Pengaturan</h3>
-                <ul class="space-y-1 text-base font-medium">
-                    <li>
-                        <button @click="uiState.pengaturanTab = 'umum'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'umum', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'umum'}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" /></svg>
-                            Pengaturan Umum
-                        </button>
-                    </li>
-                    <li>
-                        <button @click="uiState.pengaturanTab = 'marketplace'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'marketplace', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'marketplace'}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /></svg>
-                            Marketplace
-                        </button>
-                    </li>
-                    <li>
-                        <button @click="uiState.pengaturanTab = 'modelproduk'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'modelproduk', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'modelproduk'}">
-                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
-                            Model Produk
-                        </button>
-                    </li>
-                    <li>
-                        <button @click="uiState.pengaturanTab = 'rekening'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'rekening', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'rekening'}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13h1v2H4v-2z" clip-rule="evenodd" /></svg>
-                            Rekening Bank
-                        </button>
-                    </li>
-                    <li v-if="isAdmin">
-                        <button @click="uiState.pengaturanTab = 'admin'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'admin', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'admin'}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.545 2.917A5.996 5.996 0 0010 18a5.996 5.996 0 004.545-2.083A5 5 0 0012 11z" clip-rule="evenodd" /></svg>
-                            Admin
-                        </button>
-                    </li>
-                </ul>
-            </div>
-
-            <div class="lg:col-span-3">
-                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
-                    
-                    <div v-if="uiState.pengaturanTab === 'umum'" class="animate-fade-in">
-                        <h3 class="text-xl font-bold text-slate-800 mb-6">Informasi Dasar & Keamanan</h3>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Nama Brand Anda</label>
-                                <input type="text" v-model="state.settings.brandName" class="w-full p-2 border border-slate-300 rounded-md">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Batas Stok Minimum Peringatan</label>
-                                <input type="number" v-model.number="state.settings.minStok" class="w-full p-2 border border-slate-300 rounded-md">
-                            </div>
-                        </div>
-                        <div class="border-t pt-4 mt-6">
-                            <h4 class="font-semibold text-slate-700 mb-2">Aktifkan Kunci PIN</h4>
-                            <p class="text-xs text-slate-500 mb-4">Pilih bagian mana saja yang ingin Anda amankan menggunakan PIN.</p>
-                            <div class="space-y-3">
-                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
-                                    <span class="font-medium text-sm text-slate-800">Kunci Halaman Dashboard</span>
-                                    <button @click="requestPinForToggle('dashboard')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.dashboard ? 'bg-indigo-600' : 'bg-slate-300'">
-                                        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.dashboard }"></span>
-                                    </button>
-                                </div>
-                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
-                                    <span class="font-medium text-sm text-slate-800">Kunci Tabel Riwayat Pemasukan</span>
-                                    <button @click="requestPinForToggle('incomeHistory')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.incomeHistory ? 'bg-indigo-600' : 'bg-slate-300'">
-                                        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.incomeHistory }"></span>
-                                    </button>
-                                </div>
-                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
-                                    <span class="font-medium text-sm text-slate-800">Kunci Halaman Investasi</span>
-                                    <button @click="requestPinForToggle('investmentPage')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.investmentPage ? 'bg-indigo-600' : 'bg-slate-300'">
-                                        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.investmentPage }"></span>
-                                    </button>
-                                </div>
-                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
-    <span class="font-medium text-sm text-slate-800">Kunci Laporan Transaksi</span>
-    <button @click="requestPinForToggle('laporanTransaksi')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.laporanTransaksi ? 'bg-indigo-600' : 'bg-slate-300'">
-        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.laporanTransaksi }"></span>
-    </button>
-</div>
-
-<div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
-    <span class="font-medium text-sm text-slate-800">Kunci Laporan Keuangan</span>
-    <button @click="requestPinForToggle('laporanKeuangan')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.laporanKeuangan ? 'bg-indigo-600' : 'bg-slate-300'">
-        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.laporanKeuangan }"></span>
-    </button>
-</div>
-
-<div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
-    <span class="font-medium text-sm text-slate-800">Kunci Harga & HPP</span>
-    <button @click="requestPinForToggle('hargaHpp')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.hargaHpp ? 'bg-indigo-600' : 'bg-slate-300'">
-        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.hargaHpp }"></span>
-    </button>
-</div>
-
-<div class="flex justify-between items-center gap-4 p-3 bg-slate-50 rounded-lg border">
-    <div>
-        <span class="font-medium text-sm text-slate-800">Kunci Statistik Penjualan</span>
-        <p class="text-xs text-slate-500 mt-1">PIN diminta saat membuka halaman Statistik Penjualan.</p>
-    </div>
-    <button @click="requestPinForToggle('statistikPenjualan')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0" :class="state.settings.pinProtection?.statistikPenjualan ? 'bg-indigo-600' : 'bg-slate-300'">
-        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.statistikPenjualan }"></span>
-    </button>
-</div>
-
-<div class="flex justify-between items-center gap-4 p-3 bg-slate-50 rounded-lg border">
-    <div>
-        <span class="font-medium text-sm text-slate-800">Kunci Semua Tombol Export</span>
-        <p class="text-xs text-slate-500 mt-1">Setiap export data harus dikonfirmasi dengan PIN.</p>
-    </div>
-    <button @click="requestPinForToggle('exportData')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0" :class="state.settings.pinProtection?.exportData ? 'bg-indigo-600' : 'bg-slate-300'">
-        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.exportData }"></span>
-    </button>
-</div>
-
-<div class="flex justify-between items-center gap-4 p-3 bg-slate-50 rounded-lg border">
-    <div>
-        <span class="font-medium text-sm text-slate-800">Kunci Detail Riwayat Transaksi</span>
-        <p class="text-xs text-slate-500 mt-1">PIN diminta setiap kali tombol Detail transaksi dibuka.</p>
-    </div>
-    <button @click="requestPinForToggle('transactionDetail')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0" :class="state.settings.pinProtection?.transactionDetail ? 'bg-indigo-600' : 'bg-slate-300'">
-        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.transactionDetail }"></span>
-    </button>
-</div>
-                            </div>
-                        </div>
-                        <div class="border-t pt-4 mt-6">
-                            <h4 class="font-semibold text-slate-700 mb-2">
-                                <span v-if="state.settings.dashboardPin">Ubah PIN Dasbor</span>
-                                <span v-else>Buat PIN Dasbor Baru</span>
-                            </h4>
-                            <div class="space-y-2">
-                                <div v-if="state.settings.dashboardPin">
-                                    <label class="block text-sm font-medium text-slate-700">PIN Lama</label>
-                                    <input type="password" v-model="uiState.oldPin" placeholder="Masukkan PIN lama" class="w-full p-2 border border-slate-300 rounded-md">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">PIN Baru</label>
-                                    <input type="password" v-model="uiState.newPin" placeholder="Masukkan PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700">Konfirmasi PIN Baru</label>
-                                    <input type="password" v-model="uiState.confirmNewPin" placeholder="Ketik ulang PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
-                                </div>
-                                <p v-if="uiState.pinError" class="text-sm text-red-500">{{ uiState.pinError }}</p>
-                            </div>
-                        </div>
-                        <div class="flex justify-end pt-4 border-t mt-6">
-                            <button @click="saveGeneralSettings" :disabled="isSavingSettings || !isSubscriptionActive" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">
-    <span v-if="isSavingSettings">Menyimpan...</span>
-    <span v-else>Simpan Perubahan</span>
-</button>
-                        </div>
-                    </div>
-
-                    <div v-if="uiState.pengaturanTab === 'marketplace'" class="animate-fade-in">
-    <div class="flex justify-between items-center mb-4">
-    <h3 class="text-xl font-bold text-slate-800">Daftar Marketplace</h3>
-
-    <div class="flex gap-2">
-        <button 
-            @click="requestProtectedExport(() => exportMarketplaceYangTampil())" 
-            class="bg-blue-600 text-white font-bold py-1 px-3 rounded-md hover:bg-blue-700 text-sm">
-            Export
-        </button>
-
-        <button 
-            @click="addMarketplace" 
-            class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm" 
-            :disabled="!isSubscriptionActive">
-            Tambah
-        </button>
-    </div>
-</div>
-    <p class="mb-4 text-sm text-slate-500">Atur nama channel saja. Data potongan dan penghasilan bersih dicatat dari laporan marketplace yang dicocokkan dengan transaksi.</p>
-    <div class="mb-4">
-        <input type="text" v-model="uiState.pengaturanMarketplaceSearch" placeholder="Cari nama marketplace..." class="w-full p-2 border border-slate-300 rounded-md">
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-<thead class="text-left text-slate-500"><tr><th class="p-2 font-medium">NAMA MARKETPLACE</th><th class="p-2 font-medium text-right">AKSI</th></tr></thead>
-<tbody class="divide-y divide-slate-200">
-<tr v-if="filteredMarketplaces.length === 0"><td colspan="2" class="p-4 text-center text-slate-500">Belum ada channel marketplace. Tambahkan Shopee, TikTok Shop, atau channel lain yang digunakan.</td></tr>
-<tr v-for="mp in (filteredMarketplaces || [])" :key="mp.id"><td class="p-3 font-semibold text-slate-700">{{ mp.name }}</td><td class="p-3 text-right space-x-4">
-<button @click="showModal('editMarketplace', JSON.parse(JSON.stringify(mp)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
-<button @click="removeMarketplace(mp.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">Hapus</button>
-</td></tr></tbody></table>
-    </div>
-    <div class="flex justify-end pt-4 border-t mt-6">
-        <button @click="saveSettingsData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:shadow-none">
-    <span v-if="isSaving">Menyimpan...</span>
-    <span v-else>Simpan Perubahan</span>
-</button>
-    </div>
-</div>
-                    
-                    <div v-if="uiState.pengaturanTab === 'modelproduk'" class="animate-fade-in">
-    <div class="flex justify-between items-center mb-4">
-        <div class="flex items-center gap-4">
-    <h3 class="text-xl font-bold text-slate-800">Daftar Model Produk</h3>
-    <button @click="showModal('modelProdukInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-1 px-3 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-        </svg>
-        Informasi
-    </button>
-</div>
-        <button @click="addModelProduk" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm" :disabled="!isSubscriptionActive">+ Tambah Model</button>
-    </div>
-    
-    <div class="mb-4">
-        <input type="text" v-model="uiState.pengaturanModelProdukSearch" placeholder="Cari nama model..." class="w-full p-2 border border-slate-300 rounded-md">
-    </div>
-
-    <div class="overflow-x-auto" style="max-height: 50vh;">
-        <table class="w-full text-sm">
-            <thead class="text-left text-slate-500">
-                <tr>
-                    <th class="p-2 font-medium">NAMA MODEL</th>
-                    <th class="p-2 font-medium">WARNA</th>
-                    <th class="p-2 font-medium">UKURAN</th>
-                    <th class="p-2 font-medium">YARD</th>
-                    <th class="p-2 font-medium">HARGA MAKLUN</th>
-                    <th class="p-2 font-medium">HARGA JAHIT</th>
-                    <th class="p-2 font-medium text-right">AKSI</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-200">
-                <tr v-if="filteredModelProduk.length === 0">
-                    <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada model yang cocok.</td>
-                </tr>
-                <tr v-for="model in filteredModelProduk" :key="model.id">
-                    <td class="p-3 font-semibold text-slate-700">{{ model.namaModel }}</td>
-                    <td class="p-3">{{ model.warna }}</td>
-                    <td class="p-3">{{ model.ukuran }}</td>
-                    <td class="p-3">{{ model.yardPerModel || 0 }} y</td>
-                    <td class="p-3">{{ formatCurrency(model.hargaMaklun || 0) }}</td>
-                    <td class="p-3">{{ formatCurrency(model.hargaJahit || 0) }}</td>
-                    <td class="p-3 text-right space-x-4">
-                        <button @click="showModal('editModelProduk', JSON.parse(JSON.stringify(model)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
-                        <button @click="removeModelProduk(model.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">
-    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-</button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    <div class="flex justify-end pt-4 border-t mt-6">
-        <button @click="saveSettingsData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:shadow-none">
-    <span v-if="isSaving">Menyimpan...</span>
-    <span v-else>Simpan Perubahan</span>
-</button>
-    </div>
-</div>
-                    
-                    <div v-if="uiState.pengaturanTab === 'rekening'" class="animate-fade-in">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-slate-800">Daftar Rekening Bank</h3>
-                            <button @click="showModal('addBankAccount', { bankName: '', accountNumber: '', accountName: '' })" class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm" :disabled="!isSubscriptionActive">Tambah</button>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead class="text-left text-slate-500">
-                                    <tr>
-                                        <th class="p-2 font-medium">NAMA BANK</th>
-                                        <th class="p-2 font-medium">NO. REKENING</th>
-                                        <th class="p-2 font-medium">ATAS NAMA</th>
-                                        <th class="p-2 font-medium text-right">AKSI</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-200">
-                                    <tr v-if="state.bankAccounts.length === 0">
-                                        <td colspan="4" class="p-4 text-center text-slate-500">Belum ada rekening tersimpan.</td>
-                                    </tr>
-                                    <tr v-for="acc in (state.bankAccounts || [])" :key="acc.id">
-                                        <td class="p-3 font-semibold text-slate-700">{{ acc.bankName }}</td>
-                                        <td class="p-3">{{ acc.accountNumber }}</td>
-                                        <td class="p-3">{{ acc.accountName }}</td>
-                                        <td class="p-3 text-right space-x-4">
-                                            <button @click="showModal('editBankAccount', acc)" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
-                                            <button @click="deleteBankAccount(acc.id)" class="text-red-500 hover:text-red-700 font-semibold" :disabled="!isSubscriptionActive">Hapus</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div v-if="uiState.pengaturanTab === 'admin' && isAdmin" class="animate-fade-in">
-    <div class="space-y-6">
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Akun Mitra</h3>
-            <p class="text-sm text-slate-500 mb-4">
-                Pilih pengguna di bawah ini untuk menjadikannya mitra. Kode rujukan unik akan dibuat otomatis.
-            </p>
-            <div class="overflow-x-auto max-h-96">
-    <table class="w-full text-sm">
-        <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
-            <tr>
-                <th class="p-2 font-medium">Email Pengguna</th>
-                <th class="p-2 font-medium text-center">Status Mitra</th>
-                <th class="p-2 font-medium text-center">Kode Rujukan</th>
-                <th class="p-2 font-medium text-right">Aksi</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-200">
-            <tr v-if="uiState.allUsers.length === 0">
-                <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada pengguna terdaftar.</td>
-            </tr>
-            <tr v-for="user in uiState.allUsers" :key="user.uid" class="hover:bg-slate-50">
-                <td class="p-3">{{ user.email }}</td>
-                <td class="p-3 text-center">
-                    <span v-if="user.isPartner" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">Ya</span>
-                    <span v-else class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800">Tidak</span>
-                </td>
-                <td class="p-3 text-center font-mono text-sm">
-                    {{ user.referralCode || '-' }}
-                </td>
-                <td class="p-3 text-right space-x-2">
-                    <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
-                        Jadikan Mitra
-                    </button>
-                    <div v-else class="inline-flex items-center gap-2">
-                        <button @click="showModal('editReferralCode', { user: user, newReferralCode: user.referralCode })" class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-md hover:bg-blue-200 text-xs">
-                            Edit
-                        </button>
-                        <button @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
-                            Lihat Kode
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-        </div>
-
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h3 class="text-lg font-semibold text-slate-800 mb-4">Export Data Pelanggan</h3>
-            <p class="text-sm text-slate-500 mb-4">Pilih pelanggan dan rentang waktu untuk mengunduh semua data mereka.</p>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700">Pilih Pelanggan</label>
-                    <select v-model="uiState.selectedUserForExport" class="mt-1 w-full p-2 border rounded-md">
-                        <option :value="null" disabled>-- Daftar Pelanggan --</option>
-                        <option v-for="user in uiState.allUsers" :key="user.uid" :value="user">
-                            {{ user.email }}
-                        </option>
-                    </select>
-                    <div v-if="uiState.selectedUserForExport" class="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-    <p>
-        <b>Email dipilih:</b>
-        {{ getAdminExportUserEmail(uiState.selectedUserForExport) }}
-    </p>
-
-    <p>
-        <b>User ID yang akan diexport:</b>
-        {{ getAdminExportUserId(uiState.selectedUserForExport) }}
-    </p>
-
-    <p v-if="uiState.selectedUserForExport.oldUidField">
-        <b>UID lama di field data:</b>
-        {{ uiState.selectedUserForExport.oldUidField }}
-    </p>
-</div>
-                </div>
-                <div>
-    <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
-    <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
-        <option value="today">Hari Ini</option>
-        <option value="last_7_days">7 Hari Terakhir</option>
-        <option value="last_30_days">30 Hari Terakhir</option>
-        <option value="this_year">Tahun Ini</option>
-        <option value="by_date_range">Rentang Tanggal</option>
-        <option value="by_month_range">Rentang Bulan</option>
-        <option value="by_year_range">Rentang Tahun</option>
-        <option value="all_time">Semua</option>
-    </select>
-</div>
-<div v-if="uiState.exportFilter === 'by_date_range'" class="mt-2 grid grid-cols-2 gap-2 animate-fade-in">
-    <div><label class="block text-xs font-medium mb-1">Dari Tanggal</label><input type="date" v-model="uiState.exportStartDate" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
-    <div><label class="block text-xs font-medium mb-1">Sampai Tanggal</label><input type="date" v-model="uiState.exportEndDate" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
-</div>
-<div v-if="uiState.exportFilter === 'by_month_range'" class="mt-2 grid grid-cols-4 gap-2 animate-fade-in">
-    <div><label class="block text-xs font-medium">Dari</label><select v-model.number="uiState.exportStartMonth" class="w-full p-2 border rounded-md bg-white shadow-sm"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select></div>
-    <div><label class="block text-xs font-medium">Tahun</label><input type="number" v-model.number="uiState.exportStartYear" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
-    <div><label class="block text-xs font-medium">Sampai</label><select v-model.number="uiState.exportEndMonth" class="w-full p-2 border rounded-md bg-white shadow-sm"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select></div>
-    <div><label class="block text-xs font-medium">Tahun</label><input type="number" v-model.number="uiState.exportEndYear" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
-</div>
-<div v-if="uiState.exportFilter === 'by_year_range'" class="mt-2 grid grid-cols-2 gap-2 animate-fade-in">
-    <div><label class="block text-xs font-medium mb-1">Dari Tahun</label><input type="number" v-model.number="uiState.exportStartYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
-    <div><label class="block text-xs font-medium mb-1">Sampai Tahun</label><input type="number" v-model.number="uiState.exportEndYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
-</div>
-                <button @click="requestProtectedExport(() => exportAllDataForUser(
-    uiState.selectedUserForExport?.uid || uiState.selectedUserForExport?.id,
-    uiState.selectedUserForExport?.email,
-    uiState.exportFilter,
-    uiState.exportStartDate,
-    uiState.exportEndDate,
-    uiState.exportStartMonth,
-    uiState.exportEndMonth,
-    uiState.exportStartYear,
-    uiState.exportEndYear
-))"
- :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
-                    <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
-                    <span v-else>Export Data Pelanggan</span>
-                </button>
-            </div>
-        </div>
-        
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h3 class="text-lg font-semibold text-slate-800 mb-4">Riwayat Pengajuan Pencairan Komisi (Semua Mitra)</h3>
-            <div class="overflow-x-auto max-h-96">
-                <table class="w-full text-sm">
-                    <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
-                        <tr>
-                            <th class="p-3 font-medium">TANGGAL</th>
-                            <th class="p-3 font-medium">DETAIL PENCAIRAN</th>
-                            <th class="p-3 font-medium text-right">JUMLAH</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        <tr v-if="commissionPayouts.length === 0">
-                            <td colspan="3" class="p-4 text-center text-slate-500">Belum ada riwayat pencairan.</td>
-                        </tr>
-                        <tr v-for="payout in commissionPayouts" :key="payout.id">
-                            <td class="p-3 whitespace-nowrap">{{ new Date(payout.tanggal.seconds * 1000).toLocaleDateString('id-ID') }}</td>
-                            <td class="p-3">
-                                <p class="font-semibold text-slate-700">{{ payout.catatan }}</p>
-                            </td>
-                            <td class="p-3 text-right font-bold text-green-600">
-                                {{ formatCurrency(payout.jumlah) }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Kode Aktivasi</h3>
-            <p class="text-sm text-slate-500 mb-4">
-                Buat kode sekali pakai untuk pengguna yang membeli di luar aplikasi (misalnya Shopee).
-            </p>
-            <div class="flex gap-2 mb-6">
-                <input type="text" v-model="newActivationCode" placeholder="Ketik kode kustom (opsional)" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
-                <button @click="createActivationCode" :disabled="isSaving" class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">
-                    <span v-if="isSaving">...</span>
-                    <span v-else>Buat Kode</span>
-                </button>
-            </div>
-            <div class="overflow-x-auto max-h-96">
-    <table class="w-full text-sm">
-        <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
-            <tr>
-                <th class="p-3 font-medium">KODE AKTIVASI</th>
-                <th class="p-3 font-medium text-center">STATUS</th>
-                <th class="p-3 font-medium">DIGUNAKAN OLEH</th>
-                <th class="p-3 font-medium text-right">AKSI</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-200">
-            <tr v-if="activationCodes.length === 0">
-                <td colspan="4" class="p-4 text-center text-slate-500">Belum ada kode aktivasi yang dibuat.</td>
-            </tr>
-            <tr v-for="code in activationCodes" :key="code.id">
-                <td class="p-3 font-mono text-indigo-600">{{ code.id }}</td>
-                <td class="p-3 text-center">
-                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                          :class="code.status === 'unused' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'">
-                        {{ code.status }}
-                    </span>
-                </td>
-                <td class="p-3 text-slate-500">{{ code.usedByEmail || '-' }}</td>
-                <td class="p-3 text-right">
-                    <button @click="deleteActivationCode(code.id)" class="text-red-500 hover:text-red-700">
-                        <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-        </div>
-
-        <!-- 👇👇 BLOK VERIFIKASI YANG SUDAH DIPERBAIKI 👇👇 -->
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mt-6">
-            <h3 class="text-lg font-semibold text-slate-800 mb-4">Verifikasi Pencairan Komisi Mitra</h3>
-            <p class="text-sm text-slate-500 mb-4">
-                Masukkan ID Pencairan dari email untuk memverifikasi jumlah yang benar.
-            </p>
-            <form @submit.prevent="verifyCashoutRequest" class="flex gap-2">
-                <input 
-                    type="text" 
-                    v-model="uiState.adminVerificationIdInput" 
-                    placeholder="Contoh: WDRW-17..." 
-                    class="w-full p-2 border border-slate-300 rounded-md shadow-sm font-mono"
-                >
-                <button 
-                    type="submit" 
-                    :disabled="uiState.isVerifying" 
-                    class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400"
-                >
-                    <span v-if="uiState.isVerifying">...</span>
-                    <span v-else>Verifikasi</span>
-                </button>
-            </form>
-
-            <div v-if="uiState.adminVerificationResult" class="mt-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-800 animate-fade-in">
-                <p class="font-bold text-lg">✅ Verifikasi Berhasil</p>
-                <div class="mt-2 space-y-1 text-sm">
-                    <p><strong>Jumlah Asli:</strong> <span class="text-2xl font-bold">{{ formatCurrency(uiState.adminVerificationResult.jumlah) }}</span></p>
-                    <p><strong>Tanggal Pengajuan:</strong> {{ uiState.adminVerificationResult.tanggal }}</p>
-                    <p><strong>Detail:</strong> {{ uiState.adminVerificationResult.catatan }}</p>
-                </div>
-                <button @click="confirmCashoutPayment(uiState.adminVerificationIdInput)" class="mt-4 w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700">
-                    Konfirmasi Pembayaran Selesai
-                </button>
-            </div>
-            <div v-if="uiState.adminVerificationError" class="mt-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-800 animate-fade-in">
-                <p class="font-bold text-lg">❌ Gagal Verifikasi</p>
-                <p class="text-sm mt-1">{{ uiState.adminVerificationError }}</p>
-            </div>
-        </div>
-        
-    </div>
-</div>
-
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-
 <div v-if="activePage === 'panduan'" class="min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-4 sm:p-8">
     <div class="max-w-7xl mx-auto space-y-8">
 
@@ -21770,7 +20266,7 @@ SKU-BAJU-PUTIH-S"
 
                         <p class="text-slate-300 text-lg mt-5 max-w-3xl leading-relaxed">
                             Pelajari fungsi setiap halaman Fashion OS dengan alur yang rapi. Mulai dari pengaturan,
-                            produk, stok, produksi, penjualan, retur, keuangan, laporan, sampai analisis ROAS.
+                            inventaris dan HPP, impor pesanan terkirim, konfirmasi pencairan, laporan, serta modal dan bagi hasil.
                         </p>
 
                         <div class="flex flex-wrap gap-3 mt-7">
@@ -21803,7 +20299,7 @@ SKU-BAJU-PUTIH-S"
                         </div>
                         <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
                             <p class="text-3xl font-black text-white">04</p>
-                            <p class="text-sm text-slate-300 mt-1">Laporan & ROAS</p>
+                            <p class="text-sm text-slate-300 mt-1">Pencairan & Laporan</p>
                         </div>
                     </div>
                 </div>
@@ -21819,7 +20315,7 @@ SKU-BAJU-PUTIH-S"
                         Urutan paling aman saat memakai Fashion OS
                     </h3>
                     <p class="text-slate-600 mt-2">
-                        Jangan loncat langsung ke transaksi. Pastikan data dasar sudah rapi supaya laporan tidak salah hitung.
+                        Siapkan model dan varian terlebih dahulu. Impor pesanan, konfirmasi dana, dan simpan total pencairan sebagai langkah terpisah.
                     </p>
                 </div>
             </div>
@@ -21828,31 +20324,31 @@ SKU-BAJU-PUTIH-S"
                 <div class="rounded-2xl bg-indigo-50 border border-indigo-100 p-4">
                     <div class="text-2xl mb-2">⚙️</div>
                     <h4 class="font-black text-slate-900">Pengaturan</h4>
-                    <p class="text-sm text-slate-600 mt-1">Marketplace, model produk, kategori, rekening, PIN.</p>
+                    <p class="text-sm text-slate-600 mt-1">Channel penjualan dan model produk.</p>
                 </div>
 
                 <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
                     <div class="text-2xl mb-2">📦</div>
                     <h4 class="font-black text-slate-900">Produk</h4>
-                    <p class="text-sm text-slate-600 mt-1">SKU, warna, ukuran, stok, harga, HPP.</p>
+                    <p class="text-sm text-slate-600 mt-1">Pilih model dan varian, lalu catat stok serta HPP.</p>
                 </div>
 
                 <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
                     <div class="text-2xl mb-2">🏭</div>
                     <h4 class="font-black text-slate-900">Produksi</h4>
-                    <p class="text-sm text-slate-600 mt-1">Kain, maklun, supplier, aktual jadi.</p>
+                    <p class="text-sm text-slate-600 mt-1">Catat produksi atau penerimaan barang bila diperlukan.</p>
                 </div>
 
                 <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4">
                     <div class="text-2xl mb-2">🛒</div>
                     <h4 class="font-black text-slate-900">Penjualan</h4>
-                    <p class="text-sm text-slate-600 mt-1">POS, proses massal, retur, audit data.</p>
+                    <p class="text-sm text-slate-600 mt-1">Tempel ID dan unggah ekspor pesanan terkirim.</p>
                 </div>
 
                 <div class="rounded-2xl bg-green-50 border border-green-100 p-4">
                     <div class="text-2xl mb-2">📊</div>
                     <h4 class="font-black text-slate-900">Laporan</h4>
-                    <p class="text-sm text-slate-600 mt-1">Profit, keuangan, ROAS, statistik.</p>
+                    <p class="text-sm text-slate-600 mt-1">Konfirmasi pencairan, tinjau dashboard, laporan, dan bagi hasil.</p>
                 </div>
             </div>
         </div>
@@ -21886,9 +20382,9 @@ SKU-BAJU-PUTIH-S"
 
                 <div class="bg-gradient-to-br from-indigo-600 to-slate-900 rounded-3xl shadow-xl p-6 text-white">
                     <p class="text-sm font-bold text-indigo-200 uppercase tracking-wide">Catatan Penting</p>
-                    <h3 class="text-xl font-black mt-2">Akurasi laporan bergantung dari data awal.</h3>
+                    <h3 class="text-xl font-black mt-2">Pastikan data varian, HPP, dan stok benar sebelum impor pesanan.</h3>
                     <p class="text-indigo-100 mt-3 text-sm leading-relaxed">
-                        Marketplace, model produk, HPP, harga jual, dan stok harus rapi dulu sebelum transaksi mulai dicatat.
+                        Data varian, HPP, dan stok harus benar sebelum impor. Status pesanan berubah setelah dikonfirmasi, sedangkan pencairan masuk ke dashboard setelah disimpan.
                     </p>
                 </div>
 
@@ -21992,10 +20488,10 @@ SKU-BAJU-PUTIH-S"
                 <div>
                     <p class="text-sm font-black text-green-600 uppercase tracking-wide">Panduan selesai</p>
                     <h3 class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-                        Gunakan Fashion OS dari data dasar sampai laporan profit.
+                        Gunakan Fashion OS dari data dasar hingga transaksi, pencairan, dan laporan tercatat.
                     </h3>
                     <p class="text-slate-600 mt-2">
-                        Mulai dari pengaturan, lanjut produk, stok, penjualan, lalu cek laporan dan ROAS.
+                        Mulai dari data model dan inventaris, impor pesanan terkirim, konfirmasi pencairan, lalu tinjau laporan serta modal/bagi hasil.
                     </p>
                 </div>
 
@@ -22036,8 +20532,7 @@ SKU-BAJU-PUTIH-S"
                         </h2>
 
                         <p class="text-slate-300 text-lg mt-5 max-w-3xl leading-relaxed">
-                            Ikuti alur ini agar data produk, stok, harga, penjualan, produksi, keuangan, dan ROAS
-                            tersusun rapi sejak awal. Panduan ini dibuat untuk pengguna baru supaya tidak bingung harus mulai dari mana.
+                            Ikuti urutan ini untuk menyiapkan model dan varian, mengelola stok/HPP, mengimpor pesanan, mengonfirmasi pencairan, dan membaca laporan dengan benar.
                         </p>
 
                         <div class="flex flex-wrap gap-3 mt-7">
@@ -22070,7 +20565,7 @@ SKU-BAJU-PUTIH-S"
                         </div>
                         <div class="rounded-2xl bg-white/10 border border-white/10 p-5">
                             <p class="text-3xl font-black text-white">04</p>
-                            <p class="text-sm text-slate-300 mt-1">Laporan & ROAS</p>
+                            <p class="text-sm text-slate-300 mt-1">Konfirmasi & Laporan</p>
                         </div>
                     </div>
                 </div>
@@ -22099,7 +20594,7 @@ SKU-BAJU-PUTIH-S"
 
         <div class="flex-1">
             <div class="flex flex-wrap items-center gap-2 mb-2">
-                <h4 class="font-black text-slate-900 text-lg">Wajib Isi Pengaturan Awal</h4>
+                <h4 class="font-black text-slate-900 text-lg">Siapkan Channel dan Model Produk</h4>
                 <span class="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-black">
                     WAJIB PERTAMA
                 </span>
@@ -22108,7 +20603,7 @@ SKU-BAJU-PUTIH-S"
             <p class="text-slate-700 mt-1 leading-relaxed">
                 Sebelum menambahkan produk, transaksi, produksi, atau laporan, pengguna baru wajib mengisi
                 <strong>Marketplace</strong> dan <strong>Model Produk</strong> terlebih dahulu.
-                Dua bagian ini adalah fondasi utama agar harga, HPP, stok, laporan, dan ROAS bisa terbaca dengan benar.
+                Channel dan nama model menjadi dasar untuk memasukkan varian inventaris dan mengenali produk dari ekspor marketplace.
             </p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
@@ -22120,9 +20615,9 @@ SKU-BAJU-PUTIH-S"
                             🛒
                         </div>
                         <div>
-                            <h5 class="font-black text-slate-900">A. Isi Marketplace</h5>
+                            <h5 class="font-black text-slate-900">A. Atur Channel Penjualan</h5>
                             <p class="text-sm text-slate-600 mt-1">
-                                Tambahkan semua channel jualan seperti Shopee, TikTok Shop, Offline, Website, atau marketplace lain.
+                                Tambahkan marketplace atau channel yang digunakan agar channel pesanan dapat dipilih dengan benar.
                             </p>
 
                             <div class="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
@@ -22151,9 +20646,9 @@ SKU-BAJU-PUTIH-S"
                             👗
                         </div>
                         <div>
-                            <h5 class="font-black text-slate-900">B. Isi Model Produk</h5>
+                            <h5 class="font-black text-slate-900">B. Buat Model Produk</h5>
                             <p class="text-sm text-slate-600 mt-1">
-                                Tambahkan nama model produk utama, misalnya Aurelia, Amara, Elara, atau model lain yang kamu jual.
+                                Tambahkan nama model utama seperti Sauna atau Aurelia. Warna dan ukuran dikelola sebagai varian di bawah model, bukan digabung menjadi nama model.
                             </p>
 
                             <div class="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
@@ -22162,7 +20657,7 @@ SKU-BAJU-PUTIH-S"
                                     <li>• Produk akan mengambil data dari model</li>
                                     <li>• Laporan bisa dibaca per model</li>
                                     <li>• Produksi dan stok lebih rapi</li>
-                                    <li>• ROAS bisa dianalisis per model</li>
+                                    <li>• Varian warna dan ukuran dapat dipilih saat menambah inventaris</li>
                                 </ul>
                             </div>
 
@@ -22182,7 +20677,7 @@ SKU-BAJU-PUTIH-S"
                 <p class="text-sm text-amber-800 leading-relaxed">
                     1. Isi <strong>Marketplace</strong> → 
                     2. Isi <strong>Model Produk</strong> → 
-                    3. Baru masuk ke <strong>Inventaris</strong> untuk tambah produk/SKU.
+                    3. Pilih <strong>Inventaris</strong>, lalu tentukan varian, stok, dan HPP.
                 </p>
             </div>
         </div>
@@ -22194,12 +20689,12 @@ SKU-BAJU-PUTIH-S"
                         <div class="flex gap-4">
                             <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0">2</div>
                             <div class="flex-1">
-                                <h4 class="font-black text-slate-900 text-lg">Masukkan Produk, SKU, Warna, Ukuran, dan Stok</h4>
+                                <h4 class="font-black text-slate-900 text-lg">Masukkan Varian, Stok, dan HPP ke Inventaris</h4>
                                 <p class="text-slate-600 mt-1">
-                                    Buat produk per varian agar stok, barcode, retur, penjualan, dan laporan bisa terbaca rapi.
+                                    Pilih model produk, lalu pilih atau ketik varian warna dan ukuran yang sesuai. Masukkan jumlah stok dan HPP per pcs. SKU internal dibuat otomatis oleh Fashion OS.
                                 </p>
                                 <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 mt-4 text-sm">
-                                    Contoh SKU yang rapi: <strong>ARL-HTM-M</strong> untuk Aurelia Hitam ukuran M.
+                                    Pastikan varian di inventaris sesuai dengan nama produk, warna, ukuran, atau Seller SKU di file ekspor marketplace.
                                 </div>
                                 <button @click="changePage('inventaris')" class="mt-4 text-indigo-700 font-bold hover:text-indigo-900">
                                     Buka Inventaris →
@@ -22213,9 +20708,9 @@ SKU-BAJU-PUTIH-S"
                         <div class="flex gap-4">
                             <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0">3</div>
                             <div class="flex-1">
-                                <h4 class="font-black text-slate-900 text-lg">Isi Harga Jual dan HPP</h4>
+                                <h4 class="font-black text-slate-900 text-lg">Periksa HPP Produk</h4>
                                 <p class="text-slate-600 mt-1">
-                                    Lengkapi modal produk dan harga jual per channel supaya laba, margin, laporan, dan ROAS tidak salah hitung.
+                                    HPP adalah modal per pcs. Pastikan nilainya sesuai untuk tiap varian; total pencairan marketplace dicatat terpisah dari harga jual dan HPP.
                                 </p>
                                 <button @click="changePage('harga-hpp')" class="mt-4 text-indigo-700 font-bold hover:text-indigo-900">
                                     Buka Harga & HPP →
@@ -22229,9 +20724,9 @@ SKU-BAJU-PUTIH-S"
                         <div class="flex gap-4">
                             <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black flex-shrink-0">4</div>
                             <div class="flex-1">
-                                <h4 class="font-black text-slate-900 text-lg">Mulai Proses Penjualan</h4>
+                                <h4 class="font-black text-slate-900 text-lg">Impor Pesanan Terkirim</h4>
                                 <p class="text-slate-600 mt-1">
-                                    Gunakan Kasir POS untuk penjualan langsung. Untuk marketplace, cocokkan scan paket dengan ekspor terkirim lalu impor hasilnya.
+                                    Pilih marketplace, tempel atau pindai banyak ID, unggah ekspor pesanan Dikirim, periksa pratinjau produk dan HPP, lalu impor pesanan yang cocok. Transaksi masuk ke Riwayat Transaksi dan stok berkurang sesuai jumlah pcs.
                                 </p>
                                 <div class="flex flex-wrap gap-3 mt-4">
                                     <button @click="changePage('transaksi')" class="bg-slate-900 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-800">
@@ -22240,8 +20735,11 @@ SKU-BAJU-PUTIH-S"
                                     <button @click="changePage('bulk_process')" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">
                                         Impor Pesanan Terkirim
                                     </button>
+                                    <button @click="changePage('konfirmasi-berhasil')" class="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700">
+                                        Konfirmasi Pesanan Berhasil
+                                    </button>
                                     <button @click="changePage('retur')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">
-                                        Retur
+                                        Penanganan Pesanan
                                     </button>
                                 </div>
                             </div>
@@ -22253,16 +20751,16 @@ SKU-BAJU-PUTIH-S"
                         <div class="flex gap-4">
                             <div class="w-11 h-11 rounded-xl bg-green-600 text-white flex items-center justify-center font-black flex-shrink-0">5</div>
                             <div class="flex-1">
-                                <h4 class="font-black text-slate-900 text-lg">Pantau Laporan, Profit, dan ROAS</h4>
+                                <h4 class="font-black text-slate-900 text-lg">Konfirmasi Pencairan dan Tinjau Laporan</h4>
                                 <p class="text-slate-600 mt-1">
-                                    Setelah transaksi masuk, cek Dashboard, Laporan Keuangan, Laporan Transaksi, Dashboard ROAS, dan Kalkulator ROAS.
+                                    Setelah dana benar-benar cair, periksa ID pesanan dan konfirmasi. Masukkan Total yang Dilepas untuk rentang tanggal yang tepat lalu simpan; dashboard menghitung pencairan setelah disimpan.
                                 </p>
                                 <div class="flex flex-wrap gap-3 mt-4">
                                     <button @click="changePage('dashboard')" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">
                                         Dashboard
                                     </button>
-                                    <button @click="changePage('roas-dashboard')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">
-                                        Dashboard ROAS
+                                    <button @click="changePage('investasi')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">
+                                        Modal & Bagi Hasil
                                     </button>
                                     <button @click="changePage('laporan-keuangan')" class="bg-white border border-slate-300 text-slate-700 font-bold py-2 px-4 rounded-lg hover:bg-slate-50">
                                         Laporan Keuangan
@@ -22290,7 +20788,7 @@ SKU-BAJU-PUTIH-S"
                         </div>
                         <div class="flex gap-3">
                             <span class="text-green-600 font-black">✓</span>
-                            <span>Produk dan SKU sudah rapi.</span>
+                            <span>Varian inventaris sesuai dengan file ekspor marketplace.</span>
                         </div>
                         <div class="flex gap-3">
                             <span class="text-green-600 font-black">✓</span>
@@ -22298,7 +20796,7 @@ SKU-BAJU-PUTIH-S"
                         </div>
                         <div class="flex gap-3">
                             <span class="text-green-600 font-black">✓</span>
-                            <span>HPP dan harga jual sudah lengkap.</span>
+                            <span>HPP tiap varian dan stok sudah benar.</span>
                         </div>
                     </div>
                 </div>
@@ -22307,7 +20805,7 @@ SKU-BAJU-PUTIH-S"
                     <p class="text-sm font-bold text-indigo-200 uppercase tracking-wide">Tips Penting</p>
                     <h3 class="text-xl font-black mt-2">Jangan langsung input penjualan kalau data dasar belum rapi.</h3>
                     <p class="text-indigo-100 mt-3 text-sm leading-relaxed">
-                        Kalau SKU, HPP, channel, atau stok belum lengkap, laporan profit dan ROAS bisa tidak akurat.
+                        Jika model/varian tidak cocok, periksa inventaris terlebih dahulu. Jika pencairan belum disimpan, nilainya belum masuk ke ringkasan dashboard.
                     </p>
                 </div>
 
@@ -22338,14 +20836,14 @@ SKU-BAJU-PUTIH-S"
                 <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
                     <div class="text-3xl mb-4">📦</div>
                     <h4 class="font-black text-slate-900 text-lg">Inventaris</h4>
-                    <p class="text-slate-600 text-sm mt-2">Tempat mengatur produk, SKU, warna, ukuran, stok fisik, dan alokasi stok.</p>
+                    <p class="text-slate-600 text-sm mt-2">Tempat memilih model dan varian warna/ukuran, mencatat stok, serta menyimpan HPP per pcs.</p>
                     <button @click="changePage('inventaris')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
                 </div>
 
                 <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
                     <div class="text-3xl mb-4">🏷️</div>
                     <h4 class="font-black text-slate-900 text-lg">Harga & HPP</h4>
-                    <p class="text-slate-600 text-sm mt-2">Tempat mengisi modal produk dan harga jual per channel penjualan.</p>
+                    <p class="text-slate-600 text-sm mt-2">Periksa HPP per varian; pencairan aktual dicatat terpisah melalui Konfirmasi Pesanan Berhasil.</p>
                     <button @click="changePage('harga-hpp')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
                 </div>
 
@@ -22365,30 +20863,30 @@ SKU-BAJU-PUTIH-S"
 
                 <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
                     <div class="text-3xl mb-4">🛒</div>
-                    <h4 class="font-black text-slate-900 text-lg">Kasir POS</h4>
-                    <p class="text-slate-600 text-sm mt-2">Input penjualan manual, offline, marketplace, atau toko sendiri.</p>
-                    <button @click="changePage('transaksi')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                    <h4 class="font-black text-slate-900 text-lg">Konfirmasi Pesanan Berhasil</h4>
+                    <p class="text-slate-600 text-sm mt-2">Konfirmasi ID yang sukses cair, lalu simpan total pencairan periode agar masuk ke dashboard.</p>
+                    <button @click="changePage('konfirmasi-berhasil')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
                 </div>
 
                 <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
                     <div class="text-3xl mb-4">⚡</div>
                     <h4 class="font-black text-slate-900 text-lg">Impor Pesanan Terkirim</h4>
-                    <p class="text-slate-600 text-sm mt-2">Impor paket yang sudah cocok dengan data pesanan terkirim dari marketplace.</p>
+                    <p class="text-slate-600 text-sm mt-2">Tempel ID pesanan/paket, unggah ekspor asli Seller Center, periksa pencocokan, lalu impor transaksi yang cocok.</p>
                     <button @click="changePage('bulk_process')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
                 </div>
 
                 <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
                     <div class="text-3xl mb-4">↩️</div>
-                    <h4 class="font-black text-slate-900 text-lg">Retur</h4>
+                    <h4 class="font-black text-slate-900 text-lg">Penanganan Pesanan</h4>
                     <p class="text-slate-600 text-sm mt-2">Catat produk kembali, alasan retur, dan dampaknya ke stok serta laporan.</p>
                     <button @click="changePage('retur')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
                 </div>
 
                 <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
                     <div class="text-3xl mb-4">📊</div>
-                    <h4 class="font-black text-slate-900 text-lg">ROAS</h4>
-                    <p class="text-slate-600 text-sm mt-2">Pantau omset, HPP, diskon, biaya iklan, profit, dan target ROAS per model.</p>
-                    <button @click="changePage('roas-dashboard')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
+                    <h4 class="font-black text-slate-900 text-lg">Modal &amp; Bagi Hasil</h4>
+                    <p class="text-slate-600 text-sm mt-2">Catat ID yang sudah sukses cair dan simpan total dana dilepas secara terpisah untuk periode marketplace.</p>
+                    <button @click="changePage('investasi')" class="mt-4 text-indigo-700 font-bold text-sm">Buka halaman →</button>
                 </div>
 
             </div>
@@ -22403,7 +20901,7 @@ SKU-BAJU-PUTIH-S"
                         Setelah semua langkah selesai, aplikasi sudah siap dipakai harian.
                     </h3>
                     <p class="text-slate-600 mt-2">
-                        Mulai dari input penjualan, pantau stok, produksi, retur, keuangan, sampai analisis ROAS.
+                        Alur marketplace: impor pesanan terkirim → konfirmasi ID yang sukses cair → simpan total pencairan → tinjau dashboard dan laporan.
                     </p>
                 </div>
 
