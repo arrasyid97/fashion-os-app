@@ -367,6 +367,40 @@ function findMasterProduct({ sellerSku, platformSkuId, productName, variation })
     return matchedByVariation.length === 1 ? matchedByVariation[0] : null;
 }
 
+function explainModelProductMismatch({ sellerSku, platformSkuId, variation }) {
+    const skuKeys = [sellerSku, platformSkuId].filter(Boolean).map(normalizeKey);
+    const models = Array.isArray(modelProducts.value) ? modelProducts.value : [];
+    const skuModels = models.filter(model => skuKeys.includes(normalizeKey(model.namaModel)));
+    if (!skuModels.length) return '';
+
+    const parts = cleanText(variation).split(/[,|/]+/).map(normalizeKey).filter(Boolean);
+    const matchesDimension = (value) => {
+        const key = normalizeKey(value);
+        return !key || parts.some(part =>
+            part === key ||
+            (key.length >= 3 && part.includes(key)) ||
+            (part.length >= 3 && key.includes(part))
+        );
+    };
+    const variantModels = skuModels.filter(model =>
+        matchesDimension(model.warna) && matchesDimension(model.ukuran)
+    );
+    if (!variantModels.length) {
+        return 'SKU/model "' + (sellerSku || platformSkuId) + '" ditemukan di Daftar Model Produk, tetapi warna/ukuran ekspor (' + (variation || 'kosong') + ') tidak cocok dengan variasi model.';
+    }
+    if (variantModels.length > 1) {
+        return 'SKU/model "' + (sellerSku || platformSkuId) + '" cocok ke lebih dari satu baris model dengan warna/ukuran tersebut. Periksa data model yang ganda.';
+    }
+    const model = variantModels[0];
+    const linkedProducts = props.products.filter(product =>
+        normalizeKey(product.model_id || product.modelId) === normalizeKey(model.id)
+    );
+    if (!linkedProducts.length) {
+        return 'SKU/model "' + (model.namaModel || sellerSku) + '" dan variasi ' + [model.warna, model.ukuran].filter(Boolean).join(' · ') + ' ditemukan, tetapi belum ada produk Inventaris yang tertaut ke baris model ini untuk mengambil HPP dan mengurangi stok.';
+    }
+    return 'SKU/model dan variasinya ditemukan, tetapi produk Inventaris tertaut tidak dapat dipastikan secara unik. Periksa tautan Model Produk, variasi, dan HPP produk.';
+}
+
 function loadScanQueue() {
     if (!props.userId) { scanQueue.value = []; return; }
     try {
@@ -615,7 +649,7 @@ function parseSelectedSheet() {
             ? 'Jumlah tidak bisa dihitung dengan pasti dari harga satuan dan subtotal'
             : 'Jumlah harus bilangan bulat lebih dari 0');
         if (!shippedStatusTokens.has(status)) issues.push('Status pesanan bukan Dikirim/Terkirim/Selesai');
-        if (!product) issues.push('Produk/variasi belum cocok dengan master Fashion OS. Samakan Seller SKU atau nama produk dan variasi.');
+        if (!product) issues.push(explainModelProductMismatch({ sellerSku, platformSkuId, variation }) || 'Produk/variasi belum cocok dengan master Fashion OS. Cocokkan Seller SKU dengan nama Model Produk serta warna dan ukuran.');
         else if (!(product.docId || product.id)) issues.push('ID dokumen produk tidak tersedia; muat ulang master produk');
         else if (!(Number(product.hpp) > 0)) issues.push('HPP produk belum diisi atau masih 0');
         if (issues.length) {
