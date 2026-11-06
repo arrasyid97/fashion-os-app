@@ -34,13 +34,13 @@
                     </tbody>
                 </table>
             </div>
-            <p v-if="manualRows.length" class="mt-3 text-xs text-slate-500">Konfirmasi ID mengubah status saja. Penghasilan/laba periode dihitung setelah total dana dilepas dicatat pada kotak di bawah.</p>
+            <p v-if="manualRows.length" class="mt-3 text-xs text-slate-500">Langkah 1: konfirmasi ID yang sudah dipastikan berhasil cair. Tanggal akhir periode di bawah akan dicatat sebagai tanggal pencairan pesanan. Pemasukan dan laba dashboard baru dihitung setelah total pencairan periode disimpan.</p>
             <button v-if="manualRows.length" type="button" @click="saveConfirmedIds" :disabled="isSavingManual || manualRows.some(row => row.error) || manualRows.every(row => row.alreadySettled)" class="mt-4 rounded-lg bg-emerald-600 px-5 py-3 font-bold text-white disabled:bg-slate-300">
                 {{ isSavingManual ? 'Menyimpan…' : 'Konfirmasi dana sudah dilepas' }}
             </button>
             <div class="mt-5 rounded-lg border border-indigo-100 bg-indigo-50 p-4">
-                <h3 class="font-semibold text-slate-900">Catat total pencairan periode (tanpa unggah file)</h3>
-                <p class="mt-1 text-xs text-slate-600">Masukkan nilai “Total yang Dilepas” dari ringkasan marketplace. Nilai baru masuk ke dashboard dan laporan setelah tombol simpan ditekan. Simpan satu kali untuk toko dan periode yang sama; nilai tidak dibagi ke tiap pesanan.</p>
+                <h3 class="font-semibold text-slate-900">Catat total pencairan periode</h3>
+                <p class="mt-1 text-xs text-slate-600">Langkah 2: masukkan nilai “Total yang Dilepas” dari ringkasan marketplace untuk toko dan periode yang sama dengan ID yang dikonfirmasi, lalu simpan. Nilai baru masuk ke dashboard dan laporan setelah disimpan. Simpan satu kali per toko dan periode; nilai tidak dibagi ke tiap pesanan.</p>
                 <div class="mt-3 grid gap-3 sm:grid-cols-3">
                     <label class="block"><span class="mb-1 block text-xs">Periode mulai</span><input v-model="payoutPeriodStart" type="date" class="w-full rounded-lg border p-2 text-sm"></label>
                     <label class="block"><span class="mb-1 block text-xs">Periode selesai</span><input v-model="payoutPeriodEnd" type="date" class="w-full rounded-lg border p-2 text-sm"></label>
