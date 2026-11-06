@@ -19162,7 +19162,7 @@ void [
 </div>
 <div v-else class="min-h-screen w-full bg-slate-50 p-4 sm:p-8">
 <div class="max-w-7xl mx-auto space-y-6">
-<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Fashion OS · Business</p><h1 class="mt-1 text-3xl font-bold text-slate-900">Dashboard Bisnis</h1><p class="mt-2 text-sm text-slate-500">Pantau pesanan, HPP, penghasilan marketplace yang sudah cocok, dan dana yang belum cair.</p></div><div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
+<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><h1 class="mt-1 text-3xl font-bold text-slate-900">Dashboard Bisnis</h1><p class="mt-2 text-sm text-slate-500">Pantau pesanan, HPP, penghasilan marketplace yang sudah cocok, dan dana yang belum cair.</p></div><div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
 <label class="text-sm text-slate-600" for="dashboard-period-filter">Periode transaksi</label>
 <select id="dashboard-period-filter" v-model="uiState.dashboardDateFilter" class="rounded-lg border-slate-300 text-sm">
 <option value="today">Hari ini</option><option value="last_7_days">7 hari terakhir</option><option value="last_30_days">30 hari terakhir</option><option value="this_year">Tahun ini</option><option value="by_date_range">Rentang tanggal</option><option value="by_month_range">Rentang bulan</option><option value="by_year_range">Rentang tahun</option><option value="all_time">Semua</option>
