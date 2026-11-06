@@ -171,6 +171,7 @@ const selectedSheet = ref('');
 const packages = ref([]);
 const rowErrors = ref([]);
 const isImporting = ref(false);
+const modelProducts = ref([]);
 
 const scanStorageKey = computed(() => `fashion-os-package-scan-queue:${props.userId || 'anonymous'}`);
 const matchedPackages = computed(() => packages.value.filter(group => scanQueue.value.some(scan => scanMatchesGroup(group, scan))));
@@ -194,14 +195,27 @@ const importDisabledReason = computed(() => {
     if (!matchedPackages.value.length) return 'Belum ada ID scan yang cocok dengan file. Pastikan marketplace pilihan sama dan ID ada di file ekspor.';
     return '';
 });
+async function loadModelProducts() {
+    if (!props.userId) { modelProducts.value = []; return; }
+    try {
+        const settingsSnapshot = await getDoc(doc(db, 'settings', props.userId));
+        const settings = settingsSnapshot.exists() ? settingsSnapshot.data() || {} : {};
+        modelProducts.value = Array.isArray(settings.modelProduk) ? settings.modelProduk : [];
+    } catch (error) {
+        console.warn('Daftar Model Produk tidak dapat dimuat untuk pencocokan pesanan:', error);
+        modelProducts.value = [];
+    }
+}
+
 onMounted(() => {
     loadScanQueue();
+    loadModelProducts();
     if (props.marketplaces.length) {
         if (!scanChannelId.value) scanChannelId.value = props.marketplaces[0].id;
         if (!shipmentChannelId.value) shipmentChannelId.value = props.marketplaces[0].id;
     }
 });
-watch(() => props.userId, loadScanQueue);
+watch(() => props.userId, () => { loadScanQueue(); loadModelProducts(); });
 watch(scanQueue, queue => {
     if (!props.userId) return;
     try { localStorage.setItem(scanStorageKey.value, JSON.stringify(queue)); } catch (error) { console.warn('Antrean scan tidak dapat disimpan:', error); }
@@ -282,46 +296,73 @@ function findMasterProduct({ sellerSku, platformSkuId, productName, variation })
         product.sku, product.sellerSku, product.marketplaceSku, product.externalSku,
         product.model_id, product.modelId, product.tiktokSkuId, product.shopeeSkuId
     ].filter(Boolean).map(norm);
-    const directMatches = props.products.filter(product => fields(product).some(key => skuKeys.includes(key)));
 
+    const variationParts = cleanText(variation).split(/[,|/]+/).map(norm).filter(Boolean);
+    const dimensionMatches = (color, size) => {
+        const expected = [color, size].filter(Boolean).map(norm);
+        return !expected.length || expected.every(dimension => variationParts.some(part =>
+            part === dimension ||
+            (dimension.length >= 3 && part.includes(dimension)) ||
+            (part.length >= 3 && dimension.includes(part))
+        ));
+    };
+
+    // Di Fashion OS, SKU jual marketplace dicatat sebagai nama model di
+    // Daftar Model Produk. Cocokkan model dan variasinya terlebih dahulu.
+    const models = Array.isArray(modelProducts.value) ? modelProducts.value : [];
+    const matchingModels = models.filter(model =>
+        skuKeys.includes(norm(model.namaModel)) &&
+        dimensionMatches(model.warna, model.ukuran)
+    );
+    if (matchingModels.length) {
+        if (matchingModels.length !== 1) return null;
+        const model = matchingModels[0];
+        const linkedProducts = props.products.filter(product =>
+            norm(product.model_id || product.modelId) === norm(model.id)
+        );
+        const productMatches = linkedProducts.filter(product =>
+            (!model.warna || norm(product.warna || product.color) === norm(model.warna)) &&
+            (!model.ukuran || norm(product.ukuran || product.size || product.varian || product.variant) === norm(model.ukuran))
+        );
+        const chosen = productMatches.length === 1
+            ? productMatches[0]
+            : (productMatches.length === 0 && linkedProducts.length === 1 ? linkedProducts[0] : null);
+        if (!chosen) return null;
+        return {
+            ...chosen,
+            nama: model.namaModel || chosen.nama || chosen.product_name || productName || sellerSku || 'Produk',
+            warna: model.warna || chosen.warna || chosen.color || '',
+            ukuran: model.ukuran || chosen.ukuran || chosen.size || chosen.varian || chosen.variant || '',
+            varian: model.ukuran || chosen.ukuran || chosen.size || chosen.varian || chosen.variant || ''
+        };
+    }
+
+    // Kompatibilitas untuk master lama yang belum terhubung ke Daftar Model Produk.
+    const directMatches = props.products.filter(product => fields(product).some(key => skuKeys.includes(key)));
     const sourceNames = [sellerSku, productName].filter(Boolean).map(norm);
     const nameMatches = props.products.filter(product => [
         product.nama, product.namaModel, product.namaProduk, product.product_name, product.modelName, product.nama_model
     ].filter(Boolean).map(norm).some(name => sourceNames.includes(name)));
-
-    // TikTok dapat memakai satu Seller SKU untuk banyak varian. Dahulukan semua
-    // kandidat SKU tersebut, lalu pilih yang seluruh dimensi variasinya cocok.
     const candidates = directMatches.length ? directMatches : nameMatches;
     if (!candidates.length) return null;
     if (!variation) return candidates.length === 1 ? candidates[0] : null;
 
-    const variationParts = variation.split(/[,|/]+/).map(norm).filter(Boolean);
-    const variationCompact = compact(variation);
-    const dimensionValues = product => [
-        product.warna || product.color,
-        product.ukuran || product.size
-    ].filter(Boolean).map(norm);
-
     const matchedByVariation = candidates.filter(product => {
-        const dimensions = dimensionValues(product);
-        if (dimensions.length) {
-            // Jika master punya warna dan ukuran, keduanya harus cocok; satu
-            // dimensi saja tidak cukup untuk memilih varian yang benar.
-            return dimensions.every(dimension => variationParts.some(part =>
-                part === dimension || part.includes(dimension) || dimension.includes(part)
-            ));
-        }
-
+        const dimensions = [
+            product.warna || product.color,
+            product.ukuran || product.size
+        ].filter(Boolean);
+        if (dimensions.length) return dimensionMatches(...dimensions);
         const variant = product.varian || product.variant;
         if (!variant) return candidates.length === 1;
         const variantCompact = compact(variant);
+        const variationCompact = compact(variation);
         return Boolean(variantCompact && (
             variantCompact === variationCompact ||
             variationCompact.includes(variantCompact) ||
             variantCompact.includes(variationCompact)
         ));
     });
-
     return matchedByVariation.length === 1 ? matchedByVariation[0] : null;
 }
 
