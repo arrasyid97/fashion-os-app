@@ -201,6 +201,7 @@ async function loadModelProducts() {
         const settingsSnapshot = await getDoc(doc(db, 'settings', props.userId));
         const settings = settingsSnapshot.exists() ? settingsSnapshot.data() || {} : {};
         modelProducts.value = Array.isArray(settings.modelProduk) ? settings.modelProduk : [];
+        if (workbook.value && selectedSheet.value) parseSelectedSheet();
     } catch (error) {
         console.warn('Daftar Model Produk tidak dapat dimuat untuk pencocokan pesanan:', error);
         modelProducts.value = [];
