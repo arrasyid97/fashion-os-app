@@ -17,18 +17,19 @@
                 </div>
             </header>
             <section class="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm ring-1 ring-indigo-50 sm:p-6">
-                <div class="flex flex-wrap items-end gap-3">
-                    <label class="block min-w-48">
-                        <span class="mb-1 block text-sm font-semibold text-slate-800">Marketplace yang discan</span>
-                        <select v-model="scanChannelId" class="w-full rounded-lg border border-slate-300 p-2">
+                <div class="grid items-start gap-4 md:grid-cols-[minmax(220px,0.8fr)_minmax(0,2fr)]">
+                    <label class="block min-w-0">
+                        <span class="mb-1 block text-sm font-semibold leading-5 text-slate-800">Marketplace yang discan</span>
+                        <select v-model="scanChannelId" class="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm">
                             <option value="">Pilih marketplace</option>
                             <option v-for="marketplace in marketplaces" :key="marketplace.id" :value="marketplace.id">{{ marketplace.name }}</option>
                         </select>
+                        <span class="mt-1 block text-xs leading-5 text-slate-500">Gunakan toko yang sama dengan file ekspor.</span>
                     </label>
-                    <label class="block min-w-64 flex-1">
-                        <span class="mb-1 block text-sm font-medium text-slate-700">Scan atau tempel ID Pesanan / Paket / Resi</span>
-                        <input ref="scanInput" v-model="scanInputValue" @paste="pasteScannedPackages" @keydown.enter.prevent="addScannedPackage" autocomplete="off" placeholder="Tempel daftar ID dari Sheet, atau scan satu per satu (otomatis tersimpan saat tekan Enter)" class="w-full rounded-lg border border-slate-300 p-2">
-                        <span class="mt-1 block text-xs text-slate-500">Bisa tempel beberapa ID sekaligus dari satu kolom Google Sheet atau Excel. Saat memakai scanner, arahkan ke kolom ini; tiap scan otomatis tersimpan saat scanner mengirim Enter.</span>
+                    <label class="block min-w-0">
+                        <span class="mb-1 block text-sm font-semibold leading-5 text-slate-800">Scan atau tempel ID Pesanan / Paket / Resi</span>
+                        <input ref="scanInput" v-model="scanInputValue" @paste="pasteScannedPackages" @keydown.enter.prevent="addScannedPackage" autocomplete="off" placeholder="Tempel daftar ID dari Sheet, atau scan satu per satu (otomatis tersimpan saat tekan Enter)" class="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm">
+                        <span class="mt-1 block text-xs leading-5 text-slate-500">Tempel beberapa ID sekaligus atau scan paket satu per satu. Tiap scan tersimpan otomatis saat scanner mengirim Enter.</span>
                     </label>
                 </div>
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
@@ -54,7 +55,7 @@
                         <p class="mt-1 text-sm text-slate-500">Pilih file asli dari Seller Center. Fashion OS akan membaca kolom produk dan jumlah secara otomatis.</p>
                     </div>
                 </div>
-                <div class="mt-4 grid gap-4 md:grid-cols-[1fr_1fr]">
+                <div class="mt-4 grid items-start gap-4 md:grid-cols-2">
                     <label class="block">
                         <span class="mb-1 block text-sm font-medium text-slate-700">Marketplace pada file</span>
                         <select v-model="shipmentChannelId" @change="parseSelectedSheet" class="w-full rounded-lg border border-slate-300 p-2 text-sm">
@@ -64,7 +65,7 @@
                     </label>
                     <label class="block">
                         <span class="mb-1 block text-sm font-medium text-slate-700">File ekspor pesanan Dikirim</span>
-                        <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" @change="handleFile" class="block w-full rounded-lg border border-slate-300 p-2 text-sm">
+                        <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" @change="handleFile" class="block h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200">
                     </label>
                     <label v-if="sheetNames.length > 1" class="block">
                         <span class="mb-1 block text-sm font-medium text-slate-700">Tab yang diimpor</span>
