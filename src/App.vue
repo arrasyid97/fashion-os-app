@@ -18937,7 +18937,7 @@ void [
     <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Impor Pesanan Terkirim</a>
     <a href="#" @click.prevent="changePage('konfirmasi-berhasil')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'konfirmasi-berhasil' }">Konfirmasi Pesanan Berhasil</a>
     <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">Riwayat Transaksi</a>
-    <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
+    <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Penanganan Pesanan</a>
     <a href="#" @click.prevent="changePage('statistik-penjualan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'statistik-penjualan' }">Statistik Penjualan</a>
 </div>
 
@@ -19162,7 +19162,7 @@ void [
 </div>
 <div v-else class="min-h-screen w-full bg-slate-50 p-4 sm:p-8">
 <div class="max-w-7xl mx-auto space-y-6">
-<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Fashion OS · Business Overview</p><h1 class="mt-1 text-3xl font-bold text-slate-900">Dashboard Bisnis</h1><p class="mt-2 text-sm text-slate-500">Pantau pesanan, HPP, penghasilan marketplace yang sudah cocok, dan dana yang belum cair.</p></div><div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
+<header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600">Fashion OS · Business</p><h1 class="mt-1 text-3xl font-bold text-slate-900">Dashboard Bisnis</h1><p class="mt-2 text-sm text-slate-500">Pantau pesanan, HPP, penghasilan marketplace yang sudah cocok, dan dana yang belum cair.</p></div><div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
 <label class="text-sm text-slate-600" for="dashboard-period-filter">Periode transaksi</label>
 <select id="dashboard-period-filter" v-model="uiState.dashboardDateFilter" class="rounded-lg border-slate-300 text-sm">
 <option value="today">Hari ini</option><option value="last_7_days">7 hari terakhir</option><option value="last_30_days">30 hari terakhir</option><option value="this_year">Tahun ini</option><option value="by_date_range">Rentang tanggal</option><option value="by_month_range">Rentang bulan</option><option value="by_year_range">Rentang tahun</option><option value="all_time">Semua</option>
@@ -19175,7 +19175,12 @@ void [
 <input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 rounded-lg border-slate-300 text-sm" placeholder="Tahun"></div>
 <div v-if="uiState.dashboardDateFilter === 'by_year_range'" class="flex items-center gap-2"><input type="number" v-model.number="uiState.dashboardStartYear" class="w-24 rounded-lg border-slate-300 text-sm" placeholder="Dari tahun"><span class="text-slate-400">s/d</span><input type="number" v-model.number="uiState.dashboardEndYear" class="w-24 rounded-lg border-slate-300 text-sm" placeholder="Sampai tahun"></div>
 </div></header>
-<section class="rounded-3xl bg-slate-900 p-6 text-white shadow-lg"><div><p class="text-sm font-semibold text-indigo-200">Aktivitas sesuai periode</p><h2 class="mt-1 text-xl font-bold">Pesanan yang tercatat di Fashion OS</h2><p class="mt-1 text-sm text-slate-300">Pesanan dihitung dari tanggal pesanan; pencairan dihitung dari tanggal pencairan yang tersimpan.</p></div><div v-if="dashboardDataLoading" class="mt-3 text-sm text-slate-300">Memuat data…</div><div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4"><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Pesanan tercatat</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderHariIni) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Menunggu pencocokan</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderMenungguCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Sudah cocok</p><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderCocok) }}</p></div><div class="rounded-2xl bg-white/10 p-4"><p class="text-sm text-slate-300">Pencairan tersimpan pada periode</p><p class="mt-2 text-xl font-bold">{{ formatCurrency(dashboardPremiumData.penghasilanCocok) }}</p></div></div></section>
+<section class="rounded-3xl bg-slate-900 p-6 text-white shadow-lg"><div><p class="text-sm font-semibold text-indigo-200">Aktivitas sesuai periode</p><h2 class="mt-1 text-xl font-bold">Pesanan yang tercatat di Fashion OS</h2><p class="mt-1 text-sm text-slate-300">Pesanan dihitung dari tanggal pesanan; pencairan dihitung dari tanggal pencairan yang tersimpan.</p></div><div v-if="dashboardDataLoading" class="mt-3 text-sm text-slate-300">Memuat data…</div><div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+<div class="relative rounded-2xl bg-white/10 p-4 pr-12"><p class="text-sm text-slate-300">Pesanan tercatat</p><details class="absolute right-3 top-3 z-20"><summary aria-label="Info Pesanan tercatat" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-white/30 text-xs font-bold text-slate-100 hover:bg-white/10">?</summary><p class="absolute right-0 top-8 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700 shadow-xl">Jumlah transaksi yang dibuat di Fashion OS pada periode pilihan, berdasarkan tanggal pesanan.</p></details><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderHariIni) }}</p></div>
+<div class="relative rounded-2xl bg-white/10 p-4 pr-12"><p class="text-sm text-slate-300">Menunggu pencocokan</p><details class="absolute right-3 top-3 z-20"><summary aria-label="Info Menunggu pencocokan" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-white/30 text-xs font-bold text-slate-100 hover:bg-white/10">?</summary><p class="absolute right-0 top-8 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700 shadow-xl">Jumlah pesanan pada periode pilihan yang belum dikonfirmasi berhasil cair atau belum dicocokkan dengan data marketplace.</p></details><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderMenungguCocok) }}</p></div>
+<div class="relative rounded-2xl bg-white/10 p-4 pr-12"><p class="text-sm text-slate-300">Sudah cocok</p><details class="absolute right-3 top-3 z-20"><summary aria-label="Info Sudah cocok" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-white/30 text-xs font-bold text-slate-100 hover:bg-white/10">?</summary><p class="absolute right-0 top-8 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700 shadow-xl">Jumlah pesanan pada periode pilihan yang sudah dikonfirmasi berhasil cair.</p></details><p class="mt-2 text-2xl font-bold">{{ formatNumber(dashboardPremiumData.orderCocok) }}</p></div>
+<div class="relative rounded-2xl bg-white/10 p-4 pr-12"><p class="text-sm text-slate-300">Pencairan tersimpan pada periode</p><details class="absolute right-3 top-3 z-20"><summary aria-label="Info Pencairan tersimpan pada periode" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-white/30 text-xs font-bold text-slate-100 hover:bg-white/10">?</summary><p class="absolute right-0 top-8 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700 shadow-xl">Total pencairan marketplace yang sudah disimpan dan tanggal pencairannya berada dalam periode pilihan.</p></details><p class="mt-2 text-xl font-bold">{{ formatCurrency(dashboardPremiumData.penghasilanCocok) }}</p></div>
+</div></section>
 <section><div class="mb-3"><h2 class="text-lg font-bold text-slate-900">Ringkasan periode pencairan</h2><p class="text-sm text-slate-500">Pemasukan dan HPP pesanan yang sudah cair mengikuti tanggal pencairan. Laba dihitung setelah dikurangi HPP dan biaya operasional.</p></div><div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 <article class="relative rounded-2xl border border-emerald-100 bg-white p-5 pr-12 shadow-sm "><div class="flex items-start justify-between gap-2"><p class="text-sm font-medium text-slate-500">Penghasilan Bersih Marketplace</p><details class="absolute right-4 top-4 z-20"><summary aria-label="Info Penghasilan Bersih Marketplace" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 text-xs font-bold text-slate-500 hover:bg-slate-100">?</summary><p class="absolute right-0 top-8 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-xl">Jumlah total pencairan periode yang sudah disimpan untuk marketplace pada periode dashboard. ID sukses saja belum menambah pemasukan.</p></details></div><p class="mt-2 text-2xl font-bold text-emerald-700">{{ dashboardWorkflowMetrics.incomeComplete ? formatCurrency(dashboardWorkflowMetrics.netIncome) : 'Lengkapi ringkasan pencairan' }}</p><p class="mt-2 text-xs text-slate-400">{{ dashboardWorkflowMetrics.incomeComplete ? 'Hanya total pencairan periode yang sudah disimpan.' : 'Ada ID sukses tanpa ringkasan total pencairan periode.' }}</p></article>
 <article class="relative rounded-2xl border border-indigo-100 bg-white p-5 pr-12 shadow-sm "><div class="flex items-start justify-between gap-2"><p class="text-sm font-medium text-slate-500">HPP Barang Terjual</p><details class="absolute right-4 top-4 z-20"><summary aria-label="Info HPP Barang Terjual" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 text-xs font-bold text-slate-500 hover:bg-slate-100">?</summary><p class="absolute right-0 top-8 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-xl">HPP pesanan berhasil yang masuk ke periode berdasarkan tanggal pencairannya. Nilai dihitung dari HPP per unit dikali jumlah barang.</p></details></div><p class="mt-2 text-2xl font-bold text-indigo-700">{{ formatCurrency(dashboardWorkflowMetrics.totalHpp) }}</p><p class="mt-2 text-xs text-slate-400">HPP pesanan berhasil yang cair pada periode terpilih.</p></article>
@@ -20507,8 +20512,8 @@ SKU-BAJU-PUTIH-S"
                 
                 <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
                     <div>
-                        <h2 class="text-3xl font-bold text-slate-800">Manajemen Retur</h2>
-                        <p class="text-slate-500 mt-1">Lacak dan kelola semua pengembalian produk dari pelanggan.</p>
+                        <h2 class="text-3xl font-bold text-slate-800">Penanganan Pesanan</h2>
+                        <p class="text-slate-500 mt-1">Kelola retur dan catatan masalah produk dari transaksi pelanggan.</p>
                     </div>
                     <div class="flex items-center gap-4">
                         <button @click="showModal('panduanRetur')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
@@ -23833,7 +23838,7 @@ SKU-BAJU-PUTIH-S"
     </div>
     <div class="flex-1 overflow-y-auto py-4 pr-2 space-y-6 text-slate-700 leading-relaxed">
         <p>
-            Ketika Anda menambahkan data retur di halaman **Manajemen Retur**, sistem secara otomatis menganggap pesanan tersebut sebagai **gagal** atau **dibatalkan**. Hal ini memicu penyesuaian otomatis pada semua metrik keuangan di dashboard analitik Anda untuk memastikan data yang ditampilkan selalu akurat.
+            Ketika Anda menambahkan data retur di halaman **Penanganan Pesanan**, sistem secara otomatis menganggap pesanan tersebut sebagai **gagal** atau **dibatalkan**. Hal ini memicu penyesuaian otomatis pada semua metrik keuangan di dashboard analitik Anda untuk memastikan data yang ditampilkan selalu akurat.
         </p>
         
         <div class="p-4 bg-slate-50 rounded-lg">
@@ -23906,7 +23911,7 @@ SKU-BAJU-PUTIH-S"
                     <li><strong>Hasil Produksi:</strong> Jika Anda tidak menggunakan tombol "+ Masukkan ke Inventaris" di halaman laporan produksi.</li>
                     <li><strong>Penyesuaian Inventaris:</strong> Ketika hasil stok opname menemukan jumlah fisik lebih banyak daripada yang tercatat di sistem.</li>
                 </ul>
-                <p class="mt-3 text-xs text-slate-500"><strong>Catatan:</strong> Untuk retur dari pelanggan, sangat direkomendasikan menggunakan halaman <strong>Manajemen Retur</strong> agar kalkulasi keuangan di dasbor lebih akurat.</p>
+                <p class="mt-3 text-xs text-slate-500"><strong>Catatan:</strong> Untuk retur dari pelanggan, sangat direkomendasikan menggunakan halaman <strong>Penanganan Pesanan</strong> agar kalkulasi keuangan di dasbor lebih akurat.</p>
             </div>
 
             <div class="p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
@@ -26185,7 +26190,7 @@ BAJU-PUTIH-M</pre>
 
 <div v-if="uiState.modalType === 'panduanRetur'" class="bg-white rounded-xl shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[70vh] flex flex-col">
     <div class="flex-shrink-0 pb-4 mb-4 border-b">
-        <h3 class="text-2xl font-bold text-slate-800">Panduan Manajemen Retur</h3>
+        <h3 class="text-2xl font-bold text-slate-800">Panduan Penanganan Pesanan</h3>
         <p class="text-slate-500 mt-1">Pahami alur kerja dan logika stok untuk proses retur yang akurat.</p>
     </div>
     
