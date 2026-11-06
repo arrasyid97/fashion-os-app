@@ -8824,7 +8824,7 @@ const dashboardPremiumData = computed(() => {
   return {...transaction,tanggal:orderDate&&!Number.isNaN(orderDate.getTime())?orderDate:null};
  });
  const periodTransactions=filterDataByDate(transactionsByOrderDate,...activityFilterOptions).filter(transaction=>Boolean(String(transaction?.marketplaceOrderId||'').trim())&&Boolean(String(transaction?.channelId||transaction?.channel||'').trim()));
- const normalizeDashboardStatus=value=>String(value||'').trim().toLocaleLowerCase('id-ID').replace(/[\\s/_-]+/g,'');
+ const normalizeDashboardStatus=value=>String(value||'').trim().toLocaleLowerCase('id-ID').replace(/[\s/_-]+/g,'');
  const resolvedStatuses=new Set(['id_sukses_terkonfirmasi','sudahcair','retur','returpengembalian','dikembalikan','pengembalian','baranghilang','hilang','dibatalkan','batal','cancelled','canceled']);
  const hasResolvedOutcome=transaction=>resolvedStatuses.has(normalizeDashboardStatus(transaction?.statusDataMarketplace))||resolvedStatuses.has(normalizeDashboardStatus(transaction?.statusPencairan));
  const isMatched=transaction=>['cocok','id_sukses_terkonfirmasi'].includes(normalizeDashboardStatus(transaction?.statusDataMarketplace))||transaction?.konfirmasiSuksesCairManual===true;
