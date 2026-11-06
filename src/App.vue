@@ -9733,6 +9733,7 @@ function changePage(pageName) {
 
         transaksi: 'penjualan',
         bulk_process: 'penjualan',
+        'konfirmasi-berhasil': 'penjualan',
         retur: 'penjualan',
         'statistik-penjualan': 'penjualan',
 
@@ -18934,6 +18935,7 @@ void [
 
 <div v-show="uiState.sidebarGroups.penjualan" class="ml-4 space-y-1">
     <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Impor Pesanan Terkirim</a>
+    <a href="#" @click.prevent="changePage('konfirmasi-berhasil')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'konfirmasi-berhasil' }">Konfirmasi Pesanan Berhasil</a>
     <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">Riwayat Transaksi</a>
     <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Manajemen Retur</a>
     <a href="#" @click.prevent="changePage('statistik-penjualan')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'statistik-penjualan' }">Statistik Penjualan</a>
@@ -19199,6 +19201,11 @@ void [
             :subscription-active="isSubscriptionActive"
             @completed="handleMarketplaceImportCompleted"
         />
+    </div>
+</div>
+
+<div v-if="activePage === 'konfirmasi-berhasil'">
+    <div class="mx-auto max-w-7xl space-y-6 p-4 sm:p-8">
         <MarketplaceIncomeImport
             :marketplaces="state.settings.marketplaces || []"
             :user-id="currentUser?.uid || ''"
