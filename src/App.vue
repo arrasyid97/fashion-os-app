@@ -74,8 +74,39 @@ import { 
 } from "firebase/auth";
 
 // --- STATE MANAGEMENT ---
-const storedActivePage = localStorage.getItem('lastActivePage') || 'dashboard';
-const removedPageRoutes = ['promosi', 'audit-data', 'bulk_process_legacy', 'rekonsiliasi'];
+const storedActivePage = localStorage.getItem('fashionOs:lastActivePage') || localStorage.getItem('lastActivePage') || 'dashboard';
+const removedPageRoutes = ['promosi', 'audit-data', 'bulk_process_legacy', 'rekonsiliasi', 'barcode-generator'];
+const sidebarGroupForPage = {
+    inventaris: 'produk',
+    'harga-hpp': 'produk',
+    promosi: 'produk',
+    produksi: 'produksi',
+    supplier: 'produksi',
+    'gudang-kain': 'produksi',
+    transaksi: 'penjualan',
+    bulk_process: 'penjualan',
+    bulk_process_legacy: 'penjualan',
+    'konfirmasi-berhasil': 'penjualan',
+    retur: 'penjualan',
+    'statistik-penjualan': 'penjualan',
+    keuangan: 'keuangan',
+    'roas-dashboard': 'keuangan',
+    'roas-calculator': 'keuangan',
+    investasi: 'keuangan',
+    'laporan-transaksi': 'keuangan',
+    'laporan-keuangan': 'keuangan',
+    mitra: 'sistem',
+    pengaturan: 'sistem',
+    langganan: 'bantuan',
+    'panduan-baru': 'bantuan',
+    panduan: 'bantuan',
+    tentang: 'bantuan'
+};
+const sidebarGroupKeys = ['produk', 'produksi', 'penjualan', 'keuangan', 'sistem', 'bantuan'];
+const savedSidebarGroup = localStorage.getItem('fashionOs:lastOpenSidebarGroup');
+const initialSidebarGroup = sidebarGroupKeys.includes(savedSidebarGroup)
+    ? savedSidebarGroup
+    : (sidebarGroupForPage[storedActivePage] || '');
 const activePage = ref(
     storedActivePage === 'bulk_process_legacy'
         ? 'bulk_process'
@@ -83,6 +114,7 @@ const activePage = ref(
 );
 if (removedPageRoutes.includes(storedActivePage)) {
     localStorage.setItem('lastActivePage', activePage.value);
+    localStorage.setItem('fashionOs:lastActivePage', activePage.value);
 }
 const isLoading = ref(true);
 const isSaving = ref(false); // Untuk tombol simpan umum
@@ -243,12 +275,12 @@ const uiState = reactive({
     onboardingStep: 0,
     activeAccordion: null,
     sidebarGroups: {
-    produk: true,
-    produksi: false,
-    penjualan: false,
-    keuangan: false,
-    sistem: false,
-    bantuan: false
+    produk: initialSidebarGroup === 'produk',
+    produksi: initialSidebarGroup === 'produksi',
+    penjualan: initialSidebarGroup === 'penjualan',
+    keuangan: initialSidebarGroup === 'keuangan',
+    sistem: initialSidebarGroup === 'sistem',
+    bantuan: initialSidebarGroup === 'bantuan'
 },
     activeCartChannel: null,
 
@@ -680,6 +712,7 @@ function toggleSidebarGroup(group) {
     });
 
     uiState.sidebarGroups[group] = !isCurrentlyOpen;
+    localStorage.setItem('fashionOs:lastOpenSidebarGroup', uiState.sidebarGroups[group] ? group : '');
 }
 
 
@@ -9786,6 +9819,7 @@ function changePage(pageName) {
 
     // Simpan halaman terakhir secara langsung
     localStorage.setItem('lastActivePage', pageName);
+    localStorage.setItem('fashionOs:lastActivePage', pageName);
 
     const sidebarPageGroups = {
         inventaris: 'produk',
@@ -9827,6 +9861,7 @@ function changePage(pageName) {
         });
 
         uiState.sidebarGroups[targetGroup] = true;
+        localStorage.setItem('fashionOs:lastOpenSidebarGroup', targetGroup);
     }
 
     // Logika Kunci Halaman Dashboardd
@@ -18826,6 +18861,7 @@ onMounted(() => {
 
 watch(activePage, (newPage, oldPage) => {
     localStorage.setItem('lastActivePage', newPage);
+    localStorage.setItem('fashionOs:lastActivePage', newPage);
     loadDataForPage(newPage);
 
     // --- LOGIKA BARU UNTUK LISTENER REAL-TIME ---
