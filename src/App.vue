@@ -20244,6 +20244,1379 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
 
+<div v-if="activePage === 'retur'">
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        <div class="max-w-7xl mx-auto">
+            
+            <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up">
+                
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800">Penanganan Pesanan</h2>
+                        <p class="text-slate-500 mt-1">Kelola retur dan catatan masalah produk dari transaksi pelanggan.</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <button @click="showModal('panduanRetur')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
+                            Informasi
+                        </button>
+                        <button @click="showModal('addRetur', { tanggal: new Date().toISOString().split('T')[0], transactionIdSearch: '', foundTransaction: null, items: [] })" class="bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 shadow transition-colors" :disabled="!isSubscriptionActive">
+                            + Tambah Retur
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                    <div class="relative">
+                        <label for="retur-search" class="block text-sm font-medium text-slate-700 mb-1">Cari (ID Retur, SKU, Nama, Alasan)</label>
+                        <input 
+                            v-model="uiState.returPageSearchQuery"
+                            @input="handleReturPageSearch"
+                            type="text" 
+                            id="retur-search" 
+                            placeholder="Ketik untuk mencari data retur..." 
+                            class="w-full p-2 border border-slate-300 rounded-md shadow-sm"
+                            autocomplete="off"
+                        >
+                        <div v-if="uiState.returPageSearchRecommendations.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            <div 
+                                v-for="(rec, index) in uiState.returPageSearchRecommendations" 
+                                :key="index" 
+                                @click="selectReturPageRecommendation(rec)" 
+                                class="p-2 px-3 hover:bg-slate-100 cursor-pointer text-sm"
+                            >
+                                {{ rec }}
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="retur-date-filter" class="block text-sm font-medium text-slate-700 mb-1">Filter Berdasarkan Tanggal</label>
+                        <div class="flex items-center gap-2">
+                            <select v-model="uiState.returPageDateFilter" id="retur-date-filter" class="w-full p-2 border border-slate-300 rounded-md shadow-sm capitalize">
+                                <option value="today">hari ini</option>
+                                <option value="last_7_days">1 minggu terakhir</option>
+                                <option value="last_30_days">1 bulan terakhir</option>
+                                <option value="this_year">1 tahun terakhir</option>
+                                <option value="by_date_range">rentang tanggal</option>
+                                <option value="by_month_range">rentang bulan</option>
+                                <option value="by_year_range">rentang tahun</option>
+                                <option value="all_time">semua</option>
+                            </select>
+                            <button @click="requestProtectedExport(() => exportReturToExcel())" id="export-retur-btn" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 h-10 flex-shrink-0">Export</button>
+                        </div>
+                        <div v-if="uiState.returPageDateFilter === 'by_date_range'" class="mt-2 flex items-center gap-2">
+                            <input type="date" v-model="uiState.returPageStartDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                            <span>s/d</span>
+                            <input type="date" v-model="uiState.returPageEndDate" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2">
+                        </div>
+                        <div v-if="uiState.returPageDateFilter === 'by_month_range'" class="mt-2 flex items-center gap-2">
+                            <select v-model.number="uiState.returPageStartMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                            <input type="number" v-model.number="uiState.returPageStartYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+                            <span class="mx-2">s/d</span>
+                            <select v-model.number="uiState.returPageEndMonth" class="w-full bg-white border-slate-300 text-sm rounded-lg p-2"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select>
+                            <input type="number" v-model.number="uiState.returPageEndYear" class="w-24 border-slate-300 text-sm rounded-lg p-2">
+                        </div>
+                        <div v-if="uiState.returPageDateFilter === 'by_year_range'" class="mt-2 flex items-center gap-2">
+                            <input type="number" v-model.number="uiState.returPageStartYear" placeholder="Dari Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                            <span class="text-slate-500">s/d</span>
+                            <input type="number" v-model.number="uiState.returPageEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    v-if="returnHistoryLoading"
+                    class="mb-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700"
+                >
+                    Menampilkan
+                    <strong>{{ returnHistoryLoadedCount }}</strong>
+                    data retur. Data berikutnya sedang dimuat otomatis...
+                </div>
+
+                <div
+                    v-else-if="returnHistoryMessage"
+                    class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                >
+                    {{ returnHistoryMessage }}
+                </div>
+
+                <div
+                    v-else-if="returnHistoryError"
+                    class="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                >
+                    {{ returnHistoryError }}
+
+                    <button
+                        @click="loadReturnHistoryByCurrentFilter(currentUser.uid)"
+                        class="ml-2 font-bold underline"
+                    >
+                        Coba Lagi
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-500">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
+    <tr>
+        <th class="px-6 py-3">Tanggal</th>
+        
+        <th class="px-6 py-3">ID Pesanan</th> 
+        
+        <th class="px-6 py-3">Asal Toko</th>
+        <th class="px-6 py-3">Produk</th>
+        <th class="px-6 py-3 text-center">Qty</th>
+        <th class="px-6 py-3">Alasan</th>
+        <th class="px-6 py-3 text-center">Aksi</th>
+    </tr>
+</thead>
+                        <tbody class="divide-y divide-slate-200/50">
+                            <tr v-if="!returnHistoryLoading && filteredRetur.length === 0">
+                                <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
+                            </tr>
+                            <tr v-for="(item, index) in filteredRetur" :key="`${item.returnDocId}-${item.sku}-${index}`" class="hover:bg-slate-50/50">
+    <td class="px-6 py-4 whitespace-nowrap">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
+    
+    <td class="px-6 py-4 font-mono text-xs font-bold text-indigo-600">
+        {{ getTransactionDisplayId(item.originalTransactionId) }}
+    </td>
+
+    <td class="px-6 py-4">{{ getMarketplaceById(item.channelId)?.name || 'N/A' }}</td>
+                                <td class="px-6 py-4">
+                                    <p class="font-semibold text-slate-800">{{ getProductBySku(item.sku)?.nama || 'Produk tidak ditemukan' }}</p>
+                                    <p class="font-mono text-xs text-slate-500">{{ item.sku }}</p>
+                                </td>
+                                <td class="px-6 py-4 font-medium text-center">{{ item.qty }}</td>
+                                <td class="px-6 py-4">{{ item.alasan }}</td>
+                                <td class="px-6 py-4 text-center space-x-2">
+                                    <button @click="deleteReturnItem(item)" class="text-xs text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div v-if="activePage === 'mitra'">
+    <div class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+        
+        <div v-if="currentUser && !userProfile.data?.isPartner" class="flex items-center justify-center h-full animate-fade-in">
+            <div class="bg-white p-8 rounded-2xl shadow-xl border text-center max-w-md">
+                <h3 class="text-2xl font-bold text-slate-800 mb-4">Jadilah Mitra & Dapatkan Penghasilan</h3>
+                <p class="text-slate-600 mb-6">Dapatkan komisi dari setiap pelanggan yang Anda ajak. Jadilah bagian dari tim kami untuk mengembangkan Fashion OS bersama.</p>
+                <button @click="showModal('registerPartner')" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/30">
+                    Daftar Menjadi Mitra
+                </button>
+            </div>
+        </div>
+        
+        <div v-else-if="userProfile.data?.isPartner" class="max-w-7xl mx-auto">
+            <div class="flex justify-between items-center mb-8 animate-fade-in-up">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Dashboard Mitra</h2>
+        <p class="text-slate-500 mt-1">Pantau kinerja dan penghasilan Anda di sini.</p>
+    </div>
+    <a :href="`https://wa.me/${nomorWhatsAppAdmin}`" target="_blank" class="bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600 transition-colors shadow-lg flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.487 5.235 3.487 8.413 0 6.557-5.338 11.892-11.894 11.892-1.99 0-3.903-.52-5.687-1.475L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.886-.001 2.267.655 4.398 1.905 6.344l-1.332 4.869 4.869-1.332z"/></svg>
+        Hubungi Admin
+    </a>
+</div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+                <!-- Kolom Kode Rujukan -->
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 animate-fade-in-up flex flex-col justify-center" style="animation-delay: 100ms;">
+                    <h4 class="text-sm font-medium text-slate-500">Kode Rujukan Anda</h4>
+                    <p class="font-mono font-bold text-indigo-600 mt-2 break-all" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ userProfile.data.referralCode }}</p>
+                </div>
+
+                <!-- Kolom Total Pendapatan -->
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 200ms;">
+                    <div class="bg-indigo-100 text-indigo-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h4 class="text-sm font-medium text-slate-500">Total Pendapatan</h4>
+                        <p class="font-bold text-slate-800 mt-1" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ formatCurrency(totalRevenue) }}</p>
+                    </div>
+                </div>
+
+                <!-- Kolom Tersedia untuk Dicairkan -->
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 300ms;">
+                    <div class="bg-green-100 text-green-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h4 class="text-sm font-medium text-slate-500">Tersedia Dicairkan</h4>
+                        <p class="font-bold text-green-600 mt-1" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ formatCurrency(availableForWithdrawal) }}</p>
+                    </div>
+                </div>
+                
+                <!-- Kolom Sedang Diproses -->
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 400ms;">
+                    <div class="bg-yellow-100 text-yellow-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h4 class="text-sm font-medium text-slate-500">Sedang Diproses</h4>
+                        <p class="font-bold text-yellow-600 mt-1" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ formatCurrency(totalProcessingCommission) }}</p>
+                    </div>
+                </div>
+
+                <!-- Kolom Sudah Dicairkan -->
+                <div class="bg-white/70 backdrop-blur-sm p-5 rounded-xl shadow-lg border border-slate-200 flex items-start gap-4 animate-fade-in-up" style="animation-delay: 500ms;">
+                    <div class="bg-cyan-100 text-cyan-600 p-3 rounded-lg flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h4 class="text-sm font-medium text-slate-500">Sudah Dicairkan</h4>
+                        <p class="font-bold text-slate-800 mt-1" :style="{ fontSize: 'clamp(1rem, 1.8vw, 1.5rem)' }">{{ formatCurrency(totalWithdrawn) }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 600ms;">
+                 <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-slate-800">Riwayat Komisi (Siap Dicairkan)</h3>
+                    <button @click="handleCashoutRequest" :disabled="totalUnpaidCommission === 0 || isSaving" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-lg shadow-green-500/20 hover:bg-green-700 transition-colors disabled:bg-slate-400 disabled:shadow-none">
+                        <span v-if="isSaving">Mengajukan...</span>
+                        <span v-else>Cairkan Semua Komisi</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-500">
+                         <thead class="text-xs text-slate-700 uppercase bg-slate-50/50">
+                            <tr>
+                                <th class="px-6 py-3">Tanggal</th>
+                                <th class="px-6 py-3">Pelanggan Rujukan</th>
+                                <th class="px-6 py-3 text-right">Jumlah Komisi</th>
+                                <th class="px-6 py-3 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200/50">
+                            <tr v-if="unpaidCommissions.length === 0">
+                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada komisi yang siap dicairkan.</td>
+                            </tr>
+                            <tr v-for="com in unpaidCommissions" :key="com.id" class="hover:bg-slate-50/50">
+                                <td class="px-6 py-4">{{ new Date(com.createdAt.seconds * 1000).toLocaleDateString('id-ID') }}</td>
+                                <td class="px-6 py-4">{{ com.referredUserEmail }}</td>
+                                <td class="px-6 py-4 text-right font-bold text-green-600">{{ formatCurrency(com.commissionAmount) }}</td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 capitalize">{{ com.status }}</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 animate-fade-in-up" style="animation-delay: 700ms;">
+                 <h3 class="text-lg font-semibold text-slate-800 mb-4">Pencairan Sedang Diproses</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-500">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-50/50">
+    <tr>
+        <th class="px-6 py-3">Tanggal Pengajuan</th>
+        <th class="px-6 py-3">ID Pencairan</th> <th class="px-6 py-3">Pelanggan Rujukan</th>
+        <th class="px-6 py-3 text-right">Jumlah Komisi</th>
+        <th class="px-6 py-3 text-center">Status</th>
+    </tr>
+</thead>
+                        <tbody class="divide-y divide-slate-200/50">
+                            <tr v-if="processingCommissions.length === 0">
+                                <td colspan="4" class="p-10 text-center text-slate-500">Tidak ada pencairan yang sedang diproses.</td>
+                            </tr>
+                            <tr v-for="com in processingCommissions" :key="com.id" class="hover:bg-slate-50/50">
+    <td class="px-6 py-4">{{ new Date(com.createdAt.seconds * 1000).toLocaleDateString('id-ID') }}</td>
+    <td class="px-6 py-4 font-mono text-xs">{{ com.withdrawalId }}</td> <td class="px-6 py-4">{{ com.referredUserEmail }}</td>
+    <td class="px-6 py-4 text-right font-bold text-yellow-600">{{ formatCurrency(com.commissionAmount) }}</td>
+    <td class="px-6 py-4 text-center">
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800">Processing</span>
+    </td>
+</tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div v-if="activePage === 'laporan-transaksi'" class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
+<div v-if="isLaporanTransaksiLocked" class="mx-auto mt-16 max-w-sm rounded-2xl border bg-white p-8 text-center shadow-xl"><h3 class="text-xl font-bold">Halaman Terkunci</h3><p class="my-3 text-sm text-slate-600">Masukkan PIN keamanan Anda untuk membuka.</p><form @submit.prevent="unlockLaporanTransaksi"><input type="password" v-model="uiState.laporanTransaksiPinInput" placeholder="••••" class="w-full rounded-md border p-2 text-center text-lg"><p v-if="uiState.laporanTransaksiPinError" class="my-2 text-xs text-red-600">{{ uiState.laporanTransaksiPinError }}</p><button type="submit" class="mt-2 w-full rounded-lg bg-indigo-600 py-2.5 font-bold text-white">Buka</button></form></div>
+<div v-else class="mx-auto max-w-7xl space-y-5"><header class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Operasional</p><h2 class="text-3xl font-bold">Laporan Transaksi</h2><p class="mt-1 text-sm text-slate-600">Ringkasan pesanan berdasarkan tanggal terkirim. Total pencairan marketplace ada di Laporan Keuangan.</p></div><label class="text-sm font-medium">Tahun <input type="number" v-model.number="uiState.laporanTransaksiTahun" class="ml-2 w-28 rounded-md border p-2"></label></header>
+<div class="overflow-x-auto rounded-2xl border bg-white shadow-sm"><table class="w-full min-w-[760px] text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Bulan</th><th class="p-4 text-right">Pesanan diproses</th><th class="p-4 text-right">Qty tercatat</th><th class="p-4 text-right">HPP transaksi</th><th class="p-4 text-right">Dana dikonfirmasi</th><th class="p-4 text-right">Belum selesai</th></tr></thead><tbody class="divide-y"><tr v-for="month in laporanTransaksiData.months" :key="month.monthName"><td class="p-4 font-semibold capitalize">{{ month.monthName }}</td><td class="p-4 text-right">{{ formatNumber(month.totalOrders) }}</td><td class="p-4 text-right">{{ formatNumber(month.totalQty) }} pcs</td><td class="p-4 text-right">{{ formatCurrency(month.totalHpp) }}</td><td class="p-4 text-right text-emerald-700">{{ formatNumber(month.successfulOrders) }}</td><td class="p-4 text-right text-amber-700">{{ formatNumber(month.pendingOrders) }}</td></tr></tbody><tfoot class="border-t-2 bg-slate-50 font-bold"><tr><td class="p-4">TOTAL {{ uiState.laporanTransaksiTahun }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.totalOrders) }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.totalQty) }} pcs</td><td class="p-4 text-right">{{ formatCurrency(laporanTransaksiData.yearlyTotals.totalHpp) }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.successfulOrders) }}</td><td class="p-4 text-right">{{ formatNumber(laporanTransaksiData.yearlyTotals.pendingOrders) }}</td></tr></tfoot></table></div>
+<p class="rounded-lg bg-indigo-50 p-3 text-xs text-indigo-900">Transaksi tetap tersimpan setelah antrean scan dibersihkan. Ringkasan ini menghitung data operasional dan HPP; total dana marketplace tidak dibagi ke setiap pesanan.</p></div></div>
+
+<div v-if="activePage === 'roas-dashboard'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-blue-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto animate-fade-in-up">
+
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-slate-800">Dashboard ROAS Iklan</h2>
+            <p class="text-slate-500 mt-1">
+                Pantau performa iklan berdasarkan data POS, HPP produk, biaya marketplace, dan anggaran iklan.
+            </p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow border border-slate-200 mb-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Filter & Anggaran</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Periode</label>
+                    <select v-model="uiState.roasDashboard.dateFilter" class="mt-1 w-full p-2 border rounded-lg">
+                        <option value="today">Hari Ini</option>
+                        <option value="last_7_days">7 Hari Terakhir</option>
+                        <option value="last_30_days">30 Hari Terakhir</option>
+                        <option value="this_month">Bulan Ini</option>
+                        <option value="all_time">Semua Data</option>
+                    </select>
+                </div>
+
+<div>
+    <label class="block text-sm font-medium text-slate-700">Channel Penjualan</label>
+    <select v-model="uiState.roasDashboard.channelId" class="mt-1 w-full p-2 border rounded-lg">
+        <option value="all">Semua Channel</option>
+        <option
+            v-for="channel in state.settings.marketplaces"
+            :key="channel.id"
+            :value="channel.id"
+        >
+            {{ channel.name }}
+        </option>
+    </select>
+</div>
+
+<div>
+    <label class="block text-sm font-medium text-slate-700">Model Produk</label>
+    <select v-model="uiState.roasDashboard.selectedModelId" class="mt-1 w-full p-2 border rounded-lg">
+        <option value="all">Semua Model</option>
+        <option
+    v-for="model in uniqueRoasModels"
+    :key="model.namaModel"
+    :value="model.namaModel"
+>
+    {{ model.namaModel }}
+</option>
+    </select>
+</div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Biaya Iklan</label>
+                    <input type="number" v-model.number="uiState.roasDashboard.adSpend" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 100000">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Pajak (%)</label>
+                    <input type="number" v-model.number="uiState.roasDashboard.taxPercent" class="mt-1 w-full p-2 border rounded-lg" placeholder="Contoh: 0.5">
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
+            <div class="bg-white p-5 rounded-2xl shadow border">
+                <p class="text-sm text-slate-500">Omset</p>
+                <p class="text-2xl font-bold text-slate-800">{{ formatCurrency(roasDashboardData.omset) }}</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow border">
+                <p class="text-sm text-slate-500">ROAS</p>
+                <p class="text-2xl font-bold text-blue-700">{{ roasDashboardData.roas.toFixed(2) }}x</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow border">
+                <p class="text-sm text-slate-500">Rugi ROAS (BEP)</p>
+                <p class="text-2xl font-bold text-orange-600">{{ roasDashboardData.bepRoas.toFixed(2) }}x</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow border">
+                <p class="text-sm text-slate-500">Status</p>
+                <p class="text-xl font-bold" :class="roasDashboardData.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">
+                    {{ roasDashboardData.status }}
+                </p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow border">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">Ringkasan Penjualan</h3>
+
+                <div class="space-y-3">
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Total Order</span>
+                        <strong>{{ roasDashboardData.totalOrder }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Qty Terjual</span>
+                        <strong>{{ formatNumber(roasDashboardData.qtyTerjual) }} pcs</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Omset</span>
+                        <strong>{{ formatCurrency(roasDashboardData.omset) }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Laba Kotor</span>
+                        <strong>{{ formatCurrency(roasDashboardData.labaKotor) }}</strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Margin Bersih</span>
+                        <strong>{{ roasDashboardData.marginBersih.toFixed(2) }}%</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow border">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">Rincian Biaya</h3>
+
+                <div class="space-y-3">
+                    <div class="flex justify-between border-b pb-2">
+                        <div class="flex justify-between border-b pb-2">
+    <span>Diskon</span>
+
+    <strong class="text-red-600">
+        -{{ formatCurrency(roasDashboardData.discount) }}
+    </strong>
+</div>
+                        <span>HPP Terjual</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.totalHpp) }}</strong>
+                    </div>
+                
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Biaya Marketplace</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaMarketplace) }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Biaya Iklan</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaIklan) }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Biaya Operasional</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.biayaOperasional) }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span>Estimasi Pajak</span>
+                        <strong class="text-red-600">-{{ formatCurrency(roasDashboardData.pajak) }}</strong>
+                    </div>
+                    <div class="flex justify-between pt-2 text-lg">
+                        <span class="font-bold">Laba Setelah Iklan</span>
+                        <strong :class="roasDashboardData.labaBersih >= 0 ? 'text-green-700' : 'text-red-700'">
+                            {{ formatCurrency(roasDashboardData.labaBersih) }}
+                            <p class="text-xs text-slate-500 mt-1">
+    Belum termasuk biaya operasional.
+</p>
+                        </strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div v-if="activePage === 'roas-calculator'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto animate-fade-in-up">
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-slate-800">Kalkulator Target ROAS Iklan</h2>
+            <p class="text-slate-500 mt-1">Tentukan target ROAS Anda agar iklan tidak merugi dan mencapai target profit.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            
+            <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200 space-y-4 lg:sticky lg:top-8">
+                <div class="flex items-center justify-between border-b pb-3">
+                    <h3 class="text-xl font-bold text-slate-800">1. Masukkan Data</h3>
+                    <button @click="showModal('roasInputInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Harga Jual / AOV</label>
+                    <input type="number" v-model.number="uiState.roasCalculator.hargaJual" class="mt-1 w-full p-2 border rounded-md font-semibold">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Modal Produk (HPP)</label>
+                    <input type="number" v-model.number="uiState.roasCalculator.modalProduk" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Biaya Packing & Lainnya</label>
+                    <input type="number" v-model.number="uiState.roasCalculator.biayaPacking" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Biaya Admin Marketplace (Rp)</label>
+                    <input type="number" v-model.number="uiState.roasCalculator.biayaAdminMarketplace" class="mt-1 w-full p-2 border rounded-md">
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
+                    <div class="flex items-center justify-between border-b pb-3 mb-4">
+                        <h3 class="text-xl font-bold text-slate-800">2. Hasil Perhitungan</h3>
+                        <button @click="showModal('roasResultInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
+                    </div>
+                    <div v-if="roasResults.error" class="p-4 bg-red-100 text-red-700 border border-red-200 rounded-lg">
+                        {{ roasResults.error }}
+                    </div>
+                    <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="p-4 bg-slate-50 rounded-lg border">
+                            <p class="text-sm font-medium text-slate-500">Profit Kotor / Penjualan</p>
+                            <p class="text-2xl font-bold mt-1 text-indigo-600">{{ formatCurrency(roasResults.profitKotor) }}</p>
+                        </div>
+                        <div class="p-4 bg-yellow-100 rounded-lg border border-yellow-300">
+                            <p class="text-sm font-medium text-yellow-800">ROAS Impas (BEP)</p>
+                            <p class="text-2xl font-bold mt-1 text-yellow-900">{{ roasResults.breakEvenROAS.toFixed(2) }}</p>
+                            <p class="text-xs text-yellow-700">ROAS minimum agar tidak rugi</p>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-lg border">
+                            <p class="text-sm font-medium text-slate-500">Margin Profit Kotor</p>
+                            <p class="text-2xl font-bold mt-1 text-indigo-600">{{ roasResults.profitMargin.toFixed(1) }}%</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
+                    <h3 class="text-xl font-bold text-slate-800 border-b pb-3 mb-4">3. Target ROAS (untuk Profit)</h3>
+                    <p class="text-sm text-slate-600 mb-4">Untuk mendapatkan margin profit bersih dari penjualan, Anda harus mencapai target ROAS berikut:</p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-left bg-slate-100">
+                                <tr>
+                                    <th class="p-3 font-semibold text-slate-600">Target Profit Margin</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-center">Target ROAS yang Dibutuhkan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="target in roasResults.targets" :key="target.margin" class="border-b">
+                                    <td class="p-3">Target profit **{{ target.margin }}%** dari Harga Jual</td>
+                                    <td class="p-3 text-center font-bold text-lg" :class="target.roas > roasResults.breakEvenROAS ? 'text-green-600' : 'text-slate-500'">
+                                        <span v-if="isFinite(target.roas)">{{ target.roas.toFixed(2) }}</span>
+                                        <span v-else>Tidak Mungkin</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-slate-200">
+                    <div class="flex items-center justify-between border-b pb-3 mb-4">
+    <h3 class="text-xl font-bold text-slate-800">4. Simulasi Iklan dengan Budget</h3>
+    <button @click="showModal('roasSimulationInfo')" class="bg-blue-100 text-blue-700 text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-200">Informasi</button>
+</div>
+                    <div class="max-w-md mb-6">
+                        <label class="block text-sm font-medium text-slate-700">Masukkan Estimasi Budget Iklan (per bulan)</label>
+                        <input type="number" v-model.number="uiState.roasCalculator.estimasiBiayaIklan" class="mt-1 w-full p-2 border rounded-md font-semibold">
+                    </div>
+
+                    <div v-if="roasResults.error">
+                        <p class="text-slate-500 text-center py-4">Silakan lengkapi data produk di atas terlebih dahulu.</p>
+                    </div>
+                    <div v-else class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-left bg-slate-100">
+                                <tr>
+                                    <th class="p-3 font-semibold text-slate-600">Skenario</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-center">Target ROAS</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-center">Estimasi Order</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-right">Estimasi Omset</th>
+                                    <th class="p-3 font-semibold text-slate-600 text-right bg-indigo-100 text-indigo-800">Estimasi Laba Bersih<br><span class="font-normal text-xs">(Setelah Biaya Iklan)</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="sim in roasSimulationResults" :key="sim.scenario" class="border-b">
+                                    <td class="p-3 font-semibold">{{ sim.scenario }}</td>
+                                    <td class="p-3 text-center text-lg font-bold" :class="{'text-yellow-700': sim.scenario.includes('Impas'), 'text-green-700': sim.scenario.includes('Target')}">
+                                        <div v-if="sim.scenario.includes('Kustom')" class="w-24 mx-auto">
+                                            <input type="number" step="0.1" v-model.number="uiState.roasCalculator.customRoasTarget" class="w-full p-1 text-center border rounded-md">
+                                        </div>
+                                        <span v-else>{{ typeof sim.targetRoas === 'number' ? sim.targetRoas.toFixed(2) : sim.targetRoas }}</span>
+                                    </td>
+                                    <td class="p-3 text-center">{{ sim.estimasiOrder.toFixed(0) }} order</td>
+                                    <td class="p-3 text-right">{{ formatCurrency(sim.estimasiOmset) }}</td>
+                                    <td class="p-3 text-right text-lg font-bold" :class="sim.estimasiLabaBersih >= 0 ? 'text-green-600' : 'text-red-600'">
+                                        {{ formatCurrency(sim.estimasiLabaBersih) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div v-if="activePage === 'laporan-keuangan'" class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+<div v-if="isLaporanKeuanganLocked" class="mx-auto mt-16 max-w-sm rounded-2xl border bg-white p-8 text-center shadow-xl"><h3 class="text-xl font-bold">Halaman Terkunci</h3><p class="my-3 text-sm text-slate-600">Masukkan PIN keamanan Anda untuk membuka.</p><form @submit.prevent="unlockLaporanKeuangan"><input type="password" v-model="uiState.laporanKeuanganPinInput" placeholder="••••" class="w-full rounded-md border p-2 text-center text-lg"><p v-if="uiState.laporanKeuanganPinError" class="my-2 text-xs text-red-600">{{ uiState.laporanKeuanganPinError }}</p><button type="submit" class="mt-2 w-full rounded-lg bg-indigo-600 py-2.5 font-bold text-white">Buka</button></form></div>
+<div v-else class="mx-auto max-w-7xl space-y-5"><header class="flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Keuangan</p><h2 class="text-3xl font-bold">Laporan Keuangan</h2><p class="mt-1 text-sm text-slate-600">Pencairan marketplace dicatat satu kali per toko/periode; HPP dihitung dari pesanan yang berhasil dikonfirmasi.</p></div><label class="text-sm font-medium">Tahun <input type="number" v-model.number="uiState.laporanKeuanganTahun" class="ml-2 w-28 rounded-md border p-2"></label></header>
+<section class="grid gap-4 md:grid-cols-3">
+<article class="rounded-xl border bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-500">Dana dilepas</p><p class="mt-1 text-xl font-bold">{{ formatCurrency(laporanKeuanganData.yearlyTotals.payoutAmount) }}</p></article>
+<article class="rounded-xl border bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-500">Laba/rugi setelah HPP dan biaya</p><p class="mt-1 text-xl font-bold" :class="laporanKeuanganData.yearlyTotals.netProfit===null?'text-amber-700':laporanKeuanganData.yearlyTotals.netProfit>=0?'text-emerald-700':'text-red-700'">{{ laporanKeuanganData.yearlyTotals.netProfit===null?'Lengkapi data':formatCurrency(laporanKeuanganData.yearlyTotals.netProfit) }}</p></article>
+<article class="rounded-xl border bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-500">Laba belum dibagikan</p><p class="mt-1 text-xl font-bold text-indigo-700">{{ laporanKeuanganData.yearlyTotals.undistributedProfit===null?'Lengkapi data':formatCurrency(laporanKeuanganData.yearlyTotals.undistributedProfit) }}</p></article>
+</section>
+<section class="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-5">
+<h3 class="font-bold text-slate-900">Catat bagi hasil dan pengembalian modal</h3>
+<p class="mt-1 text-sm text-slate-600">Gunakan halaman Modal &amp; Bagi Hasil agar setiap pembayaran tertaut ke periode, laba, persentase kesepakatan, dan nominal yang benar-benar dibayarkan. Pembayaran modal dan bagi hasil tidak mengubah laba usaha.</p>
+<button type="button" @click="changePage('investasi')" class="mt-3 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white">Buka Modal &amp; Bagi Hasil</button>
+</section>
+<div class="overflow-x-auto rounded-2xl border bg-white shadow-sm"><table class="w-full min-w-[720px] text-left text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Bulan</th><th class="p-4 text-right">Total pencairan marketplace</th><th class="p-4 text-right">HPP pesanan berhasil</th><th class="p-4 text-right">Biaya operasional</th><th class="p-4 text-right">Laba setelah HPP & biaya</th></tr></thead><tbody class="divide-y"><tr v-for="month in laporanKeuanganData.months" :key="month.monthName"><td class="p-4 font-semibold capitalize">{{ month.monthName }}</td><td class="p-4 text-right">{{ formatCurrency(month.payoutAmount) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.soldHpp) }}</td><td class="p-4 text-right">-{{ formatCurrency(month.operatingCosts) }}</td><td class="p-4 text-right font-bold" :class="month.netProfit===null?'text-amber-700':month.netProfit>=0?'text-emerald-700':'text-red-700'">{{ month.netProfit===null?'Lengkapi total pencairan':formatCurrency(month.netProfit) }}</td></tr></tbody><tfoot class="border-t-2 bg-slate-50 font-bold"><tr><td class="p-4">TOTAL {{ uiState.laporanKeuanganTahun }}</td><td class="p-4 text-right">{{ formatCurrency(laporanKeuanganData.yearlyTotals.payoutAmount) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.soldHpp) }}</td><td class="p-4 text-right">-{{ formatCurrency(laporanKeuanganData.yearlyTotals.operatingCosts) }}</td><td class="p-4 text-right">{{ laporanKeuanganData.yearlyTotals.netProfit===null?'Lengkapi total pencairan':formatCurrency(laporanKeuanganData.yearlyTotals.netProfit) }}</td></tr></tfoot></table></div>
+<p class="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Masukkan total dana dilepas dari ringkasan marketplace di halaman Impor Pesanan Terkirim. Jika total pencairan belum dicatat, laba ditampilkan sebagai belum lengkap agar tidak keliru dianggap Rp0.</p></div></div>
+
+<div v-if="activePage === 'statistik-penjualan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+
+    <div v-if="isStatistikPenjualanLocked" class="flex items-center justify-center min-h-[70vh] animate-fade-in">
+        <div class="bg-white/70 backdrop-blur-sm p-8 rounded-2xl shadow-xl border text-center max-w-sm w-full">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Statistik Penjualan Terkunci</h3>
+            <p class="text-sm text-slate-600 mb-4">Masukkan PIN keamanan untuk melihat statistik penjualan.</p>
+            <form @submit.prevent="unlockStatistikPenjualan" class="w-full">
+                <input type="password" v-model="uiState.statistikPenjualanPinInput" placeholder="••••" class="w-full p-2 border border-slate-300 rounded-md text-center text-lg mb-2" autocomplete="current-password">
+                <p v-if="uiState.statistikPenjualanPinError" class="text-red-500 text-xs mb-2">{{ uiState.statistikPenjualanPinError }}</p>
+                <button type="submit" class="mt-2 w-full bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition-colors">Buka Statistik Penjualan</button>
+            </form>
+        </div>
+    </div>
+
+    <div v-else class="max-w-7xl mx-auto space-y-6">
+
+        <div class="bg-white/90 backdrop-blur-sm rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                <div>
+                    <p class="text-sm text-slate-500">Analisis performa produk</p>
+                    <h2 class="text-3xl font-bold text-slate-800 mt-1">Statistik Penjualan</h2>
+                    <p class="text-slate-500 mt-2 max-w-2xl">
+                        Pantau jumlah pesanan, HPP, serta model dan varian yang paling banyak terjual.
+                    </p>
+                </div>
+
+                <div class="w-full lg:w-[760px] space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Periode</label>
+                            <select v-model="uiState.salesStatsDateFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                                <option value="all_time">Semua</option>
+                                <option value="today">Hari Ini</option>
+                                <option value="last_7_days">7 Hari Terakhir</option>
+                                <option value="last_30_days">30 Hari Terakhir</option>
+                                <option value="this_month">Bulan Ini</option>
+                                <option value="last_month">Bulan Lalu</option>
+                                <option value="this_year">Tahun Ini</option>
+                                <option value="custom_dates">Rentang tanggal</option>
+                                <option value="month_range">Rentang bulan</option>
+                                <option value="year">Pilih tahun</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Model</label>
+                            <select v-model="uiState.salesStatsModelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                                <option value="all">Semua Model</option>
+                                <option v-for="model in salesStatsModelOptions" :key="model.namaModel" :value="model.namaModel">{{ model.namaModel }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Channel</label>
+                            <select v-model="uiState.salesStatsChannelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                                <option value="all">Semua Channel</option>
+                                <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.name">{{ channel.name }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div v-if="uiState.salesStatsDateFilter === 'custom_dates'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+                        <label class="block text-xs font-semibold text-slate-600">Tanggal mulai<input v-model="uiState.salesStatsStartDate" type="date" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
+                        <label class="block text-xs font-semibold text-slate-600">Tanggal selesai<input v-model="uiState.salesStatsEndDate" type="date" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
+                    </div>
+                    <div v-if="uiState.salesStatsDateFilter === 'month_range'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+                        <label class="block text-xs font-semibold text-slate-600">Bulan mulai<input v-model="uiState.salesStatsStartMonth" type="month" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
+                        <label class="block text-xs font-semibold text-slate-600">Bulan selesai<input v-model="uiState.salesStatsEndMonth" type="month" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
+                    </div>
+                    <div v-if="uiState.salesStatsDateFilter === 'year'" class="max-w-xs rounded-xl bg-slate-50 p-3">
+                        <label class="block text-xs font-semibold text-slate-600">Tahun<select v-model.number="uiState.salesStatsYear" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"><option v-for="year in Array.from({ length: new Date().getFullYear() - 2000 + 1 }, (_, index) => 2000 + index)" :key="year" :value="year">{{ year }}</option></select></label>
+                    </div>
+                    <p v-if="salesPerformanceStats.dateRangeInvalid" class="text-xs text-red-600">Periksa rentang periode yang dipilih.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Total Order</p>
+                <p class="text-3xl font-bold text-slate-800 mt-2">{{ formatNumber(salesPerformanceStats.totalOrder) }}</p>
+                <p class="text-xs text-slate-400 mt-2">Jumlah transaksi sesuai filter.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Total Produk Terjual</p>
+                <p class="text-3xl font-bold text-cyan-600 mt-2">{{ formatNumber(salesPerformanceStats.totalQty) }} pcs</p>
+                <p class="text-xs text-slate-400 mt-2">Total qty produk yang terjual.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Total HPP</p>
+                <p class="text-3xl font-bold text-orange-600 mt-2">{{ formatCurrency(salesPerformanceStats.totalHpp) }}</p>
+                <p class="text-xs text-slate-400 mt-2">Total modal produk pada pesanan sesuai filter.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Rata-rata HPP per pcs</p>
+                <p class="text-3xl font-bold text-orange-600 mt-2">{{ formatCurrency(salesPerformanceStats.averageHppPerUnit) }}</p>
+                <p class="text-xs text-slate-400 mt-2">Total HPP dibagi jumlah pcs terjual.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Model Terlaris</p>
+                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topModels[0]?.name || 'Belum ada data' }}</p>
+                <p class="text-sm text-slate-500 mt-2">
+                    {{ salesPerformanceStats.topModels[0] ? formatNumber(salesPerformanceStats.topModels[0].qty) + ' pcs terjual' : '-' }}
+                </p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Warna Terlaris</p>
+                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topColors[0]?.name || 'Belum ada data' }}</p>
+                <p class="text-sm text-slate-500 mt-2">
+                    {{ salesPerformanceStats.topColors[0] ? formatNumber(salesPerformanceStats.topColors[0].qty) + ' pcs terjual' : '-' }}
+                </p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Ukuran Terlaris</p>
+                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topSizes[0]?.name || 'Belum ada data' }}</p>
+                <p class="text-sm text-slate-500 mt-2">
+                    {{ salesPerformanceStats.topSizes[0] ? formatNumber(salesPerformanceStats.topSizes[0].qty) + ' pcs terjual' : '-' }}
+                </p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
+                <p class="text-sm text-slate-500">Channel Pesanan Terbanyak</p>
+                <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topChannels[0]?.name || 'Belum ada data' }}</p>
+                <p class="text-sm text-slate-500 mt-2">
+                    {{ salesPerformanceStats.topChannels[0] ? formatNumber(salesPerformanceStats.topChannels[0].order) + ' order · ' + formatNumber(salesPerformanceStats.topChannels[0].qty) + ' pcs' : '-' }}
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="flex items-center justify-between gap-4 mb-5">
+                <div>
+                    <p class="text-sm text-slate-500">Ranking produk</p>
+                    <h3 class="text-xl font-bold text-slate-800">Performa Produk per SKU</h3>
+                </div>
+                <p class="text-sm text-slate-400">20 SKU dengan pcs terjual terbanyak</p>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-left">
+                        <tr>
+                            <th class="px-4 py-3 font-semibold">SKU</th>
+                            <th class="px-4 py-3 font-semibold">Model</th>
+                            <th class="px-4 py-3 font-semibold">Warna</th>
+                            <th class="px-4 py-3 font-semibold">Ukuran</th>
+                            <th class="px-4 py-3 font-semibold text-right">Qty Terjual</th>
+                            <th class="px-4 py-3 font-semibold text-right">HPP / pcs</th>
+                            <th class="px-4 py-3 font-semibold text-right">Total HPP</th>
+                        </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-slate-100">
+                        <tr v-if="salesPerformanceStats.topProducts.length === 0">
+                            <td colspan="7" class="px-4 py-6 text-center text-slate-500">
+                                Belum ada data penjualan untuk filter ini.
+                            </td>
+                        </tr>
+
+                        <tr v-for="item in salesPerformanceStats.topProducts" :key="item.sku + '|' + item.model + '|' + item.color + '|' + item.size" class="hover:bg-slate-50">
+                            <td class="px-4 py-3 text-blue-600 font-mono">{{ item.sku }}</td>
+                            <td class="px-4 py-3 font-semibold text-slate-800">{{ item.model }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ item.color }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ item.size }}</td>
+                            <td class="px-4 py-3 text-right font-bold">{{ formatNumber(item.qty) }}</td>
+                            <td class="px-4 py-3 text-right text-orange-600">{{ formatCurrency(item.hppPerUnit) }}</td>
+                            <td class="px-4 py-3 text-right font-bold text-orange-700">{{ formatCurrency(item.hpp) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <section class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-sm font-medium text-indigo-600">Tren penjualan</p>
+                    <h3 class="text-xl font-bold text-slate-800">Model dan varian yang meningkat</h3>
+                    <p class="mt-1 text-sm text-slate-500">Perbandingan pcs terjual per model, warna, dan ukuran.</p>
+                </div>
+                <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                    {{ salesPerformanceStats.hasComparison ? 'Periode aktif vs periode sebelumnya' : 'Pcs pada periode aktif' }}
+                </span>
+            </div>
+            <div v-if="salesPerformanceStats.variantTrend.length" class="mt-5 w-full" :style="{ height: Math.max(280, salesPerformanceStats.variantTrend.length * 48) + 'px' }">
+                <canvas ref="salesStatsChartCanvas" aria-label="Grafik pcs terjual berdasarkan model, warna, dan ukuran" role="img"></canvas>
+            </div>
+            <div v-else class="mt-5 rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
+                Belum ada data penjualan yang sesuai filter untuk ditampilkan pada grafik.
+            </div>
+        </section>
+
+    </div>
+</div>
+
+
+
+<div v-if="activePage === 'pengaturan'" class="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-indigo-100 p-4 sm:p-8">
+    <div class="max-w-7xl mx-auto">
+        
+        <div class="mb-8 animate-fade-in-up">
+            <h2 class="text-3xl font-bold text-slate-800">Pengaturan Aplikasi</h2>
+            <p class="text-slate-500 mt-1">Kelola semua konfigurasi inti untuk bisnis Anda di sini.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+            
+            <div class="lg:col-span-1 bg-white/70 backdrop-blur-sm p-4 rounded-2xl shadow-lg border border-slate-200 lg:sticky lg:top-8 animate-fade-in-up" style="animation-delay: 100ms;">
+                <h3 class="text-xl font-bold text-slate-800 mb-4 px-3">Pengaturan</h3>
+                <ul class="space-y-1 text-base font-medium">
+                    <li>
+                        <button @click="uiState.pengaturanTab = 'umum'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'umum', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'umum'}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" /></svg>
+                            Pengaturan Umum
+                        </button>
+                    </li>
+                    <li>
+                        <button @click="uiState.pengaturanTab = 'marketplace'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'marketplace', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'marketplace'}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /></svg>
+                            Marketplace
+                        </button>
+                    </li>
+                    <li>
+                        <button @click="uiState.pengaturanTab = 'modelproduk'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'modelproduk', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'modelproduk'}">
+                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
+                            Model Produk
+                        </button>
+                    </li>
+                    <li>
+                        <button @click="uiState.pengaturanTab = 'rekening'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'rekening', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'rekening'}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13h1v2H4v-2z" clip-rule="evenodd" /></svg>
+                            Rekening Bank
+                        </button>
+                    </li>
+                    <li v-if="isAdmin">
+                        <button @click="uiState.pengaturanTab = 'admin'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'admin', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'admin'}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.545 2.917A5.996 5.996 0 0010 18a5.996 5.996 0 004.545-2.083A5 5 0 0012 11z" clip-rule="evenodd" /></svg>
+                            Admin
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="lg:col-span-3">
+                <div class="bg-white/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200 animate-fade-in-up" style="animation-delay: 200ms;">
+                    
+                    <div v-if="uiState.pengaturanTab === 'umum'" class="animate-fade-in">
+                        <h3 class="text-xl font-bold text-slate-800 mb-6">Informasi Dasar & Keamanan</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nama Brand Anda</label>
+                                <input type="text" v-model="state.settings.brandName" class="w-full p-2 border border-slate-300 rounded-md">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Batas Stok Minimum Peringatan</label>
+                                <input type="number" v-model.number="state.settings.minStok" class="w-full p-2 border border-slate-300 rounded-md">
+                            </div>
+                        </div>
+                        <div class="border-t pt-4 mt-6">
+                            <h4 class="font-semibold text-slate-700 mb-2">Aktifkan Kunci PIN</h4>
+                            <p class="text-xs text-slate-500 mb-4">Pilih bagian mana saja yang ingin Anda amankan menggunakan PIN.</p>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+                                    <span class="font-medium text-sm text-slate-800">Kunci Halaman Dashboard</span>
+                                    <button @click="requestPinForToggle('dashboard')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.dashboard ? 'bg-indigo-600' : 'bg-slate-300'">
+                                        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.dashboard }"></span>
+                                    </button>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+                                    <span class="font-medium text-sm text-slate-800">Kunci Tabel Riwayat Pemasukan</span>
+                                    <button @click="requestPinForToggle('incomeHistory')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.incomeHistory ? 'bg-indigo-600' : 'bg-slate-300'">
+                                        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.incomeHistory }"></span>
+                                    </button>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+                                    <span class="font-medium text-sm text-slate-800">Kunci Halaman Investasi</span>
+                                    <button @click="requestPinForToggle('investmentPage')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.investmentPage ? 'bg-indigo-600' : 'bg-slate-300'">
+                                        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.investmentPage }"></span>
+                                    </button>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+    <span class="font-medium text-sm text-slate-800">Kunci Laporan Transaksi</span>
+    <button @click="requestPinForToggle('laporanTransaksi')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.laporanTransaksi ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.laporanTransaksi }"></span>
+    </button>
+</div>
+
+<div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+    <span class="font-medium text-sm text-slate-800">Kunci Laporan Keuangan</span>
+    <button @click="requestPinForToggle('laporanKeuangan')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.laporanKeuangan ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.laporanKeuangan }"></span>
+    </button>
+</div>
+
+<div class="flex justify-between items-center p-3 bg-slate-50 rounded-lg border">
+    <span class="font-medium text-sm text-slate-800">Kunci Harga & HPP</span>
+    <button @click="requestPinForToggle('hargaHpp')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1" :class="state.settings.pinProtection?.hargaHpp ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.hargaHpp }"></span>
+    </button>
+</div>
+
+<div class="flex justify-between items-center gap-4 p-3 bg-slate-50 rounded-lg border">
+    <div>
+        <span class="font-medium text-sm text-slate-800">Kunci Statistik Penjualan</span>
+        <p class="text-xs text-slate-500 mt-1">PIN diminta saat membuka halaman Statistik Penjualan.</p>
+    </div>
+    <button @click="requestPinForToggle('statistikPenjualan')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0" :class="state.settings.pinProtection?.statistikPenjualan ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.statistikPenjualan }"></span>
+    </button>
+</div>
+
+<div class="flex justify-between items-center gap-4 p-3 bg-slate-50 rounded-lg border">
+    <div>
+        <span class="font-medium text-sm text-slate-800">Kunci Semua Tombol Export</span>
+        <p class="text-xs text-slate-500 mt-1">Setiap export data harus dikonfirmasi dengan PIN.</p>
+    </div>
+    <button @click="requestPinForToggle('exportData')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0" :class="state.settings.pinProtection?.exportData ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.exportData }"></span>
+    </button>
+</div>
+
+<div class="flex justify-between items-center gap-4 p-3 bg-slate-50 rounded-lg border">
+    <div>
+        <span class="font-medium text-sm text-slate-800">Kunci Detail Riwayat Transaksi</span>
+        <p class="text-xs text-slate-500 mt-1">PIN diminta setiap kali tombol Detail transaksi dibuka.</p>
+    </div>
+    <button @click="requestPinForToggle('transactionDetail')" class="w-14 h-7 rounded-full flex items-center transition-colors px-1 flex-shrink-0" :class="state.settings.pinProtection?.transactionDetail ? 'bg-indigo-600' : 'bg-slate-300'">
+        <span class="w-5 h-5 bg-white rounded-full shadow-md transition-transform" :class="{ 'transform translate-x-7': state.settings.pinProtection?.transactionDetail }"></span>
+    </button>
+</div>
+                            </div>
+                        </div>
+                        <div class="border-t pt-4 mt-6">
+                            <h4 class="font-semibold text-slate-700 mb-2">
+                                <span v-if="state.settings.dashboardPin">Ubah PIN Dasbor</span>
+                                <span v-else>Buat PIN Dasbor Baru</span>
+                            </h4>
+                            <div class="space-y-2">
+                                <div v-if="state.settings.dashboardPin">
+                                    <label class="block text-sm font-medium text-slate-700">PIN Lama</label>
+                                    <input type="password" v-model="uiState.oldPin" placeholder="Masukkan PIN lama" class="w-full p-2 border border-slate-300 rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">PIN Baru</label>
+                                    <input type="password" v-model="uiState.newPin" placeholder="Masukkan PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Konfirmasi PIN Baru</label>
+                                    <input type="password" v-model="uiState.confirmNewPin" placeholder="Ketik ulang PIN baru" class="w-full p-2 border border-slate-300 rounded-md">
+                                </div>
+                                <p v-if="uiState.pinError" class="text-sm text-red-500">{{ uiState.pinError }}</p>
+                            </div>
+                        </div>
+                        <div class="flex justify-end pt-4 border-t mt-6">
+                            <button @click="saveGeneralSettings" :disabled="isSavingSettings || !isSubscriptionActive" class="bg-indigo-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400">
+    <span v-if="isSavingSettings">Menyimpan...</span>
+    <span v-else>Simpan Perubahan</span>
+</button>
+                        </div>
+                    </div>
+
+                    <div v-if="uiState.pengaturanTab === 'marketplace'" class="animate-fade-in">
+    <div class="flex justify-between items-center mb-4">
+    <h3 class="text-xl font-bold text-slate-800">Daftar Marketplace</h3>
+
+    <div class="flex gap-2">
+        <button 
+            @click="requestProtectedExport(() => exportMarketplaceYangTampil())" 
+            class="bg-blue-600 text-white font-bold py-1 px-3 rounded-md hover:bg-blue-700 text-sm">
+            Export
+        </button>
+
+        <button 
+            @click="addMarketplace" 
+            class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm" 
+            :disabled="!isSubscriptionActive">
+            Tambah
+        </button>
+    </div>
+</div>
+    <p class="mb-4 text-sm text-slate-500">Atur nama channel saja. Data potongan dan penghasilan bersih dicatat dari laporan marketplace yang dicocokkan dengan transaksi.</p>
+    <div class="mb-4">
+        <input type="text" v-model="uiState.pengaturanMarketplaceSearch" placeholder="Cari nama marketplace..." class="w-full p-2 border border-slate-300 rounded-md">
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+<thead class="text-left text-slate-500"><tr><th class="p-2 font-medium">NAMA MARKETPLACE</th><th class="p-2 font-medium text-right">AKSI</th></tr></thead>
+<tbody class="divide-y divide-slate-200">
+<tr v-if="filteredMarketplaces.length === 0"><td colspan="2" class="p-4 text-center text-slate-500">Belum ada channel marketplace. Tambahkan Shopee, TikTok Shop, atau channel lain yang digunakan.</td></tr>
+<tr v-for="mp in (filteredMarketplaces || [])" :key="mp.id"><td class="p-3 font-semibold text-slate-700">{{ mp.name }}</td><td class="p-3 text-right space-x-4">
+<button @click="showModal('editMarketplace', JSON.parse(JSON.stringify(mp)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
+<button @click="removeMarketplace(mp.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">Hapus</button>
+</td></tr></tbody></table>
+    </div>
+    <div class="flex justify-end pt-4 border-t mt-6">
+        <button @click="saveSettingsData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:shadow-none">
+    <span v-if="isSaving">Menyimpan...</span>
+    <span v-else>Simpan Perubahan</span>
+</button>
+    </div>
+</div>
+                    
+                    <div v-if="uiState.pengaturanTab === 'modelproduk'" class="animate-fade-in">
+    <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-4">
+    <h3 class="text-xl font-bold text-slate-800">Daftar Model Produk</h3>
+    <button @click="showModal('modelProdukInfo')" class="bg-indigo-100 text-indigo-700 font-bold py-1 px-3 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+        </svg>
+        Informasi
+    </button>
+</div>
+        <button @click="addModelProduk" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 text-sm" :disabled="!isSubscriptionActive">+ Tambah Model</button>
+    </div>
+    
+    <div class="mb-4">
+        <input type="text" v-model="uiState.pengaturanModelProdukSearch" placeholder="Cari nama model..." class="w-full p-2 border border-slate-300 rounded-md">
+    </div>
+
+    <div class="overflow-x-auto" style="max-height: 50vh;">
+        <table class="w-full text-sm">
+            <thead class="text-left text-slate-500">
+                <tr>
+                    <th class="p-2 font-medium">NAMA MODEL</th>
+                    <th class="p-2 font-medium">WARNA</th>
+                    <th class="p-2 font-medium">UKURAN</th>
+                    <th class="p-2 font-medium">YARD</th>
+                    <th class="p-2 font-medium">HARGA MAKLUN</th>
+                    <th class="p-2 font-medium">HARGA JAHIT</th>
+                    <th class="p-2 font-medium text-right">AKSI</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+                <tr v-if="filteredModelProduk.length === 0">
+                    <td colspan="5" class="p-4 text-center text-slate-500">Tidak ada model yang cocok.</td>
+                </tr>
+                <tr v-for="model in filteredModelProduk" :key="model.id">
+                    <td class="p-3 font-semibold text-slate-700">{{ model.namaModel }}</td>
+                    <td class="p-3">{{ model.warna }}</td>
+                    <td class="p-3">{{ model.ukuran }}</td>
+                    <td class="p-3">{{ model.yardPerModel || 0 }} y</td>
+                    <td class="p-3">{{ formatCurrency(model.hargaMaklun || 0) }}</td>
+                    <td class="p-3">{{ formatCurrency(model.hargaJahit || 0) }}</td>
+                    <td class="p-3 text-right space-x-4">
+                        <button @click="showModal('editModelProduk', JSON.parse(JSON.stringify(model)))" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
+                        <button @click="removeModelProduk(model.id)" class="text-red-500 hover:text-red-700" :disabled="!isSubscriptionActive">
+    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="flex justify-end pt-4 border-t mt-6">
+        <button @click="saveSettingsData" :disabled="isSaving || !isSubscriptionActive" class="bg-green-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:shadow-none">
+    <span v-if="isSaving">Menyimpan...</span>
+    <span v-else>Simpan Perubahan</span>
+</button>
+    </div>
+</div>
+                    
+                    <div v-if="uiState.pengaturanTab === 'rekening'" class="animate-fade-in">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-slate-800">Daftar Rekening Bank</h3>
+                            <button @click="showModal('addBankAccount', { bankName: '', accountNumber: '', accountName: '' })" class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 text-sm" :disabled="!isSubscriptionActive">Tambah</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="text-left text-slate-500">
+                                    <tr>
+                                        <th class="p-2 font-medium">NAMA BANK</th>
+                                        <th class="p-2 font-medium">NO. REKENING</th>
+                                        <th class="p-2 font-medium">ATAS NAMA</th>
+                                        <th class="p-2 font-medium text-right">AKSI</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <tr v-if="state.bankAccounts.length === 0">
+                                        <td colspan="4" class="p-4 text-center text-slate-500">Belum ada rekening tersimpan.</td>
+                                    </tr>
+                                    <tr v-for="acc in (state.bankAccounts || [])" :key="acc.id">
+                                        <td class="p-3 font-semibold text-slate-700">{{ acc.bankName }}</td>
+                                        <td class="p-3">{{ acc.accountNumber }}</td>
+                                        <td class="p-3">{{ acc.accountName }}</td>
+                                        <td class="p-3 text-right space-x-4">
+                                            <button @click="showModal('editBankAccount', acc)" class="font-semibold text-blue-500 hover:underline" :disabled="!isSubscriptionActive">Edit</button>
+                                            <button @click="deleteBankAccount(acc.id)" class="text-red-500 hover:text-red-700 font-semibold" :disabled="!isSubscriptionActive">Hapus</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div v-if="uiState.pengaturanTab === 'admin' && isAdmin" class="animate-fade-in">
+    <div class="space-y-6">
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Akun Mitra</h3>
+            <p class="text-sm text-slate-500 mb-4">
+                Pilih pengguna di bawah ini untuk menjadikannya mitra. Kode rujukan unik akan dibuat otomatis.
+            </p>
+            <div class="overflow-x-auto max-h-96">
+    <table class="w-full text-sm">
+        <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
+            <tr>
+                <th class="p-2 font-medium">Email Pengguna</th>
+                <th class="p-2 font-medium text-center">Status Mitra</th>
+                <th class="p-2 font-medium text-center">Kode Rujukan</th>
+                <th class="p-2 font-medium text-right">Aksi</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+            <tr v-if="uiState.allUsers.length === 0">
+                <td colspan="4" class="p-4 text-center text-slate-500">Tidak ada pengguna terdaftar.</td>
+            </tr>
+            <tr v-for="user in uiState.allUsers" :key="user.uid" class="hover:bg-slate-50">
+                <td class="p-3">{{ user.email }}</td>
+                <td class="p-3 text-center">
+                    <span v-if="user.isPartner" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800">Ya</span>
+                    <span v-else class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-800">Tidak</span>
+                </td>
+                <td class="p-3 text-center font-mono text-sm">
+                    {{ user.referralCode || '-' }}
+                </td>
+                <td class="p-3 text-right space-x-2">
+                    <button v-if="!user.isPartner" @click="makeUserPartner(user.uid)" class="bg-indigo-600 text-white font-bold py-1 px-3 rounded-md hover:bg-indigo-700 text-xs">
+                        Jadikan Mitra
+                    </button>
+                    <div v-else class="inline-flex items-center gap-2">
+                        <button @click="showModal('editReferralCode', { user: user, newReferralCode: user.referralCode })" class="bg-blue-100 text-blue-800 font-bold py-1 px-3 rounded-md hover:bg-blue-200 text-xs">
+                            Edit
+                        </button>
+                        <button @click="showModal('viewNote', { title: 'Kode Rujukan Mitra', content: user.referralCode })" class="bg-slate-200 text-slate-800 font-bold py-1 px-3 rounded-md hover:bg-slate-300 text-xs">
+                            Lihat Kode
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Export Data Pelanggan</h3>
+            <p class="text-sm text-slate-500 mb-4">Pilih pelanggan dan rentang waktu untuk mengunduh semua data mereka.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Pilih Pelanggan</label>
+                    <select v-model="uiState.selectedUserForExport" class="mt-1 w-full p-2 border rounded-md">
+                        <option :value="null" disabled>-- Daftar Pelanggan --</option>
+                        <option v-for="user in uiState.allUsers" :key="user.uid" :value="user">
+                            {{ user.email }}
+                        </option>
+                    </select>
+                    <div v-if="uiState.selectedUserForExport" class="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+    <p>
+        <b>Email dipilih:</b>
+        {{ getAdminExportUserEmail(uiState.selectedUserForExport) }}
+    </p>
+
+    <p>
+        <b>User ID yang akan diexport:</b>
+        {{ getAdminExportUserId(uiState.selectedUserForExport) }}
+    </p>
+
+    <p v-if="uiState.selectedUserForExport.oldUidField">
+        <b>UID lama di field data:</b>
+        {{ uiState.selectedUserForExport.oldUidField }}
+    </p>
+</div>
+                </div>
+                <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Filter Waktu</label>
+    <select v-model="uiState.exportFilter" class="w-full p-2 border rounded-md capitalize bg-white shadow-sm">
+        <option value="today">Hari Ini</option>
+        <option value="last_7_days">7 Hari Terakhir</option>
+        <option value="last_30_days">30 Hari Terakhir</option>
+        <option value="this_year">Tahun Ini</option>
+        <option value="by_date_range">Rentang Tanggal</option>
+        <option value="by_month_range">Rentang Bulan</option>
+        <option value="by_year_range">Rentang Tahun</option>
+        <option value="all_time">Semua</option>
+    </select>
+</div>
+<div v-if="uiState.exportFilter === 'by_date_range'" class="mt-2 grid grid-cols-2 gap-2 animate-fade-in">
+    <div><label class="block text-xs font-medium mb-1">Dari Tanggal</label><input type="date" v-model="uiState.exportStartDate" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+    <div><label class="block text-xs font-medium mb-1">Sampai Tanggal</label><input type="date" v-model="uiState.exportEndDate" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+</div>
+<div v-if="uiState.exportFilter === 'by_month_range'" class="mt-2 grid grid-cols-4 gap-2 animate-fade-in">
+    <div><label class="block text-xs font-medium">Dari</label><select v-model.number="uiState.exportStartMonth" class="w-full p-2 border rounded-md bg-white shadow-sm"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select></div>
+    <div><label class="block text-xs font-medium">Tahun</label><input type="number" v-model.number="uiState.exportStartYear" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+    <div><label class="block text-xs font-medium">Sampai</label><select v-model.number="uiState.exportEndMonth" class="w-full p-2 border rounded-md bg-white shadow-sm"><option v-for="m in 12" :key="m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select></div>
+    <div><label class="block text-xs font-medium">Tahun</label><input type="number" v-model.number="uiState.exportEndYear" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+</div>
+<div v-if="uiState.exportFilter === 'by_year_range'" class="mt-2 grid grid-cols-2 gap-2 animate-fade-in">
+    <div><label class="block text-xs font-medium mb-1">Dari Tahun</label><input type="number" v-model.number="uiState.exportStartYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+    <div><label class="block text-xs font-medium mb-1">Sampai Tahun</label><input type="number" v-model.number="uiState.exportEndYear" placeholder="Tahun" class="w-full p-2 border rounded-md bg-white shadow-sm"></div>
+</div>
+                <button @click="requestProtectedExport(() => exportAllDataForUser(
+    uiState.selectedUserForExport?.uid || uiState.selectedUserForExport?.id,
+    uiState.selectedUserForExport?.email,
+    uiState.exportFilter,
+    uiState.exportStartDate,
+    uiState.exportEndDate,
+    uiState.exportStartMonth,
+    uiState.exportEndMonth,
+    uiState.exportStartYear,
+    uiState.exportEndYear
+))"
+ :disabled="!uiState.selectedUserForExport || uiState.isExportingUserData" class="w-full bg-blue-600 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
+                    <span v-if="uiState.isExportingUserData">Mengekspor Data...</span>
+                    <span v-else>Export Data Pelanggan</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Riwayat Pengajuan Pencairan Komisi (Semua Mitra)</h3>
+            <div class="overflow-x-auto max-h-96">
+                <table class="w-full text-sm">
+                    <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
+                        <tr>
+                            <th class="p-3 font-medium">TANGGAL</th>
+                            <th class="p-3 font-medium">DETAIL PENCAIRAN</th>
+                            <th class="p-3 font-medium text-right">JUMLAH</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        <tr v-if="commissionPayouts.length === 0">
+                            <td colspan="3" class="p-4 text-center text-slate-500">Belum ada riwayat pencairan.</td>
+                        </tr>
+                        <tr v-for="payout in commissionPayouts" :key="payout.id">
+                            <td class="p-3 whitespace-nowrap">{{ new Date(payout.tanggal.seconds * 1000).toLocaleDateString('id-ID') }}</td>
+                            <td class="p-3">
+                                <p class="font-semibold text-slate-700">{{ payout.catatan }}</p>
+                            </td>
+                            <td class="p-3 text-right font-bold text-green-600">
+                                {{ formatCurrency(payout.jumlah) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Kelola Kode Aktivasi</h3>
+            <p class="text-sm text-slate-500 mb-4">
+                Buat kode sekali pakai untuk pengguna yang membeli di luar aplikasi (misalnya Shopee).
+            </p>
+            <div class="flex gap-2 mb-6">
+                <input type="text" v-model="newActivationCode" placeholder="Ketik kode kustom (opsional)" class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
+                <button @click="createActivationCode" :disabled="isSaving" class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400">
+                    <span v-if="isSaving">...</span>
+                    <span v-else>Buat Kode</span>
+                </button>
+            </div>
+            <div class="overflow-x-auto max-h-96">
+    <table class="w-full text-sm">
+        <thead class="text-left text-slate-500 bg-slate-100 sticky top-0">
+            <tr>
+                <th class="p-3 font-medium">KODE AKTIVASI</th>
+                <th class="p-3 font-medium text-center">STATUS</th>
+                <th class="p-3 font-medium">DIGUNAKAN OLEH</th>
+                <th class="p-3 font-medium text-right">AKSI</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200">
+            <tr v-if="activationCodes.length === 0">
+                <td colspan="4" class="p-4 text-center text-slate-500">Belum ada kode aktivasi yang dibuat.</td>
+            </tr>
+            <tr v-for="code in activationCodes" :key="code.id">
+                <td class="p-3 font-mono text-indigo-600">{{ code.id }}</td>
+                <td class="p-3 text-center">
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                          :class="code.status === 'unused' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'">
+                        {{ code.status }}
+                    </span>
+                </td>
+                <td class="p-3 text-slate-500">{{ code.usedByEmail || '-' }}</td>
+                <td class="p-3 text-right">
+                    <button @click="deleteActivationCode(code.id)" class="text-red-500 hover:text-red-700">
+                        <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+        </div>
+
+        <!-- 👇👇 BLOK VERIFIKASI YANG SUDAH DIPERBAIKI 👇👇 -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mt-6">
+            <h3 class="text-lg font-semibold text-slate-800 mb-4">Verifikasi Pencairan Komisi Mitra</h3>
+            <p class="text-sm text-slate-500 mb-4">
+                Masukkan ID Pencairan dari email untuk memverifikasi jumlah yang benar.
+            </p>
+            <form @submit.prevent="verifyCashoutRequest" class="flex gap-2">
+                <input 
+                    type="text" 
+                    v-model="uiState.adminVerificationIdInput" 
+                    placeholder="Contoh: WDRW-17..." 
+                    class="w-full p-2 border border-slate-300 rounded-md shadow-sm font-mono"
+                >
+                <button 
+                    type="submit" 
+                    :disabled="uiState.isVerifying" 
+                    class="bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400"
+                >
+                    <span v-if="uiState.isVerifying">...</span>
+                    <span v-else>Verifikasi</span>
+                </button>
+            </form>
+
+            <div v-if="uiState.adminVerificationResult" class="mt-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-800 animate-fade-in">
+                <p class="font-bold text-lg">✅ Verifikasi Berhasil</p>
+                <div class="mt-2 space-y-1 text-sm">
+                    <p><strong>Jumlah Asli:</strong> <span class="text-2xl font-bold">{{ formatCurrency(uiState.adminVerificationResult.jumlah) }}</span></p>
+                    <p><strong>Tanggal Pengajuan:</strong> {{ uiState.adminVerificationResult.tanggal }}</p>
+                    <p><strong>Detail:</strong> {{ uiState.adminVerificationResult.catatan }}</p>
+                </div>
+                <button @click="confirmCashoutPayment(uiState.adminVerificationIdInput)" class="mt-4 w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700">
+                    Konfirmasi Pembayaran Selesai
+                </button>
+            </div>
+            <div v-if="uiState.adminVerificationError" class="mt-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-800 animate-fade-in">
+                <p class="font-bold text-lg">❌ Gagal Verifikasi</p>
+                <p class="text-sm mt-1">{{ uiState.adminVerificationError }}</p>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
 <div v-if="activePage === 'panduan'" class="min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-4 sm:p-8">
     <div class="max-w-7xl mx-auto space-y-8">
 
