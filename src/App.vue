@@ -3527,8 +3527,8 @@ const discountedYearlyPrice = ref(2500000);
 async function submitAddProduct() {
     const form = uiState.modalData;
     const hppValue = Number(form.hpp);
-    if (!form.sku || !form.nama || !form.modelId || !form.warna || !form.varian) {
-        alert('SKU, Nama, Model produk, Warna, dan Varian wajib diisi.');
+    if (!form.nama || !form.modelId || !form.warna || !form.varian) {
+        alert('Nama, Model produk, Warna, dan Varian wajib diisi.');
         return;
     }
     if (!Number.isFinite(hppValue) || hppValue <= 0) {
@@ -3536,19 +3536,12 @@ async function submitAddProduct() {
         return;
     }
 
-    const skuFormatted = form.sku.toUpperCase().replace(/\s+/g, '-');
     const userId = currentUser.value.uid;
 
     try {
-        const productsCollection = collection(db, "products");
-        const q = query(productsCollection, where("sku", "==", skuFormatted), where("userId", "==", userId));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-            throw new Error(`Produk dengan SKU "${skuFormatted}" sudah terdaftar untuk akun Anda.`);
-        }
-
         const newProductRef = doc(collection(db, "products"));
+        // Kode internal dibuat otomatis dan unik; SKU marketplace tetap memakai Model Produk.
+        const skuFormatted = 'FO-' + newProductRef.id.toUpperCase();
 
         const productData = {
             id: newProductRef.id,
@@ -24200,9 +24193,8 @@ SKU-BAJU-PUTIH-S"
     <h3 class="text-xl font-bold mb-2">Tambah Produk Baru</h3>
     <p class="text-sm text-slate-500 mb-4">Isi HPP/modal produk pada formulir ini agar Fashion OS bisa mencocokkan transaksi dengan biaya modal. Harga jual tiap channel dapat diatur di halaman Harga & HPP.</p>
     <form @submit.prevent="submitAddProduct" class="space-y-4 overflow-y-auto max-h-[75vh] p-2">
-        <div>
-            <label for="product-sku" class="block text-sm font-medium text-slate-700">SKU (Stock Keeping Unit)</label>
-            <input type="text" v-model="uiState.modalData.sku" id="product-sku" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: TSH-BL-M001" required>
+        <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-800">
+            SKU penjualan diambil dari Model Produk. Fashion OS membuat kode internal produk secara otomatis untuk membedakan stok dan HPP tiap varian.
         </div>
         
         <div>
