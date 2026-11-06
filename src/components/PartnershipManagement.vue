@@ -1,5 +1,5 @@
 <template>
-    <div class="min-h-screen bg-slate-50 p-4 sm:p-8">
+    <div class="min-h-screen bg-slate-50 p-4 sm:p-8" @click.capture="resetGuardedAction">
         <div class="mx-auto max-w-7xl space-y-6">
             <header>
                 <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Keuangan dan kemitraan</p>
@@ -22,16 +22,23 @@
                     <span v-if="loading" class="text-sm text-slate-500">Memuat catatan…</span>
                 </div>
                 <div v-if="partners.length" class="overflow-x-auto">
-                    <table class="w-full min-w-[680px] text-left text-sm">
-                        <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Nama mitra</th><th class="p-3 text-right">Modal awal</th><th class="p-3 text-right">Tambahan modal</th><th class="p-3 text-right">Modal belum kembali</th><th class="p-3">Bagi hasil</th><th class="p-3 text-right">Sudah dibayar</th></tr></thead>
+                    <table class="w-full min-w-[820px] text-left text-sm">
+                        <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Nama mitra</th><th class="p-3 text-right">Modal awal</th><th class="p-3 text-right">Tambahan modal</th><th class="p-3 text-right">Modal belum kembali</th><th class="p-3">Bagi hasil</th><th class="p-3 text-right">Sudah dibayar</th><th class="p-3 text-right">Aksi</th></tr></thead>
                         <tbody class="divide-y divide-slate-100">
                             <tr v-for="partner in partners" :key="partner.id">
                                 <td class="p-3 font-semibold text-slate-800">{{ partner.name }}<span class="mt-1 block text-xs font-normal text-slate-500">Mulai {{ displayDate(partner.startDate) }}</span></td>
                                 <td class="p-3 text-right">{{ currency(partner.amount) }}</td>
                                 <td class="p-3 text-right">{{ currency(totalAddedCapital(partner.id)) }}</td>
                                 <td class="p-3 text-right font-semibold">{{ currency(outstandingCapital(partner)) }}</td>
-                                <td class="p-3"><div class="flex items-center gap-2"><input type="number" min="0" max="100" step="0.1" :value="partner.profitShare" @change="saveProfitShare(partner, $event)" class="w-20 rounded-md border border-slate-300 p-2 text-sm" :disabled="!subscriptionActive"><span>%</span></div></td>
+                                <td class="p-3">{{ amount(partner.profitShare) }}%</td>
                                 <td class="p-3 text-right">{{ currency(totalProfitPaid(partner.id)) }}</td>
+                                <td class="p-3 text-right">
+                                    <div class="inline-flex gap-2">
+                                        <button type="button" data-guard-action @click="guardPartnerAction(partner, 'edit')" :disabled="saving || !subscriptionActive" class="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">{{ isGuarded(partner, 'edit') ? 'Klik lagi untuk edit' : 'Edit' }}</button>
+                                        <button type="button" data-guard-action @click="guardPartnerAction(partner, 'delete')" :disabled="saving || !subscriptionActive" class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">{{ isGuarded(partner, 'delete') ? 'Hapus permanen' : 'Hapus' }}</button>
+                                    </div>
+                                    <p v-if="isGuarded(partner, 'edit') || isGuarded(partner, 'delete')" class="mt-1 text-xs text-slate-500">Klik tombol yang sama sekali lagi untuk melanjutkan.</p>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -135,7 +142,7 @@
                     <p class="mt-1 text-sm text-slate-500">Catatan setoran, pengembalian modal, dan pembayaran bagi hasil.</p>
                     <div v-if="historyRecords.length" class="mt-4 max-h-[28rem] divide-y divide-slate-100 overflow-y-auto">
                         <article v-for="entry in historyRecords" :key="entry.id" class="flex items-start justify-between gap-3 py-3">
-                            <div><p class="font-semibold text-slate-800">{{ recordTitle(entry) }}</p><p class="mt-1 text-xs text-slate-500">{{ partnerName(entry.investorId) }} · {{ displayDate(entry.paymentDate) }}<span v-if="entry.period"> · {{ entry.period }}</span></p><p v-if="entry.note" class="mt-1 text-xs text-slate-500">{{ entry.note }}</p></div>
+                            <div><p class="font-semibold text-slate-800">{{ recordTitle(entry) }}</p><p class="mt-1 text-xs text-slate-500">{{ entry.investorName || partnerName(entry.investorId) }} · {{ displayDate(entry.paymentDate) }}<span v-if="entry.period"> · {{ entry.period }}</span></p><p v-if="entry.note" class="mt-1 text-xs text-slate-500">{{ entry.note }}</p></div>
                             <strong class="whitespace-nowrap text-sm" :class="entry.recordType === 'capital_contribution' ? 'text-emerald-700' : 'text-slate-800'">{{ currency(entry.amountPaid || entry.amount || entry.investorShare || 0) }}</strong>
                         </article>
                     </div>
@@ -143,13 +150,29 @@
                 </div>
             </section>
         </div>
+        <div v-if="editingPartner" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" @click.self="editingPartner = null">
+            <form role="dialog" aria-modal="true" aria-labelledby="edit-partner-title" @submit.prevent="savePartnerEdits" @click.stop class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+                <h2 id="edit-partner-title" class="text-xl font-bold text-slate-900">Edit data mitra</h2>
+                <p class="mt-1 text-sm text-slate-600">Perubahan modal awal juga memperbarui catatan setoran awal yang terkait.</p>
+                <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                    <label class="block sm:col-span-2"><span class="mb-1 block text-sm font-medium text-slate-700">Nama mitra</span><input v-model.trim="partnerEditForm.name" class="w-full rounded-lg border border-slate-300 p-2.5 text-sm" required></label>
+                    <label class="block"><span class="mb-1 block text-sm font-medium text-slate-700">Modal awal (Rp)</span><input v-model.number="partnerEditForm.amount" type="number" min="1" step="1" class="w-full rounded-lg border border-slate-300 p-2.5 text-sm" required></label>
+                    <label class="block"><span class="mb-1 block text-sm font-medium text-slate-700">Porsi bagi hasil (%)</span><input v-model.number="partnerEditForm.profitShare" type="number" min="0" max="100" step="0.1" class="w-full rounded-lg border border-slate-300 p-2.5 text-sm" required></label>
+                    <label class="block sm:col-span-2"><span class="mb-1 block text-sm font-medium text-slate-700">Tanggal modal masuk</span><input v-model="partnerEditForm.date" type="date" class="w-full rounded-lg border border-slate-300 p-2.5 text-sm" required></label>
+                </div>
+                <div class="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
+                    <button type="button" @click="editingPartner = null" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Batal</button>
+                    <button type="submit" :disabled="saving || !subscriptionActive" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">{{ saving ? 'Menyimpan…' : 'Simpan perubahan' }}</button>
+                </div>
+            </form>
+        </div>
     </div>
 </template>
 
 <script setup>
 /* global defineProps, defineEmits */
-import { computed, ref, watch } from 'vue';
-import { collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { collection, deleteDoc, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase.js';
 
 const props = defineProps({
@@ -174,6 +197,9 @@ const periodStart = ref(thisMonthStart);
 const periodEnd = ref(today);
 const profitPaymentForm = ref({ amount: '', date: today, method: 'transfer' });
 const returnForm = ref({ partnerId: '', amount: '', date: today, method: 'transfer', note: '' });
+const guardedAction = ref(null);
+const editingPartner = ref(null);
+const partnerEditForm = ref({ name: '', amount: '', profitShare: '', date: today });
 
 const selectedPartner = computed(() => partners.value.find(item => item.id === reportPartnerId.value) || null);
 const returnPartner = computed(() => partners.value.find(item => item.id === returnForm.value.partnerId) || null);
@@ -196,6 +222,11 @@ const profitSummary = computed(() => {
 });
 
 watch(() => props.userId, loadData, { immediate: true });
+onMounted(() => document.addEventListener('click', resetGuardedAction, true));
+onBeforeUnmount(() => {
+    document.removeEventListener('click', resetGuardedAction, true);
+    guardedAction.value = null;
+});
 
 function dateKey(date) {
     if (!date) return '';
@@ -347,16 +378,107 @@ async function createPartner() {
         loadError.value = error?.message || 'Mitra gagal disimpan.';
     } finally { saving.value = false; }
 }
-async function saveProfitShare(partner, event) {
-    const nextValue = Number(event?.target?.value);
-    if (!Number.isFinite(nextValue) || nextValue < 0 || nextValue > 100 || nextValue === Number(partner.profitShare)) return;
-    saving.value = true; loadError.value = '';
+function isGuarded(partner, action) {
+    return guardedAction.value?.partnerId === partner.id && guardedAction.value?.action === action;
+}
+function resetGuardedAction(event) {
+    if (event?.target?.closest?.('[data-guard-action]')) return;
+    guardedAction.value = null;
+}
+function guardPartnerAction(partner, action) {
+    if (!props.subscriptionActive) return;
+    if (isGuarded(partner, action)) {
+        guardedAction.value = null;
+        if (action === 'edit') {
+            editingPartner.value = partner;
+            partnerEditForm.value = {
+                name: partner.name || '',
+                amount: amount(partner.amount),
+                profitShare: amount(partner.profitShare),
+                date: dateKey(toDate(partner.startDate)) || today
+            };
+        } else {
+            removePartner(partner);
+        }
+        return;
+    }
+    guardedAction.value = { partnerId: partner.id, action };
+}
+async function savePartnerEdits() {
+    const partner = editingPartner.value;
+    const name = partnerEditForm.value.name.trim();
+    const initialAmount = amount(partnerEditForm.value.amount);
+    const profitShare = amount(partnerEditForm.value.profitShare);
+    const date = localDate(partnerEditForm.value.date);
+    if (!partner || !name || initialAmount <= 0 || profitShare < 0 || profitShare > 100 || !partnerEditForm.value.date) return;
+    saving.value = true; loadError.value = ''; successMessage.value = '';
     try {
-        await updateDoc(doc(db, 'investors', partner.id), { profitShare: nextValue, arrangementType: 'kerja_sama_modal_bagi_hasil' });
-        partners.value = partners.value.map(item => item.id === partner.id ? { ...item, profitShare: nextValue } : item);
-        successMessage.value = 'Persentase bagi hasil diperbarui.';
-    } catch (error) { loadError.value = error?.message || 'Persentase gagal diperbarui.'; }
-    finally { saving.value = false; }
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'investors', partner.id), {
+            name, amount: initialAmount, profitShare, startDate: date,
+            arrangementType: 'kerja_sama_modal_bagi_hasil'
+        });
+        const initialRecord = records.value.find(item =>
+            item.investorId === partner.id &&
+            item.recordType === 'capital_contribution' &&
+            (item.paymentMethod === 'modal_awal' || item.note === 'Modal awal kerja sama')
+        );
+        const initialFinance = financeRecords.value.find(item =>
+            item.investorId === partner.id &&
+            item.isCapitalPartnershipTransfer === true &&
+            String(item.kategori || '').toLowerCase().includes('modal kerja sama') &&
+            String(item.catatan || '').startsWith('Modal awal dari ')
+        );
+        if (initialRecord) {
+            batch.update(doc(db, 'investor_payments', initialRecord.id), {
+                investorName: name, amount: initialAmount, amountPaid: initialAmount, paymentDate: date
+            });
+        }
+        if (initialFinance) {
+            batch.update(doc(db, 'keuangan', initialFinance.id), {
+                jumlah: initialAmount, amount: initialAmount, tanggal: date, catatan: 'Modal awal dari ' + name
+            });
+        }
+        await batch.commit();
+        partners.value = partners.value.map(item => item.id === partner.id
+            ? { ...item, name, amount: initialAmount, profitShare, startDate: date }
+            : item);
+        if (initialRecord) {
+            records.value = records.value.map(item => item.id === initialRecord.id
+                ? { ...item, investorName: name, amount: initialAmount, amountPaid: initialAmount, paymentDate: date }
+                : item);
+        }
+        if (initialFinance) {
+            financeRecords.value = financeRecords.value.map(item => item.id === initialFinance.id
+                ? { ...item, jumlah: initialAmount, amount: initialAmount, tanggal: date, catatan: 'Modal awal dari ' + name }
+                : item);
+        }
+        editingPartner.value = null;
+        successMessage.value = 'Data mitra berhasil diperbarui.';
+    } catch (error) {
+        loadError.value = error?.message || 'Data mitra gagal diperbarui.';
+    } finally {
+        saving.value = false;
+    }
+}
+async function removePartner(partner) {
+    if (!partner?.id || !props.userId) return;
+    saving.value = true; loadError.value = ''; successMessage.value = '';
+    try {
+        await deleteDoc(doc(db, 'investors', partner.id));
+        partners.value = partners.value.filter(item => item.id !== partner.id);
+        if (reportPartnerId.value === partner.id) reportPartnerId.value = partners.value[0]?.id || '';
+        if (capitalForm.value.partnerId === partner.id) capitalForm.value.partnerId = partners.value[0]?.id || '';
+        if (returnForm.value.partnerId === partner.id) {
+            returnForm.value.partnerId = partners.value[0]?.id || '';
+            returnForm.value.amount = '';
+        }
+        successMessage.value = 'Profil mitra dihapus. Catatan keuangan terkait tetap disimpan untuk menjaga riwayat transaksi.';
+    } catch (error) {
+        loadError.value = error?.message || 'Profil mitra gagal dihapus.';
+    } finally {
+        saving.value = false;
+    }
 }
 async function addCapital() {
     const partner = partners.value.find(item => item.id === capitalForm.value.partnerId);
