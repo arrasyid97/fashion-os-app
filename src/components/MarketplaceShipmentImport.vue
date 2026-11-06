@@ -273,26 +273,56 @@ function channelFor(value) {
 
 function findMasterProduct({ sellerSku, platformSkuId, productName, variation }) {
     const norm = normalizeKey;
+    const compact = value => cleanText(value).toLocaleLowerCase('id-ID')
+        .normalize('NFD')
+        .replace(/[\\u0300-\\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
     const skuKeys = [sellerSku, platformSkuId].filter(Boolean).map(norm);
     const fields = product => [
         product.sku, product.sellerSku, product.marketplaceSku, product.externalSku,
         product.model_id, product.modelId, product.tiktokSkuId, product.shopeeSkuId
     ].filter(Boolean).map(norm);
-    const direct = props.products.filter(product => fields(product).some(key => skuKeys.includes(key)));
-    if (direct.length === 1) return direct[0];
+    const directMatches = props.products.filter(product => fields(product).some(key => skuKeys.includes(key)));
+
     const sourceNames = [sellerSku, productName].filter(Boolean).map(norm);
     const nameMatches = props.products.filter(product => [
         product.nama, product.namaModel, product.namaProduk, product.product_name, product.modelName, product.nama_model
     ].filter(Boolean).map(norm).some(name => sourceNames.includes(name)));
-    const variationKey = norm(variation);
-    const variantMatches = nameMatches.filter(product => {
-        const partKeys = [product.warna, product.color, product.varian, product.variant, product.ukuran, product.size]
-            .filter(Boolean).map(norm);
-        return !variationKey || partKeys.length === 0 || partKeys.some(part => variationKey.includes(part));
+
+    // TikTok dapat memakai satu Seller SKU untuk banyak varian. Dahulukan semua
+    // kandidat SKU tersebut, lalu pilih yang seluruh dimensi variasinya cocok.
+    const candidates = directMatches.length ? directMatches : nameMatches;
+    if (!candidates.length) return null;
+    if (!variation) return candidates.length === 1 ? candidates[0] : null;
+
+    const variationParts = variation.split(/[,|/]+/).map(norm).filter(Boolean);
+    const variationCompact = compact(variation);
+    const dimensionValues = product => [
+        product.warna || product.color,
+        product.ukuran || product.size
+    ].filter(Boolean).map(norm);
+
+    const matchedByVariation = candidates.filter(product => {
+        const dimensions = dimensionValues(product);
+        if (dimensions.length) {
+            // Jika master punya warna dan ukuran, keduanya harus cocok; satu
+            // dimensi saja tidak cukup untuk memilih varian yang benar.
+            return dimensions.every(dimension => variationParts.some(part =>
+                part === dimension || part.includes(dimension) || dimension.includes(part)
+            ));
+        }
+
+        const variant = product.varian || product.variant;
+        if (!variant) return candidates.length === 1;
+        const variantCompact = compact(variant);
+        return Boolean(variantCompact && (
+            variantCompact === variationCompact ||
+            variationCompact.includes(variantCompact) ||
+            variantCompact.includes(variationCompact)
+        ));
     });
-    if (variantMatches.length === 1) return variantMatches[0];
-    if (nameMatches.length === 1) return nameMatches[0];
-    return null;
+
+    return matchedByVariation.length === 1 ? matchedByVariation[0] : null;
 }
 
 function loadScanQueue() {
