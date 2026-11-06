@@ -4,7 +4,7 @@
             <header>
                 <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Keuangan dan kemitraan</p>
                 <h1 class="mt-1 text-3xl font-bold text-slate-900">Kerja Sama Modal &amp; Bagi Hasil</h1>
-                <p class="mt-2 max-w-3xl text-sm text-slate-600">Catat modal teman secara terpisah dari penjualan, dokumentasikan persetujuan usaha, hitung laba dari pencairan yang tersimpan, lalu rekam pembayaran bagi hasil atau pengembalian modal.</p>
+                <p class="mt-2 max-w-3xl text-sm text-slate-600">Catat modal mitra secara terpisah dari penjualan, hitung laba dari pencairan yang tersimpan, lalu rekam pembayaran bagi hasil atau pengembalian modal.</p>
             </header>
 
             <div v-if="loadError" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{{ loadError }}</div>
@@ -54,7 +54,7 @@
                 </form>
             </section>
 
-            <section class="grid gap-6 xl:grid-cols-2">
+            <section>
                 <form @submit.prevent="addCapital" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-900">Catat tambahan modal</h2><details class="group relative inline-block align-middle">
                         <summary aria-label="Informasi tambahan modal" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">?</summary>
@@ -70,41 +70,10 @@
                     <button type="submit" :disabled="saving || !subscriptionActive || !partners.length" class="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">Simpan tambahan modal</button>
                 </form>
 
-                <form @submit.prevent="addApproval" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-900">Catat permintaan persetujuan</h2><details class="group relative inline-block align-middle">
-                        <summary aria-label="Informasi permintaan persetujuan" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">?</summary>
-                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Catat rencana pengeluaran atau keputusan usaha untuk dibahas bersama mitra melalui akun Fashion OS yang digunakan bersama.</div>
-                    </details></div>
-                    <p class="mt-1 text-sm text-slate-500">Catat keputusan produk atau rencana pengeluaran yang perlu dibahas dan disepakati bersama.</p>
-                    <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                        <label class="block"><span class="mb-1 block text-xs font-medium">Mitra</span><select v-model="approvalForm.partnerId" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required><option value="">Pilih mitra</option><option v-for="partner in partners" :key="partner.id" :value="partner.id">{{ partner.name }}</option></select></label>
-                        <label class="block"><span class="mb-1 block text-xs font-medium">Jenis</span><select v-model="approvalForm.kind" class="w-full rounded-lg border border-slate-300 p-2 text-sm"><option value="pengeluaran">Rencana pengeluaran</option><option value="keputusan">Keputusan usaha / produk</option></select></label>
-                        <label class="block"><span class="mb-1 block text-xs font-medium">Tanggal diajukan</span><input v-model="approvalForm.date" type="date" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
-                        <label v-if="approvalForm.kind === 'pengeluaran'" class="block"><span class="mb-1 block text-xs font-medium">Nominal rencana (Rp)</span><input v-model.number="approvalForm.amount" type="number" min="1" step="1" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
-                        <label class="block sm:col-span-2"><span class="mb-1 block text-xs font-medium">Rencana / alasan</span><input v-model.trim="approvalForm.note" class="w-full rounded-lg border border-slate-300 p-2 text-sm" placeholder="Contoh: persetujuan produksi model baru" required></label>
-                    </div>
-                    <button type="submit" :disabled="saving || !subscriptionActive || !partners.length" class="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">Simpan permintaan persetujuan</button>
-                </form>
+
             </section>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-900">Riwayat persetujuan usaha</h2><details class="group relative inline-block align-middle">
-                        <summary aria-label="Informasi riwayat persetujuan usaha" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">?</summary>
-                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Bagian ini menampilkan rencana dan keputusan usaha beserta statusnya. Biaya masuk ke halaman Laporan Keuangan setelah disetujui dan dicatat sebagai pengeluaran aktual.</div>
-                    </details></div>
-                <p class="mt-1 text-sm text-slate-500">Setelah dibahas bersama, perbarui status persetujuan di sini. Biaya baru tercatat sebagai pengeluaran di halaman Laporan Keuangan setelah disetujui dan tombol “Catat sebagai pengeluaran” digunakan.</p>
-                <div v-if="approvalRecords.length" class="mt-4 space-y-3">
-                    <article v-for="entry in approvalRecords" :key="entry.id" class="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div><div class="flex flex-wrap items-center gap-2"><strong class="text-slate-800">{{ entry.note }}</strong><span class="rounded-full px-2 py-1 text-xs font-semibold" :class="approvalClass(entry.status)">{{ approvalLabel(entry.status) }}</span></div><p class="mt-1 text-xs text-slate-500">{{ partnerName(entry.investorId) }} · {{ entry.kind === 'pengeluaran' ? 'Rencana pengeluaran ' + currency(entry.amount) : 'Keputusan usaha / produk' }} · {{ displayDate(entry.requestDate || entry.paymentDate) }}</p><p v-if="entry.actualExpenseId" class="mt-1 text-xs text-emerald-700">Pengeluaran aktual sudah dicatat di Keuangan.</p></div>
-                        <div class="flex flex-wrap gap-2" v-if="entry.status === 'menunggu'">
-                            <button type="button" @click="setApproval(entry, 'disetujui')" :disabled="saving || !subscriptionActive" class="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-700 disabled:opacity-50">Tandai disetujui</button>
-                            <button type="button" @click="setApproval(entry, 'ditolak')" :disabled="saving || !subscriptionActive" class="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">Tandai ditolak</button>
-                        </div>
-                        <button v-else-if="entry.status === 'disetujui' && entry.kind === 'pengeluaran' && !entry.actualExpenseId" type="button" @click="recordApprovedExpense(entry)" :disabled="saving || !subscriptionActive" class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Catat sebagai pengeluaran</button>
-                    </article>
-                </div>
-                <p v-else class="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Belum ada permintaan persetujuan yang dicatat.</p>
-            </section>
+            
 
             <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <div>
@@ -161,13 +130,13 @@
                 <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-900">Riwayat modal dan pembayaran</h2><details class="group relative inline-block align-middle">
                         <summary aria-label="Informasi riwayat modal dan pembayaran" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">?</summary>
-                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Lihat catatan setoran modal, pembayaran bagi hasil, pengembalian pokok modal, dan pencatatan persetujuan usaha beserta tanggal serta nominalnya.</div>
+                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Lihat catatan setoran modal, pembayaran bagi hasil, dan pengembalian pokok modal beserta tanggal serta nominalnya.</div>
                     </details></div>
                     <p class="mt-1 text-sm text-slate-500">Catatan setoran, pengembalian modal, dan pembayaran bagi hasil.</p>
                     <div v-if="historyRecords.length" class="mt-4 max-h-[28rem] divide-y divide-slate-100 overflow-y-auto">
                         <article v-for="entry in historyRecords" :key="entry.id" class="flex items-start justify-between gap-3 py-3">
-                            <div><p class="font-semibold text-slate-800">{{ recordTitle(entry) }}</p><p class="mt-1 text-xs text-slate-500">{{ partnerName(entry.investorId) }} · {{ displayDate(entry.paymentDate || entry.requestDate) }}<span v-if="entry.period"> · {{ entry.period }}</span></p><p v-if="entry.note" class="mt-1 text-xs text-slate-500">{{ entry.note }}</p><p v-if="entry.status && entry.recordType === 'approval_request'" class="mt-1 text-xs" :class="approvalClass(entry.status)">{{ approvalLabel(entry.status) }}</p></div>
-                            <strong class="whitespace-nowrap text-sm" :class="entry.recordType === 'capital_contribution' ? 'text-emerald-700' : 'text-slate-800'">{{ entry.recordType === 'approval_request' ? (entry.amount ? currency(entry.amount) : 'Keputusan') : currency(entry.amountPaid || entry.amount || entry.investorShare || 0) }}</strong>
+                            <div><p class="font-semibold text-slate-800">{{ recordTitle(entry) }}</p><p class="mt-1 text-xs text-slate-500">{{ partnerName(entry.investorId) }} · {{ displayDate(entry.paymentDate) }}<span v-if="entry.period"> · {{ entry.period }}</span></p><p v-if="entry.note" class="mt-1 text-xs text-slate-500">{{ entry.note }}</p></div>
+                            <strong class="whitespace-nowrap text-sm" :class="entry.recordType === 'capital_contribution' ? 'text-emerald-700' : 'text-slate-800'">{{ currency(entry.amountPaid || entry.amount || entry.investorShare || 0) }}</strong>
                         </article>
                     </div>
                     <p v-else class="mt-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Belum ada catatan modal atau pembayaran yang tercatat.</p>
@@ -180,7 +149,7 @@
 <script setup>
 /* global defineProps, defineEmits */
 import { computed, ref, watch } from 'vue';
-import { addDoc, collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase.js';
 
 const props = defineProps({
@@ -200,7 +169,6 @@ const loadError = ref('');
 const successMessage = ref('');
 const partnerForm = ref({ name: '', amount: '', profitShare: '', date: today });
 const capitalForm = ref({ partnerId: '', amount: '', date: today, note: '' });
-const approvalForm = ref({ partnerId: '', kind: 'pengeluaran', amount: '', date: today, note: '' });
 const reportPartnerId = ref('');
 const periodStart = ref(thisMonthStart);
 const periodEnd = ref(today);
@@ -209,7 +177,6 @@ const returnForm = ref({ partnerId: '', amount: '', date: today, method: 'transf
 
 const selectedPartner = computed(() => partners.value.find(item => item.id === reportPartnerId.value) || null);
 const returnPartner = computed(() => partners.value.find(item => item.id === returnForm.value.partnerId) || null);
-const approvalRecords = computed(() => records.value.filter(item => item.recordType === 'approval_request').sort((a, b) => dateKey(toDate(b.requestDate || b.paymentDate)) .localeCompare(dateKey(toDate(a.requestDate || a.paymentDate)))));
 const historyRecords = computed(() => records.value.filter(item => ['capital_contribution', 'profit_share', 'principal_return'].includes(item.recordType) || (!item.recordType && item.investorId)).sort((a, b) => dateKey(toDate(b.paymentDate || b.requestDate)).localeCompare(dateKey(toDate(a.paymentDate || a.requestDate)))));
 const profitSummary = computed(() => {
     const selectedId = reportPartnerId.value;
@@ -302,17 +269,11 @@ function displayDate(value) {
     const d = toDate(value);
     return d ? d.toLocaleDateString('id-ID') : '—';
 }
-function approvalLabel(status) {
-    return status === 'disetujui' ? 'Disetujui' : status === 'ditolak' ? 'Ditolak' : 'Menunggu persetujuan';
-}
-function approvalClass(status) {
-    return status === 'disetujui' ? 'bg-emerald-100 text-emerald-800' : status === 'ditolak' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800';
-}
 function partnerName(id) {
     return partners.value.find(item => item.id === id)?.name || 'Mitra';
 }
 function totalAddedCapital(id) {
-    return records.value.filter(item => item.recordType === 'capital_contribution' && item.investorId === id).reduce((sum, item) => sum + amount(item.amount), 0);
+    return records.value.filter(item => item.recordType === 'capital_contribution' && item.investorId === id && item.paymentMethod !== 'modal_awal' && item.note !== 'Modal awal kerja sama').reduce((sum, item) => sum + amount(item.amount), 0);
 }
 function totalReturnedCapital(id) {
     return records.value.filter(item => item.recordType === 'principal_return' && item.investorId === id).reduce((sum, item) => sum + amount(item.amountPaid ?? item.amount), 0);
@@ -351,7 +312,6 @@ async function loadData() {
         transactions.value = transactionSnap.docs.map(item => ({ id: item.id, ...item.data() }));
         if (!reportPartnerId.value && partners.value.length) reportPartnerId.value = partners.value[0].id;
         if (!capitalForm.value.partnerId && partners.value.length) capitalForm.value.partnerId = partners.value[0].id;
-        if (!approvalForm.value.partnerId && partners.value.length) approvalForm.value.partnerId = partners.value[0].id;
         if (!returnForm.value.partnerId && partners.value.length) returnForm.value.partnerId = partners.value[0].id;
     } catch (error) {
         console.error('Gagal memuat kerja sama modal:', error);
@@ -414,47 +374,6 @@ async function addCapital() {
         appendRecord({ id: recordRef.id, ...record }); appendFinance({ id: financeRef.id, ...finance });
         capitalForm.value = { ...capitalForm.value, amount: '', note: '' }; successMessage.value = 'Tambahan modal berhasil dicatat.';
     } catch (error) { loadError.value = error?.message || 'Tambahan modal gagal disimpan.'; }
-    finally { saving.value = false; }
-}
-async function addApproval() {
-    const partner = partners.value.find(item => item.id === approvalForm.value.partnerId);
-    const note = approvalForm.value.note.trim();
-    const value = approvalForm.value.kind === 'pengeluaran' ? amount(approvalForm.value.amount) : 0;
-    if (!partner || !note || (approvalForm.value.kind === 'pengeluaran' && value <= 0)) return;
-    saving.value = true; loadError.value = '';
-    try {
-        const record = { userId: props.userId, investorId: partner.id, investorName: partner.name, recordType: 'approval_request', kind: approvalForm.value.kind, amount: value, note, requestDate: localDate(approvalForm.value.date), status: 'menunggu', totalPayment: 0 };
-        await addDoc(collection(db, 'investor_payments'), record).then(ref => { record.id = ref.id; });
-        appendRecord(record);
-        approvalForm.value = { ...approvalForm.value, amount: '', note: '', kind: approvalForm.value.kind };
-        successMessage.value = 'Permintaan persetujuan tercatat.';
-    } catch (error) { loadError.value = error?.message || 'Permintaan persetujuan gagal disimpan.'; }
-    finally { saving.value = false; }
-}
-async function setApproval(entry, status) {
-    saving.value = true; loadError.value = '';
-    try {
-        const decisionDate = new Date();
-        await updateDoc(doc(db, 'investor_payments', entry.id), { status, decisionDate });
-        appendRecord({ ...entry, status, decisionDate });
-        successMessage.value = status === 'disetujui' ? 'Permintaan ditandai disetujui.' : 'Permintaan ditandai ditolak.';
-    } catch (error) { loadError.value = error?.message || 'Status persetujuan gagal disimpan.'; }
-    finally { saving.value = false; }
-}
-async function recordApprovedExpense(entry) {
-    if (entry.status !== 'disetujui' || entry.actualExpenseId || amount(entry.amount) <= 0) return;
-    saving.value = true; loadError.value = '';
-    try {
-        const financeRef = doc(collection(db, 'keuangan'));
-        const finance = { userId: props.userId, jenis: 'pengeluaran', kategori: 'Biaya Operasional', tipeBiaya: 'operasional', jumlah: amount(entry.amount), amount: amount(entry.amount), tanggal: new Date(), catatan: entry.note + ' · Persetujuan ' + entry.id, sumber: 'persetujuan_kerja_sama', investorId: entry.investorId, approvalRecordId: entry.id };
-        const batch = writeBatch(db);
-        batch.set(financeRef, finance);
-        batch.update(doc(db, 'investor_payments', entry.id), { actualExpenseId: financeRef.id, actualExpenseDate: finance.tanggal });
-        await batch.commit();
-        appendRecord({ ...entry, actualExpenseId: financeRef.id, actualExpenseDate: finance.tanggal });
-        appendFinance({ id: financeRef.id, ...finance });
-        successMessage.value = 'Pengeluaran yang disetujui sudah dicatat di Keuangan.';
-    } catch (error) { loadError.value = error?.message || 'Pengeluaran gagal dicatat.'; }
     finally { saving.value = false; }
 }
 async function recordProfitPayment() {
