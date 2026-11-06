@@ -8824,9 +8824,11 @@ const dashboardPremiumData = computed(() => {
   return {...transaction,tanggal:orderDate&&!Number.isNaN(orderDate.getTime())?orderDate:null};
  });
  const periodTransactions=filterDataByDate(transactionsByOrderDate,...activityFilterOptions).filter(transaction=>Boolean(String(transaction?.marketplaceOrderId||'').trim())&&Boolean(String(transaction?.channelId||transaction?.channel||'').trim()));
- const resolvedStatuses=new Set(['id_sukses_terkonfirmasi','retur','retur/pengembalian','baranghilang','hilang','dibatalkan','batal','cancelled','canceled']);
- const isMatched=transaction=>['cocok','id_sukses_terkonfirmasi'].includes(String(transaction?.statusDataMarketplace||'').trim().toLowerCase())||transaction?.konfirmasiSuksesCairManual===true;
- const matchedTransactions=periodTransactions.filter(isMatched); const pendingTransactions=periodTransactions.filter(transaction=>!isMatched(transaction)&&!resolvedStatuses.has(String(transaction?.statusDataMarketplace||'').trim().toLowerCase()));
+ const normalizeDashboardStatus=value=>String(value||'').trim().toLocaleLowerCase('id-ID').replace(/[\\s/_-]+/g,'');
+ const resolvedStatuses=new Set(['id_sukses_terkonfirmasi','sudahcair','retur','returpengembalian','dikembalikan','pengembalian','baranghilang','hilang','dibatalkan','batal','cancelled','canceled']);
+ const hasResolvedOutcome=transaction=>resolvedStatuses.has(normalizeDashboardStatus(transaction?.statusDataMarketplace))||resolvedStatuses.has(normalizeDashboardStatus(transaction?.statusPencairan));
+ const isMatched=transaction=>['cocok','id_sukses_terkonfirmasi'].includes(normalizeDashboardStatus(transaction?.statusDataMarketplace))||transaction?.konfirmasiSuksesCairManual===true;
+ const matchedTransactions=periodTransactions.filter(isMatched); const pendingTransactions=periodTransactions.filter(transaction=>!isMatched(transaction)&&!hasResolvedOutcome(transaction));
  const savedPayouts=(dashboardFilteredData.value.keuangan||[]).filter(record=>record.isMarketplaceIncomeReport===true);
  const payoutTotal=savedPayouts.reduce((sum,record)=>sum+(Number(record.jumlah??record.amount??record.nominal)||0),0);
  const produkHampirHabis=(state.produk||[]).filter(product=>{const stock=product.stokFisik??product.physical_stock??0;return stock>0&&stock<=(state.settings.minStok||10);}).sort((a,b)=>(a.stokFisik??a.physical_stock??0)-(b.stokFisik??b.physical_stock??0)).slice(0,5);
