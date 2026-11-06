@@ -5519,6 +5519,47 @@ const uniqueRoasModels = computed(() => {
     );
 });
 
+const availableProductBaseModels = computed(() => {
+    const names = new Set(
+        (state.settings.modelProduk || [])
+            .map(model => String(model.namaModel || '').trim())
+            .filter(Boolean)
+    );
+
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'id'));
+});
+
+const filteredProductModelVariants = computed(() => {
+    const selectedBaseName = String(uiState.modalData?.modelName || '').trim().toLocaleLowerCase('id-ID');
+    const query = String(uiState.modalData?.variantSearch || '')
+        .normalize('NFKC')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLocaleLowerCase('id-ID');
+
+    if (!selectedBaseName || query.length < 2) return [];
+
+    return (state.settings.modelProduk || [])
+        .filter(model => String(model.namaModel || '').trim().toLocaleLowerCase('id-ID') === selectedBaseName)
+        .filter(model => {
+            const searchable = [model.namaModel, model.warna, model.ukuran]
+                .filter(Boolean)
+                .join(' ')
+                .normalize('NFKC')
+                .replace(/\s+/g, ' ')
+                .toLocaleLowerCase('id-ID');
+            return searchable.includes(query);
+        })
+        .sort((a, b) => {
+            const labelA = [a.warna, a.ukuran].filter(Boolean).join(' ');
+            const labelB = [b.warna, b.ukuran].filter(Boolean).join(' ');
+            return labelA.localeCompare(labelB, 'id');
+        })
+        .slice(0, 12);
+});
+
+const productVariantSuggestionsOpen = ref(false);
+
 const roasDashboardData = computed(() => {
     let transaksi = state.transaksi || [];
 
@@ -13104,6 +13145,42 @@ function handleModelProdukChange() {
     }
 }
 
+function handleProductBaseModelChange() {
+    const form = uiState.modalData;
+    form.modelId = '';
+    form.nama = String(form.modelName || '').trim();
+    form.warna = '';
+    form.varian = '';
+    form.variantSearch = '';
+    productVariantSuggestionsOpen.value = false;
+}
+
+function handleProductVariantSearch() {
+    const form = uiState.modalData;
+    form.modelId = '';
+    form.warna = '';
+    form.varian = '';
+    form.nama = String(form.modelName || '').trim();
+    productVariantSuggestionsOpen.value = true;
+}
+
+function selectProductModelVariant(model) {
+    const form = uiState.modalData;
+    form.modelId = model.id;
+    form.modelName = model.namaModel || '';
+    form.nama = model.namaModel || '';
+    form.warna = model.warna || '';
+    form.varian = model.ukuran || '';
+    form.variantSearch = [model.namaModel, model.warna, model.ukuran].filter(Boolean).join(' ');
+    productVariantSuggestionsOpen.value = false;
+}
+
+function closeProductVariantSuggestions() {
+    window.setTimeout(() => {
+        productVariantSuggestionsOpen.value = false;
+    }, 120);
+}
+
 function handleProductSkuChange(item) {
     const selectedProduct = state.produk.find(p => p.sku === item.sku);
     if (selectedProduct) {
@@ -19596,7 +19673,7 @@ SKU-BAJU-PUTIH-S"
                             Penyesuaian Stok
                         </button>
                         <button
-                            @click="showModal('addProduct', { sku: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })"
+                            @click="showModal('addProduct', { sku: '', modelId: '', modelName: '', variantSearch: '', nama: '', warna: '', varian: '', hpp: null, hargaJualDefault: null })"
                             class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700"
                             :disabled="!isSubscriptionActive"
                         >
@@ -24201,28 +24278,66 @@ SKU-BAJU-PUTIH-S"
             <label for="product-model" class="block text-sm font-medium text-slate-700">Model Produk</label>
             <div v-if="state.settings.modelProduk.length === 0" class="mt-1 p-3 bg-red-100 text-red-800 border-l-4 border-red-500 rounded-lg shadow-sm">
                 <p class="font-semibold mb-1">Peringatan:</p>
-                <p class="text-sm">Anda belum memiliki data model Produk. Silakan tambahkan di halaman **Pengaturan** terlebih dahulu.</p>
+                <p class="text-sm">Anda belum memiliki data model Produk. Silakan tambahkan di halaman Pengaturan terlebih dahulu.</p>
                 <a href="#" @click.prevent="changePage('pengaturan'); hideModal();" class="mt-2 inline-block text-red-700 font-bold hover:underline">
                     Buka Halaman Pengaturan &raquo;
                 </a>
             </div>
-            <select v-else v-model="uiState.modalData.modelId" @change="handleModelProdukChange()" id="product-model" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" required>
-    <option value="">-- Pilih Model --</option>
-    <option v-for="model in state.settings.modelProduk" :key="model.id" :value="model.id">{{ model.namaModel }}</option>
-</select>
+            <select v-else v-model="uiState.modalData.modelName" @change="handleProductBaseModelChange()" id="product-model" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" required>
+                <option value="">-- Pilih Model --</option>
+                <option v-for="modelName in availableProductBaseModels" :key="modelName" :value="modelName">{{ modelName }}</option>
+            </select>
+            <p class="mt-1 text-xs text-slate-500">Pilih nama model dasar, lalu tentukan warna dan ukuran pada kolom variasi.</p>
         </div>
-        
+
+        <div class="relative">
+            <label for="product-variant-search" class="block text-sm font-medium text-slate-700">Variasi (Warna &amp; Ukuran)</label>
+            <input
+                type="text"
+                v-model="uiState.modalData.variantSearch"
+                @input="handleProductVariantSearch()"
+                @focus="productVariantSuggestionsOpen = true"
+                @blur="closeProductVariantSuggestions"
+                @keydown.esc="productVariantSuggestionsOpen = false"
+                id="product-variant-search"
+                class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm"
+                :disabled="!uiState.modalData.modelName"
+                :placeholder="uiState.modalData.modelName ? 'Ketik minimal 2 huruf, misalnya CHOCO M' : 'Pilih Model Produk terlebih dahulu'"
+                autocomplete="off"
+                required
+            >
+            <div
+                v-if="productVariantSuggestionsOpen && uiState.modalData.modelName && String(uiState.modalData.variantSearch || '').trim().length >= 2"
+                class="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl"
+            >
+                <button
+                    v-for="variantModel in filteredProductModelVariants"
+                    :key="variantModel.id"
+                    type="button"
+                    @mousedown.prevent="selectProductModelVariant(variantModel)"
+                    class="block w-full border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-indigo-50"
+                >
+                    <span class="block font-semibold text-slate-800">{{ [variantModel.namaModel, variantModel.warna, variantModel.ukuran].filter(Boolean).join(' · ') }}</span>
+                    <span class="mt-1 block text-xs text-slate-500">Pilih variasi ini untuk mengisi nama produk, warna, dan ukuran.</span>
+                </button>
+                <p v-if="filteredProductModelVariants.length === 0" class="p-3 text-sm text-slate-500">
+                    Variasi tidak ditemukan. Tambahkan warna dan ukuran ini di Daftar Model Produk terlebih dahulu.
+                </p>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Cari variasi yang sudah tercatat di Daftar Model Produk. Produk hanya bisa disimpan setelah satu variasi dipilih.</p>
+        </div>
+
         <div>
             <label for="product-name" class="block text-sm font-medium text-slate-700">Nama Produk</label>
-            <input type="text" v-model="uiState.modalData.nama" id="product-name" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: Kaos Polos" required>
+            <input type="text" v-model="uiState.modalData.nama" id="product-name" class="mt-1 block w-full rounded-md border border-slate-300 bg-slate-50 p-2 shadow-sm" placeholder="Terisi otomatis setelah variasi dipilih" readonly required>
         </div>
         <div>
             <label for="product-color" class="block text-sm font-medium text-slate-700">Warna</label>
-            <input type="text" v-model="uiState.modalData.warna" id="product-color" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: Hitam" required>
+            <input type="text" v-model="uiState.modalData.warna" id="product-color" class="mt-1 block w-full rounded-md border border-slate-300 bg-slate-50 p-2 shadow-sm" placeholder="Terisi otomatis setelah variasi dipilih" readonly required>
         </div>
         <div>
-            <label for="product-variant" class="block text-sm font-medium text-slate-700">Varian (Ukuran/Model)</label>
-            <input type="text" v-model="uiState.modalData.varian" id="product-variant" class="mt-1 block w-full p-2 border border-slate-300 rounded-md shadow-sm" placeholder="Contoh: M, L, XL" required>
+            <label for="product-variant" class="block text-sm font-medium text-slate-700">Ukuran / Model</label>
+            <input type="text" v-model="uiState.modalData.varian" id="product-variant" class="mt-1 block w-full rounded-md border border-slate-300 bg-slate-50 p-2 shadow-sm" placeholder="Terisi otomatis setelah variasi dipilih" readonly required>
         </div>
 
         <div>
