@@ -153,6 +153,7 @@
 </template>
 
 <script setup>
+/* global defineProps, defineEmits */
 import { computed, ref, watch } from 'vue';
 import { addDoc, collection, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase.js';
