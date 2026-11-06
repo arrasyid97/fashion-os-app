@@ -172,7 +172,7 @@
 <script setup>
 /* global defineProps, defineEmits */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { collection, deleteDoc, doc, getDocs, query, updateDoc, where, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase.js';
 
 const props = defineProps({
