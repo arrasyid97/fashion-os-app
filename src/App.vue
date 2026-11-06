@@ -262,6 +262,11 @@ massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     dashboardSalesModelFilter: 'all',
     dashboardSalesChannelFilter: 'all',
     salesStatsDateFilter: 'all_time',
+    salesStatsStartDate: '',
+    salesStatsEndDate: '',
+    salesStatsStartMonth: new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'),
+    salesStatsEndMonth: new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'),
+    salesStatsYear: new Date().getFullYear(),
     salesStatsModelFilter: 'all',
     salesStatsChannelFilter: 'all',
     dashboardStartDate: '',
@@ -5520,6 +5525,12 @@ const uniqueRoasModels = computed(() => {
         a.namaModel.localeCompare(b.namaModel)
     );
 });
+const salesStatsModelOptions = computed(() => {
+    const names = new Set((state.settings.modelProduk || [])
+        .map(model => String(model.namaModel || '').trim())
+        .filter(Boolean));
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'id'));
+});
 
 const availableProductBaseModels = computed(() => {
     const names = new Set(
@@ -8911,220 +8922,233 @@ const salesPerformanceStats = computed(() => {
     const selectedDate = uiState.salesStatsDateFilter;
     const selectedModel = uiState.salesStatsModelFilter;
     const selectedChannel = uiState.salesStatsChannelFilter;
-
+    const now = new Date();
+    const dayStart = date => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+    const dayEnd = date => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+    const parseDateInput = value => {
+        if (!value) return null;
+        const parts = String(value).split('-').map(Number);
+        if (parts.length !== 3 || parts.some(part => !part)) return null;
+        return new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+    };
+    const parseMonthInput = value => {
+        if (!value) return null;
+        const parts = String(value).split('-').map(Number);
+        if (parts.length !== 2 || parts.some(part => !part)) return null;
+        return { year: parts[0], month: parts[1] - 1 };
+    };
+    const rangeForFilter = () => {
+        if (selectedDate === 'all_time') return null;
+        if (selectedDate === 'today') return { start: dayStart(now), end: dayEnd(now) };
+        if (selectedDate === 'last_7_days' || selectedDate === 'last_30_days') {
+            const start = dayStart(now);
+            start.setDate(start.getDate() - (selectedDate === 'last_7_days' ? 6 : 29));
+            return { start, end: dayEnd(now) };
+        }
+        if (selectedDate === 'this_month') return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
+        if (selectedDate === 'last_month') return { start: new Date(now.getFullYear(), now.getMonth() - 1, 1), end: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999) };
+        if (selectedDate === 'this_year') return { start: new Date(now.getFullYear(), 0, 1), end: now };
+        if (selectedDate === 'custom_dates') {
+            const start = parseDateInput(uiState.salesStatsStartDate);
+            const endDate = parseDateInput(uiState.salesStatsEndDate);
+            if (!start || !endDate || start > endDate) return { invalid: true };
+            return { start: dayStart(start), end: dayEnd(endDate) };
+        }
+        if (selectedDate === 'month_range') {
+            const startMonth = parseMonthInput(uiState.salesStatsStartMonth);
+            const endMonth = parseMonthInput(uiState.salesStatsEndMonth);
+            if (!startMonth || !endMonth) return { invalid: true };
+            const start = new Date(startMonth.year, startMonth.month, 1);
+            const end = new Date(endMonth.year, endMonth.month + 1, 0, 23, 59, 59, 999);
+            return start <= end ? { start, end } : { invalid: true };
+        }
+        if (selectedDate === 'year') {
+            const year = Number(uiState.salesStatsYear);
+            if (!Number.isFinite(year) || year < 2000 || year > 2200) return { invalid: true };
+            return { start: new Date(year, 0, 1), end: new Date(year, 11, 31, 23, 59, 59, 999) };
+        }
+        return null;
+    };
+    const currentRange = rangeForFilter();
+    const previousRange = currentRange && !currentRange.invalid
+        ? (() => {
+            const spanDays = Math.max(1, Math.round((currentRange.end - currentRange.start) / 86400000) + 1);
+            const end = new Date(currentRange.start.getTime() - 1);
+            const start = new Date(end);
+            start.setDate(start.getDate() - spanDays + 1);
+            start.setHours(0, 0, 0, 0);
+            return { start, end };
+        })()
+        : null;
+    const toDate = value => {
+        if (!value) return null;
+        const date = value?.toDate ? value.toDate() : value?.seconds ? new Date(value.seconds * 1000) : new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
+    };
+    const dateInRange = (dateValue, range) => {
+        if (!range) return true;
+        if (range.invalid) return false;
+        const date = toDate(dateValue);
+        return Boolean(date && date >= range.start && date <= range.end);
+    };
+    const firstText = values => values.map(value => String(value || '').trim()).find(Boolean) || '';
     const modelMap = {};
     const colorMap = {};
     const sizeMap = {};
     const channelMap = {};
     const productMap = {};
-
+    const variantMap = {};
     let totalOrder = 0;
     let totalQty = 0;
-    let totalOmset = 0;
     let totalHpp = 0;
 
-    const toDate = (value) => {
-        if (!value) return null;
-        const date = value?.toDate
-            ? value.toDate()
-            : value?.seconds
-                ? new Date(value.seconds * 1000)
-                : new Date(value);
-
-        return isNaN(date.getTime()) ? null : date;
-    };
-
-    const isDateIncluded = (dateValue) => {
-        if (selectedDate === 'all_time') return true;
-
-        const date = toDate(dateValue);
-        if (!date) return false;
-
-        const now = new Date();
-
-        const startToday = new Date();
-        startToday.setHours(0, 0, 0, 0);
-
-        const endToday = new Date();
-        endToday.setHours(23, 59, 59, 999);
-
-        if (selectedDate === 'today') {
-            return date >= startToday && date <= endToday;
-        }
-
-        if (selectedDate === 'last_7_days') {
-            const start = new Date();
-            start.setDate(now.getDate() - 7);
-            start.setHours(0, 0, 0, 0);
-            return date >= start && date <= now;
-        }
-
-        if (selectedDate === 'last_30_days') {
-            const start = new Date();
-            start.setDate(now.getDate() - 30);
-            start.setHours(0, 0, 0, 0);
-            return date >= start && date <= now;
-        }
-
-        if (selectedDate === 'this_month') {
-            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        }
-
-        return true;
-    };
-
     (state.transaksi || []).forEach(trx => {
-        if (!isDateIncluded(trx.tanggal)) return;
-
         const channelName = trx.channel || trx.channelId || 'Tanpa Channel';
-
-        if (selectedChannel !== 'all' && channelName !== selectedChannel) {
-            return;
-        }
-
-        let trxIncluded = false;
+        if (selectedChannel !== 'all' && channelName !== selectedChannel) return;
+        const trxDate = trx.tanggal;
+        let currentOrderIncluded = false;
 
         (trx.items || []).forEach(item => {
-            const qty = Number(item.qty) || 0;
+            const qty = Number(item.qty || item.jumlah || 0);
             if (qty <= 0) return;
 
-            const productData = (state.produk || []).find(p =>
-                p.sku === item.sku ||
-                p.docId === item.product_id ||
-                p.id === item.product_id
+            const productData = (state.produk || []).find(product =>
+                product.sku === item.sku ||
+                product.docId === item.product_id ||
+                product.id === item.product_id ||
+                product.sku === item.sellerSku
             );
-
-            const masterModel = (state.settings.modelProduk || []).find(m =>
-                m.id === productData?.model_id ||
-                m.id === productData?.modelId ||
-                m.id === item.modelProdukId ||
-                m.id === item.model_id
+            const modelId = item.modelProdukId || item.model_id || item.modelId ||
+                productData?.model_id || productData?.modelId;
+            const masterModel = (state.settings.modelProduk || []).find(model =>
+                model.id === modelId ||
+                model.docId === modelId
             );
+            const sku = firstText([item.sku, item.sellerSku, productData?.sku]) || '-';
+            const modelName = firstText([
+                item.modelName, item.namaModel, item.model_name, item.nama_model,
+                masterModel?.namaModel,
+                productData?.modelName, productData?.namaModel, productData?.model_name
+            ]) || (sku !== '-' ? sku : firstText([item.namaProduk, item.product_name, productData?.nama, productData?.product_name, 'Tanpa Model']));
 
-            const modelName =
-                item.modelName ||
-                masterModel?.namaModel ||
-                productData?.nama ||
-                productData?.product_name ||
-                'Tanpa Model';
+            if (selectedModel !== 'all' && modelName !== selectedModel) return;
+            const colorName = firstText([item.warna, item.color, item.namaWarna, productData?.warna, productData?.color]) || 'Tanpa Warna';
+            const sizeName = firstText([item.varian, item.size, item.ukuran, item.variant, productData?.varian, productData?.variant, productData?.ukuran]) || 'Tanpa Ukuran';
+            const hppPerUnit = Number(item.hpp || item.hargaPokok || productData?.hpp || 0);
+            const itemHpp = hppPerUnit * qty;
+            const productKey = [sku, modelName, colorName, sizeName].join('|');
+            const variantKey = [modelName, colorName, sizeName].join('|');
+            const isCurrent = dateInRange(trxDate, currentRange);
+            const isPrevious = previousRange ? dateInRange(trxDate, previousRange) : false;
 
-            if (selectedModel !== 'all' && modelName !== selectedModel) {
-                return;
+            if (isCurrent) {
+                currentOrderIncluded = true;
+                totalQty += qty;
+                totalHpp += itemHpp;
+                if (!modelMap[modelName]) modelMap[modelName] = { name: modelName, qty: 0 };
+                if (!colorMap[colorName]) colorMap[colorName] = { name: colorName, qty: 0 };
+                if (!sizeMap[sizeName]) sizeMap[sizeName] = { name: sizeName, qty: 0 };
+                if (!channelMap[channelName]) channelMap[channelName] = { name: channelName, qty: 0, order: 0 };
+                if (!productMap[productKey]) productMap[productKey] = { sku, name: modelName, model: modelName, color: colorName, size: sizeName, qty: 0, hpp: 0, hppPerUnit };
+                if (!variantMap[variantKey]) variantMap[variantKey] = { key: variantKey, model: modelName, color: colorName, size: sizeName, qty: 0, previousQty: 0 };
+                modelMap[modelName].qty += qty;
+                colorMap[colorName].qty += qty;
+                sizeMap[sizeName].qty += qty;
+                channelMap[channelName].qty += qty;
+                productMap[productKey].qty += qty;
+                productMap[productKey].hpp += itemHpp;
+                if (!productMap[productKey].hppPerUnit && hppPerUnit) productMap[productKey].hppPerUnit = hppPerUnit;
+                variantMap[variantKey].qty += qty;
+            } else if (isPrevious) {
+                if (!variantMap[variantKey]) variantMap[variantKey] = { key: variantKey, model: modelName, color: colorName, size: sizeName, qty: 0, previousQty: 0 };
+                variantMap[variantKey].previousQty += qty;
             }
-
-            trxIncluded = true;
-
-            const colorName =
-                item.warna ||
-                item.color ||
-                productData?.warna ||
-                productData?.color ||
-                'Tanpa Warna';
-
-            const sizeName =
-                item.varian ||
-                item.size ||
-                item.ukuran ||
-                productData?.varian ||
-                productData?.variant ||
-                productData?.ukuran ||
-                'Tanpa Ukuran';
-
-            const productName =
-                productData?.nama ||
-                productData?.product_name ||
-                modelName;
-
-            const sku = item.sku || productData?.sku || '-';
-
-            const hargaJual = Number(item.hargaJual || item.price || item.harga || 0);
-            const hpp = Number(item.hpp || productData?.hpp || 0);
-
-            const itemOmset = hargaJual * qty;
-            const itemHpp = hpp * qty;
-            const itemProfit = itemOmset - itemHpp;
-
-            totalQty += qty;
-            totalOmset += itemOmset;
-            totalHpp += itemHpp;
-
-            if (!modelMap[modelName]) {
-                modelMap[modelName] = { name: modelName, qty: 0, omset: 0, profit: 0 };
-            }
-
-            if (!colorMap[colorName]) {
-                colorMap[colorName] = { name: colorName, qty: 0, omset: 0 };
-            }
-
-            if (!sizeMap[sizeName]) {
-                sizeMap[sizeName] = { name: sizeName, qty: 0, omset: 0 };
-            }
-
-            if (!channelMap[channelName]) {
-                channelMap[channelName] = { name: channelName, qty: 0, omset: 0, order: 0 };
-            }
-
-            if (!productMap[sku]) {
-                productMap[sku] = {
-                    sku,
-                    name: productName,
-                    model: modelName,
-                    color: colorName,
-                    size: sizeName,
-                    qty: 0,
-                    omset: 0,
-                    hpp: 0,
-                    profit: 0
-                };
-            }
-
-            modelMap[modelName].qty += qty;
-            modelMap[modelName].omset += itemOmset;
-            modelMap[modelName].profit += itemProfit;
-
-            colorMap[colorName].qty += qty;
-            colorMap[colorName].omset += itemOmset;
-
-            sizeMap[sizeName].qty += qty;
-            sizeMap[sizeName].omset += itemOmset;
-
-            channelMap[channelName].qty += qty;
-            channelMap[channelName].omset += itemOmset;
-
-            productMap[sku].qty += qty;
-            productMap[sku].omset += itemOmset;
-            productMap[sku].hpp += itemHpp;
-            productMap[sku].profit += itemProfit;
         });
 
-        if (trxIncluded) {
+        if (currentOrderIncluded) {
             totalOrder += 1;
-            if (channelMap[channelName]) {
-                channelMap[channelName].order += 1;
-            }
+            const channel = channelMap[channelName];
+            if (channel) channel.order += 1;
         }
     });
 
-    const sortByQty = (data) => Object.values(data).sort((a, b) => b.qty - a.qty);
-    const sortByOmset = (data) => Object.values(data).sort((a, b) => b.omset - a.omset);
-
-    const grossProfit = totalOmset - totalHpp;
-
+    const sortByQty = data => Object.values(data).sort((a, b) => b.qty - a.qty);
+    const topVariants = Object.values(variantMap)
+        .filter(item => item.qty > 0 || item.previousQty > 0)
+        .sort((a, b) => Math.max(b.qty, b.previousQty) - Math.max(a.qty, a.previousQty))
+        .slice(0, 10);
     return {
         totalOrder,
         totalQty,
-        totalOmset,
         totalHpp,
-        grossProfit,
-        averageOrderValue: totalOrder > 0 ? totalOmset / totalOrder : 0,
-
+        averageHppPerUnit: totalQty > 0 ? totalHpp / totalQty : 0,
+        hasComparison: Boolean(previousRange),
+        dateRangeInvalid: Boolean(currentRange?.invalid),
         topModels: sortByQty(modelMap).slice(0, 10),
         topColors: sortByQty(colorMap).slice(0, 10),
         topSizes: sortByQty(sizeMap).slice(0, 10),
-        topChannels: sortByOmset(channelMap).slice(0, 10),
-        topProducts: sortByOmset(productMap).slice(0, 20)
+        topChannels: Object.values(channelMap).sort((a, b) => b.order - a.order || b.qty - a.qty).slice(0, 10),
+        topProducts: Object.values(productMap).sort((a, b) => b.qty - a.qty).slice(0, 20),
+        variantTrend: topVariants
     };
 });
+
+const salesStatsChartCanvas = ref(null);
+let salesStatsChartInstance = null;
+watch(
+    () => [activePage.value, isStatistikPenjualanLocked.value, salesPerformanceStats.value.variantTrend, salesPerformanceStats.value.hasComparison, isDarkMode.value],
+    async () => {
+        if (salesStatsChartInstance) {
+            salesStatsChartInstance.destroy();
+            salesStatsChartInstance = null;
+        }
+        await nextTick();
+        if (activePage.value !== 'statistik-penjualan' || !salesStatsChartCanvas.value) return;
+        const stats = salesPerformanceStats.value;
+        if (!stats.variantTrend.length) return;
+        const datasets = [{
+            label: stats.hasComparison ? 'Periode aktif' : 'Jumlah terjual',
+            data: stats.variantTrend.map(item => item.qty),
+            backgroundColor: '#4f46e5',
+            borderRadius: 8,
+            maxBarThickness: 28
+        }];
+        if (stats.hasComparison) {
+            datasets.push({
+                label: 'Periode sebelumnya',
+                data: stats.variantTrend.map(item => item.previousQty),
+                backgroundColor: '#cbd5e1',
+                borderRadius: 8,
+                maxBarThickness: 28
+            });
+        }
+        salesStatsChartInstance = new Chart(salesStatsChartCanvas.value, {
+            type: 'bar',
+            data: {
+                labels: stats.variantTrend.map(item => [item.model, item.color + ' · ' + item.size]),
+                datasets
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: context => context.dataset.label + ': ' + formatNumber(context.parsed.x) + ' pcs'
+                        }
+                    }
+                },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } },
+                    y: { grid: { display: false } }
+                }
+            }
+        });
+    },
+    { deep: true }
+);
 
 const kpiExplanations = {
     'saldo-kas': {
@@ -20996,49 +21020,54 @@ SKU-BAJU-PUTIH-S"
                     <p class="text-sm text-slate-500">Analisis performa produk</p>
                     <h2 class="text-3xl font-bold text-slate-800 mt-1">Statistik Penjualan</h2>
                     <p class="text-slate-500 mt-2 max-w-2xl">
-                        Pantau produk, model, warna, ukuran, dan channel yang paling berkontribusi terhadap penjualan.
+                        Pantau jumlah pesanan, HPP, serta model dan varian yang paling banyak terjual.
                     </p>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-[720px]">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">Periode</label>
-                        <select v-model="uiState.salesStatsDateFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
-                            <option value="all_time">Semua</option>
-                            <option value="today">Hari Ini</option>
-                            <option value="last_7_days">7 Hari Terakhir</option>
-                            <option value="last_30_days">30 Hari Terakhir</option>
-                            <option value="this_month">Bulan Ini</option>
-                        </select>
+                <div class="w-full lg:w-[760px] space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Periode</label>
+                            <select v-model="uiState.salesStatsDateFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                                <option value="all_time">Semua</option>
+                                <option value="today">Hari Ini</option>
+                                <option value="last_7_days">7 Hari Terakhir</option>
+                                <option value="last_30_days">30 Hari Terakhir</option>
+                                <option value="this_month">Bulan Ini</option>
+                                <option value="last_month">Bulan Lalu</option>
+                                <option value="this_year">Tahun Ini</option>
+                                <option value="custom_dates">Rentang tanggal</option>
+                                <option value="month_range">Rentang bulan</option>
+                                <option value="year">Pilih tahun</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Model</label>
+                            <select v-model="uiState.salesStatsModelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                                <option value="all">Semua Model</option>
+                                <option v-for="model in salesStatsModelOptions" :key="model.namaModel" :value="model.namaModel">{{ model.namaModel }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Channel</label>
+                            <select v-model="uiState.salesStatsChannelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
+                                <option value="all">Semua Channel</option>
+                                <option v-for="channel in state.settings.marketplaces" :key="channel.id" :value="channel.name">{{ channel.name }}</option>
+                            </select>
+                        </div>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">Model</label>
-                        <select v-model="uiState.salesStatsModelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
-                            <option value="all">Semua Model</option>
-                            <option
-                                v-for="model in uniqueRoasModels"
-                                :key="model.namaModel"
-                                :value="model.namaModel"
-                            >
-                                {{ model.namaModel }}
-                            </option>
-                        </select>
+                    <div v-if="uiState.salesStatsDateFilter === 'custom_dates'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+                        <label class="block text-xs font-semibold text-slate-600">Tanggal mulai<input v-model="uiState.salesStatsStartDate" type="date" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
+                        <label class="block text-xs font-semibold text-slate-600">Tanggal selesai<input v-model="uiState.salesStatsEndDate" type="date" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">Channel</label>
-                        <select v-model="uiState.salesStatsChannelFilter" class="w-full p-3 border border-slate-200 rounded-xl text-sm bg-white">
-                            <option value="all">Semua Channel</option>
-                            <option
-                                v-for="channel in state.settings.marketplaces"
-                                :key="channel.id"
-                                :value="channel.name"
-                            >
-                                {{ channel.name }}
-                            </option>
-                        </select>
+                    <div v-if="uiState.salesStatsDateFilter === 'month_range'" class="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3">
+                        <label class="block text-xs font-semibold text-slate-600">Bulan mulai<input v-model="uiState.salesStatsStartMonth" type="month" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
+                        <label class="block text-xs font-semibold text-slate-600">Bulan selesai<input v-model="uiState.salesStatsEndMonth" type="month" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"></label>
                     </div>
+                    <div v-if="uiState.salesStatsDateFilter === 'year'" class="max-w-xs rounded-xl bg-slate-50 p-3">
+                        <label class="block text-xs font-semibold text-slate-600">Tahun<select v-model.number="uiState.salesStatsYear" class="mt-1 w-full p-2.5 border border-slate-200 rounded-lg text-sm bg-white"><option v-for="year in Array.from({ length: new Date().getFullYear() - 2000 + 1 }, (_, index) => 2000 + index)" :key="year" :value="year">{{ year }}</option></select></label>
+                    </div>
+                    <p v-if="salesPerformanceStats.dateRangeInvalid" class="text-xs text-red-600">Periksa rentang periode yang dipilih.</p>
                 </div>
             </div>
         </div>
@@ -21057,17 +21086,15 @@ SKU-BAJU-PUTIH-S"
             </div>
 
             <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Total Omset</p>
-                <p class="text-3xl font-bold text-blue-600 mt-2">{{ formatCurrency(salesPerformanceStats.totalOmset) }}</p>
-                <p class="text-xs text-slate-400 mt-2">Perkiraan omset dari item terjual.</p>
+                <p class="text-sm text-slate-500">Total HPP</p>
+                <p class="text-3xl font-bold text-orange-600 mt-2">{{ formatCurrency(salesPerformanceStats.totalHpp) }}</p>
+                <p class="text-xs text-slate-400 mt-2">Total modal produk pada pesanan sesuai filter.</p>
             </div>
 
             <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Estimasi Laba Kotor</p>
-                <p class="text-3xl font-bold mt-2" :class="salesPerformanceStats.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'">
-                    {{ formatCurrency(salesPerformanceStats.grossProfit) }}
-                </p>
-                <p class="text-xs text-slate-400 mt-2">Omset dikurangi HPP produk.</p>
+                <p class="text-sm text-slate-500">Rata-rata HPP per pcs</p>
+                <p class="text-3xl font-bold text-orange-600 mt-2">{{ formatCurrency(salesPerformanceStats.averageHppPerUnit) }}</p>
+                <p class="text-xs text-slate-400 mt-2">Total HPP dibagi jumlah pcs terjual.</p>
             </div>
         </div>
 
@@ -21097,10 +21124,10 @@ SKU-BAJU-PUTIH-S"
             </div>
 
             <div class="bg-white rounded-2xl border border-slate-200 shadow-lg p-6">
-                <p class="text-sm text-slate-500">Channel Terbaik</p>
+                <p class="text-sm text-slate-500">Channel Pesanan Terbanyak</p>
                 <p class="text-xl font-bold text-slate-800 mt-2">{{ salesPerformanceStats.topChannels[0]?.name || 'Belum ada data' }}</p>
                 <p class="text-sm text-slate-500 mt-2">
-                    {{ salesPerformanceStats.topChannels[0] ? formatCurrency(salesPerformanceStats.topChannels[0].omset) : '-' }}
+                    {{ salesPerformanceStats.topChannels[0] ? formatNumber(salesPerformanceStats.topChannels[0].order) + ' order · ' + formatNumber(salesPerformanceStats.topChannels[0].qty) + ' pcs' : '-' }}
                 </p>
             </div>
         </div>
@@ -21111,49 +21138,62 @@ SKU-BAJU-PUTIH-S"
                     <p class="text-sm text-slate-500">Ranking produk</p>
                     <h3 class="text-xl font-bold text-slate-800">Performa Produk per SKU</h3>
                 </div>
-                <p class="text-sm text-slate-400">Top 20 berdasarkan omset</p>
+                <p class="text-sm text-slate-400">20 SKU dengan pcs terjual terbanyak</p>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-slate-50 text-slate-500 text-left">
                         <tr>
-                            <th class="px-4 py-3 font-semibold">Produk</th>
                             <th class="px-4 py-3 font-semibold">SKU</th>
                             <th class="px-4 py-3 font-semibold">Model</th>
                             <th class="px-4 py-3 font-semibold">Warna</th>
                             <th class="px-4 py-3 font-semibold">Ukuran</th>
-                            <th class="px-4 py-3 font-semibold text-right">Qty</th>
-                            <th class="px-4 py-3 font-semibold text-right">Omset</th>
-                            <th class="px-4 py-3 font-semibold text-right">HPP</th>
-                            <th class="px-4 py-3 font-semibold text-right">Laba Kotor</th>
+                            <th class="px-4 py-3 font-semibold text-right">Qty Terjual</th>
+                            <th class="px-4 py-3 font-semibold text-right">HPP / pcs</th>
+                            <th class="px-4 py-3 font-semibold text-right">Total HPP</th>
                         </tr>
                     </thead>
 
                     <tbody class="divide-y divide-slate-100">
                         <tr v-if="salesPerformanceStats.topProducts.length === 0">
-                            <td colspan="9" class="px-4 py-6 text-center text-slate-500">
+                            <td colspan="7" class="px-4 py-6 text-center text-slate-500">
                                 Belum ada data penjualan untuk filter ini.
                             </td>
                         </tr>
 
-                        <tr v-for="item in salesPerformanceStats.topProducts" :key="item.sku" class="hover:bg-slate-50">
-                            <td class="px-4 py-3 font-semibold text-slate-800">{{ item.name }}</td>
+                        <tr v-for="item in salesPerformanceStats.topProducts" :key="item.sku + '|' + item.model + '|' + item.color + '|' + item.size" class="hover:bg-slate-50">
                             <td class="px-4 py-3 text-blue-600 font-mono">{{ item.sku }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ item.model }}</td>
+                            <td class="px-4 py-3 font-semibold text-slate-800">{{ item.model }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ item.color }}</td>
                             <td class="px-4 py-3 text-slate-600">{{ item.size }}</td>
                             <td class="px-4 py-3 text-right font-bold">{{ formatNumber(item.qty) }}</td>
-                            <td class="px-4 py-3 text-right font-bold text-blue-600">{{ formatCurrency(item.omset) }}</td>
-                            <td class="px-4 py-3 text-right text-orange-600">{{ formatCurrency(item.hpp) }}</td>
-                            <td class="px-4 py-3 text-right font-bold" :class="item.profit >= 0 ? 'text-green-600' : 'text-red-600'">
-                                {{ formatCurrency(item.profit) }}
-                            </td>
+                            <td class="px-4 py-3 text-right text-orange-600">{{ formatCurrency(item.hppPerUnit) }}</td>
+                            <td class="px-4 py-3 text-right font-bold text-orange-700">{{ formatCurrency(item.hpp) }}</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
+
+        <section class="bg-white rounded-3xl border border-slate-200 shadow-xl p-6">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-sm font-medium text-indigo-600">Tren penjualan</p>
+                    <h3 class="text-xl font-bold text-slate-800">Model dan varian yang meningkat</h3>
+                    <p class="mt-1 text-sm text-slate-500">Perbandingan pcs terjual per model, warna, dan ukuran.</p>
+                </div>
+                <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                    {{ salesPerformanceStats.hasComparison ? 'Periode aktif vs periode sebelumnya' : 'Pcs pada periode aktif' }}
+                </span>
+            </div>
+            <div v-if="salesPerformanceStats.variantTrend.length" class="mt-5 w-full" :style="{ height: Math.max(280, salesPerformanceStats.variantTrend.length * 48) + 'px' }">
+                <canvas ref="salesStatsChartCanvas" aria-label="Grafik pcs terjual berdasarkan model, warna, dan ukuran" role="img"></canvas>
+            </div>
+            <div v-else class="mt-5 rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
+                Belum ada data penjualan yang sesuai filter untuk ditampilkan pada grafik.
+            </div>
+        </section>
 
     </div>
 </div>
