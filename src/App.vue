@@ -123,6 +123,19 @@ const isSavingSettings = ref(false); // Untuk tombol simpan di halaman Pengatura
 const isSubscribingMonthly = ref(false); // <-- TAMBAHKAN INI
 const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
+const loginLampOn = ref(false);
+const loginLampPulling = ref(false);
+let loginLampPullTimer = null;
+
+function pullLoginLamp() {
+    if (loginLampPulling.value) return;
+    loginLampPulling.value = true;
+    window.clearTimeout(loginLampPullTimer);
+    loginLampPullTimer = window.setTimeout(() => {
+        loginLampOn.value = !loginLampOn.value;
+        loginLampPulling.value = false;
+    }, 380);
+}
 
 // ============================================================
 // PRIVASI DANA GANTUNG
@@ -18997,64 +19010,108 @@ void [
         </div>
     </div>
 </div>
-    <div v-if="!currentUser && !isLoading" class="relative min-h-screen flex items-center justify-center bg-slate-900 overflow-hidden">
-    
-    <video autoplay muted loop playsinline class="absolute inset-0 w-full h-full object-cover z-0 opacity-40">
-        <source src="/wallpaper.mp4?v=2" type="video/mp4"> 
-        Browser Anda tidak mendukung tag video.
-    </video>
+    <div
+    v-if="!currentUser && !isLoading"
+    class="login-lamp-scene"
+    :class="{ 'is-lamp-on': loginLampOn, 'is-lamp-pulling': loginLampPulling }"
+>
+    <div class="login-scene-grid" aria-hidden="true"></div>
+    <div class="login-scene-glow" aria-hidden="true"></div>
+    <div class="login-lamp-beam" aria-hidden="true"></div>
 
-    <div class="relative z-10 p-8 sm:p-10 bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl w-full max-w-md text-center animate-fade-in-up">
-        <h2 class="text-3xl font-bold text-gray-800 mb-2">Selamat Datang di</h2>
-        <p class="text-indigo-600 text-xl font-semibold mb-8">{{ state.settings.brandName }}</p>
-
-        <button @click="signInWithGoogle" class="w-full flex items-center justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-3 px-4 rounded-xl shadow-sm transition-all duration-300 transform hover:scale-105 mb-6">
-            <img src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="Google logo" class="w-6 h-6 mr-3">
-            Login dengan Google
-        </button>
-
-        <div class="flex items-center my-6">
-            <hr class="flex-grow border-gray-300">
-            <span class="px-4 text-gray-500 text-sm">Atau</span>
-            <hr class="flex-grow border-gray-300">
-        </div>
-
-        <form @submit.prevent="activePage === 'login' ? handleLogin() : handleRegister()" class="space-y-5">
-            <div>
-                <label for="email" class="sr-only">Alamat Email</label>
-                <input type="email" id="email" v-model="authForm.email" placeholder="Alamat Email" required
-                       class="w-full p-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 text-gray-800 shadow-sm transition-all duration-200">
-            </div>
-            <div>
-                <label for="password" class="sr-only">Password</label>
-                <input type="password" id="password" v-model="authForm.password" placeholder="Password" required
-                       class="w-full p-3 border border-gray-300 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 text-gray-800 shadow-sm transition-all duration-200">
-            </div>
-            
-            <div v-if="activePage === 'register'">
-                <label for="activation-code" class="sr-only">Kode Aktivasi (Opsional)</label>
-                <input type="text" v-model="authForm.activationCode" id="activation-code" class="w-full p-3 border border-gray-300 rounded-xl" placeholder="Kode Aktivasi (Opsional)">
+    <div class="login-lamp-layout">
+        <section class="login-brand-panel">
+            <div class="login-brand-lockup">
+                <div class="login-brand-mark">F</div>
+                <div>
+                    <p class="login-brand-name">{{ state.settings.brandName }}</p>
+                    <p class="login-brand-caption">BUSINESS MANAGEMENT</p>
+                </div>
             </div>
 
-            <p v-if="authForm.error" class="text-red-600 text-sm pt-1">{{ authForm.error }}</p>
+            <div class="login-brand-copy">
+                <p class="login-eyebrow"><span></span> RUANG KERJA BISNIS ANDA</p>
+                <h1>Bisnis rapi.<br><span>Langkah lebih terang.</span></h1>
+                <p class="login-brand-description">
+                    Kelola pesanan, stok, keuangan, dan perkembangan usaha dalam satu ruang kerja.
+                </p>
+            </div>
 
-            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors duration-300 transform hover:scale-105 shadow-lg shadow-indigo-600/30">
-                <span v-if="activePage === 'login'">Login</span>
-                <span v-else>Daftar Akun Baru</span>
-            </button>
-        </form>
+            <div class="login-lamp-art" aria-label="Lampu dengan tali tarik">
+                <div class="login-ceiling-line"></div>
+                <div class="login-lamp-wire"></div>
+                <div class="login-lamp-shade"><span></span></div>
+                <div class="login-bulb"></div>
+                <div class="login-pull-cord"></div>
+                <button
+                    type="button"
+                    class="login-pull-knob"
+                    @click="pullLoginLamp"
+                    :aria-label="loginLampOn ? 'Tarik tali untuk mematikan lampu' : 'Tarik tali untuk menyalakan lampu'"
+                    :aria-pressed="loginLampOn"
+                ><span></span></button>
+                <p class="login-pull-label">{{ loginLampOn ? 'Tarik untuk mematikan' : 'Tarik tali untuk menyalakan' }}</p>
+            </div>
+        </section>
 
-        <div class="mt-6 text-sm">
-            <p class="mt-3 text-gray-600">
-                <span v-if="activePage === 'login'">Belum Punya Akun?</span>
-                <span v-else>Sudah Punya Akun?</span>
-                <button @click.prevent="changePage(activePage === 'login' ? 'register' : 'login')" class="text-indigo-600 hover:text-indigo-800 font-semibold transition-colors duration-200">
-                    <span v-if="activePage === 'login'">Daftar Sekarang</span>
-                    <span v-else>Login</span>
-                </button>
-            </p>
-        </div>
+        <section class="login-access-panel" aria-live="polite">
+            <Transition name="lamp-login-reveal" mode="out-in">
+                <div v-if="loginLampOn" key="form" class="login-form-card">
+                    <div class="login-form-heading">
+                        <p class="login-eyebrow"><span></span> AKSES AMAN</p>
+                        <h2>{{ activePage === 'login' ? 'Selamat datang kembali' : 'Buat akun Fashion OS' }}</h2>
+                        <p>Masuk untuk melanjutkan ke ruang kerja bisnis Anda.</p>
+                    </div>
+
+                    <button type="button" @click="signInWithGoogle" class="login-google-button">
+                        <img src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="" class="h-5 w-5">
+                        <span>Masuk dengan Google</span>
+                    </button>
+
+                    <div class="login-divider"><span>atau gunakan email</span></div>
+
+                    <form @submit.prevent="activePage === 'login' ? handleLogin() : handleRegister()" class="login-form-fields">
+                        <div class="login-field">
+                            <label for="email">Alamat email</label>
+                            <input type="email" id="email" v-model="authForm.email" placeholder="nama@email.com" autocomplete="email" required>
+                        </div>
+                        <div class="login-field">
+                            <label for="password">Kata sandi</label>
+                            <input type="password" id="password" v-model="authForm.password" placeholder="Masukkan kata sandi" :autocomplete="activePage === 'login' ? 'current-password' : 'new-password'" required>
+                        </div>
+                        <div v-if="activePage === 'register'" class="login-field">
+                            <label for="activation-code">Kode aktivasi <span>(opsional)</span></label>
+                            <input type="text" v-model="authForm.activationCode" id="activation-code" placeholder="Masukkan kode aktivasi">
+                        </div>
+
+                        <p v-if="authForm.error" class="login-auth-error">{{ authForm.error }}</p>
+
+                        <button type="submit" class="login-submit-button">
+                            {{ activePage === 'login' ? 'Masuk ke Fashion OS' : 'Daftar akun' }}
+                            <span aria-hidden="true">→</span>
+                        </button>
+                    </form>
+
+                    <p class="login-register-prompt">
+                        {{ activePage === 'login' ? 'Belum punya akun?' : 'Sudah punya akun?' }}
+                        <button type="button" @click.prevent="changePage(activePage === 'login' ? 'register' : 'login')">
+                            {{ activePage === 'login' ? 'Daftar sekarang' : 'Masuk' }}
+                        </button>
+                    </p>
+                </div>
+
+                <div v-else key="hint" class="login-light-hint-card">
+                    <div class="login-hint-icon">✦</div>
+                    <p class="login-hint-overline">LOGIN FASHION OS</p>
+                    <h2>Siap memulai?</h2>
+                    <p>Tarik tali lampu di samping untuk menerangi formulir masuk Anda.</p>
+                    <div class="login-hint-line"><span></span></div>
+                </div>
+            </Transition>
+        </section>
     </div>
+
+    <p class="login-scene-footer">FASHION OS <span>•</span> RUANG KERJA BISNIS ANDA</p>
 </div>
         
   <div v-if="currentUser">
@@ -19275,7 +19332,7 @@ void [
 </aside>
 
       <!-- Main Content -->
-      <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 fashion-main-stage">
     
     <div v-if="isLoading" class="flex items-center justify-center h-full">
         <div class="text-center">
@@ -27315,4 +27372,832 @@ BAJU-PUTIH-M</pre>
 /* FASHION_OS_PIN_NEW_KEYS_CACHE_HOTFIX_V1 */
 
 /* FASHION_OS_PENDING_PRIVACY_EYE_DASHBOARD_V1 */
+
+/* FASHION OS — MOTION DESIGN SYSTEM + LAMP LOGIN */
+.fashion-app-shell {
+    background: #f4f6fb;
+}
+
+.fashion-main-stage {
+    position: relative;
+    isolation: isolate;
+    scroll-behavior: smooth;
+    background:
+        radial-gradient(ellipse at 12% 0%, rgba(99, 102, 241, 0.075), transparent 30rem),
+        radial-gradient(ellipse at 92% 18%, rgba(14, 165, 233, 0.055), transparent 28rem),
+        #f5f7fb;
+}
+
+.fashion-main-stage > div:not([class*="fixed"]) {
+    animation: fashion-page-arrive 0.48s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.fashion-main-stage :deep(.rounded-2xl.border-slate-200),
+.fashion-main-stage :deep(.rounded-3xl.border-slate-200),
+.fashion-main-stage :deep(.rounded-2xl.border-gray-200),
+.fashion-main-stage :deep(.rounded-3xl.border-gray-200) {
+    transition:
+        transform 0.24s ease,
+        box-shadow 0.24s ease,
+        border-color 0.24s ease;
+}
+
+.fashion-main-stage :deep(.rounded-2xl.border-slate-200:hover),
+.fashion-main-stage :deep(.rounded-3xl.border-slate-200:hover),
+.fashion-main-stage :deep(.rounded-2xl.border-gray-200:hover),
+.fashion-main-stage :deep(.rounded-3xl.border-gray-200:hover) {
+    transform: translateY(-2px);
+    border-color: rgba(129, 140, 248, 0.42);
+    box-shadow: 0 18px 38px -28px rgba(15, 23, 42, 0.45);
+}
+
+.fashion-main-stage :deep(button:not(:disabled)) {
+    transition:
+        filter 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.18s ease;
+}
+
+.fashion-main-stage :deep(button:not(:disabled):hover) {
+    filter: brightness(1.045);
+}
+
+.fashion-main-stage :deep(button:not(:disabled):active) {
+    transform: scale(0.985);
+}
+
+.fashion-main-stage :deep(input:not([type="checkbox"]):not([type="radio"])),
+.fashion-main-stage :deep(select),
+.fashion-main-stage :deep(textarea) {
+    transition:
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        background-color 0.18s ease;
+}
+
+.fashion-main-stage :deep(input:not([type="checkbox"]):not([type="radio"]):focus),
+.fashion-main-stage :deep(select:focus),
+.fashion-main-stage :deep(textarea:focus) {
+    border-color: #818cf8 !important;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12) !important;
+}
+
+.fashion-main-stage :deep(tbody tr) {
+    transition: background-color 0.18s ease;
+}
+
+.sidebar-link {
+    position: relative;
+    overflow: hidden;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.sidebar-link:hover {
+    transform: translateX(2px);
+}
+
+.sidebar-link-active {
+    background-image: linear-gradient(112deg, #4f46e5 0%, #6d28d9 62%, #7c3aed 100%);
+    box-shadow: 0 10px 24px -16px rgba(99, 102, 241, 0.95);
+}
+
+@keyframes fashion-page-arrive {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fashion-dark > .fashion-main-stage {
+    background:
+        radial-gradient(ellipse at 12% 0%, rgba(99, 102, 241, 0.12), transparent 30rem),
+        radial-gradient(ellipse at 92% 18%, rgba(14, 165, 233, 0.07), transparent 28rem),
+        #0b1120 !important;
+}
+
+/* Login: lampu tarik dengan sorot yang membuka formulir */
+.login-lamp-scene {
+    --lamp-accent: #f3c96b;
+    position: relative;
+    display: flex;
+    min-height: 100vh;
+    min-height: 100svh;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    isolation: isolate;
+    color: #f8fafc;
+    background:
+        radial-gradient(ellipse at 18% 12%, rgba(56, 71, 116, 0.42), transparent 35rem),
+        linear-gradient(135deg, #080d1a 0%, #0b1120 52%, #10162a 100%);
+}
+
+.login-scene-grid {
+    position: absolute;
+    inset: 0;
+    z-index: -3;
+    opacity: 0.16;
+    background-image:
+        linear-gradient(rgba(148, 163, 184, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.1) 1px, transparent 1px);
+    background-size: 54px 54px;
+    mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.login-scene-glow {
+    position: absolute;
+    z-index: -2;
+    left: -16rem;
+    top: 20%;
+    width: 40rem;
+    height: 40rem;
+    border-radius: 50%;
+    background: rgba(79, 70, 229, 0.12);
+    filter: blur(100px);
+    animation: login-ambient-drift 12s ease-in-out infinite alternate;
+}
+
+.login-lamp-beam {
+    position: absolute;
+    z-index: -1;
+    left: 22%;
+    top: 5%;
+    width: 76%;
+    height: 110%;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.92);
+    transform-origin: 24% 18%;
+    background:
+        radial-gradient(ellipse at 28% 22%, rgba(255, 222, 151, 0.3), rgba(251, 191, 36, 0.1) 26%, transparent 66%);
+    filter: blur(8px);
+    transition: opacity 0.8s ease, transform 1s cubic-bezier(0.2, 0.7, 0.15, 1);
+}
+
+.login-lamp-scene.is-lamp-on .login-lamp-beam {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.login-lamp-layout {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+    align-items: center;
+    gap: clamp(2.5rem, 7vw, 7rem);
+    width: min(1160px, calc(100% - 3rem));
+    min-height: 100vh;
+    min-height: 100svh;
+    padding: 4rem 0 5rem;
+}
+
+.login-brand-panel {
+    position: relative;
+    min-width: 0;
+}
+
+.login-brand-lockup {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+.login-brand-mark {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    place-items: center;
+    border: 1px solid rgba(226, 232, 240, 0.24);
+    border-radius: 1rem;
+    color: #fff;
+    background: linear-gradient(145deg, rgba(129, 140, 248, 0.3), rgba(79, 70, 229, 0.12));
+    box-shadow: inset 0 1px rgba(255,255,255,0.12), 0 12px 30px rgba(0,0,0,0.18);
+    font-size: 1.25rem;
+    font-weight: 900;
+}
+
+.login-brand-name {
+    color: #f8fafc;
+    font-size: 0.95rem;
+    font-weight: 850;
+    letter-spacing: 0.16em;
+}
+
+.login-brand-caption {
+    margin-top: 0.18rem;
+    color: #94a3b8;
+    font-size: 0.57rem;
+    font-weight: 800;
+    letter-spacing: 0.21em;
+}
+
+.login-brand-copy {
+    margin-top: clamp(3rem, 7vh, 5rem);
+}
+
+.login-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #c7d2fe;
+    font-size: 0.68rem;
+    font-weight: 850;
+    letter-spacing: 0.2em;
+}
+
+.login-eyebrow > span {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: #f4ca70;
+    box-shadow: 0 0 15px rgba(244, 202, 112, 0.72);
+}
+
+.login-brand-copy h1 {
+    margin-top: 1.2rem;
+    color: #f8fafc;
+    font-size: clamp(2.5rem, 5vw, 4.2rem);
+    font-weight: 780;
+    letter-spacing: -0.055em;
+    line-height: 1.02;
+}
+
+.login-brand-copy h1 span {
+    color: #f4d28b;
+    background: linear-gradient(90deg, #fff2d4, #f2c56c 55%, #d5b7ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.login-brand-description {
+    max-width: 31rem;
+    margin-top: 1.35rem;
+    color: #aab5c8;
+    font-size: 0.98rem;
+    line-height: 1.75;
+}
+
+.login-lamp-art {
+    position: relative;
+    width: min(100%, 33rem);
+    height: 18rem;
+    margin-top: 2rem;
+}
+
+.login-ceiling-line {
+    position: absolute;
+    top: 0.2rem;
+    left: 0;
+    width: 74%;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(148,163,184,0.38), rgba(148,163,184,0.02));
+}
+
+.login-lamp-wire {
+    position: absolute;
+    top: 0;
+    left: 31%;
+    width: 1px;
+    height: 4.2rem;
+    background: linear-gradient(#64748b, #cbd5e1);
+    transform-origin: top;
+    transition: transform 0.38s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.login-lamp-shade {
+    position: absolute;
+    top: 3.95rem;
+    left: calc(31% - 2.35rem);
+    width: 4.75rem;
+    height: 2.5rem;
+    overflow: hidden;
+    border-radius: 4rem 4rem 0.8rem 0.8rem;
+    background: linear-gradient(145deg, #64748b, #293246 76%);
+    box-shadow: inset 0 1px rgba(255,255,255,0.28), 0 12px 25px rgba(0,0,0,0.3);
+    transition: background 0.5s ease, box-shadow 0.5s ease;
+}
+
+.login-lamp-shade span {
+    position: absolute;
+    right: 0.3rem;
+    bottom: -0.4rem;
+    left: 0.3rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: #111827;
+}
+
+.login-bulb {
+    position: absolute;
+    top: 6.3rem;
+    left: calc(31% - 0.42rem);
+    width: 0.84rem;
+    height: 0.9rem;
+    border-radius: 50% 50% 42% 42%;
+    background: #475569;
+    transition: background 0.4s ease, box-shadow 0.4s ease;
+}
+
+.login-pull-cord {
+    position: absolute;
+    top: 6.35rem;
+    left: 31%;
+    width: 1px;
+    height: 4.4rem;
+    background: linear-gradient(#94a3b8, #64748b);
+    transform-origin: top;
+    transition: transform 0.34s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.login-pull-knob {
+    position: absolute;
+    z-index: 2;
+    top: 10.45rem;
+    left: calc(31% - 0.78rem);
+    display: grid;
+    width: 1.6rem;
+    height: 1.8rem;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,0.32);
+    border-radius: 0.55rem 0.55rem 0.75rem 0.75rem;
+    color: #fff7e5;
+    background: linear-gradient(145deg, #d4ad62, #87652d);
+    box-shadow: 0 7px 15px rgba(0,0,0,0.28);
+    cursor: pointer;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+}
+
+.login-pull-knob span {
+    width: 0.32rem;
+    height: 0.32rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.login-pull-knob:hover {
+    filter: brightness(1.15);
+    box-shadow: 0 0 24px rgba(244, 202, 112, 0.35);
+}
+
+.login-pull-knob:focus-visible {
+    outline: 3px solid #f4ca70;
+    outline-offset: 4px;
+}
+
+.login-lamp-scene.is-lamp-pulling .login-pull-cord,
+.login-lamp-scene.is-lamp-pulling .login-lamp-wire {
+    transform: scaleY(1.16);
+}
+
+.login-lamp-scene.is-lamp-pulling .login-pull-knob {
+    transform: translateY(0.72rem);
+}
+
+.login-lamp-scene.is-lamp-on .login-lamp-shade {
+    background: linear-gradient(145deg, #f9dd9b, #c39745 78%);
+    box-shadow: inset 0 1px rgba(255,255,255,0.6), 0 0 45px rgba(244, 202, 112, 0.3);
+}
+
+.login-lamp-scene.is-lamp-on .login-lamp-shade span {
+    background: #fff1c7;
+    box-shadow: 0 0 34px 17px rgba(255, 224, 153, 0.48);
+}
+
+.login-lamp-scene.is-lamp-on .login-bulb {
+    background: #fff4cc;
+    box-shadow: 0 0 25px 10px rgba(255, 220, 136, 0.55);
+}
+
+.login-pull-label {
+    position: absolute;
+    top: 12.65rem;
+    left: 21%;
+    color: #94a3b8;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    transition: color 0.4s ease;
+}
+
+.login-lamp-scene.is-lamp-on .login-pull-label {
+    color: #f4d28b;
+}
+
+.login-access-panel {
+    position: relative;
+    min-width: 0;
+    perspective: 1200px;
+}
+
+.login-form-card,
+.login-light-hint-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.17);
+    border-radius: 1.6rem;
+    background: rgba(255,255,255,0.96);
+    color: #0f172a;
+    box-shadow: 0 32px 90px -35px rgba(0,0,0,0.62), 0 0 0 1px rgba(255,255,255,0.1);
+}
+
+.login-form-card {
+    padding: clamp(1.6rem, 3vw, 2.45rem);
+}
+
+.login-form-card::before,
+.login-light-hint-card::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 0.25rem;
+    content: "";
+    background: linear-gradient(90deg, #6366f1, #8b5cf6 55%, #f4ca70);
+}
+
+.login-form-heading h2,
+.login-light-hint-card h2 {
+    margin-top: 0.75rem;
+    color: #111827;
+    font-size: clamp(1.55rem, 2.4vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+}
+
+.login-form-heading > p:last-child {
+    margin-top: 0.55rem;
+    color: #64748b;
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.login-google-button {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7rem;
+    margin-top: 1.5rem;
+    padding: 0.82rem 1rem;
+    border: 1px solid #dbe2ee;
+    border-radius: 0.85rem;
+    color: #273449;
+    background: #fff;
+    font-weight: 700;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.login-google-button:hover {
+    border-color: #a5b4fc;
+    background: #f8faff;
+    transform: translateY(-1px);
+}
+
+.login-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    margin: 1.35rem 0;
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+
+.login-divider::before,
+.login-divider::after {
+    height: 1px;
+    flex: 1;
+    content: "";
+    background: #e2e8f0;
+}
+
+.login-form-fields {
+    display: grid;
+    gap: 1rem;
+}
+
+.login-field {
+    display: grid;
+    gap: 0.45rem;
+    text-align: left;
+}
+
+.login-field label {
+    color: #334155;
+    font-size: 0.78rem;
+    font-weight: 750;
+}
+
+.login-field label span {
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.login-field input {
+    width: 100%;
+    min-height: 3.15rem;
+    padding: 0.78rem 0.9rem;
+    border: 1px solid #d7deea;
+    border-radius: 0.78rem;
+    outline: none;
+    color: #0f172a;
+    background: #fff;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.login-field input::placeholder {
+    color: #a0aabc;
+}
+
+.login-field input:focus {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.13);
+}
+
+.login-auth-error {
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #fecaca;
+    border-radius: 0.75rem;
+    color: #b91c1c;
+    background: #fef2f2;
+    font-size: 0.82rem;
+    text-align: left;
+}
+
+.login-submit-button {
+    display: flex;
+    min-height: 3.25rem;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.15rem;
+    padding: 0.8rem 1rem;
+    border: 0;
+    border-radius: 0.82rem;
+    color: white;
+    background: linear-gradient(105deg, #4f46e5, #6d28d9 62%, #7c3aed);
+    box-shadow: 0 13px 27px -17px rgba(79, 70, 229, 0.95);
+    font-weight: 800;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.login-submit-button span {
+    display: grid;
+    width: 1.7rem;
+    height: 1.7rem;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.16);
+    transition: transform 0.2s ease;
+}
+
+.login-submit-button:hover {
+    box-shadow: 0 18px 34px -17px rgba(79, 70, 229, 0.95);
+    transform: translateY(-1px);
+}
+
+.login-submit-button:hover span {
+    transform: translateX(3px);
+}
+
+.login-register-prompt {
+    margin-top: 1.4rem;
+    color: #64748b;
+    font-size: 0.82rem;
+    text-align: center;
+}
+
+.login-register-prompt button {
+    margin-left: 0.3rem;
+    color: #4f46e5;
+    font-weight: 800;
+}
+
+.login-register-prompt button:hover {
+    text-decoration: underline;
+}
+
+.login-light-hint-card {
+    display: flex;
+    min-height: 22rem;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: clamp(1.8rem, 4vw, 3rem);
+    background: rgba(255,255,255,0.045);
+    border-color: rgba(255,255,255,0.12);
+    box-shadow: inset 0 1px rgba(255,255,255,0.04), 0 30px 70px -45px rgba(0,0,0,0.8);
+    color: #e2e8f0;
+    transition: background 0.6s ease, box-shadow 0.6s ease, border-color 0.6s ease;
+}
+
+.login-lamp-scene.is-lamp-on .login-light-hint-card {
+    border-color: rgba(244, 202, 112, 0.45);
+    background: rgba(255, 248, 227, 0.12);
+    box-shadow: 0 0 58px rgba(244, 202, 112, 0.12);
+}
+
+.login-hint-icon {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    place-items: center;
+    border: 1px solid rgba(244,202,112,0.35);
+    border-radius: 1rem;
+    color: #f4d28b;
+    background: rgba(244,202,112,0.08);
+    font-size: 1.2rem;
+}
+
+.login-hint-overline {
+    margin-top: 1.5rem;
+    color: #cbd5e1;
+    font-size: 0.66rem;
+    font-weight: 850;
+    letter-spacing: 0.2em;
+}
+
+.login-light-hint-card h2 {
+    color: #f8fafc;
+}
+
+.login-light-hint-card > p:not(.login-hint-overline) {
+    max-width: 19rem;
+    margin-top: 0.65rem;
+    color: #aab5c8;
+    font-size: 0.9rem;
+    line-height: 1.7;
+}
+
+.login-hint-line {
+    width: min(100%, 15rem);
+    height: 2px;
+    margin-top: 2rem;
+    overflow: hidden;
+    background: rgba(148,163,184,0.2);
+}
+
+.login-hint-line span {
+    display: block;
+    width: 38%;
+    height: 100%;
+    background: #f4ca70;
+    transform: translateX(-110%);
+    animation: login-hint-scan 2.8s ease-in-out infinite;
+}
+
+.login-scene-footer {
+    position: absolute;
+    right: 1.5rem;
+    bottom: 1.2rem;
+    color: #64748b;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+}
+
+.login-scene-footer span {
+    margin: 0 0.35rem;
+    color: #f4ca70;
+}
+
+.lamp-login-reveal-enter-active,
+.lamp-login-reveal-leave-active {
+    transition: opacity 0.32s ease, transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.4s ease;
+}
+
+.lamp-login-reveal-enter-from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(18px) rotateX(-3deg) scale(0.98);
+}
+
+.lamp-login-reveal-leave-to {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(-8px) scale(0.99);
+}
+
+@keyframes login-hint-scan {
+    0%, 100% { transform: translateX(-110%); }
+    55% { transform: translateX(260%); }
+}
+
+@keyframes login-ambient-drift {
+    from { transform: translate(0, -1rem) scale(0.95); }
+    to { transform: translate(5rem, 2rem) scale(1.08); }
+}
+
+@media (max-width: 900px) {
+    .login-lamp-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+        gap: 2rem;
+        width: min(100% - 2rem, 760px);
+    }
+
+    .login-brand-copy h1 {
+        font-size: clamp(2.4rem, 6vw, 3.4rem);
+    }
+
+    .login-lamp-art {
+        height: 14rem;
+        margin-top: 1rem;
+        transform: scale(0.88);
+        transform-origin: left top;
+    }
+}
+
+@media (max-width: 700px) {
+    .login-lamp-layout {
+        display: flex;
+        width: min(100% - 2rem, 32rem);
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: flex-start;
+        gap: 0.5rem;
+        padding: 2rem 0 4.5rem;
+    }
+
+    .login-brand-copy {
+        margin-top: 2.1rem;
+    }
+
+    .login-brand-copy h1 {
+        max-width: 34rem;
+        font-size: clamp(2.25rem, 11vw, 3.4rem);
+    }
+
+    .login-brand-description {
+        max-width: 26rem;
+        margin-top: 0.8rem;
+        font-size: 0.88rem;
+    }
+
+    .login-lamp-art {
+        width: 100%;
+        height: 8.5rem;
+        margin-top: 1rem;
+        transform: scale(0.64);
+        transform-origin: left top;
+    }
+
+    .login-lamp-scene:not(.is-lamp-on) .login-brand-panel {
+        margin-bottom: -5.3rem;
+    }
+
+    .login-access-panel {
+        margin-top: 0;
+    }
+
+    .login-light-hint-card {
+        min-height: 12rem;
+        padding: 1.35rem;
+    }
+
+    .login-light-hint-card .login-hint-overline {
+        margin-top: 0.8rem;
+    }
+
+    .login-light-hint-card h2 {
+        font-size: 1.4rem;
+    }
+
+    .login-hint-line {
+        margin-top: 1rem;
+    }
+
+    .login-scene-footer {
+        right: 1rem;
+        bottom: 0.8rem;
+    }
+
+    .login-lamp-beam {
+        left: -15%;
+        top: 27%;
+        width: 130%;
+        height: 65%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fashion-main-stage > div:not([class*="fixed"]),
+    .login-scene-glow,
+    .login-hint-line span {
+        animation: none !important;
+    }
+
+    .fashion-main-stage :deep(*),
+    .login-lamp-scene *,
+    .lamp-login-reveal-enter-active,
+    .lamp-login-reveal-leave-active {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
 </style>
