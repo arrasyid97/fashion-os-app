@@ -28259,8 +28259,8 @@ BAJU-PUTIH-M</pre>
 }
 
 .login-form-card {
-    opacity: 0.36;
-    filter: brightness(0.58) saturate(0.72);
+    opacity: 0.12;
+    filter: brightness(0.24) saturate(0.38);
     transition: opacity 0.7s ease, filter 0.7s ease, box-shadow 0.7s ease;
 }
 
