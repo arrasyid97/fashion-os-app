@@ -2,9 +2,9 @@
     <div class="min-h-screen bg-slate-50 p-4 sm:p-8" @click.capture="resetGuardedAction">
         <div class="mx-auto max-w-7xl space-y-6">
             <header>
-                <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Keuangan dan kemitraan</p>
+                <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Keuangan dan kepemodalan</p>
                 <h1 class="mt-1 text-3xl font-bold text-slate-900">Kerja Sama Modal &amp; Bagi Hasil</h1>
-                <p class="mt-2 max-w-3xl text-sm text-slate-600">Catat modal mitra secara terpisah dari penjualan, hitung laba dari pencairan yang tersimpan, lalu rekam pembayaran bagi hasil atau pengembalian modal.</p>
+                <p class="mt-2 max-w-3xl text-sm text-slate-600">Catat modal pemodal secara terpisah dari penjualan, hitung laba dari pencairan yang tersimpan, lalu rekam pembayaran bagi hasil atau pengembalian modal.</p>
             </header>
 
             <div v-if="loadError" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{{ loadError }}</div>
@@ -13,9 +13,9 @@
             <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-900">Mitra pemodal</h2><details class="group relative inline-block align-middle">
-                        <summary aria-label="Informasi mitra pemodal" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">?</summary>
-                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Data mitra memuat modal yang disetor dan porsi bagi hasil sesuai kesepakatan. Setoran modal dicatat sebagai arus kas modal, terpisah dari penghasilan penjualan.</div>
+                        <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-900">Pemodal</h2><details class="group relative inline-block align-middle">
+                        <summary aria-label="Informasi pemodal" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">?</summary>
+                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Data pemodal memuat modal yang disetor dan porsi bagi hasil sesuai kesepakatan. Setoran modal dicatat sebagai arus kas modal, terpisah dari penghasilan penjualan.</div>
                     </details></div>
                         <p class="mt-1 text-sm text-slate-500">Kelola setoran modal dan porsi bagi hasil sesuai kesepakatan bersama.</p>
                     </div>
@@ -23,7 +23,7 @@
                 </div>
                 <div v-if="partners.length" class="overflow-x-auto">
                     <table class="w-full min-w-[820px] text-left text-sm">
-                        <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Nama mitra</th><th class="p-3 text-right">Modal awal</th><th class="p-3 text-right">Tambahan modal</th><th class="p-3 text-right">Modal belum kembali</th><th class="p-3">Bagi hasil</th><th class="p-3 text-right">Sudah dibayar</th><th class="p-3 text-right">Aksi</th></tr></thead>
+                        <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Nama pemodal</th><th class="p-3 text-right">Modal awal</th><th class="p-3 text-right">Tambahan modal</th><th class="p-3 text-right">Modal belum kembali</th><th class="p-3">Bagi hasil</th><th class="p-3 text-right">Sudah dibayar</th><th class="p-3 text-right">Aksi</th></tr></thead>
                         <tbody class="divide-y divide-slate-100">
                             <tr v-for="partner in partners" :key="partner.id">
                                 <td class="p-3 font-semibold text-slate-800">{{ partner.name }}<span class="mt-1 block text-xs font-normal text-slate-500">Mulai {{ displayDate(partner.startDate) }}</span></td>
@@ -43,21 +43,21 @@
                         </tbody>
                     </table>
                 </div>
-                <p v-else class="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Belum ada mitra pemodal. Tambahkan data kesepakatan pertama di formulir bawah.</p>
+                <p v-else class="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Belum ada pemodal. Tambahkan data kesepakatan pertama di formulir bawah.</p>
 
                 <form @submit.prevent="createPartner" class="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
-                    <div class="flex items-center gap-2"><h3 class="font-semibold text-slate-900">Tambah mitra dan catat modal awal</h3><details class="group relative inline-block align-middle">
+                    <div class="flex items-center gap-2"><h3 class="font-semibold text-slate-900">Tambah pemodal dan catat modal awal</h3><details class="group relative inline-block align-middle">
                         <summary aria-label="Informasi modal awal" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">?</summary>
-                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Gunakan formulir ini untuk mencatat mitra, setoran awal, tanggal dana diterima, dan porsi bagi hasil yang disepakati. Modal awal masuk ke arus kas modal, bukan pendapatan penjualan.</div>
+                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Gunakan formulir ini untuk mencatat pemodal, setoran awal, tanggal dana diterima, dan porsi bagi hasil yang disepakati. Modal awal masuk ke arus kas modal, bukan pendapatan penjualan.</div>
                     </details></div>
                     <p class="mt-1 text-xs text-slate-600">Catat nama, setoran awal, tanggal penerimaan, dan porsi bagi hasil yang disepakati.</p>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <label class="block"><span class="mb-1 block text-xs font-medium">Nama mitra</span><input v-model.trim="partnerForm.name" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
+                        <label class="block"><span class="mb-1 block text-xs font-medium">Nama pemodal</span><input v-model.trim="partnerForm.name" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
                         <label class="block"><span class="mb-1 block text-xs font-medium">Modal awal (Rp)</span><input v-model.number="partnerForm.amount" type="number" min="1" step="1" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
                         <label class="block"><span class="mb-1 block text-xs font-medium">Porsi bagi hasil (%)</span><input v-model.number="partnerForm.profitShare" type="number" min="0" max="100" step="0.1" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
                         <label class="block"><span class="mb-1 block text-xs font-medium">Tanggal modal masuk</span><input v-model="partnerForm.date" type="date" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
                     </div>
-                    <button type="submit" :disabled="saving || !subscriptionActive" class="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">{{ saving ? 'Menyimpan…' : 'Simpan mitra dan modal awal' }}</button>
+                    <button type="submit" :disabled="saving || !subscriptionActive" class="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300">{{ saving ? 'Menyimpan…' : 'Simpan pemodal dan modal awal' }}</button>
                 </form>
             </section>
 
@@ -69,7 +69,7 @@
                     </details></div>
                     <p class="mt-1 text-sm text-slate-500">Setiap setoran modal disimpan sebagai catatan tersendiri dan menambah saldo modal yang masih berputar.</p>
                     <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                        <label class="block sm:col-span-2"><span class="mb-1 block text-xs font-medium">Mitra</span><select v-model="capitalForm.partnerId" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required><option value="">Pilih mitra</option><option v-for="partner in partners" :key="partner.id" :value="partner.id">{{ partner.name }}</option></select></label>
+                        <label class="block sm:col-span-2"><span class="mb-1 block text-xs font-medium">Pemodal</span><select v-model="capitalForm.partnerId" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required><option value="">Pilih pemodal</option><option v-for="partner in partners" :key="partner.id" :value="partner.id">{{ partner.name }}</option></select></label>
                         <label class="block"><span class="mb-1 block text-xs font-medium">Jumlah modal (Rp)</span><input v-model.number="capitalForm.amount" type="number" min="1" step="1" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
                         <label class="block"><span class="mb-1 block text-xs font-medium">Tanggal masuk</span><input v-model="capitalForm.date" type="date" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
                         <label class="block sm:col-span-2"><span class="mb-1 block text-xs font-medium">Keterangan</span><input v-model.trim="capitalForm.note" class="w-full rounded-lg border border-slate-300 p-2 text-sm" placeholder="Contoh: tambahan modal pembelian stok"></label>
@@ -84,14 +84,14 @@
 
             <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <div>
-                    <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-900">Hitung laba dan bagian mitra</h2><details class="group relative inline-block align-middle">
+                    <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-900">Hitung laba dan bagian pemodal</h2><details class="group relative inline-block align-middle">
                         <summary aria-label="Informasi perhitungan laba" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">?</summary>
-                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Laba periode dihitung dari total pencairan tersimpan dikurangi HPP pesanan yang berhasil cair dan biaya operasional pada periode tersebut. Bagian mitra dihitung dari laba positif sesuai persentase kesepakatan.</div>
+                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Laba periode dihitung dari total pencairan tersimpan dikurangi HPP pesanan yang berhasil cair dan biaya operasional pada periode tersebut. Bagian pemodal dihitung dari laba positif sesuai persentase kesepakatan; bagian pengelola adalah sisa dari 100%.</div>
                     </details></div>
                     <p class="mt-1 text-sm text-slate-500">Perhitungan memakai total pencairan yang sudah disimpan, HPP pesanan sukses cair, dan biaya operasional pada tanggal pencairan yang dipilih.</p>
                 </div>
                 <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <label class="block"><span class="mb-1 block text-xs font-medium">Mitra</span><select v-model="reportPartnerId" class="w-full rounded-lg border border-slate-300 p-2 text-sm"><option value="">Pilih mitra</option><option v-for="partner in partners" :key="partner.id" :value="partner.id">{{ partner.name }}</option></select></label>
+                    <label class="block"><span class="mb-1 block text-xs font-medium">Pemodal</span><select v-model="reportPartnerId" class="w-full rounded-lg border border-slate-300 p-2 text-sm"><option value="">Pilih pemodal</option><option v-for="partner in partners" :key="partner.id" :value="partner.id">{{ partner.name }}</option></select></label>
                     <label class="block"><span class="mb-1 block text-xs font-medium">Periode mulai</span><input v-model="periodStart" type="date" class="w-full rounded-lg border border-slate-300 p-2 text-sm"></label>
                     <label class="block"><span class="mb-1 block text-xs font-medium">Periode selesai</span><input v-model="periodEnd" type="date" class="w-full rounded-lg border border-slate-300 p-2 text-sm"></label>
                     <div class="flex items-end text-sm text-slate-500">Bagi hasil sesuai kesepakatan: {{ selectedPartner ? selectedPartner.profitShare : 0 }}%</div>
@@ -103,30 +103,46 @@
                         <div class="rounded-xl bg-amber-50 p-4"><p class="text-xs text-slate-600">Biaya operasional tercatat</p><p class="mt-1 text-lg font-bold text-amber-800">{{ currency(profitSummary.expenses) }}</p></div>
                         <div class="rounded-xl p-4" :class="profitSummary.profit >= 0 ? 'bg-blue-50' : 'bg-red-50'"><p class="text-xs text-slate-600">Laba / rugi periode</p><p class="mt-1 text-lg font-bold" :class="profitSummary.profit >= 0 ? 'text-blue-800' : 'text-red-700'">{{ currency(profitSummary.profit) }}</p></div>
                     </div>
-                    <p class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">Ringkasan di atas tetap menampilkan total pencairan, HPP, biaya, dan laba periode setelah pembayaran dicatat. Pembayaran mengurangi sisa bagian mitra, bukan laba periode. Setelah berhasil disimpan, kolom nominal dikosongkan agar pembayaran tidak tercatat dua kali.</p>
+                    <p class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">Ringkasan di atas tetap menampilkan total pencairan, HPP, biaya, dan laba periode setelah pembayaran dicatat. Pembayaran mengurangi sisa bagian yang belum dibayarkan, bukan laba periode. Setelah berhasil disimpan, kolom nominal dikosongkan agar pembayaran tidak tercatat dua kali.</p>
                     <div class="mt-4 flex flex-col gap-4 rounded-xl border border-slate-200 p-4 lg:flex-row lg:items-end lg:justify-between">
-                        <div><p class="text-sm font-semibold text-slate-800">Bagian mitra: {{ currency(profitSummary.shareDue) }}</p><p class="mt-1 text-xs text-slate-500">Sudah dibayarkan: {{ currency(profitSummary.paid) }} · Sisa bagian mitra yang belum dibayar: {{ currency(profitSummary.remaining) }}</p><p v-if="!profitSummary.payout" class="mt-1 text-xs text-amber-700">Belum ada ringkasan pencairan pada rentang periode ini. Simpan total pencairan terlebih dahulu.</p></div>
+                        <div><p class="text-sm font-semibold text-slate-800">Bagian pemodal terpilih: {{ currency(profitSummary.shareDue) }}</p><p class="mt-1 text-xs text-slate-500">Sudah dibayarkan: {{ currency(profitSummary.paid) }} · Sisa bagian pemodal ini: {{ currency(profitSummary.remaining) }}</p><p v-if="!profitSummary.payout" class="mt-1 text-xs text-amber-700">Belum ada ringkasan pencairan pada rentang periode ini. Simpan total pencairan terlebih dahulu.</p></div>
                         <div class="grid gap-3 sm:grid-cols-3">
                             <label class="block"><span class="mb-1 block text-xs font-medium">Nominal dibayarkan (Rp)</span><input v-model.number="profitPaymentForm.amount" type="number" min="1" :max="profitSummary.remaining" step="1" class="w-full rounded-lg border border-slate-300 p-2 text-sm" :placeholder="String(Math.floor(profitSummary.remaining))"></label>
                             <label class="block"><span class="mb-1 block text-xs font-medium">Tanggal pembayaran</span><input v-model="profitPaymentForm.date" type="date" class="w-full rounded-lg border border-slate-300 p-2 text-sm"></label>
                             <label class="block"><span class="mb-1 block text-xs font-medium">Metode</span><select v-model="profitPaymentForm.method" class="w-full rounded-lg border border-slate-300 p-2 text-sm"><option value="transfer">Transfer</option><option value="tunai">Tunai</option></select></label>
-                            <button type="button" @click="recordProfitPayment" :disabled="saving || !subscriptionActive || profitSummary.remaining <= 0 || !reportPartnerId" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300 sm:col-span-3">Catat pembayaran bagi hasil</button>
+                            <button type="button" @click="recordProfitPayment" :disabled="saving || !subscriptionActive || profitSummary.remaining <= 0 || !reportPartnerId" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300 sm:col-span-3">Catat pembayaran bagi hasil kepada pemodal</button>
                         </div>
                     </div>
+                    <div class="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div><h3 class="font-semibold text-slate-900">Bagian pengelola (Anda)</h3><p class="mt-1 text-xs text-slate-600">Porsi pengelola adalah sisa dari 100% setelah seluruh porsi pemodal. Bagian ini dicatat saat laba benar-benar diambil dari kas usaha.</p></div>
+                            <span class="rounded-full bg-white px-3 py-1 text-sm font-semibold text-indigo-700">{{ profitSummary.ownerSharePercent }}% bagian pengelola</span>
+                        </div>
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                            <div class="rounded-lg bg-white p-3 text-sm"><p class="text-slate-600">Bagian pengelola dari laba periode</p><p class="mt-1 font-bold text-slate-900">{{ currency(profitSummary.ownerShareDue) }}</p><p class="mt-1 text-xs text-slate-500">Sudah dicatat: {{ currency(profitSummary.ownerPaid) }} · Sisa belum dibayar: {{ currency(profitSummary.ownerRemaining) }}</p></div>
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <label class="block"><span class="mb-1 block text-xs font-medium">Nominal diambil (Rp)</span><input v-model.number="ownerProfitPaymentForm.amount" type="number" min="1" :max="profitSummary.ownerRemaining" step="1" class="w-full rounded-lg border border-slate-300 p-2 text-sm" :placeholder="String(Math.floor(profitSummary.ownerRemaining))"></label>
+                                <label class="block"><span class="mb-1 block text-xs font-medium">Tanggal</span><input v-model="ownerProfitPaymentForm.date" type="date" class="w-full rounded-lg border border-slate-300 p-2 text-sm"></label>
+                                <label class="block"><span class="mb-1 block text-xs font-medium">Metode</span><select v-model="ownerProfitPaymentForm.method" class="w-full rounded-lg border border-slate-300 p-2 text-sm"><option value="transfer">Transfer</option><option value="tunai">Tunai</option></select></label>
+                                <button type="button" @click="recordOwnerProfitPayment" :disabled="saving || !subscriptionActive || profitSummary.ownerRemaining <= 0" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300 sm:col-span-3">Catat pembayaran bagian pengelola</button>
+                            </div>
+                        </div>
+                        <p v-if="profitSummary.partnerSharePercentTotal > 100" class="mt-2 text-xs font-medium text-red-700">Total porsi pemodal melebihi 100%. Periksa kesepakatan pemodal; bagian pengelola sementara dihitung 0%.</p>
+                    </div>
                 </div>
-                <p v-else class="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Pilih mitra dan rentang tanggal yang valid untuk melihat perhitungan.</p>
-                <p class="mt-3 text-xs text-slate-500">Bagian mitra hanya dihitung dari laba positif setelah seluruh pencairan dan biaya periode dicatat. Pastikan periode ini memang sudah selesai direkonsiliasi sebelum membayar.</p>
+                <p v-else class="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Pilih pemodal dan rentang tanggal yang valid untuk melihat perhitungan.</p>
+                <p class="mt-3 text-xs text-slate-500">Bagian pemodal hanya dihitung dari laba positif setelah seluruh pencairan dan biaya periode dicatat. Pastikan periode ini memang sudah selesai direkonsiliasi sebelum membayar.</p>
             </section>
 
             <section class="grid gap-6 xl:grid-cols-2">
                 <form @submit.prevent="recordPrincipalReturn" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div class="flex items-center gap-2"><h2 class="text-lg font-bold text-slate-900">Catat pengembalian modal</h2><details class="group relative inline-block align-middle">
                         <summary aria-label="Informasi pengembalian modal" class="flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-500 hover:border-indigo-400 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">?</summary>
-                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Catat pembayaran kembali pokok modal kepada mitra. Nilai ini mengurangi saldo modal yang belum dikembalikan, tetapi tidak dihitung sebagai biaya atau pengurang laba.</div>
+                        <div class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-slate-200 bg-white p-3 text-xs font-normal leading-5 text-slate-600 shadow-xl">Catat pembayaran kembali pokok modal kepada pemodal. Nilai ini mengurangi saldo modal yang belum dikembalikan, tetapi tidak dihitung sebagai biaya atau pengurang laba.</div>
                     </details></div>
                     <p class="mt-1 text-sm text-slate-500">Pengembalian pokok modal terpisah dari pembagian laba dan tidak mengurangi laba usaha.</p>
                     <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                        <label class="block sm:col-span-2"><span class="mb-1 block text-xs font-medium">Mitra</span><select v-model="returnForm.partnerId" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required><option value="">Pilih mitra</option><option v-for="partner in partners" :key="partner.id" :value="partner.id">{{ partner.name }} · modal tersisa {{ currency(outstandingCapital(partner)) }}</option></select></label>
+                        <label class="block sm:col-span-2"><span class="mb-1 block text-xs font-medium">Pemodal</span><select v-model="returnForm.partnerId" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required><option value="">Pilih pemodal</option><option v-for="partner in partners" :key="partner.id" :value="partner.id">{{ partner.name }} · modal tersisa {{ currency(outstandingCapital(partner)) }}</option></select></label>
                         <label class="block"><span class="mb-1 block text-xs font-medium">Nominal dikembalikan (Rp)</span><input v-model.number="returnForm.amount" type="number" min="1" :max="returnPartner ? outstandingCapital(returnPartner) : 0" step="1" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
                         <label class="block"><span class="mb-1 block text-xs font-medium">Tanggal</span><input v-model="returnForm.date" type="date" class="w-full rounded-lg border border-slate-300 p-2 text-sm" required></label>
                         <label class="block"><span class="mb-1 block text-xs font-medium">Metode</span><select v-model="returnForm.method" class="w-full rounded-lg border border-slate-300 p-2 text-sm"><option value="transfer">Transfer</option><option value="tunai">Tunai</option></select></label>
@@ -143,7 +159,7 @@
                     <p class="mt-1 text-sm text-slate-500">Catatan setoran, pengembalian modal, dan pembayaran bagi hasil.</p>
                     <div v-if="historyRecords.length" class="mt-4 max-h-[28rem] divide-y divide-slate-100 overflow-y-auto">
                         <article v-for="entry in historyRecords" :key="entry.id" class="flex items-start justify-between gap-3 py-3">
-                            <div><p class="font-semibold text-slate-800">{{ recordTitle(entry) }}</p><p class="mt-1 text-xs text-slate-500">{{ entry.investorName || partnerName(entry.investorId) }} · {{ displayDate(entry.paymentDate) }}<span v-if="entry.period"> · {{ entry.period }}</span></p><p v-if="entry.note" class="mt-1 text-xs text-slate-500">{{ entry.note }}</p></div>
+                            <div><p class="font-semibold text-slate-800">{{ recordTitle(entry) }}</p><p class="mt-1 text-xs text-slate-500">{{ entry.beneficiaryName || entry.investorName || partnerName(entry.investorId) }} · {{ displayDate(entry.paymentDate) }}<span v-if="entry.period"> · {{ entry.period }}</span></p><p v-if="entry.note" class="mt-1 text-xs text-slate-500">{{ entry.note }}</p></div>
                             <strong class="whitespace-nowrap text-sm" :class="entry.recordType === 'capital_contribution' ? 'text-emerald-700' : 'text-slate-800'">{{ currency(entry.amountPaid || entry.amount || entry.investorShare || 0) }}</strong>
                         </article>
                     </div>
@@ -153,10 +169,10 @@
         </div>
         <div v-if="editingPartner" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" @click.self="editingPartner = null">
             <form role="dialog" aria-modal="true" aria-labelledby="edit-partner-title" @submit.prevent="savePartnerEdits" @click.stop class="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
-                <h2 id="edit-partner-title" class="text-xl font-bold text-slate-900">Edit data mitra</h2>
+                <h2 id="edit-partner-title" class="text-xl font-bold text-slate-900">Edit data pemodal</h2>
                 <p class="mt-1 text-sm text-slate-600">Perubahan modal awal juga memperbarui catatan setoran awal yang terkait.</p>
                 <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                    <label class="block sm:col-span-2"><span class="mb-1 block text-sm font-medium text-slate-700">Nama mitra</span><input v-model.trim="partnerEditForm.name" class="w-full rounded-lg border border-slate-300 p-2.5 text-sm" required></label>
+                    <label class="block sm:col-span-2"><span class="mb-1 block text-sm font-medium text-slate-700">Nama pemodal</span><input v-model.trim="partnerEditForm.name" class="w-full rounded-lg border border-slate-300 p-2.5 text-sm" required></label>
                     <label class="block"><span class="mb-1 block text-sm font-medium text-slate-700">Modal awal (Rp)</span><input v-model.number="partnerEditForm.amount" type="number" min="1" step="1" class="w-full rounded-lg border border-slate-300 p-2.5 text-sm" required></label>
                     <label class="block"><span class="mb-1 block text-sm font-medium text-slate-700">Porsi bagi hasil (%)</span><input v-model.number="partnerEditForm.profitShare" type="number" min="0" max="100" step="0.1" class="w-full rounded-lg border border-slate-300 p-2.5 text-sm" required></label>
                     <label class="block sm:col-span-2"><span class="mb-1 block text-sm font-medium text-slate-700">Tanggal modal masuk</span><input v-model="partnerEditForm.date" type="date" class="w-full rounded-lg border border-slate-300 p-2.5 text-sm" required></label>
@@ -197,6 +213,7 @@ const reportPartnerId = ref('');
 const periodStart = ref(thisMonthStart);
 const periodEnd = ref(today);
 const profitPaymentForm = ref({ amount: '', date: today, method: 'transfer' });
+const ownerProfitPaymentForm = ref({ amount: '', date: today, method: 'transfer' });
 const returnForm = ref({ partnerId: '', amount: '', date: today, method: 'transfer', note: '' });
 const guardedAction = ref(null);
 const editingPartner = ref(null);
@@ -204,7 +221,7 @@ const partnerEditForm = ref({ name: '', amount: '', profitShare: '', date: today
 
 const selectedPartner = computed(() => partners.value.find(item => item.id === reportPartnerId.value) || null);
 const returnPartner = computed(() => partners.value.find(item => item.id === returnForm.value.partnerId) || null);
-const historyRecords = computed(() => records.value.filter(item => ['capital_contribution', 'profit_share', 'principal_return'].includes(item.recordType) || (!item.recordType && item.investorId)).sort((a, b) => dateKey(toDate(b.paymentDate || b.requestDate)).localeCompare(dateKey(toDate(a.paymentDate || a.requestDate)))));
+const historyRecords = computed(() => records.value.filter(item => ['capital_contribution', 'profit_share', 'owner_profit_share', 'principal_return'].includes(item.recordType) || (!item.recordType && item.investorId)).sort((a, b) => dateKey(toDate(b.paymentDate || b.requestDate)).localeCompare(dateKey(toDate(a.paymentDate || a.requestDate)))));
 const profitSummary = computed(() => {
     const selectedId = reportPartnerId.value;
     const start = periodStart.value;
@@ -219,7 +236,12 @@ const profitSummary = computed(() => {
     const shareDue = Math.max(0, profit) * (amount(partner?.profitShare) / 100);
     const label = periodLabel(start, end);
     const paid = records.value.filter(item => item.investorId === selectedId && isProfitShareRecordForPeriod(item, start, end, label)).reduce((sum, item) => sum + amount(item.amountPaid ?? item.investorShare), 0);
-    return { payout, hpp, expenses, profit, shareDue, paid, remaining: Math.max(0, shareDue - paid), label };
+    const partnerSharePercentTotal = partners.value.reduce((sum, item) => sum + amount(item.profitShare), 0);
+    const ownerSharePercent = Math.max(0, 100 - partnerSharePercentTotal);
+    const ownerShareDue = Math.max(0, profit) * ownerSharePercent / 100;
+    const ownerPaid = records.value.filter(item => item.recordType === 'owner_profit_share' && isProfitShareRecordForPeriod(item, start, end, label)).reduce((sum, item) => sum + amount(item.amountPaid), 0);
+    const ownerRemaining = Math.max(0, ownerShareDue - ownerPaid);
+    return { payout, hpp, expenses, profit, shareDue, paid, remaining: Math.max(0, shareDue - paid), partnerSharePercentTotal, ownerSharePercent, ownerShareDue, ownerPaid, ownerRemaining, label };
 });
 
 watch(() => props.userId, loadData, { immediate: true });
@@ -282,7 +304,7 @@ function isExcludedTransfer(item) {
         category.includes('pengembalian modal');
 }
 function isProfitShareRecordForPeriod(item, start, end, label) {
-    if (item.recordType === 'profit_share') {
+    if (item.recordType === 'profit_share' || item.recordType === 'owner_profit_share') {
         return item.periodStart === start && item.periodEnd === end;
     }
     return !item.recordType && item.period === label;
@@ -302,7 +324,7 @@ function displayDate(value) {
     return d ? d.toLocaleDateString('id-ID') : '—';
 }
 function partnerName(id) {
-    return partners.value.find(item => item.id === id)?.name || 'Mitra';
+    return partners.value.find(item => item.id === id)?.name || 'Pemodal';
 }
 function totalAddedCapital(id) {
     return records.value.filter(item => item.recordType === 'capital_contribution' && item.investorId === id && item.paymentMethod !== 'modal_awal' && item.note !== 'Modal awal kerja sama').reduce((sum, item) => sum + amount(item.amount), 0);
@@ -373,10 +395,10 @@ async function createPartner() {
         appendRecord({ id: capitalRef.id, ...record });
         appendFinance({ id: financeRef.id, ...finance });
         partnerForm.value = { name: '', amount: '', profitShare: '', date: today };
-        successMessage.value = 'Mitra dan modal awal berhasil dicatat.';
+        successMessage.value = 'Pemodal dan modal awal berhasil dicatat.';
     } catch (error) {
-        console.error('Gagal mencatat mitra:', error);
-        loadError.value = error?.message || 'Mitra gagal disimpan.';
+        console.error('Gagal mencatat pemodal:', error);
+        loadError.value = error?.message || 'Pemodal gagal disimpan.';
     } finally { saving.value = false; }
 }
 function isGuarded(partner, action) {
@@ -455,9 +477,9 @@ async function savePartnerEdits() {
                 : item);
         }
         editingPartner.value = null;
-        successMessage.value = 'Data mitra berhasil diperbarui.';
+        successMessage.value = 'Data pemodal berhasil diperbarui.';
     } catch (error) {
-        loadError.value = error?.message || 'Data mitra gagal diperbarui.';
+        loadError.value = error?.message || 'Data pemodal gagal diperbarui.';
     } finally {
         saving.value = false;
     }
@@ -474,9 +496,9 @@ async function removePartner(partner) {
             returnForm.value.partnerId = partners.value[0]?.id || '';
             returnForm.value.amount = '';
         }
-        successMessage.value = 'Profil mitra dihapus. Catatan keuangan terkait tetap disimpan untuk menjaga riwayat transaksi.';
+        successMessage.value = 'Profil pemodal dihapus. Catatan keuangan terkait tetap disimpan untuk menjaga riwayat transaksi.';
     } catch (error) {
-        loadError.value = error?.message || 'Profil mitra gagal dihapus.';
+        loadError.value = error?.message || 'Profil pemodal gagal dihapus.';
     } finally {
         saving.value = false;
     }
@@ -517,6 +539,23 @@ async function recordProfitPayment() {
     } catch (error) { loadError.value = error?.message || 'Pembayaran bagi hasil gagal dicatat.'; }
     finally { saving.value = false; }
 }
+async function recordOwnerProfitPayment() {
+    const value = amount(ownerProfitPaymentForm.value.amount || profitSummary.value.ownerRemaining);
+    if (value <= 0 || value > profitSummary.value.ownerRemaining || !props.userId) return;
+    saving.value = true; loadError.value = ''; successMessage.value = '';
+    try {
+        const paymentRef = doc(collection(db, 'investor_payments'));
+        const financeRef = doc(collection(db, 'keuangan'));
+        const date = localDate(ownerProfitPaymentForm.value.date);
+        const payment = { userId: props.userId, recordType: 'owner_profit_share', beneficiaryType: 'owner_operator', beneficiaryName: 'Pemilik/Pengelola', period: profitSummary.value.label, periodStart: periodStart.value, periodEnd: periodEnd.value, payoutTotal: profitSummary.value.payout, hppTotal: profitSummary.value.hpp, operatingExpenses: profitSummary.value.expenses, profitBasis: profitSummary.value.profit, profitSharePercentage: profitSummary.value.ownerSharePercent, shareDue: profitSummary.value.ownerShareDue, amountPaid: value, totalPayment: value, paymentDate: date, paymentMethod: ownerProfitPaymentForm.value.method, note: 'Pembayaran bagian pengelola untuk periode ' + profitSummary.value.label };
+        const finance = { userId: props.userId, jenis: 'pengeluaran', kategori: 'Pembayaran Bagian Pengelola', jumlah: value, amount: value, tanggal: date, catatan: 'Bagian pengelola · ' + profitSummary.value.label, sumber: 'kerja_sama_modal_bagi_hasil', isCapitalPartnershipTransfer: true, excludeFromProfitCalculation: true, isProfitDistribution: true, isOwnerProfitDistribution: true, periodeLabaTahun: Number(periodEnd.value.slice(0, 4)), periodeLabaBulan: Number(periodEnd.value.slice(5, 7)), periodeMulai: periodStart.value, periodeSelesai: periodEnd.value };
+        const batch = writeBatch(db); batch.set(paymentRef, payment); batch.set(financeRef, finance); await batch.commit();
+        appendRecord({ id: paymentRef.id, ...payment }); appendFinance({ id: financeRef.id, ...finance });
+        ownerProfitPaymentForm.value = { amount: '', date: today, method: 'transfer' };
+        successMessage.value = 'Pembayaran bagian pengelola berhasil dicatat dan ditautkan ke dasar perhitungannya.';
+    } catch (error) { loadError.value = error?.message || 'Pembayaran bagian pengelola gagal dicatat.'; }
+    finally { saving.value = false; }
+}
 async function recordPrincipalReturn() {
     const partner = returnPartner.value;
     const value = amount(returnForm.value.amount);
@@ -539,6 +578,7 @@ async function recordPrincipalReturn() {
 function recordTitle(entry) {
     if (entry.recordType === 'capital_contribution') return entry.note === 'Modal awal kerja sama' ? 'Modal awal masuk' : 'Tambahan modal masuk';
     if (entry.recordType === 'profit_share') return 'Pembayaran bagi hasil';
+    if (entry.recordType === 'owner_profit_share') return 'Pembayaran bagian pengelola';
     if (entry.recordType === 'principal_return') return 'Pengembalian modal';
     if (entry.investorShare || entry.totalPayment) return 'Pembayaran bagi hasil';
     return 'Catatan';
