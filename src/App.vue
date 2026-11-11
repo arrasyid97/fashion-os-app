@@ -125,16 +125,38 @@ const isSubscribingYearly = ref(false);  // <-- TAMBAHKAN INI
 const currentUser = ref(null);
 const loginLampOn = ref(false);
 const loginLampPulling = ref(false);
-let loginLampPullTimer = null;
+const loginLampPullDistance = ref(0);
+const loginLampPullStartY = ref(null);
 
-function pullLoginLamp() {
-    if (loginLampPulling.value) return;
+function startLoginLampPull(event) {
+    if (event.button !== undefined && event.button !== 0) return;
+    loginLampPullStartY.value = event.clientY;
+    loginLampPullDistance.value = 0;
     loginLampPulling.value = true;
-    window.clearTimeout(loginLampPullTimer);
-    loginLampPullTimer = window.setTimeout(() => {
-        loginLampOn.value = !loginLampOn.value;
-        loginLampPulling.value = false;
-    }, 380);
+    if (event.currentTarget?.setPointerCapture) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+    }
+}
+
+function moveLoginLampPull(event) {
+    if (!loginLampPulling.value || loginLampPullStartY.value === null) return;
+    loginLampPullDistance.value = Math.max(
+        0,
+        Math.min(64, event.clientY - loginLampPullStartY.value)
+    );
+}
+
+function finishLoginLampPull() {
+    if (!loginLampPulling.value) return;
+    const didPull = loginLampPullDistance.value >= 26;
+    loginLampPulling.value = false;
+    loginLampPullDistance.value = 0;
+    loginLampPullStartY.value = null;
+    if (didPull) loginLampOn.value = !loginLampOn.value;
+}
+
+function toggleLoginLampByKeyboard() {
+    loginLampOn.value = !loginLampOn.value;
 }
 
 // ============================================================
@@ -19037,7 +19059,7 @@ void [
                 </p>
             </div>
 
-            <div class="login-lamp-art" aria-label="Lampu dengan tali tarik">
+            <div class="login-lamp-art" aria-label="Lampu dengan tali tarik" :style="{ '--login-pull-distance': loginLampPullDistance + 'px' }">
                 <div class="login-ceiling-line"></div>
                 <div class="login-lamp-wire"></div>
                 <div class="login-lamp-shade"><span></span></div>
@@ -19046,68 +19068,64 @@ void [
                 <button
                     type="button"
                     class="login-pull-knob"
-                    @click="pullLoginLamp"
-                    :aria-label="loginLampOn ? 'Tarik tali untuk mematikan lampu' : 'Tarik tali untuk menyalakan lampu'"
+                    @pointerdown.prevent="startLoginLampPull"
+                    @pointermove="moveLoginLampPull"
+                    @pointerup="finishLoginLampPull"
+                    @pointercancel="finishLoginLampPull"
+                    @keydown.enter.prevent="toggleLoginLampByKeyboard"
+                    @keydown.space.prevent="toggleLoginLampByKeyboard"
+                    :aria-label="loginLampOn ? 'Tarik tali ke bawah untuk mematikan lampu' : 'Tarik tali ke bawah untuk menyalakan lampu'"
                     :aria-pressed="loginLampOn"
+                    aria-keyshortcuts="Enter Space"
                 ><span></span></button>
-                <p class="login-pull-label">{{ loginLampOn ? 'Tarik untuk mematikan' : 'Tarik tali untuk menyalakan' }}</p>
+                <p class="login-pull-label">{{ loginLampOn ? 'Tarik tali ke bawah untuk mematikan lampu' : 'Tarik tali ke bawah untuk menyalakan lampu' }}</p>
             </div>
         </section>
 
         <section class="login-access-panel" aria-live="polite">
-            <Transition name="lamp-login-reveal" mode="out-in">
-                <div v-if="loginLampOn" key="form" class="login-form-card">
-                    <div class="login-form-heading">
-                        <p class="login-eyebrow"><span></span> AKSES AMAN</p>
-                        <h2>{{ activePage === 'login' ? 'Selamat datang kembali' : 'Buat akun Fashion OS' }}</h2>
-                        <p>Masuk untuk melanjutkan ke ruang kerja bisnis Anda.</p>
+            <div class="login-form-card" :class="{ 'login-form-lit': loginLampOn }">
+                <div class="login-form-heading">
+                    <p class="login-eyebrow"><span></span> AKSES AMAN</p>
+                    <h2>{{ activePage === 'login' ? 'Selamat datang kembali' : 'Buat akun Fashion OS' }}</h2>
+                    <p>Masuk untuk melanjutkan ke ruang kerja bisnis Anda.</p>
+                </div>
+
+                <button type="button" @click="signInWithGoogle" class="login-google-button">
+                    <img src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="" class="h-5 w-5">
+                    <span>Masuk dengan Google</span>
+                </button>
+
+                <div class="login-divider"><span>atau gunakan email</span></div>
+
+                <form @submit.prevent="activePage === 'login' ? handleLogin() : handleRegister()" class="login-form-fields">
+                    <div class="login-field">
+                        <label for="email">Alamat email</label>
+                        <input type="email" id="email" v-model="authForm.email" placeholder="nama@email.com" autocomplete="email" required>
+                    </div>
+                    <div class="login-field">
+                        <label for="password">Kata sandi</label>
+                        <input type="password" id="password" v-model="authForm.password" placeholder="Masukkan kata sandi" :autocomplete="activePage === 'login' ? 'current-password' : 'new-password'" required>
+                    </div>
+                    <div v-if="activePage === 'register'" class="login-field">
+                        <label for="activation-code">Kode aktivasi <span>(opsional)</span></label>
+                        <input type="text" v-model="authForm.activationCode" id="activation-code" placeholder="Masukkan kode aktivasi">
                     </div>
 
-                    <button type="button" @click="signInWithGoogle" class="login-google-button">
-                        <img src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="" class="h-5 w-5">
-                        <span>Masuk dengan Google</span>
+                    <p v-if="authForm.error" class="login-auth-error">{{ authForm.error }}</p>
+
+                    <button type="submit" class="login-submit-button">
+                        {{ activePage === 'login' ? 'Masuk ke Fashion OS' : 'Daftar akun' }}
+                        <span aria-hidden="true">→</span>
                     </button>
+                </form>
 
-                    <div class="login-divider"><span>atau gunakan email</span></div>
-
-                    <form @submit.prevent="activePage === 'login' ? handleLogin() : handleRegister()" class="login-form-fields">
-                        <div class="login-field">
-                            <label for="email">Alamat email</label>
-                            <input type="email" id="email" v-model="authForm.email" placeholder="nama@email.com" autocomplete="email" required>
-                        </div>
-                        <div class="login-field">
-                            <label for="password">Kata sandi</label>
-                            <input type="password" id="password" v-model="authForm.password" placeholder="Masukkan kata sandi" :autocomplete="activePage === 'login' ? 'current-password' : 'new-password'" required>
-                        </div>
-                        <div v-if="activePage === 'register'" class="login-field">
-                            <label for="activation-code">Kode aktivasi <span>(opsional)</span></label>
-                            <input type="text" v-model="authForm.activationCode" id="activation-code" placeholder="Masukkan kode aktivasi">
-                        </div>
-
-                        <p v-if="authForm.error" class="login-auth-error">{{ authForm.error }}</p>
-
-                        <button type="submit" class="login-submit-button">
-                            {{ activePage === 'login' ? 'Masuk ke Fashion OS' : 'Daftar akun' }}
-                            <span aria-hidden="true">→</span>
-                        </button>
-                    </form>
-
-                    <p class="login-register-prompt">
-                        {{ activePage === 'login' ? 'Belum punya akun?' : 'Sudah punya akun?' }}
-                        <button type="button" @click.prevent="changePage(activePage === 'login' ? 'register' : 'login')">
-                            {{ activePage === 'login' ? 'Daftar sekarang' : 'Masuk' }}
-                        </button>
-                    </p>
-                </div>
-
-                <div v-else key="hint" class="login-light-hint-card">
-                    <div class="login-hint-icon">✦</div>
-                    <p class="login-hint-overline">LOGIN FASHION OS</p>
-                    <h2>Siap memulai?</h2>
-                    <p>Tarik tali lampu di samping untuk menerangi formulir masuk Anda.</p>
-                    <div class="login-hint-line"><span></span></div>
-                </div>
-            </Transition>
+                <p class="login-register-prompt">
+                    {{ activePage === 'login' ? 'Belum punya akun?' : 'Sudah punya akun?' }}
+                    <button type="button" @click.prevent="changePage(activePage === 'login' ? 'register' : 'login')">
+                        {{ activePage === 'login' ? 'Daftar sekarang' : 'Masuk' }}
+                    </button>
+                </p>
+            </div>
         </section>
     </div>
 
@@ -28146,10 +28164,6 @@ BAJU-PUTIH-M</pre>
         transform-origin: left top;
     }
 
-    .login-lamp-scene:not(.is-lamp-on) .login-brand-panel {
-        margin-bottom: -5.3rem;
-    }
-
     .login-access-panel {
         margin-top: 0;
     }
@@ -28200,4 +28214,86 @@ BAJU-PUTIH-M</pre>
     }
 }
 
+/* Fixes for sidebar jitter/overflow and persistent dimmed login */
+.fashion-app-shell {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
+    overflow-x: clip;
+}
+
+.fashion-app-shell > aside {
+    flex: 0 0 16rem;
+    width: 16rem;
+    min-width: 16rem;
+    max-width: 16rem;
+    overflow-x: hidden !important;
+}
+
+.fashion-app-shell aside > div,
+.fashion-app-shell aside nav {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden !important;
+}
+
+.fashion-app-shell aside .sidebar-link,
+.fashion-app-shell aside a,
+.fashion-app-shell aside button {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.fashion-main-stage {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.fashion-app-shell aside .sidebar-link:hover {
+    transform: none !important;
+}
+
+.fashion-app-shell aside .sidebar-link {
+    transition-property: background-color, color, box-shadow;
+}
+
+.login-form-card {
+    opacity: 0.36;
+    filter: brightness(0.58) saturate(0.72);
+    transition: opacity 0.7s ease, filter 0.7s ease, box-shadow 0.7s ease;
+}
+
+.login-lamp-scene.is-lamp-on .login-form-card {
+    opacity: 1;
+    filter: none;
+}
+
+.login-pull-knob {
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+}
+
+.login-lamp-scene.is-lamp-pulling .login-pull-knob {
+    cursor: grabbing;
+    transform: translateY(var(--login-pull-distance, 0px));
+    transition: none;
+}
+
+.login-lamp-scene.is-lamp-pulling .login-pull-cord {
+    height: calc(4.4rem + var(--login-pull-distance, 0px));
+    transform: none;
+    transition: none;
+}
+
+.login-lamp-scene.is-lamp-pulling .login-lamp-wire {
+    transform: scaleY(1.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-form-card {
+        transition: none !important;
+    }
+}
 </style>
