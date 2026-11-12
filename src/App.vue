@@ -361,13 +361,6 @@ massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     keuanganPemasukanTahun: new Date().getFullYear(),
     keuanganPemasukanExportType: 'all',
     keuanganPengeluaranExportType: 'all',
-    keuanganMetrikFilter: 'today',
-    keuanganMetrikStartDate: '',
-    keuanganMetrikEndDate: '',
-    keuanganMetrikStartMonth: new Date().getMonth() + 1,
-    keuanganMetrikStartYear: new Date().getFullYear(),
-    keuanganMetrikEndMonth: new Date().getMonth() + 1,
-    keuanganMetrikEndYear: new Date().getFullYear(),
     keuanganPengeluaranBulan: new Date().getMonth() + 1,
     keuanganPengeluaranEndDate: '',
     keuanganPengeluaranFilter: 'today',
@@ -1754,31 +1747,9 @@ const pengeluaranExportCategories = computed(() => [...new Set([
 ].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')));
 
 const keuanganMetrik = computed(() => {
-    const filter = uiState.keuanganMetrikFilter || 'today';
-    const startDate = uiState.keuanganMetrikStartDate;
-    const endDate = uiState.keuanganMetrikEndDate;
-    const startMonth = uiState.keuanganMetrikStartMonth;
-    const startYear = uiState.keuanganMetrikStartYear;
-    const endMonth = uiState.keuanganMetrikEndMonth;
-    const endYear = uiState.keuanganMetrikEndYear;
-    const incompleteDateRange = filter === 'by_date_range' && (!startDate || !endDate || startDate > endDate);
-    const startMonthIndex = Number(startYear) * 12 + Number(startMonth);
-    const endMonthIndex = Number(endYear) * 12 + Number(endMonth);
-    const incompleteMonthRange = filter === 'by_month_range' &&
-        (!startMonth || !startYear || !endMonth || !endYear || startMonthIndex > endMonthIndex);
-    const applyPeriod = rows => {
-        if (incompleteDateRange || incompleteMonthRange) return [];
-        return filterDataByDate(
-            rows, filter, startDate, endDate,
-            startMonth, startYear, endMonth, endYear
-        );
-    };
-    const filteredIncome = applyPeriod(
-        (state.keuangan || []).filter(item => item.jenis === 'pemasukan_lain')
-    );
-    const filteredExpenses = applyPeriod(
-        (state.keuangan || []).filter(item => item.jenis === 'pengeluaran' || item.jenis === 'biaya')
-    );
+    const allFinanceRows = state.keuangan || [];
+    const filteredIncome = allFinanceRows.filter(item => item.jenis === 'pemasukan_lain');
+    const filteredExpenses = allFinanceRows.filter(item => item.jenis === 'pengeluaran' || item.jenis === 'biaya');
     const sum = rows => rows.reduce((total, item) => total + (Number(item.jumlah ?? item.amount) || 0), 0);
     const isCapital = item => item.isCapitalPartnershipTransfer === true ||
         /modal/i.test(String(item.kategori || ''));
@@ -20430,32 +20401,10 @@ SKU-BAJU-PUTIH-S"
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-200">Ringkasan keuangan</p>
                             <h3 class="mt-1 text-2xl font-bold">Arus kas usaha</h3>
-                            <p class="mt-1 max-w-2xl text-sm text-indigo-100">Ringkasan uang yang benar-benar dicatat masuk dan keluar. Modal pemodal termasuk uang masuk kas, bukan omzet penjualan.</p>
+                            <p class="mt-1 max-w-2xl text-sm text-indigo-100">Akumulasi uang masuk dan keluar yang tercatat sejak awal. Modal pemodal menambah kas, bukan omzet penjualan.</p>
                         </div>
-                        <div class="w-full max-w-2xl">
-                            <label class="block text-xs font-semibold text-indigo-100">Periode metrik
-                                <select v-model="uiState.keuanganMetrikFilter" class="mt-1 w-full rounded-xl border border-white/20 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800">
-                                    <option value="today">Hari ini</option>
-                                    <option value="last_7_days">7 hari terakhir</option>
-                                    <option value="last_30_days">30 hari terakhir</option>
-                                    <option value="this_year">Tahun ini</option>
-                                    <option value="by_date_range">Rentang tanggal</option>
-                                    <option value="by_month_range">Rentang bulan</option>
-                                    <option value="all_time">Semua periode</option>
-                                </select>
-                            </label>
-                            <div v-if="uiState.keuanganMetrikFilter === 'by_date_range'" class="mt-2 grid grid-cols-2 gap-2">
-                                <label class="text-[11px] text-indigo-100">Mulai<input type="date" v-model="uiState.keuanganMetrikStartDate" class="mt-1 w-full rounded-lg border border-white/20 bg-white px-2 py-2 text-sm text-slate-800"></label>
-                                <label class="text-[11px] text-indigo-100">Selesai<input type="date" v-model="uiState.keuanganMetrikEndDate" class="mt-1 w-full rounded-lg border border-white/20 bg-white px-2 py-2 text-sm text-slate-800"></label>
-                            </div>
-                            <div v-if="uiState.keuanganMetrikFilter === 'by_month_range'" class="mt-2 grid grid-cols-2 gap-2">
-                                <label class="text-[11px] text-indigo-100">Mulai
-                                    <span class="mt-1 flex gap-1"><select v-model.number="uiState.keuanganMetrikStartMonth" class="min-w-0 flex-1 rounded-lg border border-white/20 bg-white px-2 py-2 text-sm text-slate-800"><option v-for="m in 12" :key="'metric-start-' + m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select><input type="number" v-model.number="uiState.keuanganMetrikStartYear" class="w-20 rounded-lg border border-white/20 bg-white px-2 py-2 text-sm text-slate-800"></span>
-                                </label>
-                                <label class="text-[11px] text-indigo-100">Selesai
-                                    <span class="mt-1 flex gap-1"><select v-model.number="uiState.keuanganMetrikEndMonth" class="min-w-0 flex-1 rounded-lg border border-white/20 bg-white px-2 py-2 text-sm text-slate-800"><option v-for="m in 12" :key="'metric-end-' + m" :value="m">{{ new Date(0, m - 1).toLocaleString('id-ID', { month: 'long' }) }}</option></select><input type="number" v-model.number="uiState.keuanganMetrikEndYear" class="w-20 rounded-lg border border-white/20 bg-white px-2 py-2 text-sm text-slate-800"></span>
-                                </label>
-                            </div>
+                        <div class="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-indigo-50">
+                            Akumulasi seluruh catatan
                         </div>
                     </div>
                 </div>
@@ -20477,7 +20426,7 @@ SKU-BAJU-PUTIH-S"
                         <article class="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">
                             <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Perubahan kas bersih</p>
                             <p class="mt-2 text-2xl font-bold" :class="keuanganMetrik.netCashFlow >= 0 ? 'text-indigo-800' : 'text-red-700'">{{ formatCurrency(keuanganMetrik.netCashFlow) }}</p>
-                            <p class="mt-1 text-xs text-slate-500">Uang masuk dikurangi uang keluar pada periode ini.</p>
+                            <p class="mt-1 text-xs text-slate-500">Total uang masuk dikurangi total uang keluar dari seluruh catatan.</p>
                         </article>
                         <article class="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-5 shadow-sm">
                             <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Biaya operasional</p>
@@ -20487,7 +20436,7 @@ SKU-BAJU-PUTIH-S"
                     </div>
                     <div class="grid gap-5 xl:grid-cols-2">
                         <article class="rounded-2xl border border-slate-200 p-5">
-                            <div class="flex items-center justify-between gap-3"><div><h4 class="font-bold text-slate-900">Perbandingan arus kas</h4><p class="mt-1 text-xs text-slate-500">Skala batang menyesuaikan nilai periode terpilih.</p></div><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ uiState.keuanganMetrikFilter === 'all_time' ? 'Semua periode' : uiState.keuanganMetrikFilter === 'this_year' ? 'Tahun ini' : uiState.keuanganMetrikFilter === 'last_30_days' ? '30 hari' : uiState.keuanganMetrikFilter === 'last_7_days' ? '7 hari' : 'Hari ini' }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><div><h4 class="font-bold text-slate-900">Perbandingan arus kas</h4><p class="mt-1 text-xs text-slate-500">Skala batang membandingkan total akumulasi uang masuk dan keluar.</p></div><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Seluruh catatan</span></div>
                             <div class="mt-5 space-y-4">
                                 <div><div class="mb-1 flex justify-between text-xs"><span class="font-semibold text-emerald-700">Uang masuk</span><span>{{ formatCurrency(keuanganMetrik.totalIncome) }}</span></div><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-500" :style="{ width: keuanganMetrikBarWidth(keuanganMetrik.totalIncome) }"></div></div></div>
                                 <div><div class="mb-1 flex justify-between text-xs"><span class="font-semibold text-rose-700">Uang keluar</span><span>{{ formatCurrency(keuanganMetrik.totalOutflow) }}</span></div><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gradient-to-r from-rose-400 to-rose-600 transition-all duration-500" :style="{ width: keuanganMetrikBarWidth(keuanganMetrik.totalOutflow) }"></div></div></div>
