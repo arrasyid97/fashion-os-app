@@ -3843,7 +3843,7 @@ async function saveProfitDistribution() {
     if (isSavingProfitDistribution.value) return;
     profitDistributionForm.error = '';
     profitDistributionForm.message = '';
-    const amount = Math.round(Number(profitDistributionForm.amount) || 0);
+    const amount = parseRupiahInput(profitDistributionForm.amount);
     const selectedMonth = Number(profitDistributionForm.month) - 1;
     const available = laporanKeuanganData.value.months[selectedMonth]?.undistributedProfit;
     if (!currentUser.value?.uid) {
@@ -5523,12 +5523,18 @@ let salesChannelChart = null;
 
 
 // --- UTILITY FUNCTIONS ---
+const parseRupiahInput = value => {
+    if (value === null || value === undefined || value === '') return 0;
+    const digits = String(value).trim().replace(/[^0-9]/g, '');
+    return digits ? Number(digits) : 0;
+};
+
 const formatCurrency = (value) => {
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
-        minimumFractionDigits: 0, // Tidak ada angka di belakang koma
-        maximumFractionDigits: 0, // Angka akan dibulatkan
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2, // Pertahankan pecahan hasil perhitungan bila ada
     }).format(value || 0);
 };
 
@@ -11872,15 +11878,18 @@ function exportGroupedProduksiToExcel() {
 async function submitBiaya() {
     if (!currentUser.value) return alert("Anda harus login.");
     const form = uiState.modalData;
+    if (isLoading.value) return;
+    const jumlahPokok = parseRupiahInput(form.jumlah);
+    const adminFeeInput = parseRupiahInput(form.adminFee);
 
     // Validasi dasar
-    if (!form.kategori || !form.jumlah) {
+    if (!form.kategori || jumlahPokok <= 0) {
         return alert("Tanggal, Kategori, dan Jumlah Pokok wajib diisi.");
     }
 
     const paymentMethod = form.paymentMethod;
-    const adminFee = paymentMethod === 'transfer' ? (form.adminFee || 0) : 0;
-    const totalPengeluaran = form.jumlah + adminFee;
+    const adminFee = paymentMethod === 'transfer' ? adminFeeInput : 0;
+    const totalPengeluaran = jumlahPokok + adminFee;
     let catatanLengkap = form.catatan || '';
 
     // Buat catatan otomatis berdasarkan metode pembayaran
@@ -11902,7 +11911,7 @@ const tipeBiaya = selectedCategory?.type || getExpenseTypeByCategory(form.katego
 
 isLoading.value = true;
 try {
-    await addDoc(collection(db, "keuangan"), { 
+    const record = {
         kategori: form.kategori,
         kategoriId: selectedCategory?.id || '',
         tipeBiaya: tipeBiaya,
@@ -11911,19 +11920,21 @@ try {
         jenis: 'pengeluaran',
         userId: currentUser.value.uid,
         tanggal: new Date(form.tanggal)
-    });
+    };
+    const docRef = await addDoc(collection(db, "keuangan"), record);
+    state.keuangan.unshift({ id: docRef.id, ...record });
+    dataFetched.finance = true;
 
-        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
-        await fetchKeuanganData(true); 
-        
-        hideModal();
-        alert('Data pengeluaran berhasil disimpan!');
-    } catch (e) {
-        console.error("Error menyimpan biaya:", e);
-        alert("Gagal menyimpan data pengeluaran.");
-    } finally {
-        isLoading.value = false;
-    }
+    hideModal();
+    alert('Data pengeluaran berhasil disimpan!');
+
+    // Perbarui data lain di latar belakang supaya formulir tidak menunggu muat ulang seluruh catatan.
+    void fetchKeuanganData(true);
+} catch (e) {
+    console.error("Error menyimpan biaya:", e);
+    alert("Gagal menyimpan data pengeluaran.");
+} finally {
+    isLoading.value = false;
 }
 
 async function deleteBiaya(id) {
@@ -11945,24 +11956,31 @@ async function deleteBiaya(id) {
 
 async function submitPemasukan() {
     if (!currentUser.value) return alert("Anda harus login untuk mengelola pemasukan.");
+    const form = uiState.modalData;
+    if (isLoading.value) return;
+    const jumlahPemasukan = parseRupiahInput(form.jumlah);
+    if (!form.kategori || jumlahPemasukan <= 0) {
+        return alert("Kategori dan jumlah pemasukan wajib diisi.");
+    }
     isLoading.value = true;
     try {
-        await addDoc(collection(db, "keuangan"), {
-            kategori: uiState.modalData.kategori,
-            jumlah: uiState.modalData.jumlah,
-            catatan: uiState.modalData.catatan,
-            jenis: 'pemasukan_lain',
-            userId: currentUser.value.uid,
-            tanggal: new Date(uiState.modalData.tanggal)
-        });
-
-        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
-        await fetchKeuanganData(true); 
+        const record = {
+            kategori: form.kategori,
+            jumlah: jumlahPemasukan,
+            catatan: form.catatan,
+            jenis: 'pemasukan_lain',
+            userId: currentUser.value.uid,
+            tanggal: new Date(form.tanggal)
+        };
+        const docRef = await addDoc(collection(db, "keuangan"), record);
+        state.keuangan.unshift({ id: docRef.id, ...record });
+        dataFetched.finance = true;
 
         hideModal();
         alert('Data pemasukan berhasil disimpan!');
+        void fetchKeuanganData(true);
     } catch (e) {
-        console.error("Error menyimpan pemasukan:", e);
+        console.error("Error menyimpan data pemasukan:", e);
         alert("Gagal menyimpan data pemasukan.");
     } finally {
         isLoading.value = false;
@@ -25070,7 +25088,7 @@ BAJU-PUTIH-M</pre>
         </div>
         <div>
             <label class="block text-sm font-medium">Jumlah Pokok Pengeluaran (Rp)</label>
-            <input type="number" v-model.number="uiState.modalData.jumlah" placeholder="Contoh: 500000" class="mt-1 w-full p-2 border rounded-md" required>
+            <input type="text" inputmode="numeric" v-model="uiState.modalData.jumlah" placeholder="Contoh: 103651" class="mt-1 w-full p-2 border rounded-md" required>
         </div>
         
         <div class="pt-4 border-t space-y-4">
@@ -25091,7 +25109,7 @@ BAJU-PUTIH-M</pre>
                 </div>
                 <div>
                     <label class="block text-sm font-medium">Biaya Admin Transfer (jika ada)</label>
-                    <input type="number" v-model.number="uiState.modalData.adminFee" class="mt-1 w-full p-2 border rounded-md" placeholder="Contoh: 6500">
+                    <input type="text" inputmode="numeric" v-model="uiState.modalData.adminFee" class="mt-1 w-full p-2 border rounded-md" placeholder="Contoh: 6500">
                 </div>
             </div>
         </div>
@@ -25103,12 +25121,12 @@ BAJU-PUTIH-M</pre>
         
         <div class="p-3 bg-slate-100 rounded-md flex justify-between items-center text-lg font-bold">
             <span>Total Pengeluaran Akan Dicatat:</span>
-            <span class="text-indigo-600">{{ formatCurrency((uiState.modalData.jumlah || 0) + (uiState.modalData.paymentMethod === 'transfer' ? (uiState.modalData.adminFee || 0) : 0)) }}</span>
+            <span class="text-indigo-600">{{ formatCurrency(parseRupiahInput(uiState.modalData.jumlah) + (uiState.modalData.paymentMethod === 'transfer' ? parseRupiahInput(uiState.modalData.adminFee) : 0)) }}</span>
         </div>
 
         <div class="flex justify-end gap-3 pt-4 border-t">
             <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
+            <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg disabled:cursor-not-allowed disabled:opacity-60" :disabled="isLoading">{{ isLoading ? 'Menyimpan…' : 'Simpan' }}</button>
         </div>
     </form>
 </div>
@@ -25141,7 +25159,7 @@ BAJU-PUTIH-M</pre>
                 </div>
                 <div>
                     <label class="block text-sm font-medium">Jumlah (Rp)</label>
-                    <input type="number" v-model.number="uiState.modalData.jumlah" placeholder="Contoh: 10000000" class="mt-1 w-full p-2 border rounded-md" required>
+                    <input type="text" inputmode="numeric" v-model="uiState.modalData.jumlah" placeholder="Contoh: 103651" class="mt-1 w-full p-2 border rounded-md" required>
                 </div>
                 <div>
                     <label class="block text-sm font-medium">Catatan (Opsional)</label>
@@ -25149,7 +25167,7 @@ BAJU-PUTIH-M</pre>
                 </div>
                 <div class="flex justify-end gap-3 pt-4 border-t">
                     <button type="button" @click="hideModal" class="bg-slate-200 py-2 px-4 rounded-lg">Batal</button>
-                    <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg">Simpan</button>
+                    <button type="submit" class="bg-indigo-600 text-white py-2 px-4 rounded-lg disabled:cursor-not-allowed disabled:opacity-60" :disabled="isLoading">{{ isLoading ? 'Menyimpan…' : 'Simpan' }}</button>
                 </div>
             </form>
         </div>
