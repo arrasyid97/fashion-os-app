@@ -1624,6 +1624,10 @@ case 'laporan-keuangan': {
 }
             case 'keuangan':
                 dataPromises.push(fetchKeuanganData());
+                if (!dataFetched.investorsAndBanks) {
+                    // Formulir pengeluaran membutuhkan rekening tujuan meski halaman Pengaturan belum dibuka.
+                    dataPromises.push(fetchInvestorsAndBanksData(userId, true));
+                }
                 break;
             case 'investasi':
       await fetchInvestorsAndBanksData(userId);
@@ -9739,6 +9743,12 @@ async function submitBankAccount() {
         } else {
             state.bankAccounts.unshift({ ...dataToSave, id: docRef.id });
         }
+        dataFetched.investorsAndBanks = true;
+        void writeModuleCache('investment', 'investors-and-banks', {
+            investors: state.investor || [],
+            bankAccounts: state.bankAccounts || [],
+            investorPayments: state.investorPayments || []
+        }).catch(error => console.warn('Gagal memperbarui cache rekening:', error));
         hideModal();
         alert("Rekening bank berhasil disimpan!");
     } catch (error) {
@@ -9753,6 +9763,11 @@ async function deleteBankAccount(accountId) {
     try {
         await deleteDoc(doc(db, "bank_accounts", accountId));
         state.bankAccounts = state.bankAccounts.filter(b => b.id !== accountId);
+        void writeModuleCache('investment', 'investors-and-banks', {
+            investors: state.investor || [],
+            bankAccounts: state.bankAccounts || [],
+            investorPayments: state.investorPayments || []
+        }).catch(error => console.warn('Gagal memperbarui cache rekening:', error));
         alert("Rekening bank berhasil dihapus.");
     } catch (error) {
         console.error("Error deleting bank account:", error);
