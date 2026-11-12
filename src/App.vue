@@ -359,6 +359,9 @@ massUpdateFilterSize: '', // <-- BARUU: Untuk menyimpan input ukuran
     keuanganPemasukanFilter: 'today',
     keuanganPemasukanStartDate: '',
     keuanganPemasukanTahun: new Date().getFullYear(),
+    keuanganPemasukanExportType: 'all',
+    keuanganPengeluaranExportType: 'all',
+    keuanganMetrikFilter: 'this_year',
     keuanganPengeluaranBulan: new Date().getMonth() + 1,
     keuanganPengeluaranEndDate: '',
     keuanganPengeluaranFilter: 'today',
@@ -1725,6 +1728,72 @@ const riwayatPemasukan = computed(() => {
         return a.id.localeCompare(b.id);
     });
 });
+
+const pemasukanExportCategories = computed(() => [...new Set(
+    (state.keuangan || [])
+        .filter(item => item.jenis === 'pemasukan_lain')
+        .map(item => String(item.kategori || item.tipe || 'Pemasukan lainnya').trim())
+        .filter(Boolean)
+)].sort((a, b) => a.localeCompare(b, 'id')));
+
+const pengeluaranExportCategories = computed(() => [...new Set([
+    ...(state.settings.categories || []).map(category => String(category.name || '').trim()),
+    ...(state.keuangan || [])
+        .filter(item => item.jenis === 'pengeluaran' || item.jenis === 'biaya')
+        .map(item => String(item.kategori || item.tipe || '').trim())
+].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')));
+
+const keuanganMetrik = computed(() => {
+    const filter = uiState.keuanganMetrikFilter || 'this_year';
+    const filteredIncome = filterDataByDate(
+        (state.keuangan || []).filter(item => item.jenis === 'pemasukan_lain'),
+        filter,
+        '', '', new Date().getMonth() + 1, new Date().getFullYear(),
+        new Date().getMonth() + 1, new Date().getFullYear()
+    );
+    const filteredExpenses = filterDataByDate(
+        (state.keuangan || []).filter(item => item.jenis === 'pengeluaran' || item.jenis === 'biaya'),
+        filter,
+        '', '', new Date().getMonth() + 1, new Date().getFullYear(),
+        new Date().getMonth() + 1, new Date().getFullYear()
+    );
+    const sum = rows => rows.reduce((total, item) => total + (Number(item.jumlah ?? item.amount) || 0), 0);
+    const isCapital = item => item.isCapitalPartnershipTransfer === true ||
+        /modal/i.test(String(item.kategori || ''));
+    const isMarketplacePayout = item => item.isMarketplaceIncomeReport === true;
+    const isPartnershipTransfer = item => item.isCapitalPartnershipTransfer === true ||
+        /bagi hasil|pengembalian modal/i.test(String(item.kategori || ''));
+    const isProductionCost = item => !isPartnershipTransfer(item) &&
+        (item.tipeBiaya === 'produksi' || getExpenseTypeByCategory(item.kategori) === 'produksi');
+    const marketplaceIncome = sum(filteredIncome.filter(isMarketplacePayout));
+    const capitalIncome = sum(filteredIncome.filter(isCapital));
+    const otherIncome = Math.max(0, sum(filteredIncome) - marketplaceIncome - capitalIncome);
+    const productionOutflow = sum(filteredExpenses.filter(isProductionCost));
+    const operatingOutflow = sum(filteredExpenses.filter(item => !isPartnershipTransfer(item) && !isProductionCost(item)));
+    const partnershipOutflow = sum(filteredExpenses.filter(isPartnershipTransfer));
+    const totalIncome = sum(filteredIncome);
+    const totalOutflow = sum(filteredExpenses);
+    return {
+        totalIncome,
+        totalOutflow,
+        netCashFlow: totalIncome - totalOutflow,
+        marketplaceIncome,
+        capitalIncome,
+        otherIncome,
+        productionOutflow,
+        operatingOutflow,
+        partnershipOutflow
+    };
+});
+
+const keuanganMetrikBarMax = computed(() => Math.max(
+    keuanganMetrik.value.totalIncome,
+    keuanganMetrik.value.totalOutflow,
+    1
+));
+function keuanganMetrikBarWidth(value) {
+    return Math.max(0, Math.min(100, (Number(value || 0) / keuanganMetrikBarMax.value) * 100)) + '%';
+}
 
 const unpaidCommissions = computed(() =>
     commissions.value.filter(c => c.status === 'unpaid')
@@ -11984,31 +12053,54 @@ async function deleteInflowCategory(categoryId) {
 }
 
 function exportKeuangan(type) {
-    const dataToFilter = state.keuangan || [];
-    let data;
+    const isExpense = type === 'pengeluaran';
+    const selectedPeriod = isExpense ? uiState.keuanganPengeluaranFilter : uiState.keuanganPemasukanFilter;
+    const selectedType = isExpense ? (uiState.keuanganPengeluaranExportType || 'all') : (uiState.keuanganPemasukanExportType || 'all');
+    const source = (state.keuangan || []).filter(item => isExpense
+        ? item.jenis === 'pengeluaran' || item.jenis === 'biaya'
+        : item.jenis === 'pemasukan_lain');
+    const startDate = isExpense ? uiState.keuanganPengeluaranStartDate : uiState.keuanganPemasukanStartDate;
+    const endDate = isExpense ? uiState.keuanganPengeluaranEndDate : uiState.keuanganPemasukanEndDate;
+    const startMonth = isExpense ? uiState.keuanganPengeluaranStartMonth : uiState.keuanganPemasukanStartMonth;
+    const startYear = isExpense ? uiState.keuanganPengeluaranStartYear : uiState.keuanganPemasukanStartYear;
+    const endMonth = isExpense ? uiState.keuanganPengeluaranEndMonth : uiState.keuanganPemasukanEndMonth;
+    const endYear = isExpense ? uiState.keuanganPengeluaranEndYear : uiState.keuanganPemasukanEndYear;
+    let data = filterDataByDate(source, selectedPeriod, startDate, endDate, startMonth, startYear, endMonth, endYear);
 
-    if (type === 'pengeluaran') {
-        data = dataToFilter.filter(k => k.jenis === 'pengeluaran');
-    } else {
-        data = dataToFilter.filter(k => k.jenis === 'pemasukan_lain');
+    if (isExpense && selectedType !== 'all') {
+        if (selectedType === 'produksi' || selectedType === 'operasional') {
+            data = data.filter(item => (item.tipeBiaya || getExpenseTypeByCategory(item.kategori)) === selectedType);
+        } else if (selectedType.startsWith('kategori:')) {
+            const category = selectedType.slice('kategori:'.length);
+            data = data.filter(item => (item.kategori || item.tipe) === category);
+        }
+    } else if (!isExpense && selectedType !== 'all') {
+        data = data.filter(item => String(item.kategori || item.tipe || 'Pemasukan lainnya') === selectedType);
     }
-    
-    const sheetName = type === 'pengeluaran' ? 'Laporan Pengeluaran' : 'Laporan Pemasukan';
-    if (data.length === 0) {
-        alert(`Tidak ada data ${type} untuk diexport.`);
-        return;
-    }
-    const dataForExcel = data.map(item => ({
-        "Tanggal": new Date(item.tanggal),
-        "Kategori/Tipe": item.kategori || item.tipe,
-        "Jumlah": item.jumlah,
-        "Catatan": item.catatan || ''
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    worksheet["!cols"] = [ { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 40 } ];
-    XLSX.writeFile(workbook, `${sheetName.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    const filterLabel = isExpense
+        ? selectedType === 'all' ? 'Semua Jenis' : selectedType === 'produksi' ? 'Produksi' : selectedType === 'operasional' ? 'Operasional' : selectedType.slice('kategori:'.length)
+        : selectedType === 'all' ? 'Semua Jenis' : selectedType;
+    const sheetName = (isExpense ? 'Laporan Pengeluaran' : 'Laporan Pemasukan').slice(0, 31);
+    if (!data.length) {
+        alert(`Tidak ada data ${isExpense ? 'pengeluaran' : 'pemasukan'} untuk periode dan jenis yang dipilih.`);
+        return;
+    }
+
+    const dataForExcel = data.map(item => ({
+        "Tanggal": new Date(item.tanggal),
+        "Kategori": item.kategori || item.tipe || '',
+        ...(isExpense ? { "Tipe Biaya": item.tipeBiaya || getExpenseTypeByCategory(item.kategori) } : {}),
+        "Jumlah": Number(item.jumlah ?? item.amount) || 0,
+        "Catatan": item.catatan || ''
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    worksheet["!cols"] = [ { wch: 15 }, { wch: 28 }, ...(isExpense ? [{ wch: 18 }] : []), { wch: 20 }, { wch: 40 } ];
+    const safeLabel = String(filterLabel).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 32);
+    const filePrefix = isExpense ? 'Laporan_Pengeluaran' : 'Laporan_Pemasukan';
+    XLSX.writeFile(workbook, `${filePrefix}_${safeLabel}_${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 // FUNGSI HAPUS RETUR (SEKARANG LEBIH SEDERHANA)
 
@@ -20145,7 +20237,7 @@ SKU-BAJU-PUTIH-S"
                         Informasi
                     </button>
                 </div>
-                <p class="text-slate-500 mt-1">Catat dan lacak semua arus kas operasional bisnis Anda di luar transaksi penjualan.</p>
+                <p class="text-slate-500 mt-1">Pantau uang masuk dan keluar: pencairan marketplace, modal pemodal, biaya produksi, operasional seperti iklan, serta pembayaran usaha.</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -20186,7 +20278,10 @@ SKU-BAJU-PUTIH-S"
                                     <input type="number" v-model.number="uiState.keuanganPengeluaranEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
                                 </div>
                             </div>
-                            <button @click="requestProtectedExport(() => exportKeuangan('pengeluaran'))" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px] shadow-sm">Export</button>
+                            <div class="flex flex-wrap items-end gap-2">
+                                <label class="block min-w-[170px] flex-1"><span class="mb-1 block text-xs font-medium text-slate-600">Jenis yang diekspor</span><select v-model="uiState.keuanganPengeluaranExportType" class="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm"><option value="all">Semua jenis pengeluaran</option><option value="operasional">Semua operasional</option><option value="produksi">Semua produksi</option><optgroup label="Kategori pengeluaran"><option v-for="category in pengeluaranExportCategories" :key="category" :value="'kategori:' + category">{{ category }}</option></optgroup></select></label>
+                                <button @click="requestProtectedExport(() => exportKeuangan('pengeluaran'))" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px] shadow-sm">Export</button>
+                            </div>
                         </div>
                     </div>
                     <div class="overflow-y-auto max-h-[60vh]">
@@ -20195,7 +20290,7 @@ SKU-BAJU-PUTIH-S"
                                 <tr><th class="px-4 py-3">Detail</th><th class="px-4 py-3">Catatan</th><th class="px-4 py-3 text-right">Jumlah</th><th class="px-4 py-3 text-center">Aksi</th></tr>
                             </thead>
                             <tbody class="divide-y divide-slate-200/50">
-                                <tr v-if="state.keuangan.filter(k => k.jenis === 'pengeluaran').length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
+                                <tr v-if="riwayatPengeluaran.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
                                 <tr v-for="item in riwayatPengeluaran" :key="item.id" class="hover:bg-slate-50/50">
                                     <td class="px-4 py-3 align-top">
                                         <p class="font-semibold text-slate-800">{{ item.kategori }}</p>
@@ -20270,7 +20365,10 @@ SKU-BAJU-PUTIH-S"
                                         <input type="number" v-model.number="uiState.keuanganPemasukanEndYear" placeholder="Sampai Tahun" class="w-full border-slate-300 text-sm rounded-lg p-2">
                                     </div>
                                 </div>
-                                <button @click="requestProtectedExport(() => exportKeuangan('pemasukan'))" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px] shadow-sm">Export</button>
+                                <div class="flex flex-wrap items-end gap-2">
+                                    <label class="block min-w-[170px] flex-1"><span class="mb-1 block text-xs font-medium text-slate-600">Jenis yang diekspor</span><select v-model="uiState.keuanganPemasukanExportType" class="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm"><option value="all">Semua jenis pemasukan</option><option v-for="category in pemasukanExportCategories" :key="category" :value="category">{{ category }}</option></select></label>
+                                    <button @click="requestProtectedExport(() => exportKeuangan('pemasukan'))" class="bg-white border text-slate-700 font-bold py-2.5 px-4 rounded-lg hover:bg-slate-100 text-sm h-[42px] shadow-sm">Export</button>
+                                </div>
                             </div>
                         </div>
                         <div class="overflow-y-auto max-h-[60vh]">
@@ -20279,7 +20377,7 @@ SKU-BAJU-PUTIH-S"
                                     <tr><th class="px-4 py-3">Detail</th><th class="px-4 py-3">Catatan</th><th class="px-4 py-3 text-right">Jumlah</th><th class="px-4 py-3 text-center">Aksi</th></tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-200/50">
-                                    <tr v-if="state.keuangan.filter(k => k.jenis === 'pemasukan_lain').length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
+                                    <tr v-if="riwayatPemasukan.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
                                     <tr v-for="item in riwayatPemasukan" :key="item.id" class="hover:bg-slate-50/50">
                                         <td class="px-4 py-3 align-top">
                                             <p class="font-semibold text-slate-800">{{ item.kategori }}</p>
@@ -20298,6 +20396,82 @@ SKU-BAJU-PUTIH-S"
                 </div>
             </div>
 
+            <section class="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+                <div class="bg-gradient-to-r from-slate-950 via-indigo-950 to-indigo-800 px-6 py-6 text-white sm:px-8">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-200">Ringkasan keuangan</p>
+                            <h3 class="mt-1 text-2xl font-bold">Arus kas usaha</h3>
+                            <p class="mt-1 max-w-2xl text-sm text-indigo-100">Ringkasan uang yang benar-benar dicatat masuk dan keluar. Modal pemodal termasuk uang masuk kas, bukan omzet penjualan.</p>
+                        </div>
+                        <label class="block min-w-[190px] text-xs font-medium text-indigo-100">Periode metrik
+                            <select v-model="uiState.keuanganMetrikFilter" class="mt-1 w-full rounded-xl border border-white/20 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800">
+                                <option value="today">Hari ini</option>
+                                <option value="last_7_days">7 hari terakhir</option>
+                                <option value="last_30_days">30 hari terakhir</option>
+                                <option value="this_year">Tahun ini</option>
+                                <option value="all_time">Semua periode</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+                <div v-if="uiState.isPemasukanLocked" class="m-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    Buka Riwayat Pemasukan dengan PIN untuk melihat metrik uang masuk dan arus kas.
+                </div>
+                <div v-else class="space-y-6 p-6 sm:p-8">
+                    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <article class="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Uang masuk tercatat</p>
+                            <p class="mt-2 text-2xl font-bold text-emerald-800">{{ formatCurrency(keuanganMetrik.totalIncome) }}</p>
+                            <p class="mt-1 text-xs text-slate-500">Termasuk pencairan dan setoran modal.</p>
+                        </article>
+                        <article class="rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50 to-white p-5 shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-rose-700">Uang keluar tercatat</p>
+                            <p class="mt-2 text-2xl font-bold text-rose-800">{{ formatCurrency(keuanganMetrik.totalOutflow) }}</p>
+                            <p class="mt-1 text-xs text-slate-500">Termasuk produksi, operasional, dan pembayaran modal/bagi hasil.</p>
+                        </article>
+                        <article class="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Perubahan kas bersih</p>
+                            <p class="mt-2 text-2xl font-bold" :class="keuanganMetrik.netCashFlow >= 0 ? 'text-indigo-800' : 'text-red-700'">{{ formatCurrency(keuanganMetrik.netCashFlow) }}</p>
+                            <p class="mt-1 text-xs text-slate-500">Uang masuk dikurangi uang keluar pada periode ini.</p>
+                        </article>
+                        <article class="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-5 shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Biaya operasional</p>
+                            <p class="mt-2 text-2xl font-bold text-amber-800">{{ formatCurrency(keuanganMetrik.operatingOutflow) }}</p>
+                            <p class="mt-1 text-xs text-slate-500">Termasuk iklan dan biaya rutin lainnya.</p>
+                        </article>
+                    </div>
+                    <div class="grid gap-5 xl:grid-cols-2">
+                        <article class="rounded-2xl border border-slate-200 p-5">
+                            <div class="flex items-center justify-between gap-3"><div><h4 class="font-bold text-slate-900">Perbandingan arus kas</h4><p class="mt-1 text-xs text-slate-500">Skala batang menyesuaikan nilai periode terpilih.</p></div><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ uiState.keuanganMetrikFilter === 'all_time' ? 'Semua periode' : uiState.keuanganMetrikFilter === 'this_year' ? 'Tahun ini' : uiState.keuanganMetrikFilter === 'last_30_days' ? '30 hari' : uiState.keuanganMetrikFilter === 'last_7_days' ? '7 hari' : 'Hari ini' }}</span></div>
+                            <div class="mt-5 space-y-4">
+                                <div><div class="mb-1 flex justify-between text-xs"><span class="font-semibold text-emerald-700">Uang masuk</span><span>{{ formatCurrency(keuanganMetrik.totalIncome) }}</span></div><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-500" :style="{ width: keuanganMetrikBarWidth(keuanganMetrik.totalIncome) }"></div></div></div>
+                                <div><div class="mb-1 flex justify-between text-xs"><span class="font-semibold text-rose-700">Uang keluar</span><span>{{ formatCurrency(keuanganMetrik.totalOutflow) }}</span></div><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gradient-to-r from-rose-400 to-rose-600 transition-all duration-500" :style="{ width: keuanganMetrikBarWidth(keuanganMetrik.totalOutflow) }"></div></div></div>
+                            </div>
+                        </article>
+                        <article class="rounded-2xl border border-slate-200 p-5">
+                            <h4 class="font-bold text-slate-900">Rincian uang masuk</h4>
+                            <p class="mt-1 text-xs text-slate-500">Modal, pencairan marketplace, dan pemasukan lain dipisahkan.</p>
+                            <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div class="rounded-xl bg-emerald-50 p-3"><p class="text-xs text-slate-600">Pencairan marketplace</p><p class="mt-1 font-bold text-emerald-800">{{ formatCurrency(keuanganMetrik.marketplaceIncome) }}</p></div>
+                                <div class="rounded-xl bg-indigo-50 p-3"><p class="text-xs text-slate-600">Modal masuk</p><p class="mt-1 font-bold text-indigo-800">{{ formatCurrency(keuanganMetrik.capitalIncome) }}</p></div>
+                                <div class="rounded-xl bg-slate-50 p-3"><p class="text-xs text-slate-600">Pemasukan lain</p><p class="mt-1 font-bold text-slate-800">{{ formatCurrency(keuanganMetrik.otherIncome) }}</p></div>
+                            </div>
+                        </article>
+                        <article class="rounded-2xl border border-slate-200 p-5 xl:col-span-2">
+                            <h4 class="font-bold text-slate-900">Rincian uang keluar</h4>
+                            <p class="mt-1 text-xs text-slate-500">Biaya produksi dicatat terpisah; HPP barang terjual sudah masuk ke laporan laba melalui transaksi.</p>
+                            <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div class="rounded-xl bg-violet-50 p-3"><p class="text-xs text-slate-600">Produksi</p><p class="mt-1 font-bold text-violet-800">{{ formatCurrency(keuanganMetrik.productionOutflow) }}</p><p class="mt-1 text-[11px] text-slate-500">Modal kerja untuk membuat atau menyiapkan stok.</p></div>
+                                <div class="rounded-xl bg-amber-50 p-3"><p class="text-xs text-slate-600">Operasional · termasuk iklan</p><p class="mt-1 font-bold text-amber-800">{{ formatCurrency(keuanganMetrik.operatingOutflow) }}</p><p class="mt-1 text-[11px] text-slate-500">Dikurangi saat menghitung laba usaha.</p></div>
+                                <div class="rounded-xl bg-slate-50 p-3"><p class="text-xs text-slate-600">Bagi hasil / pengembalian modal</p><p class="mt-1 font-bold text-slate-800">{{ formatCurrency(keuanganMetrik.partnershipOutflow) }}</p><p class="mt-1 text-[11px] text-slate-500">Arus kas keluar, bukan biaya operasional.</p></div>
+                            </div>
+                        </article>
+                    </div>
+                    <p class="rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 text-xs leading-5 text-slate-600">Metrik ini menunjukkan pergerakan kas, bukan laba. Setoran modal menambah kas tetapi bukan penghasilan penjualan. Laba usaha dihitung terpisah dari pencairan marketplace dikurangi HPP pesanan sukses cair dan biaya operasional.</p>
+                </div>
+            </section>
+
             <div v-if="uiState.isKeuanganInfoVisible" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 animate-fade-in">
                 <div class="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full animate-fade-in-up">
                     <div class="flex justify-between items-start pb-4 border-b">
@@ -20307,15 +20481,23 @@ SKU-BAJU-PUTIH-S"
                         </h3>
                     </div>
                     <div class="space-y-4 text-slate-700 py-4">
-                        <p class="text-sm text-slate-600">Halaman ini berfungsi sebagai buku kas digital Anda. Setiap data yang Anda masukkan di sini akan secara langsung memengaruhi metrik di Dashboard Analitik.</p>
-                        <div class="space-y-4">
-                            <div class="p-4 bg-slate-50 rounded-lg">
-                                <p class="font-semibold text-slate-700">Pemasukan & Pengeluaran</p>
-                                <p class="text-sm text-slate-500 mt-1">Data dari tabel ini akan diperhitungkan dalam kalkulasi **Saldo Kas** di dasbor.</p>
+                        <p class="text-sm leading-6 text-slate-600">Halaman ini mencatat arus kas usaha: uang yang benar-benar masuk dan keluar. Metrik arus kas di bawah halaman merangkum catatan sesuai periode yang dipilih.</p>
+                        <div class="space-y-3">
+                            <div class="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+                                <p class="font-semibold text-emerald-900">Pemasukan dan modal</p>
+                                <p class="mt-1 text-sm leading-5 text-slate-600">Catat pencairan marketplace satu kali untuk toko dan periode yang sama. Setoran pemodal dicatat terpisah sebagai modal masuk, bukan omzet atau laba penjualan.</p>
                             </div>
-                            <div class="p-4 bg-slate-50 rounded-lg">
-                                <p class="font-semibold text-slate-700">Kategori Pengeluaran</p>
-                                <p class="text-sm text-slate-500 mt-1">Semua data di sini akan diklasifikasikan sebagai **Biaya Operasional**, yang digunakan untuk menghitung **Laba Bersih** di dasbor.</p>
+                            <div class="rounded-xl border border-violet-100 bg-violet-50/70 p-4">
+                                <p class="font-semibold text-violet-900">Produksi dan HPP</p>
+                                <p class="mt-1 text-sm leading-5 text-slate-600">Biaya kain, jahit, dan bahan produksi dicatat sebagai biaya produksi serta harus tercermin pada HPP produk. HPP mengurangi laba ketika barang tercatat terjual dan sukses cair. Hindari memasukkan biaya yang sama dua kali.</p>
+                            </div>
+                            <div class="rounded-xl border border-amber-100 bg-amber-50/70 p-4">
+                                <p class="font-semibold text-amber-900">Operasional</p>
+                                <p class="mt-1 text-sm leading-5 text-slate-600">Biaya iklan dan pengeluaran rutin usaha dicatat sebagai operasional. Biaya ini mengurangi laba sebelum pembagian hasil.</p>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <p class="font-semibold text-slate-800">Bagi hasil dan pengembalian modal</p>
+                                <p class="mt-1 text-sm leading-5 text-slate-600">Pembayaran kepada pemodal atau bagian pengelola mengurangi kas, tetapi bukan biaya operasional dan tidak mengubah laba periode. Catat melalui halaman Kerja Sama Modal &amp; Bagi Hasil agar tertaut ke periode perhitungannya.</p>
                             </div>
                         </div>
                     </div>
