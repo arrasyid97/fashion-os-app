@@ -7818,6 +7818,20 @@ const cartSummary = computed(() => {
     summary.finalTotal = summary.subtotal - summary.discount.totalDiscount;
     return summary;
 });
+const totalSisaYardGudangKain = computed(() =>
+    (state.gudangKain || []).reduce(
+        (sum, kain) => sum + Math.max(0, Number(kain.sisaYard) || 0),
+        0
+    )
+);
+const totalNilaiGudangKain = computed(() =>
+    (state.gudangKain || []).reduce((sum, kain) => {
+        const yard = Math.max(0, Number(kain.sisaYard) || 0);
+        const hargaPerYard = Math.max(0, Number(kain.hargaBeliPerYard) || 0);
+        return sum + yard * hargaPerYard;
+    }, 0)
+);
+
 const filteredGudangKain = computed(() => {
     let kainData = [...state.gudangKain];
     const searchTerm = uiState.gudangKainSearch.toLowerCase();
@@ -20183,6 +20197,19 @@ SKU-BAJU-PUTIH-S"
 </button>
                 </div>
 
+                <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <article class="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-white p-5 shadow-sm">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Nilai kain tersisa</p>
+                        <p class="mt-2 text-2xl font-bold text-indigo-900">{{ formatCurrency(totalNilaiGudangKain) }}</p>
+                        <p class="mt-1 text-xs text-slate-500">Perkiraan nilai sisa stok seluruh kain di gudang.</p>
+                    </article>
+                    <article class="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white p-5 shadow-sm">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Total sisa kain</p>
+                        <p class="mt-2 text-2xl font-bold text-emerald-900">{{ totalSisaYardGudangKain.toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} Yard</p>
+                        <p class="mt-1 text-xs text-slate-500">Jumlah sisa yard dari semua stok yang tercatat.</p>
+                    </article>
+                </div>
+
                 <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Cari (Nama Kain, Warna, Toko)</label>
@@ -20210,12 +20237,13 @@ SKU-BAJU-PUTIH-S"
                                 <th class="px-6 py-3">Toko</th>
                                 <th class="px-6 py-3 text-center">Sisa Stok</th>
                                 <th class="px-6 py-3 text-right">Harga/Yard</th>
+                                <th class="px-6 py-3 text-right">Nilai Sisa</th>
                                 <th class="px-6 py-3 text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
                             <tr v-if="filteredGudangKain.length === 0">
-                                <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data kain yang cocok dengan filter.</td>
+                                <td colspan="7" class="p-10 text-center text-slate-500">Tidak ada data kain yang cocok dengan filter.</td>
                             </tr>
                             <tr v-for="kain in filteredGudangKain" :key="kain.id" class="hover:bg-slate-50/50">
                                 <td class="px-6 py-4 whitespace-nowrap">{{ new Date(kain.tanggalBeli).toLocaleDateString('id-ID') }}</td>
@@ -20235,6 +20263,7 @@ SKU-BAJU-PUTIH-S"
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-right font-medium text-green-600">{{ formatCurrency(kain.hargaBeliPerYard) }}</td>
+                                <td class="px-6 py-4 text-right font-semibold text-indigo-700">{{ formatCurrency(Math.max(0, Number(kain.sisaYard) || 0) * Math.max(0, Number(kain.hargaBeliPerYard) || 0)) }}</td>
                                 <td class="px-6 py-4 text-center space-x-3">
                                     <button @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="text-xs bg-slate-100 font-bold py-1 px-2 rounded hover:bg-slate-200" :disabled="!isSubscriptionActive">Edit</button>
                                     <button @click="deleteKain(kain.id)" class="text-xs text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
