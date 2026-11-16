@@ -10378,6 +10378,49 @@ function uploadFabricReceiptWithTimeout(file, destinationRef, timeoutMs = 45000)
     });
 }
 
+async function attachFabricReceiptAfterPurchase(file, purchaseId, rows, userId) {
+    let uploadedReceiptRef = null;
+    try {
+        let compressionTimeoutId;
+        const preparedFile = await Promise.race([
+            prepareFabricReceiptUpload(file),
+            new Promise(resolve => {
+                compressionTimeoutId = window.setTimeout(() => resolve(file), 15000);
+            })
+        ]);
+        window.clearTimeout(compressionTimeoutId);
+
+        const notaPath = `fabric-receipts/${userId}/${purchaseId}/${Date.now()}-${preparedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        uploadedReceiptRef = storageRef(storage, notaPath);
+        const notaUrl = await uploadFabricReceiptWithTimeout(preparedFile, uploadedReceiptRef);
+
+        const batch = writeBatch(db);
+        rows.forEach(row => {
+            batch.update(doc(db, 'fabric_stock', row.id), {
+                notaNama: preparedFile.name,
+                notaPath,
+                notaUrl
+            });
+        });
+        await batch.commit();
+
+        const savedRowIds = new Set(rows.map(row => row.id));
+        state.gudangKain = state.gudangKain.map(row => savedRowIds.has(row.id)
+            ? { ...row, notaNama: preparedFile.name, notaPath, notaUrl }
+            : row
+        );
+        alert('Stok kain sudah tersimpan dan nota berhasil dilampirkan.');
+    } catch (error) {
+        console.error('Stok sudah tersimpan, tetapi lampiran nota gagal diproses:', error);
+        if (uploadedReceiptRef) {
+            try { await deleteObject(uploadedReceiptRef); } catch (cleanupError) {
+                console.warn('Lampiran nota yang gagal diproses tidak berhasil dibersihkan.', cleanupError);
+            }
+        }
+        alert('Stok kain sudah tersimpan. Nota tidak berhasil diunggah, tetapi data stok tetap aman. Kamu bisa melanjutkan pekerjaan.');
+    }
+}
+
 async function submitFabricPurchase() {
     if (!currentUser.value) return alert('Anda harus login untuk mencatat pembelian kain.');
     const form = uiState.modalData;
@@ -10396,39 +10439,10 @@ async function submitFabricPurchase() {
     }
 
     isSavingFabric.value = true;
-    fabricSavePhase.value = 'Menyiapkan pembelian…';
-    let uploadedReceiptRef = null;
+    fabricSavePhase.value = 'Menyimpan stok kain…';
     try {
         const purchaseId = doc(collection(db, 'fabric_stock')).id;
-        let notaUrl = '';
-        let notaPath = '';
-        let notaNama = '';
-        if (fabricReceiptFile.value) {
-            fabricSavePhase.value = 'Menyiapkan foto nota…';
-            const sourceFile = fabricReceiptFile.value;
-            let compressionTimeoutId;
-            const file = await Promise.race([
-                prepareFabricReceiptUpload(sourceFile),
-                new Promise(resolve => {
-                    compressionTimeoutId = window.setTimeout(() => resolve(sourceFile), 15000);
-                })
-            ]);
-            window.clearTimeout(compressionTimeoutId);
-            notaNama = file.name;
-            notaPath = `fabric-receipts/${currentUser.value.uid}/${purchaseId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-            uploadedReceiptRef = storageRef(storage, notaPath);
-            try {
-                notaUrl = await uploadFabricReceiptWithTimeout(file, uploadedReceiptRef);
-            } catch (uploadError) {
-                console.error('Lampiran nota gagal diunggah:', uploadError);
-                uploadedReceiptRef = null;
-                notaPath = '';
-                notaNama = '';
-                if (!confirm('Foto nota tidak berhasil diunggah. Simpan rincian stok kain tanpa lampiran?')) return;
-            }
-        }
-
-        fabricSavePhase.value = 'Menyimpan stok kain…';
+        const receiptFile = fabricReceiptFile.value;
         const batch = writeBatch(db);
         const newRows = items.map(item => {
             const stockRef = doc(collection(db, 'fabric_stock'));
@@ -10446,9 +10460,9 @@ async function submitFabricPurchase() {
                 hargaBeliPerYard: item.hargaBeliPerYard,
                 fabricCategoryId: item.categoryId,
                 catatanPembelian: String(form.catatan || '').trim(),
-                notaNama,
-                notaPath,
-                notaUrl
+                notaNama: '',
+                notaPath: '',
+                notaUrl: ''
             };
             batch.set(stockRef, row);
             return { id: stockRef.id, ...row };
@@ -10457,16 +10471,15 @@ async function submitFabricPurchase() {
         state.gudangKain.unshift(...newRows);
         const savedTotalYard = items.reduce((sum, item) => sum + item.totalYard, 0);
         const savedPurchaseTotal = items.reduce((sum, item) => sum + item.totalYard * item.hargaBeliPerYard, 0);
+        fabricReceiptFile.value = null;
         hideModal();
         alert(`Pembelian kain tersimpan: ${newRows.length} baris, ${savedTotalYard.toLocaleString('id-ID')} yard, ${formatCurrency(savedPurchaseTotal)}.`);
+        if (receiptFile) {
+            void attachFabricReceiptAfterPurchase(receiptFile, purchaseId, newRows, currentUser.value.uid);
+        }
     } catch (error) {
         console.error('Gagal menyimpan pembelian kain:', error);
-        if (uploadedReceiptRef) {
-            try { await deleteObject(uploadedReceiptRef); } catch (cleanupError) {
-                console.warn('Lampiran sementara tidak berhasil dihapus.', cleanupError);
-            }
-        }
-        alert('Pembelian kain belum tersimpan. Periksa koneksi, izin Cloud Storage, lalu coba lagi.');
+        alert('Pembelian kain belum tersimpan. Periksa koneksi dan izin database, lalu coba lagi.');
     } finally {
         isSavingFabric.value = false;
         fabricSavePhase.value = '';
