@@ -13,7 +13,7 @@ import MarketplaceTransactionHistory from './components/MarketplaceTransactionHi
 
 import { db, auth, functions, storage } from './firebase.js'; 
 import { httpsCallable } from 'firebase/functions';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import {
     clearReadCacheContext,
     invalidateModuleCache,
@@ -251,6 +251,7 @@ const activationCodeMessage = ref('');
 const commissionPayouts = ref([]);
 const fabricReceiptFile = ref(null);
 const isSavingFabric = ref(false);
+const fabricSavePhase = ref('');
 const commissions = ref([]);
 const editedProducts = ref(new Set());
 const markProductAsEdited = (productId) => {
@@ -10325,6 +10326,58 @@ async function prepareFabricReceiptUpload(file) {
     }
 }
 
+function uploadFabricReceiptWithTimeout(file, destinationRef, timeoutMs = 45000) {
+    return new Promise((resolve, reject) => {
+        const task = uploadBytesResumable(destinationRef, file, {
+            contentType: file.type || 'application/octet-stream'
+        });
+        let settled = false;
+        const timeoutId = window.setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            task.cancel();
+            reject(new Error('Unggah nota tidak selesai dalam 45 detik.'));
+        }, timeoutMs);
+
+        task.on('state_changed', snapshot => {
+            const progress = snapshot.totalBytes
+                ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
+                : 0;
+            fabricSavePhase.value = `Mengunggah nota… ${progress}%`;
+        }, error => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeoutId);
+            reject(error);
+        }, async () => {
+            if (settled) return;
+            let downloadTimeoutId;
+            try {
+                const downloadUrl = await Promise.race([
+                    getDownloadURL(task.snapshot.ref),
+                    new Promise((_, rejectUrl) => {
+                        downloadTimeoutId = window.setTimeout(
+                            () => rejectUrl(new Error('Tautan nota tidak berhasil dibuat.')),
+                            15000
+                        );
+                    })
+                ]);
+                window.clearTimeout(downloadTimeoutId);
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timeoutId);
+                resolve(downloadUrl);
+            } catch (error) {
+                window.clearTimeout(downloadTimeoutId);
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timeoutId);
+                reject(error);
+            }
+        });
+    });
+}
+
 async function submitFabricPurchase() {
     if (!currentUser.value) return alert('Anda harus login untuk mencatat pembelian kain.');
     const form = uiState.modalData;
@@ -10343,6 +10396,7 @@ async function submitFabricPurchase() {
     }
 
     isSavingFabric.value = true;
+    fabricSavePhase.value = 'Menyiapkan pembelian…';
     let uploadedReceiptRef = null;
     try {
         const purchaseId = doc(collection(db, 'fabric_stock')).id;
@@ -10350,22 +10404,31 @@ async function submitFabricPurchase() {
         let notaPath = '';
         let notaNama = '';
         if (fabricReceiptFile.value) {
-            const file = await prepareFabricReceiptUpload(fabricReceiptFile.value);
+            fabricSavePhase.value = 'Menyiapkan foto nota…';
+            const sourceFile = fabricReceiptFile.value;
+            let compressionTimeoutId;
+            const file = await Promise.race([
+                prepareFabricReceiptUpload(sourceFile),
+                new Promise(resolve => {
+                    compressionTimeoutId = window.setTimeout(() => resolve(sourceFile), 15000);
+                })
+            ]);
+            window.clearTimeout(compressionTimeoutId);
             notaNama = file.name;
             notaPath = `fabric-receipts/${currentUser.value.uid}/${purchaseId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
             uploadedReceiptRef = storageRef(storage, notaPath);
             try {
-                await uploadBytes(uploadedReceiptRef, file, { contentType: file.type || 'application/octet-stream' });
-                notaUrl = await getDownloadURL(uploadedReceiptRef);
+                notaUrl = await uploadFabricReceiptWithTimeout(file, uploadedReceiptRef);
             } catch (uploadError) {
                 console.error('Lampiran nota gagal diunggah:', uploadError);
                 uploadedReceiptRef = null;
                 notaPath = '';
                 notaNama = '';
-                if (!confirm('Foto nota gagal diunggah. Simpan rincian stok kain tanpa lampiran?')) return;
+                if (!confirm('Foto nota tidak berhasil diunggah. Simpan rincian stok kain tanpa lampiran?')) return;
             }
         }
 
+        fabricSavePhase.value = 'Menyimpan stok kain…';
         const batch = writeBatch(db);
         const newRows = items.map(item => {
             const stockRef = doc(collection(db, 'fabric_stock'));
@@ -10406,6 +10469,7 @@ async function submitFabricPurchase() {
         alert('Pembelian kain belum tersimpan. Periksa koneksi, izin Cloud Storage, lalu coba lagi.');
     } finally {
         isSavingFabric.value = false;
+        fabricSavePhase.value = '';
     }
 }
 
@@ -25328,7 +25392,7 @@ BAJU-PUTIH-M</pre>
         </div>
         <div class="mt-5 flex justify-end gap-3 border-t pt-4">
             <button type="button" @click="hideModal" class="rounded-lg bg-slate-100 px-4 py-2.5 font-bold text-slate-700 hover:bg-slate-200">Batal</button>
-            <button type="submit" :disabled="isSavingFabric" class="rounded-lg bg-indigo-600 px-5 py-2.5 font-bold text-white hover:bg-indigo-700 disabled:cursor-wait disabled:bg-slate-400">{{ isSavingFabric ? 'Menyimpan…' : 'Simpan pembelian' }}</button>
+            <button type="submit" :disabled="isSavingFabric" class="rounded-lg bg-indigo-600 px-5 py-2.5 font-bold text-white hover:bg-indigo-700 disabled:cursor-wait disabled:bg-slate-400">{{ isSavingFabric ? fabricSavePhase : 'Simpan pembelian' }}</button>
         </div>
     </form>
 </div>
