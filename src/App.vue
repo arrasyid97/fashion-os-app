@@ -583,7 +583,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     purchaseOrderEndYear: new Date().getFullYear(),
 
     pengaturanTab: 'umum',
-    fabricCategoryForm: { id: '', namaKain: '', warnaList: '', hargaPerYard: '' },
+    fabricCategoryForm: { id: '', namaKain: '', warna: [''], hargaPerYard: '' },
     isKeuanganInfoVisible: false,
     priceCalculator: {
     hpp: null,
@@ -13007,10 +13007,10 @@ async function saveFabricCategory() {
     const form = uiState.fabricCategoryForm;
     const namaKain = String(form.namaKain || '').trim();
     const hargaPerYard = Number(form.hargaPerYard) || 0;
-    const warna = [...new Set(String(form.warnaList || '')
-        .split(/[,;\n]+/)
-        .map(value => value.trim())
-        .filter(Boolean))];
+    const warnaInput = Array.isArray(form.warna)
+        ? form.warna
+        : String(form.warnaList || '').split(/[,;\n]+/);
+    const warna = [...new Set(warnaInput.map(value => String(value || '').trim()).filter(Boolean))];
     if (!namaKain || !warna.length || hargaPerYard <= 0) {
         return alert('Isi nama kain, minimal satu warna, dan harga beli per yard.');
     }
@@ -13034,7 +13034,7 @@ async function saveFabricCategory() {
     try {
         await setDoc(doc(db, 'settings', currentUser.value.uid), { fabricCategories: nextCategories }, { merge: true });
         state.settings.fabricCategories = nextCategories;
-        uiState.fabricCategoryForm = { id: '', namaKain: '', warnaList: '', hargaPerYard: '' };
+        uiState.fabricCategoryForm = { id: '', namaKain: '', warna: [''], hargaPerYard: '' };
         alert(index >= 0 ? 'Kategori kain berhasil diperbarui.' : 'Kategori kain berhasil ditambahkan.');
     } catch (error) {
         console.error('Gagal menyimpan kategori kain:', error);
@@ -13048,9 +13048,21 @@ function editFabricCategory(category) {
     uiState.fabricCategoryForm = {
         id: category.id,
         namaKain: category.namaKain || '',
-        warnaList: (category.warna || []).join(', '),
+        warna: Array.isArray(category.warna) && category.warna.length ? [...category.warna] : [''],
         hargaPerYard: Number(category.hargaPerYard) || ''
     };
+}
+
+function addFabricCategoryColor() {
+    uiState.fabricCategoryForm.warna.push('');
+}
+
+function removeFabricCategoryColor(index) {
+    if (uiState.fabricCategoryForm.warna.length <= 1) {
+        uiState.fabricCategoryForm.warna[0] = '';
+        return;
+    }
+    uiState.fabricCategoryForm.warna.splice(index, 1);
 }
 
 async function deleteFabricCategory(categoryId) {
@@ -13062,7 +13074,7 @@ async function deleteFabricCategory(categoryId) {
         await setDoc(doc(db, 'settings', currentUser.value.uid), { fabricCategories: nextCategories }, { merge: true });
         state.settings.fabricCategories = nextCategories;
         if (uiState.fabricCategoryForm.id === categoryId) {
-            uiState.fabricCategoryForm = { id: '', namaKain: '', warnaList: '', hargaPerYard: '' };
+            uiState.fabricCategoryForm = { id: '', namaKain: '', warna: [''], hargaPerYard: '' };
         }
     } catch (error) {
         console.error('Gagal menghapus kategori kain:', error);
@@ -22003,7 +22015,7 @@ SKU-BAJU-PUTIH-S"
                     <div v-if="uiState.pengaturanTab === 'kategori-kain'" class="animate-fade-in">
                         <div class="mb-5">
                             <h3 class="text-xl font-bold text-slate-800">Kategori Kain</h3>
-                            <p class="mt-1 text-sm text-slate-500">Simpan nama kain, warna yang biasa dibeli, dan harga standar per yard. Data ini akan menjadi pilihan cepat saat mencatat pembelian.</p>
+                            <p class="mt-1 text-sm text-slate-500">Simpan jenis kain, pilihan warna, dan harga standar per yard agar pencatatan pembelian lebih cepat.</p>
                         </div>
                         <form @submit.prevent="saveFabricCategory" class="mb-6 grid grid-cols-1 gap-4 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 md:grid-cols-2">
                             <label class="text-sm font-semibold text-slate-700">Nama jenis kain
@@ -22012,12 +22024,21 @@ SKU-BAJU-PUTIH-S"
                             <label class="text-sm font-semibold text-slate-700">Harga beli standar per yard (Rp)
                                 <input type="number" min="1" step="1" v-model.number="uiState.fabricCategoryForm.hargaPerYard" placeholder="Contoh: 20000" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5" required>
                             </label>
-                            <label class="text-sm font-semibold text-slate-700 md:col-span-2">Warna yang biasa dibeli
-                                <input type="text" v-model="uiState.fabricCategoryForm.warnaList" placeholder="Blush Pink, Burgundy, Cream, Hitam" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5" required>
-                                <span class="mt-1 block text-xs font-normal text-slate-500">Pisahkan warna dengan koma. Anda bisa menambah atau mengubah daftarnya kapan saja.</span>
-                            </label>
+                            <div class="text-sm font-semibold text-slate-700 md:col-span-2">
+                                <div class="mb-2 flex items-center justify-between gap-3">
+                                    <span>Warna</span>
+                                    <button type="button" @click="addFabricCategoryColor" class="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50">+ Tambah warna</button>
+                                </div>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <div v-for="(color, index) in uiState.fabricCategoryForm.warna" :key="index" class="flex items-center gap-2">
+                                        <input type="text" v-model="uiState.fabricCategoryForm.warna[index]" :placeholder="`Contoh: ${index === 0 ? 'Blush Pink' : 'Burgundy'}`" class="w-full rounded-lg border border-slate-300 bg-white p-2.5 font-normal" :required="index === 0">
+                                        <button v-if="uiState.fabricCategoryForm.warna.length > 1" type="button" @click="removeFabricCategoryColor(index)" class="rounded-lg px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50" :aria-label="`Hapus warna ke-${index + 1}`">Hapus</button>
+                                    </div>
+                                </div>
+                                <span class="mt-2 block text-xs font-normal text-slate-500">Tambahkan semua warna untuk jenis kain ini sebelum menyimpan kategori.</span>
+                            </div>
                             <div class="flex flex-wrap justify-end gap-2 md:col-span-2">
-                                <button v-if="uiState.fabricCategoryForm.id" type="button" @click="uiState.fabricCategoryForm = { id: '', namaKain: '', warnaList: '', hargaPerYard: '' }" class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-600 ring-1 ring-slate-300">Batal edit</button>
+                                <button v-if="uiState.fabricCategoryForm.id" type="button" @click="uiState.fabricCategoryForm = { id: '', namaKain: '', warna: [''], hargaPerYard: '' }" class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-600 ring-1 ring-slate-300">Batal edit</button>
                                 <button type="submit" :disabled="isSavingSettings || !isSubscriptionActive" class="rounded-lg bg-indigo-600 px-5 py-2 font-bold text-white hover:bg-indigo-700 disabled:bg-slate-400">{{ isSavingSettings ? 'Menyimpan…' : (uiState.fabricCategoryForm.id ? 'Simpan perubahan kategori' : '+ Tambah kategori kain') }}</button>
                             </div>
                         </form>
