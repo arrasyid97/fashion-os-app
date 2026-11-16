@@ -4,6 +4,7 @@ import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
 
 import { getAuth } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
     apiKey: "AIzaSyACoc4vE2aq3-zuhKmzx0TsV79GoD5202o",
@@ -30,3 +31,4 @@ export const auth = getAuth(app);
 
 // Cloud Functions dipakai untuk membaca ringkasan Dashboard hemat read.
 export const functions = getFunctions(app);
+export const storage = getStorage(app);
