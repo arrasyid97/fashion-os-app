@@ -265,6 +265,7 @@ const state = reactive({
         marketplaces: [],
         modelProduk: [],
         categories: [],
+        fabricCategories: [],
         inflowCategories: [ // <-- TAMBAHKAN INI
           { id: 'INFLOW-1', name: 'Modal Masuk', description: 'Tambahan modal dari pemilik atau investor.' },
           { id: 'INFLOW-2', name: 'Pendapatan Lain', description: 'Pendapatan di luar penjualan produk.' },
@@ -582,6 +583,7 @@ purchaseOrdersHasMore: true,     // Flag untuk menandakan apakah masih ada data 
     purchaseOrderEndYear: new Date().getFullYear(),
 
     pengaturanTab: 'umum',
+    fabricCategoryForm: { id: '', namaKain: '', warnaList: '', hargaPerYard: '' },
     isKeuanganInfoVisible: false,
     priceCalculator: {
     hpp: null,
@@ -7842,8 +7844,9 @@ const fabricPurchaseTotalYard = computed(() => fabricPurchaseLines.value.reduce(
     return sum + Math.max(0, yard);
 }, 0));
 const fabricPurchaseGrandTotal = computed(() => fabricPurchaseLines.value.reduce((sum, item) => {
-    const amount = Number(item.totalHarga) || 0;
-    return sum + Math.max(0, amount);
+    const yard = Math.max(0, Number(item.totalYard) || 0);
+    const price = Math.max(0, Number(item.hargaBeliPerYard) || 0);
+    return sum + yard * price;
 }, 0));
 
 const filteredGudangKain = computed(() => {
@@ -10258,7 +10261,18 @@ async function submitKain(isEditing = false) {
 }
 
 function createFabricPurchaseLine() {
-    return { namaKain: '', warna: '', jumlahRoll: 1, totalYard: '', totalHarga: '' };
+    return { categoryId: '', namaKain: '', warna: '', jumlahRoll: 1, totalYard: '', hargaBeliPerYard: 0 };
+}
+
+function selectFabricPurchaseCategory(item) {
+    const category = (state.settings.fabricCategories || []).find(entry => entry.id === item.categoryId);
+    item.namaKain = category?.namaKain || '';
+    item.warna = '';
+    item.hargaBeliPerYard = Number(category?.hargaPerYard) || 0;
+}
+
+function fabricPurchaseLineTotal(item) {
+    return Math.max(0, Number(item.totalYard) || 0) * Math.max(0, Number(item.hargaBeliPerYard) || 0);
 }
 
 function addFabricPurchaseLine() {
@@ -10315,16 +10329,17 @@ async function submitFabricPurchase() {
     if (!currentUser.value) return alert('Anda harus login untuk mencatat pembelian kain.');
     const form = uiState.modalData;
     const items = (form.items || []).map(item => ({
+        categoryId: String(item.categoryId || '').trim(),
         namaKain: String(item.namaKain || '').trim(),
         warna: String(item.warna || '').trim(),
         jumlahRoll: Number(item.jumlahRoll) || 0,
         totalYard: Number(item.totalYard) || 0,
-        totalHarga: Number(item.totalHarga) || 0
+        hargaBeliPerYard: Number(item.hargaBeliPerYard) || 0
     }));
     if (!form.tanggalBeli || !items.length || items.some(item =>
-        !item.namaKain || !item.warna || item.jumlahRoll <= 0 || item.totalYard <= 0 || item.totalHarga <= 0
+        !item.categoryId || !item.namaKain || !item.warna || item.jumlahRoll <= 0 || item.totalYard <= 0 || item.hargaBeliPerYard <= 0
     )) {
-        return alert('Lengkapi tanggal dan setiap baris kain: nama, warna, jumlah roll, total yard, serta total harga.');
+        return alert('Lengkapi tanggal dan setiap baris kain: jenis, warna, jumlah roll, total yard, serta harga per yard. Pastikan Kategori Kain sudah disiapkan di Pengaturan.');
     }
 
     isSavingFabric.value = true;
@@ -10364,8 +10379,9 @@ async function submitFabricPurchase() {
                 jumlahRoll: item.jumlahRoll,
                 jumlahBeliYard: item.totalYard,
                 sisaYard: item.totalYard,
-                hargaTotalPembelian: item.totalHarga,
-                hargaBeliPerYard: item.totalHarga / item.totalYard,
+                hargaTotalPembelian: item.totalYard * item.hargaBeliPerYard,
+                hargaBeliPerYard: item.hargaBeliPerYard,
+                fabricCategoryId: item.categoryId,
                 catatanPembelian: String(form.catatan || '').trim(),
                 notaNama,
                 notaPath,
@@ -10377,7 +10393,7 @@ async function submitFabricPurchase() {
         await batch.commit();
         state.gudangKain.unshift(...newRows);
         const savedTotalYard = items.reduce((sum, item) => sum + item.totalYard, 0);
-        const savedPurchaseTotal = items.reduce((sum, item) => sum + item.totalHarga, 0);
+        const savedPurchaseTotal = items.reduce((sum, item) => sum + item.totalYard * item.hargaBeliPerYard, 0);
         hideModal();
         alert(`Pembelian kain tersimpan: ${newRows.length} baris, ${savedTotalYard.toLocaleString('id-ID')} yard, ${formatCurrency(savedPurchaseTotal)}.`);
     } catch (error) {
@@ -12967,6 +12983,7 @@ async function saveSettingsData() {
             marketplaces: JSON.parse(JSON.stringify(state.settings.marketplaces || [])),
             modelProduk: JSON.parse(JSON.stringify(state.settings.modelProduk || [])),
             categories: JSON.parse(JSON.stringify(state.settings.categories || [])),
+            fabricCategories: JSON.parse(JSON.stringify(state.settings.fabricCategories || [])),
             inflowCategories: JSON.parse(JSON.stringify(state.settings.inflowCategories || [])),
             pinProtection: state.settings.pinProtection || {},
             dashboardPin: state.settings.dashboardPin || '',
@@ -12983,6 +13000,80 @@ async function saveSettingsData() {
     } finally {
         isSaving.value = false;
     }
+}
+
+async function saveFabricCategory() {
+    if (!currentUser.value) return alert('Anda harus login untuk mengatur kategori kain.');
+    const form = uiState.fabricCategoryForm;
+    const namaKain = String(form.namaKain || '').trim();
+    const hargaPerYard = Number(form.hargaPerYard) || 0;
+    const warna = [...new Set(String(form.warnaList || '')
+        .split(/[,;\n]+/)
+        .map(value => value.trim())
+        .filter(Boolean))];
+    if (!namaKain || !warna.length || hargaPerYard <= 0) {
+        return alert('Isi nama kain, minimal satu warna, dan harga beli per yard.');
+    }
+    const duplicate = (state.settings.fabricCategories || []).some(category =>
+        category.id !== form.id && String(category.namaKain || '').trim().toLocaleLowerCase('id-ID') === namaKain.toLocaleLowerCase('id-ID')
+    );
+    if (duplicate) return alert('Nama kain ini sudah terdaftar. Edit kategori yang sudah ada.');
+
+    const category = {
+        id: form.id || `FABRIC-CAT-${Date.now()}`,
+        namaKain,
+        warna,
+        hargaPerYard
+    };
+    const nextCategories = [...(state.settings.fabricCategories || [])];
+    const index = nextCategories.findIndex(item => item.id === category.id);
+    if (index >= 0) nextCategories[index] = category;
+    else nextCategories.push(category);
+
+    isSavingSettings.value = true;
+    try {
+        await setDoc(doc(db, 'settings', currentUser.value.uid), { fabricCategories: nextCategories }, { merge: true });
+        state.settings.fabricCategories = nextCategories;
+        uiState.fabricCategoryForm = { id: '', namaKain: '', warnaList: '', hargaPerYard: '' };
+        alert(index >= 0 ? 'Kategori kain berhasil diperbarui.' : 'Kategori kain berhasil ditambahkan.');
+    } catch (error) {
+        console.error('Gagal menyimpan kategori kain:', error);
+        alert('Kategori kain gagal disimpan. Silakan coba lagi.');
+    } finally {
+        isSavingSettings.value = false;
+    }
+}
+
+function editFabricCategory(category) {
+    uiState.fabricCategoryForm = {
+        id: category.id,
+        namaKain: category.namaKain || '',
+        warnaList: (category.warna || []).join(', '),
+        hargaPerYard: Number(category.hargaPerYard) || ''
+    };
+}
+
+async function deleteFabricCategory(categoryId) {
+    const category = (state.settings.fabricCategories || []).find(item => item.id === categoryId);
+    if (!category) return;
+    if (!confirm(`Hapus kategori "${category.namaKain}" dari pilihan pembelian kain? Stok dan riwayat pembelian yang sudah tercatat tidak ikut dihapus.`)) return;
+    const nextCategories = (state.settings.fabricCategories || []).filter(item => item.id !== categoryId);
+    try {
+        await setDoc(doc(db, 'settings', currentUser.value.uid), { fabricCategories: nextCategories }, { merge: true });
+        state.settings.fabricCategories = nextCategories;
+        if (uiState.fabricCategoryForm.id === categoryId) {
+            uiState.fabricCategoryForm = { id: '', namaKain: '', warnaList: '', hargaPerYard: '' };
+        }
+    } catch (error) {
+        console.error('Gagal menghapus kategori kain:', error);
+        alert('Kategori kain gagal dihapus. Silakan coba lagi.');
+    }
+}
+
+function openFabricCategorySettings() {
+    hideModal();
+    uiState.pengaturanTab = 'kategori-kain';
+    changePage('pengaturan');
 }
 
 async function addModelProduk() {
@@ -21670,6 +21761,12 @@ SKU-BAJU-PUTIH-S"
                         </button>
                     </li>
                     <li>
+                        <button @click="uiState.pengaturanTab = 'kategori-kain'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'kategori-kain', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'kategori-kain'}">
+                            <span class="text-lg">🧵</span>
+                            Kategori Kain
+                        </button>
+                    </li>
+                    <li>
                         <button @click="uiState.pengaturanTab = 'rekening'" class="w-full flex items-center gap-3 text-left p-3 rounded-lg transition-colors font-semibold" :class="{'bg-indigo-600 text-white shadow': uiState.pengaturanTab === 'rekening', 'hover:bg-slate-100 text-slate-700': uiState.pengaturanTab !== 'rekening'}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13h1v2H4v-2z" clip-rule="evenodd" /></svg>
                             Rekening Bank
@@ -21903,6 +22000,45 @@ SKU-BAJU-PUTIH-S"
     </div>
 </div>
                     
+                    <div v-if="uiState.pengaturanTab === 'kategori-kain'" class="animate-fade-in">
+                        <div class="mb-5">
+                            <h3 class="text-xl font-bold text-slate-800">Kategori Kain</h3>
+                            <p class="mt-1 text-sm text-slate-500">Simpan nama kain, warna yang biasa dibeli, dan harga standar per yard. Data ini akan menjadi pilihan cepat saat mencatat pembelian.</p>
+                        </div>
+                        <form @submit.prevent="saveFabricCategory" class="mb-6 grid grid-cols-1 gap-4 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4 md:grid-cols-2">
+                            <label class="text-sm font-semibold text-slate-700">Nama jenis kain
+                                <input type="text" v-model="uiState.fabricCategoryForm.namaKain" placeholder="Contoh: Sabrina" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5" required>
+                            </label>
+                            <label class="text-sm font-semibold text-slate-700">Harga beli standar per yard (Rp)
+                                <input type="number" min="1" step="1" v-model.number="uiState.fabricCategoryForm.hargaPerYard" placeholder="Contoh: 20000" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5" required>
+                            </label>
+                            <label class="text-sm font-semibold text-slate-700 md:col-span-2">Warna yang biasa dibeli
+                                <input type="text" v-model="uiState.fabricCategoryForm.warnaList" placeholder="Blush Pink, Burgundy, Cream, Hitam" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5" required>
+                                <span class="mt-1 block text-xs font-normal text-slate-500">Pisahkan warna dengan koma. Anda bisa menambah atau mengubah daftarnya kapan saja.</span>
+                            </label>
+                            <div class="flex flex-wrap justify-end gap-2 md:col-span-2">
+                                <button v-if="uiState.fabricCategoryForm.id" type="button" @click="uiState.fabricCategoryForm = { id: '', namaKain: '', warnaList: '', hargaPerYard: '' }" class="rounded-lg bg-white px-4 py-2 font-semibold text-slate-600 ring-1 ring-slate-300">Batal edit</button>
+                                <button type="submit" :disabled="isSavingSettings || !isSubscriptionActive" class="rounded-lg bg-indigo-600 px-5 py-2 font-bold text-white hover:bg-indigo-700 disabled:bg-slate-400">{{ isSavingSettings ? 'Menyimpan…' : (uiState.fabricCategoryForm.id ? 'Simpan perubahan kategori' : '+ Tambah kategori kain') }}</button>
+                            </div>
+                        </form>
+
+                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Jenis kain</th><th class="p-3">Warna terdaftar</th><th class="p-3 text-right">Harga / yard</th><th class="p-3 text-right">Aksi</th></tr></thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <tr v-if="!state.settings.fabricCategories?.length"><td colspan="4" class="p-8 text-center text-slate-500">Belum ada kategori kain. Tambahkan jenis kain yang sering dibeli agar formulir pembelian lebih cepat.</td></tr>
+                                    <tr v-for="category in (state.settings.fabricCategories || [])" :key="category.id" class="align-top">
+                                        <td class="p-3 font-bold text-slate-800">{{ category.namaKain }}</td>
+                                        <td class="p-3"><div class="flex flex-wrap gap-1.5"><span v-for="color in category.warna || []" :key="color" class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">{{ color }}</span></div></td>
+                                        <td class="p-3 text-right font-semibold text-indigo-700">{{ formatCurrency(category.hargaPerYard) }}</td>
+                                        <td class="p-3 text-right whitespace-nowrap"><button type="button" @click="editFabricCategory(category)" class="mr-3 font-semibold text-blue-600 hover:underline" :disabled="!isSubscriptionActive">Edit</button><button type="button" @click="deleteFabricCategory(category.id)" class="font-semibold text-rose-600 hover:underline" :disabled="!isSubscriptionActive">Hapus</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900">Harga kategori dipakai sebagai harga awal per yard pada formulir pembelian. Harga pada baris pembelian tetap bisa disesuaikan bila harga di nota berbeda.</div>
+                    </div>
+
                     <div v-if="uiState.pengaturanTab === 'rekening'" class="animate-fade-in">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-xl font-bold text-slate-800">Daftar Rekening Bank</h3>
@@ -25127,23 +25263,35 @@ BAJU-PUTIH-M</pre>
                     </div>
                     <button type="button" @click="addFabricPurchaseLine" class="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50">+ Tambah baris kain</button>
                 </div>
+                <div v-if="!state.settings.fabricCategories?.length" class="m-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <p class="font-bold">Kategori kain belum disiapkan.</p>
+                    <p class="mt-1">Tambahkan nama kain, daftar warna, dan harga standar per yard agar pilihan pembelian bisa terisi otomatis.</p>
+                    <button type="button" @click="openFabricCategorySettings" class="mt-3 rounded-lg bg-amber-700 px-3 py-2 font-bold text-white hover:bg-amber-800">Atur kategori kain</button>
+                </div>
                 <div class="space-y-3 p-4">
                     <div v-for="(item, index) in uiState.modalData.items" :key="index" class="grid grid-cols-1 items-end gap-3 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-12">
-                        <label class="text-xs font-semibold text-slate-600 md:col-span-3">Jenis kain
-                            <input type="text" v-model="item.namaKain" placeholder="Contoh: Sabrina" class="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm" required>
+                        <label class="text-xs font-semibold text-slate-600 md:col-span-2">Jenis kain
+                            <select v-model="item.categoryId" @change="selectFabricPurchaseCategory(item)" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm" required>
+                                <option value="" disabled>Pilih kain</option>
+                                <option v-for="category in (state.settings.fabricCategories || [])" :key="category.id" :value="category.id">{{ category.namaKain }}</option>
+                            </select>
                         </label>
                         <label class="text-xs font-semibold text-slate-600 md:col-span-2">Warna
-                            <input type="text" v-model="item.warna" placeholder="Blush Pink" class="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm" required>
+                            <select v-model="item.warna" :disabled="!item.categoryId" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm disabled:bg-slate-100" required>
+                                <option value="" disabled>Pilih warna</option>
+                                <option v-for="color in (state.settings.fabricCategories.find(category => category.id === item.categoryId)?.warna || [])" :key="color" :value="color">{{ color }}</option>
+                            </select>
                         </label>
-                        <label class="text-xs font-semibold text-slate-600 md:col-span-2">Jumlah roll
+                        <label class="text-xs font-semibold text-slate-600 md:col-span-1">Roll
                             <input type="number" min="1" step="1" v-model.number="item.jumlahRoll" class="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm" required>
                         </label>
                         <label class="text-xs font-semibold text-slate-600 md:col-span-2">Total panjang (yard)
                             <input type="number" min="0.01" step="0.01" v-model.number="item.totalYard" placeholder="66" class="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm" required>
                         </label>
-                        <label class="text-xs font-semibold text-slate-600 md:col-span-2">Total harga (Rp)
-                            <input type="number" min="1" step="1" v-model.number="item.totalHarga" placeholder="1320000" class="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm" required>
+                        <label class="text-xs font-semibold text-slate-600 md:col-span-2">Harga / yard (Rp)
+                            <input type="number" min="1" step="1" v-model.number="item.hargaBeliPerYard" class="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm" required>
                         </label>
+                        <div class="md:col-span-2"><span class="block text-xs font-semibold text-slate-600">Total otomatis</span><span class="mt-1 block rounded-lg bg-indigo-50 p-2 text-sm font-bold text-indigo-800">{{ formatCurrency(fabricPurchaseLineTotal(item)) }}</span></div>
                         <button type="button" @click="removeFabricPurchaseLine(index)" :disabled="uiState.modalData.items.length <= 1" class="mb-0.5 rounded-lg px-2 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-30 md:col-span-1" aria-label="Hapus baris kain">Hapus</button>
                     </div>
                 </div>
