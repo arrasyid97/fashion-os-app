@@ -7854,6 +7854,28 @@ const fabricPurchaseGrandTotal = computed(() => fabricPurchaseLines.value.reduce
     return sum + yard * price;
 }, 0));
 
+const fabricPurchaseAdminFee = computed(() => {
+    const fee = Number(uiState.modalData?.adminFee);
+    return Number.isFinite(fee) && fee > 0 ? fee : 0;
+});
+const fabricPurchasePaymentTotal = computed(() => fabricPurchaseGrandTotal.value + fabricPurchaseAdminFee.value);
+
+function getFabricPurchaseGroupTotals(rows) {
+    const nilaiPembelian = rows.reduce((sum, row) => {
+        const value = row.hargaTotalPembelian ?? (Number(row.jumlahBeliYard || 0) * Number(row.hargaBeliPerYard || 0));
+        return sum + Math.max(0, Number(value) || 0);
+    }, 0);
+    // The purchase fee is shared metadata on each stock row; count it once per group.
+    const biayaAdmin = rows.reduce((fee, row) => Math.max(fee, Number(row.biayaAdminPembelian) || 0), 0);
+    return { nilaiPembelian, biayaAdmin, totalPembayaran: nilaiPembelian + biayaAdmin };
+}
+
+function getBankAccountOptionLabel(account) {
+    const owner = String(account.accountName || '').trim() || 'Nama pemilik belum diisi';
+    const bank = String(account.bankName || '').trim() || 'Bank belum diisi';
+    return owner + ' · ' + bank;
+}
+
 function getFabricCode(kain) {
     return String(kain?.kodeKain || ('K' + String(kain?.id || '').slice(0, 6).toUpperCase()));
 }
@@ -7887,6 +7909,7 @@ const filteredGudangKainGroups = computed(() => {
             groupCode: 'N' + group.key.slice(0, 5).toUpperCase(),
             namaRingkas: names.length <= 2 ? names.join(' · ') : names[0] + ' +' + (names.length - 1) + ' jenis',
             jumlahWarna: colors.length,
+            ...getFabricPurchaseGroupTotals(group.rows),
             tokoRingkas: stores.join(' · ') || '-',
             tanggalBeli: group.rows.reduce((latest, row) => !latest || new Date(row.tanggalBeli) > new Date(latest) ? row.tanggalBeli : latest, null),
             sisaYard: group.rows.reduce((sum, row) => sum + Math.max(0, Number(row.sisaYard) || 0), 0),
@@ -10222,6 +10245,7 @@ function showModal(type, data = {}) {
                 toko: '',
                 catatan: '',
                 notaNama: '',
+                adminFee: 0,
                 items: [createFabricPurchaseLine()],
                 ...data
             };
@@ -10551,6 +10575,11 @@ async function submitFabricPurchase() {
         return alert('Lengkapi tanggal dan setiap baris kain: jenis, warna, jumlah roll, total yard, serta harga per yard. Pastikan Kategori Kain sudah disiapkan di Pengaturan.');
     }
 
+    const adminFee = Number(form.adminFee ?? 0);
+    if (!Number.isSafeInteger(adminFee) || adminFee < 0) {
+        return alert('Biaya admin harus berupa angka rupiah nol atau lebih.');
+    }
+
     isSavingFabric.value = true;
     fabricSavePhase.value = 'Menyimpan stok kain…';
     try {
@@ -10574,6 +10603,7 @@ async function submitFabricPurchase() {
                 hargaBeliPerYard: item.hargaBeliPerYard,
                 fabricCategoryId: item.categoryId,
                 catatanPembelian: String(form.catatan || '').trim(),
+                biayaAdminPembelian: adminFee,
                 kodeKain: createFabricCode(stockRef.id, existingCodes),
                 receiptStatus: receiptFile ? 'pending' : '',
                 receiptError: '',
@@ -10588,7 +10618,7 @@ async function submitFabricPurchase() {
         state.gudangKain.unshift(...newRows);
         await persistFabricInventoryCache();
         const savedTotalYard = items.reduce((sum, item) => sum + item.totalYard, 0);
-        const savedPurchaseTotal = items.reduce((sum, item) => sum + item.totalYard * item.hargaBeliPerYard, 0);
+        const savedPurchaseTotal = items.reduce((sum, item) => sum + item.totalYard * item.hargaBeliPerYard, 0) + adminFee;
         fabricReceiptFile.value = null;
         hideModal();
         if (receiptFile) {
@@ -20844,6 +20874,11 @@ SKU-BAJU-PUTIH-S"
                                                 </tbody>
                                             </table>
                                         </div>
+                                        <dl v-if="group.nilaiPembelian > 0 || group.biayaAdmin > 0" class="mt-3 flex flex-wrap justify-end gap-x-6 gap-y-2 rounded-lg bg-indigo-50 p-3 text-xs">
+                                            <div><dt class="text-slate-500">Nilai pembelian</dt><dd class="mt-1 font-semibold text-slate-700">{{ formatCurrency(group.nilaiPembelian) }}</dd></div>
+                                            <div><dt class="text-slate-500">Biaya admin</dt><dd class="mt-1 font-semibold text-slate-700">{{ formatCurrency(group.biayaAdmin) }}</dd></div>
+                                            <div><dt class="text-indigo-700">Total pembayaran</dt><dd class="mt-1 font-bold text-indigo-950">{{ formatCurrency(group.totalPembayaran) }}</dd></div>
+                                        </dl>
                                         <p v-if="group.rows[0].catatanPembelian" class="mt-3 text-xs text-slate-600">{{ group.rows[0].catatanPembelian }}</p>
                                     </td>
                                 </tr>
@@ -25539,9 +25574,17 @@ BAJU-PUTIH-M</pre>
             <label class="block text-sm font-semibold text-slate-700">Catatan pembelian <span class="font-normal text-slate-400">(opsional)</span>
                 <textarea v-model="uiState.modalData.catatan" rows="2" placeholder="Nomor nota atau keterangan tambahan" class="mt-1 w-full rounded-lg border border-slate-300 p-2.5"></textarea>
             </label>
+            <label class="block text-sm font-semibold text-slate-700">Biaya admin (Rp) <span class="font-normal text-slate-400">(opsional)</span>
+                <input type="number" min="0" step="1" v-model.number="uiState.modalData.adminFee" placeholder="Contoh: 6500" class="mt-1 w-full rounded-lg border border-slate-300 p-2.5 sm:max-w-xs">
+                <span class="mt-1 block text-xs font-normal text-slate-500">Dihitung satu kali untuk seluruh warna dalam pembelian ini.</span>
+            </label>
             <div class="grid grid-cols-1 gap-3 rounded-xl bg-indigo-50 p-4 sm:grid-cols-2">
                 <div><p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Total panjang pembelian</p><p class="mt-1 text-xl font-bold text-indigo-950">{{ fabricPurchaseTotalYard.toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} Yard</p></div>
                 <div class="sm:text-right"><p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Total nilai pembelian</p><p class="mt-1 text-xl font-bold text-indigo-950">{{ formatCurrency(fabricPurchaseGrandTotal) }}</p></div>
+                <dl class="space-y-2 border-t border-indigo-200 pt-3 sm:col-span-2">
+                    <div class="flex items-center justify-between gap-3 text-sm text-slate-600"><dt>Biaya admin</dt><dd class="font-semibold">{{ formatCurrency(fabricPurchaseAdminFee) }}</dd></div>
+                    <div class="flex items-center justify-between gap-3 font-bold text-indigo-950"><dt>Total pembayaran</dt><dd class="text-xl">{{ formatCurrency(fabricPurchasePaymentTotal) }}</dd></div>
+                </dl>
             </div>
         </div>
         <div class="mt-5 flex justify-end gap-3 border-t pt-4">
@@ -25806,7 +25849,7 @@ BAJU-PUTIH-M</pre>
                     <label class="block text-sm font-medium">Rekening Tujuan</label>
                     <select v-model="uiState.modalData.selectedBankAccountId" class="mt-1 w-full p-2 border rounded-md" required>
                         <option :value="null" disabled>-- Pilih Rekening --</option>
-                        <option v-for="acc in state.bankAccounts" :key="acc.id" :value="acc.id">{{ acc.bankName }} - {{ acc.accountNumber }}</option>
+                        <option v-for="acc in state.bankAccounts" :key="acc.id" :value="acc.id">{{ getBankAccountOptionLabel(acc) }}</option>
                     </select>
                 </div>
                 <div>
