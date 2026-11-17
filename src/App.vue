@@ -11,9 +11,8 @@ import MarketplaceTransactionHistory from './components/MarketplaceTransactionHi
 
 // Impor dari file konfigurasi Firebase Anda
 
-import { db, auth, functions, storage } from './firebase.js'; 
+import { db, auth, functions } from './firebase.js'; 
 import { httpsCallable } from 'firebase/functions';
-import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import {
     clearReadCacheContext,
     invalidateModuleCache,
@@ -252,6 +251,11 @@ const commissionPayouts = ref([]);
 const fabricReceiptFile = ref(null);
 const isSavingFabric = ref(false);
 const fabricSavePhase = ref('');
+const fabricReceiptPickerRef = ref(null);
+const fabricReceiptUploadTarget = ref(null);
+const fabricReceiptUploads = reactive({});
+const expandedFabricPurchaseGroups = ref([]);
+const fabricReceiptOpening = ref('');
 const commissions = ref([]);
 const editedProducts = ref(new Set());
 const markProductAsEdited = (productId) => {
@@ -7850,31 +7854,78 @@ const fabricPurchaseGrandTotal = computed(() => fabricPurchaseLines.value.reduce
     return sum + yard * price;
 }, 0));
 
-const filteredGudangKain = computed(() => {
-    let kainData = [...state.gudangKain];
-    const searchTerm = uiState.gudangKainSearch.toLowerCase();
+function getFabricCode(kain) {
+    return String(kain?.kodeKain || ('K' + String(kain?.id || '').slice(0, 6).toUpperCase()));
+}
 
-    if (searchTerm) {
-        kainData = kainData.filter(kain => 
-            kain.namaKain.toLowerCase().includes(searchTerm) ||
-            kain.warna.toLowerCase().includes(searchTerm) ||
-            kain.toko.toLowerCase().includes(searchTerm)
-        );
+function createFabricCode(id, existingCodes) {
+    const base = 'K' + id.slice(0, 6).toUpperCase();
+    let code = base;
+    let suffix = 1;
+    while (existingCodes.has(code)) code = base + suffix++;
+    existingCodes.add(code);
+    return code;
+}
+
+const filteredGudangKainGroups = computed(() => {
+    const groups = new Map();
+    for (const row of state.gudangKain || []) {
+        const key = row.purchaseId || row.id;
+        if (!groups.has(key)) groups.set(key, { key, purchaseId: key, rows: [] });
+        groups.get(key).rows.push({ ...row, kodeKain: getFabricCode(row) });
     }
-
-    kainData.sort((a, b) => {
+    const search = String(uiState.gudangKainSearch || '').trim().toLowerCase();
+    const result = [...groups.values()].map(group => {
+        const names = [...new Set(group.rows.map(row => row.namaKain || 'Kain'))];
+        const colors = [...new Set(group.rows.map(row => row.warna).filter(Boolean))];
+        const stores = [...new Set(group.rows.map(row => row.toko).filter(Boolean))];
+        const receipt = group.rows.find(row => row.notaReceiptId || row.notaUrl) || {};
+        const prices = [...new Set(group.rows.map(row => Number(row.hargaBeliPerYard) || 0))];
+        return {
+            ...group,
+            rows: group.rows.sort((a, b) => String(a.warna || '').localeCompare(String(b.warna || ''))),
+            groupCode: 'N' + group.key.slice(0, 5).toUpperCase(),
+            namaRingkas: names.length <= 2 ? names.join(' · ') : names[0] + ' +' + (names.length - 1) + ' jenis',
+            jumlahWarna: colors.length,
+            tokoRingkas: stores.join(' · ') || '-',
+            tanggalBeli: group.rows.reduce((latest, row) => !latest || new Date(row.tanggalBeli) > new Date(latest) ? row.tanggalBeli : latest, null),
+            sisaYard: group.rows.reduce((sum, row) => sum + Math.max(0, Number(row.sisaYard) || 0), 0),
+            nilaiSisa: group.rows.reduce((sum, row) => sum + Math.max(0, Number(row.sisaYard) || 0) * Math.max(0, Number(row.hargaBeliPerYard) || 0), 0),
+            hargaPerYard: prices.length === 1 ? prices[0] : null,
+            receipt,
+            receiptError: group.rows.find(row => row.receiptError)?.receiptError || ''
+        };
+    }).filter(group => !search || group.groupCode.toLowerCase().includes(search) ||
+        group.rows.some(row => [row.namaKain, row.warna, row.toko, row.kodeKain, row.purchaseId]
+            .some(value => String(value || '').toLowerCase().includes(search))));
+    result.sort((a, b) => {
         switch (uiState.gudangKainSort) {
-            case 'nama-asc': return a.namaKain.localeCompare(b.namaKain);
-            case 'nama-desc': return b.namaKain.localeCompare(a.namaKain);
+            case 'nama-asc': return a.namaRingkas.localeCompare(b.namaRingkas);
+            case 'nama-desc': return b.namaRingkas.localeCompare(a.namaRingkas);
             case 'stok-desc': return b.sisaYard - a.sisaYard;
             case 'stok-asc': return a.sisaYard - b.sisaYard;
             case 'tanggal-asc': return new Date(a.tanggalBeli) - new Date(b.tanggalBeli);
-            case 'tanggal-desc': default: return new Date(b.tanggalBeli) - new Date(a.tanggalBeli);
+            default: return new Date(b.tanggalBeli) - new Date(a.tanggalBeli);
         }
     });
-
-    return kainData;
+    return result;
 });
+
+watch(() => uiState.gudangKainSearch, value => {
+    if (String(value || '').trim()) {
+        expandedFabricPurchaseGroups.value = filteredGudangKainGroups.value.map(group => group.key);
+    }
+});
+
+function isFabricPurchaseGroupExpanded(groupKey) {
+    return expandedFabricPurchaseGroups.value.includes(groupKey);
+}
+
+function toggleFabricPurchaseGroup(groupKey) {
+    expandedFabricPurchaseGroups.value = expandedFabricPurchaseGroups.value.includes(groupKey)
+        ? expandedFabricPurchaseGroups.value.filter(key => key !== groupKey)
+        : [...expandedFabricPurchaseGroups.value, groupKey];
+}
 
 // PATCH INVENTORY GROUPS V3
 const INVENTORY_MODEL_QUERY_CHUNK_SIZE = 30;
@@ -10254,6 +10305,7 @@ async function submitKain(isEditing = false) {
             state.gudangKain.unshift({ ...dataToSave, id: newDocRef.id });
             alert('Stok kain baru berhasil ditambahkan!');
         }
+        await persistFabricInventoryCache();
         hideModal();
     } catch (error) {
         console.error("Error menyimpan data kain:", error);
@@ -10290,13 +10342,13 @@ function selectFabricReceipt(event) {
     fabricReceiptFile.value = null;
     uiState.modalData.notaNama = '';
     if (!file) return;
-    const allowed = file.type.startsWith('image/') || file.type === 'application/pdf';
+    const allowed = isAllowedFabricReceipt(file);
     if (!allowed) {
         alert('Lampiran harus berupa foto atau PDF.');
         event.target.value = '';
         return;
     }
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
         alert('Ukuran nota maksimal 10 MB.');
         event.target.value = '';
         return;
@@ -10326,98 +10378,159 @@ async function prepareFabricReceiptUpload(file) {
     }
 }
 
-function uploadFabricReceiptWithTimeout(file, destinationRef, timeoutMs = 45000) {
-    return new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(destinationRef, file, {
-            contentType: file.type || 'application/octet-stream'
-        });
-        let settled = false;
-        const timeoutId = window.setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            task.cancel();
-            reject(new Error('Unggah nota tidak selesai dalam 45 detik.'));
-        }, timeoutMs);
+function isAllowedFabricReceipt(file) {
+    return ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'image/heic', 'image/heif', 'application/pdf'].includes(file?.type);
+}
 
-        task.on('state_changed', snapshot => {
-            const progress = snapshot.totalBytes
-                ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
-                : 0;
-            fabricSavePhase.value = `Mengunggah nota… ${progress}%`;
-        }, error => {
-            if (settled) return;
-            settled = true;
-            window.clearTimeout(timeoutId);
-            reject(error);
-        }, async () => {
-            if (settled) return;
-            let downloadTimeoutId;
-            try {
-                const downloadUrl = await Promise.race([
-                    getDownloadURL(task.snapshot.ref),
-                    new Promise((_, rejectUrl) => {
-                        downloadTimeoutId = window.setTimeout(
-                            () => rejectUrl(new Error('Tautan nota tidak berhasil dibuat.')),
-                            15000
-                        );
-                    })
-                ]);
-                window.clearTimeout(downloadTimeoutId);
-                if (settled) return;
-                settled = true;
-                window.clearTimeout(timeoutId);
-                resolve(downloadUrl);
-            } catch (error) {
-                window.clearTimeout(downloadTimeoutId);
-                if (settled) return;
-                settled = true;
-                window.clearTimeout(timeoutId);
-                reject(error);
-            }
+async function fabricReceiptRequest(body, queryString = '') {
+    const user = currentUser.value;
+    if (!user) throw new Error('Silakan masuk kembali untuk mengakses nota.');
+    const token = await user.getIdToken();
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 40000);
+    try {
+        const response = await fetch('/api/fabric-receipt' + queryString, {
+            method: queryString ? 'GET' : 'POST',
+            headers: { Authorization: 'Bearer ' + token, ...(queryString ? {} : { 'Content-Type': 'application/json' }) },
+            ...(queryString ? {} : { body: JSON.stringify(body) }),
+            signal: controller.signal,
+            cache: 'no-store'
         });
+        if (!response.ok) {
+            const detail = await response.json().catch(() => ({}));
+            throw new Error(detail.message || 'Nota belum berhasil diproses (' + response.status + ').');
+        }
+        return queryString ? await response.blob() : await response.json();
+    } catch (error) {
+        if (error.name === 'AbortError') throw new Error('Koneksi unggah nota melewati batas waktu. Silakan coba lagi.');
+        throw error;
+    } finally {
+        window.clearTimeout(timeout);
+    }
+}
+
+async function persistFabricInventoryCache() {
+    try {
+        await writeModuleCache('production', 'production-page', {
+            production: state.produksi,
+            fabric: state.gudangKain,
+            hasMore: uiState.produksiHasMore,
+            lastProductionDate: state.produksi[state.produksi.length - 1]?.tanggal || null
+        });
+    } catch (error) {
+        console.warn('Cache stok kain belum diperbarui:', error);
+    }
+}
+
+function readFabricReceiptChunk(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = () => reject(new Error('File nota tidak berhasil dibaca.'));
+        reader.readAsDataURL(blob);
     });
 }
 
 async function attachFabricReceiptAfterPurchase(file, purchaseId, rows, userId) {
-    let uploadedReceiptRef = null;
+    if (fabricReceiptUploads[purchaseId]) return;
+    fabricReceiptUploads[purchaseId] = { progress: 0, name: file.name };
+    const ids = new Set(rows.map(row => row.id));
     try {
-        let compressionTimeoutId;
-        const preparedFile = await Promise.race([
-            prepareFabricReceiptUpload(file),
-            new Promise(resolve => {
-                compressionTimeoutId = window.setTimeout(() => resolve(file), 15000);
-            })
-        ]);
-        window.clearTimeout(compressionTimeoutId);
-
-        const notaPath = `fabric-receipts/${userId}/${purchaseId}/${Date.now()}-${preparedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        uploadedReceiptRef = storageRef(storage, notaPath);
-        const notaUrl = await uploadFabricReceiptWithTimeout(preparedFile, uploadedReceiptRef);
-
-        const batch = writeBatch(db);
-        rows.forEach(row => {
-            batch.update(doc(db, 'fabric_stock', row.id), {
-                notaNama: preparedFile.name,
-                notaPath,
-                notaUrl
-            });
-        });
-        await batch.commit();
-
-        const savedRowIds = new Set(rows.map(row => row.id));
-        state.gudangKain = state.gudangKain.map(row => savedRowIds.has(row.id)
-            ? { ...row, notaNama: preparedFile.name, notaPath, notaUrl }
-            : row
-        );
-        alert('Stok kain sudah tersimpan dan nota berhasil dilampirkan.');
-    } catch (error) {
-        console.error('Stok sudah tersimpan, tetapi lampiran nota gagal diproses:', error);
-        if (uploadedReceiptRef) {
-            try { await deleteObject(uploadedReceiptRef); } catch (cleanupError) {
-                console.warn('Lampiran nota yang gagal diproses tidak berhasil dibersihkan.', cleanupError);
-            }
+        let compressionTimer;
+        let preparedFile;
+        try {
+            preparedFile = await Promise.race([
+                prepareFabricReceiptUpload(file),
+                new Promise(resolve => { compressionTimer = window.setTimeout(() => resolve(file), 15000); })
+            ]);
+        } finally {
+            window.clearTimeout(compressionTimer);
         }
-        alert('Stok kain sudah tersimpan. Nota tidak berhasil diunggah, tetapi data stok tetap aman. Kamu bisa melanjutkan pekerjaan.');
+        const begin = await fabricReceiptRequest({
+            action: 'begin', purchaseId, stockIds: [...ids],
+            name: preparedFile.name.slice(0, 240), contentType: preparedFile.type, size: preparedFile.size
+        });
+        const count = Math.ceil(preparedFile.size / begin.chunkSize);
+        for (let index = 0; index < count; index++) {
+            if (currentUser.value?.uid !== userId) throw new Error('Sesi akun berubah. Silakan unggah ulang nota.');
+            const data = await readFabricReceiptChunk(preparedFile.slice(index * begin.chunkSize, (index + 1) * begin.chunkSize));
+            await fabricReceiptRequest({ action: 'chunk', receiptId: begin.receiptId, index, data });
+            fabricReceiptUploads[purchaseId].progress = Math.round((index + 1) / count * 95);
+        }
+        const fields = await fabricReceiptRequest({ action: 'finish', receiptId: begin.receiptId });
+        if (currentUser.value?.uid !== userId) return;
+        state.gudangKain = state.gudangKain.map(row => ids.has(row.id) ? { ...row, ...fields } : row);
+        await persistFabricInventoryCache();
+        alert('Nota berhasil disimpan untuk seluruh warna dalam grup pembelian.');
+    } catch (error) {
+        console.error('Nota kain belum berhasil disimpan:', error);
+        if (currentUser.value?.uid === userId) {
+            const detail = error.message || 'Periksa koneksi lalu coba lagi.';
+            state.gudangKain = state.gudangKain.map(row => ids.has(row.id) ? { ...row, receiptError: detail } : row);
+            alert('Stok kain sudah tersimpan. Nota belum berhasil dilampirkan: ' + detail + ' Gunakan tombol Unggah nota pada grup ini untuk mencoba lagi.');
+        }
+    } finally {
+        delete fabricReceiptUploads[purchaseId];
+    }
+}
+
+function chooseFabricReceiptForGroup(group) {
+    if (fabricReceiptUploads[group.purchaseId]) return;
+    fabricReceiptUploadTarget.value = {
+        purchaseId: group.purchaseId,
+        rows: group.rows.map(row => ({ id: row.id }))
+    };
+    const picker = fabricReceiptPickerRef.value;
+    if (picker) { picker.value = ''; picker.click(); }
+}
+
+async function uploadReceiptToFabricGroup(event) {
+    const file = event.target.files?.[0];
+    const target = fabricReceiptUploadTarget.value;
+    event.target.value = '';
+    fabricReceiptUploadTarget.value = null;
+    if (!file || !target || !currentUser.value) return;
+    if (!isAllowedFabricReceipt(file)) return alert('Pilih foto JPG, PNG, WEBP, GIF, AVIF, HEIC, HEIF, atau PDF.');
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) return alert('Ukuran nota harus antara 1 byte dan 10 MB.');
+    await attachFabricReceiptAfterPurchase(file, target.purchaseId, target.rows, currentUser.value.uid);
+}
+
+async function openFabricReceipt(group) {
+    const receipt = group.receipt;
+    if (!receipt.notaReceiptId && receipt.notaUrl) {
+        window.open(receipt.notaUrl, '_blank', 'noopener,noreferrer');
+        return;
+    }
+    if (!receipt.notaReceiptId || fabricReceiptOpening.value) return;
+    const viewer = window.open('', '_blank');
+    if (viewer) {
+        viewer.opener = null;
+        viewer.document.body.textContent = 'Memuat nota…';
+    }
+    const uid = currentUser.value?.uid;
+    fabricReceiptOpening.value = group.key;
+    try {
+        const parts = [];
+        for (let index = 0; index < Number(receipt.notaChunkCount || 0); index++) {
+            if (currentUser.value?.uid !== uid) throw new Error('Sesi akun berubah. Silakan buka nota kembali.');
+            parts.push(await fabricReceiptRequest(null, '?receiptId=' + encodeURIComponent(receipt.notaReceiptId) + '&index=' + index));
+        }
+        if (currentUser.value?.uid !== uid) throw new Error('Sesi akun berubah. Silakan buka nota kembali.');
+        if (!parts.length) throw new Error('Lampiran nota belum lengkap.');
+        const url = URL.createObjectURL(new Blob(parts, { type: receipt.notaContentType || 'application/pdf' }));
+        if (viewer) viewer.location.replace(url);
+        else {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = receipt.notaNama || 'nota';
+            link.click();
+        }
+        window.setTimeout(() => URL.revokeObjectURL(url), 300000);
+    } catch (error) {
+        viewer?.close();
+        alert(error.message || 'Nota belum dapat dibuka.');
+    } finally {
+        fabricReceiptOpening.value = '';
     }
 }
 
@@ -10443,6 +10556,7 @@ async function submitFabricPurchase() {
     try {
         const purchaseId = doc(collection(db, 'fabric_stock')).id;
         const receiptFile = fabricReceiptFile.value;
+        const existingCodes = new Set(state.gudangKain.map(getFabricCode));
         const batch = writeBatch(db);
         const newRows = items.map(item => {
             const stockRef = doc(collection(db, 'fabric_stock'));
@@ -10460,6 +10574,9 @@ async function submitFabricPurchase() {
                 hargaBeliPerYard: item.hargaBeliPerYard,
                 fabricCategoryId: item.categoryId,
                 catatanPembelian: String(form.catatan || '').trim(),
+                kodeKain: createFabricCode(stockRef.id, existingCodes),
+                receiptStatus: receiptFile ? 'pending' : '',
+                receiptError: '',
                 notaNama: '',
                 notaPath: '',
                 notaUrl: ''
@@ -10469,13 +10586,15 @@ async function submitFabricPurchase() {
         });
         await batch.commit();
         state.gudangKain.unshift(...newRows);
+        await persistFabricInventoryCache();
         const savedTotalYard = items.reduce((sum, item) => sum + item.totalYard, 0);
         const savedPurchaseTotal = items.reduce((sum, item) => sum + item.totalYard * item.hargaBeliPerYard, 0);
         fabricReceiptFile.value = null;
         hideModal();
-        alert(`Pembelian kain tersimpan: ${newRows.length} baris, ${savedTotalYard.toLocaleString('id-ID')} yard, ${formatCurrency(savedPurchaseTotal)}.`);
         if (receiptFile) {
             void attachFabricReceiptAfterPurchase(receiptFile, purchaseId, newRows, currentUser.value.uid);
+        } else {
+            alert(`Pembelian kain tersimpan: ${newRows.length} warna/batch, ${savedTotalYard.toLocaleString('id-ID')} yard, ${formatCurrency(savedPurchaseTotal)}.`);
         }
     } catch (error) {
         console.error('Gagal menyimpan pembelian kain:', error);
@@ -10489,6 +10608,7 @@ async function submitFabricPurchase() {
 async function openFabricCutModal(kain) {
     showModal('fabricCut', {
         fabricId: kain.id,
+        kodeKain: getFabricCode(kain),
         namaKain: kain.namaKain,
         warna: kain.warna,
         purchaseId: kain.purchaseId || kain.id,
@@ -10536,6 +10656,7 @@ async function submitFabricCut() {
             userId: currentUser.value.uid,
             fabricId: form.fabricId,
             purchaseId: form.purchaseId,
+            kodeKain: form.kodeKain,
             namaKain: form.namaKain,
             warna: form.warna,
             tanggalPotong: new Date(form.tanggalPotong),
@@ -10552,11 +10673,12 @@ async function submitFabricCut() {
             const currentYard = Number(stockSnap.data().sisaYard) || 0;
             if (yard > currentYard) throw new Error('Stok batch berubah. Muat ulang lalu coba lagi.');
             newRemainingYard = Math.max(0, currentYard - yard);
-            transaction.update(stockRef, { sisaYard: newRemainingYard });
+            transaction.update(stockRef, { sisaYard: newRemainingYard, kodeKain: form.kodeKain });
             transaction.set(movementRef, movement);
         });
         const index = state.gudangKain.findIndex(item => item.id === form.fabricId);
         if (index !== -1) state.gudangKain[index].sisaYard = newRemainingYard;
+        await persistFabricInventoryCache();
         uiState.modalData.sisaYard = newRemainingYard;
         uiState.modalData.riwayat = [{ id: movementRef.id, ...movement }, ...(uiState.modalData.riwayat || [])].slice(0, 10);
         uiState.modalData.yardPotong = '';
@@ -10578,6 +10700,7 @@ async function deleteKain(kainId) {
             
             // Update UI setelah berhasil dihapus dari Firebase
             state.gudangKain = state.gudangKain.filter(k => k.id !== kainId);
+            await persistFabricInventoryCache();
             alert('Data kain berhasil dihapus.');
 
         } catch (error) {
@@ -20641,7 +20764,7 @@ SKU-BAJU-PUTIH-S"
 
                 <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Cari (Nama Kain, Warna, Toko)</label>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Cari (Nama Kain, Warna, Toko, atau Kode)</label>
                         <input type="text" v-model="uiState.gudangKainSearch" placeholder="Ketik untuk mencari..." class="w-full p-2 border border-slate-300 rounded-md shadow-sm">
                     </div>
                     <div>
@@ -20657,6 +20780,7 @@ SKU-BAJU-PUTIH-S"
                     </div>
                 </div>
 
+                <input ref="fabricReceiptPickerRef" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif,application/pdf" class="hidden" @change="uploadReceiptToFabricGroup">
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left text-slate-500">
                         <thead class="text-xs text-slate-700 uppercase bg-slate-100/50">
@@ -20672,41 +20796,58 @@ SKU-BAJU-PUTIH-S"
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200/50">
-                            <tr v-if="filteredGudangKain.length === 0">
-                                <td colspan="8" class="p-10 text-center text-slate-500">Tidak ada data kain yang cocok dengan filter.</td>
+                            <tr v-if="filteredGudangKainGroups.length === 0">
+                                <td colspan="8" class="p-10 text-center text-slate-500">Tidak ada pembelian kain yang cocok dengan pencarian.</td>
                             </tr>
-                            <tr v-for="kain in filteredGudangKain" :key="kain.id" class="hover:bg-slate-50/50">
-                                <td class="px-6 py-4 whitespace-nowrap">{{ new Date(kain.tanggalBeli).toLocaleDateString('id-ID') }}</td>
-                                <td class="px-6 py-4">
-                                    <p class="font-semibold text-slate-800">{{ kain.namaKain }}</p>
-                                    <p class="text-xs text-slate-500">{{ kain.warna }}</p>
-                                </td>
-                                <td class="px-6 py-4">{{ kain.toko || '-' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <p class="font-mono text-xs text-slate-600">{{ kain.purchaseId ? kain.purchaseId.slice(0, 8).toUpperCase() : 'Stok lama' }}</p>
-                                    <p v-if="kain.jumlahBeliYard" class="mt-1 text-xs text-slate-500">{{ kain.jumlahRoll || 1 }} roll · beli {{ Number(kain.jumlahBeliYard).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} yard</p>
-                                    <p v-if="kain.hargaTotalPembelian" class="text-xs font-semibold text-slate-600">{{ formatCurrency(kain.hargaTotalPembelian) }}</p>
-                                    <a v-if="kain.notaUrl" :href="kain.notaUrl" target="_blank" rel="noopener" class="mt-1 inline-block text-xs font-semibold text-indigo-700 hover:underline">Lihat nota</a>
-                                    <span v-else class="text-xs text-slate-400">Tanpa lampiran</span>
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    <span class="text-xs font-bold px-3 py-1 rounded-full"
-                                          :class="{
-                                            'bg-green-100 text-green-800': kain.sisaYard >= 50,
-                                            'bg-yellow-100 text-yellow-800': kain.sisaYard < 50 && kain.sisaYard > 10,
-                                            'bg-red-100 text-red-800': kain.sisaYard <= 10
-                                          }">
-                                        {{ kain.sisaYard }} Yard
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-right font-medium text-green-600">{{ formatCurrency(kain.hargaBeliPerYard) }}</td>
-                                <td class="px-6 py-4 text-right font-semibold text-indigo-700">{{ formatCurrency(Math.max(0, Number(kain.sisaYard) || 0) * Math.max(0, Number(kain.hargaBeliPerYard) || 0)) }}</td>
-                                <td class="px-6 py-4 text-center whitespace-nowrap">
-                                    <button @click="openFabricCutModal(kain)" class="text-xs bg-indigo-50 text-indigo-700 font-bold py-1.5 px-2 rounded hover:bg-indigo-100" :disabled="!isSubscriptionActive || Number(kain.sisaYard) <= 0">Catat potong</button>
-                                    <button @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="ml-2 text-xs bg-slate-100 font-bold py-1.5 px-2 rounded hover:bg-slate-200" :disabled="!isSubscriptionActive">Edit</button>
-                                    <button @click="deleteKain(kain.id)" class="ml-2 text-xs text-red-500 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
-                                </td>
-                            </tr>
+                            <template v-for="group in filteredGudangKainGroups" :key="group.key">
+                                <tr class="cursor-pointer bg-white hover:bg-indigo-50/40" @click="toggleFabricPurchaseGroup(group.key)">
+                                    <td class="px-4 py-4 whitespace-nowrap">{{ group.tanggalBeli ? new Date(group.tanggalBeli).toLocaleDateString('id-ID') : '-' }}</td>
+                                    <td class="px-4 py-4">
+                                        <p class="font-semibold text-slate-800">{{ group.namaRingkas }}</p>
+                                        <p class="mt-1 text-xs text-slate-500">{{ group.jumlahWarna }} warna · {{ group.rows.length }} batch</p>
+                                    </td>
+                                    <td class="px-4 py-4">{{ group.tokoRingkas }}</td>
+                                    <td class="px-4 py-4" @click.stop>
+                                        <p class="font-mono text-xs font-bold text-indigo-700">{{ group.groupCode }}</p>
+                                        <p v-if="fabricReceiptUploads[group.purchaseId]" class="mt-1 text-xs text-amber-700">Menyimpan nota… {{ fabricReceiptUploads[group.purchaseId].progress }}%</p>
+                                        <button v-if="group.receipt.notaReceiptId || group.receipt.notaUrl" @click="openFabricReceipt(group)" :disabled="Boolean(fabricReceiptOpening)" class="mt-1 text-left text-xs font-bold text-indigo-700 hover:underline disabled:opacity-50">{{ fabricReceiptOpening === group.key ? 'Membuka nota…' : 'Lihat nota' }}</button>
+                                        <p v-if="group.receipt.notaNama" class="mt-1 max-w-40 truncate text-xs text-slate-500" :title="group.receipt.notaNama">{{ group.receipt.notaNama }}</p>
+                                        <p v-if="group.receiptError && !fabricReceiptUploads[group.purchaseId]" class="mt-1 max-w-48 text-xs text-red-600">Nota belum tersimpan. Coba unggah ulang.</p>
+                                        <p v-else-if="!group.receipt.notaReceiptId && !group.receipt.notaUrl && !fabricReceiptUploads[group.purchaseId]" class="mt-1 text-xs text-slate-400">Belum ada nota tersimpan</p>
+                                        <button v-if="!fabricReceiptUploads[group.purchaseId]" @click="chooseFabricReceiptForGroup(group)" :disabled="!isSubscriptionActive" class="mt-2 rounded-md bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">{{ group.receipt.notaReceiptId || group.receipt.notaUrl ? 'Ganti nota' : 'Unggah nota' }}</button>
+                                    </td>
+                                    <td class="px-4 py-4 text-center"><span class="whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">{{ group.sisaYard.toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} Yard</span></td>
+                                    <td class="px-4 py-4 text-right font-medium text-green-600">{{ group.hargaPerYard == null ? 'Bervariasi' : formatCurrency(group.hargaPerYard) }}</td>
+                                    <td class="px-4 py-4 text-right font-semibold text-indigo-700">{{ formatCurrency(group.nilaiSisa) }}</td>
+                                    <td class="px-4 py-4 text-center whitespace-nowrap" @click.stop><button @click="toggleFabricPurchaseGroup(group.key)" :aria-expanded="isFabricPurchaseGroupExpanded(group.key)" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">{{ isFabricPurchaseGroupExpanded(group.key) ? 'Tutup rincian ▲' : 'Lihat rincian ▼' }}</button></td>
+                                </tr>
+                                <tr v-if="isFabricPurchaseGroupExpanded(group.key)" class="bg-slate-50/70">
+                                    <td colspan="8" class="px-4 pb-5 pt-2">
+                                        <p class="mb-3 text-xs text-slate-500">Tulis kode kain pada gulungan atau sisa potongan. Cari kode yang sama saat akan mencatat potong berikutnya.</p>
+                                        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                                            <table class="w-full text-left text-xs">
+                                                <thead class="bg-slate-100 text-slate-600"><tr><th class="p-3">Kode kain</th><th class="p-3">Kain / warna</th><th class="p-3">Jumlah beli</th><th class="p-3 text-right">Sisa</th><th class="p-3 text-right">Harga/Yard</th><th class="p-3 text-right">Nilai sisa</th><th class="p-3 text-center">Aksi</th></tr></thead>
+                                                <tbody class="divide-y divide-slate-100">
+                                                    <tr v-for="kain in group.rows" :key="kain.id">
+                                                        <td class="p-3"><span class="select-all rounded bg-indigo-50 px-2 py-1 font-mono font-bold tracking-wide text-indigo-800">{{ kain.kodeKain }}</span></td>
+                                                        <td class="p-3"><p class="font-semibold text-slate-800">{{ kain.warna }}</p><p class="mt-1 text-slate-500">{{ kain.namaKain }}</p></td>
+                                                        <td class="p-3 text-slate-600">{{ kain.jumlahRoll || 1 }} roll<span v-if="kain.jumlahBeliYard"> · {{ Number(kain.jumlahBeliYard).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} yard</span></td>
+                                                        <td class="p-3 text-right font-bold">{{ Number(kain.sisaYard || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} yard</td>
+                                                        <td class="p-3 text-right">{{ formatCurrency(kain.hargaBeliPerYard) }}</td>
+                                                        <td class="p-3 text-right font-semibold text-indigo-700">{{ formatCurrency(Math.max(0, Number(kain.sisaYard) || 0) * Math.max(0, Number(kain.hargaBeliPerYard) || 0)) }}</td>
+                                                        <td class="p-3 text-center whitespace-nowrap">
+                                                            <button @click="openFabricCutModal(kain)" class="rounded bg-indigo-50 px-2 py-1.5 font-bold text-indigo-700 hover:bg-indigo-100" :disabled="!isSubscriptionActive || Number(kain.sisaYard) <= 0">Catat potong</button>
+                                                            <button @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="ml-1 rounded bg-slate-100 px-2 py-1.5 font-bold hover:bg-slate-200" :disabled="!isSubscriptionActive">Edit</button>
+                                                            <button @click="deleteKain(kain.id)" class="ml-1 px-1 font-bold text-red-600 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <p v-if="group.rows[0].catatanPembelian" class="mt-3 text-xs text-slate-600">{{ group.rows[0].catatanPembelian }}</p>
+                                    </td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
                 </div>
@@ -25348,7 +25489,7 @@ BAJU-PUTIH-M</pre>
                     <input type="text" v-model="uiState.modalData.toko" placeholder="Nama toko kain" class="mt-1 w-full rounded-lg border border-slate-300 p-2.5">
                 </label>
                 <label class="text-sm font-semibold text-slate-700">Foto atau PDF nota <span class="font-normal text-slate-400">(opsional)</span>
-                    <input type="file" accept="image/*,application/pdf" @change="selectFabricReceipt" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm">
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/heic,image/heif,application/pdf" @change="selectFabricReceipt" class="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2 text-sm">
                     <span v-if="uiState.modalData.notaNama" class="mt-1 block truncate text-xs font-normal text-emerald-700">{{ uiState.modalData.notaNama }}</span>
                 </label>
             </div>
@@ -25426,7 +25567,7 @@ BAJU-PUTIH-M</pre>
 <div v-if="uiState.modalType === 'fabricCut'" class="bg-white rounded-2xl shadow-2xl p-5 sm:p-7 max-w-4xl w-full max-h-[92vh] flex flex-col">
     <div class="mb-4 border-b pb-4">
         <h3 class="text-2xl font-bold text-slate-900">Catat Pemotongan Kain</h3>
-        <p class="mt-1 text-sm text-slate-600">{{ uiState.modalData.namaKain }} · {{ uiState.modalData.warna }} <span class="text-slate-400">· Batch {{ String(uiState.modalData.purchaseId || '').slice(0, 8).toUpperCase() }}</span></p>
+        <p class="mt-1 text-sm text-slate-600">{{ uiState.modalData.namaKain }} · {{ uiState.modalData.warna }} <span class="font-mono font-bold text-indigo-700">· Kode {{ uiState.modalData.kodeKain }}</span></p>
         <p class="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-800">Sisa batch: {{ Number(uiState.modalData.sisaYard || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} Yard</p>
     </div>
     <div class="flex-1 overflow-y-auto space-y-5 pr-1">
