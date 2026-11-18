@@ -1,0 +1,9 @@
+{
+  "id": "./",
+  "name": "OS",
+  "short_name": "OS",
+  "lang": "id",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone"
+}
