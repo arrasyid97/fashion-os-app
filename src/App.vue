@@ -11,6 +11,8 @@ import { isFabricComplete, asFabricDate, allocateFabricAdmin, filterFabricHistor
 import MarketplaceTransactionHistory from './components/MarketplaceTransactionHistory.vue';
 import ReturnOrderSearch from './components/ReturnOrderSearch.vue';
 import OrderReturnForm from './components/OrderReturnForm.vue';
+import {useMobileLayout} from './mobile-layout.js';
+const {isMobile:isMobileViewport,menuOpen:mobileMenuOpen,navigation:mobileNavigation,trigger:mobileMenuTrigger,openMenu:openMobileMenu,closeMenu:closeMobileMenu}=useMobileLayout();
 import {isReturnedOrder,activeDashboardOrders} from './order-return.js';
 
 // Impor dari file konfigurasi Firebase Anda
@@ -10033,6 +10035,7 @@ function generateBagiHasilReport() {
 }
 
 function changePage(pageName) {
+    closeMobileMenu();
     if (pageName === 'bulk_process' || pageName === 'bulk_process_legacy') pageName = 'impor-pesanan-shopee';
     activePage.value = pageName;
 
@@ -19902,10 +19905,16 @@ void [
         class="flex h-screen bg-slate-100 fashion-app-shell"
         :class="{ 'fashion-dark': isDarkMode }"
     >
+      <header class="fashion-mobile-header">
+        <button ref="mobileMenuTrigger" type="button" @click="openMobileMenu" :disabled="uiState.isModalVisible" aria-label="Buka menu navigasi" aria-controls="fashion-navigation" :aria-expanded="mobileMenuOpen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg></button>
+        <div class="min-w-0"><strong>{{ state.settings.brandName || 'FASHION OS' }}</strong><small>Ruang kerja bisnis Anda</small></div>
+      </header>
+      <button v-if="isMobileViewport && mobileMenuOpen" class="fashion-menu-backdrop" type="button" @click="closeMobileMenu()" aria-label="Tutup menu navigasi" tabindex="-1"></button>
       <!-- Sidebar -->
-      <aside class="w-64 bg-gray-900 text-gray-300 flex-shrink-0 hidden md:flex md:flex-col">
+      <aside id="fashion-navigation" ref="mobileNavigation" :role="isMobileViewport ? 'dialog' : undefined" :aria-modal="isMobileViewport && mobileMenuOpen ? true : undefined" aria-label="Navigasi utama" :inert="isMobileViewport && !mobileMenuOpen" :aria-hidden="isMobileViewport && !mobileMenuOpen ? true : undefined" :class="{ 'is-mobile-open': mobileMenuOpen }" tabindex="-1" class="w-64 bg-gray-900 text-gray-300 flex-shrink-0 hidden md:flex md:flex-col fashion-sidebar">
     <div class="h-16 flex items-center justify-center px-4 border-b border-gray-700/50">
         <h1 class="text-xl font-bold text-white tracking-wider">{{ state.settings.brandName }}</h1>
+        <button class="fashion-mobile-close" type="button" @click="closeMobileMenu()" aria-label="Tutup menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18" /></svg></button>
     </div>
     
     <div class="flex-1 flex flex-col overflow-y-auto">
@@ -20116,7 +20125,7 @@ void [
 </aside>
 
       <!-- Main Content -->
-      <main class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 fashion-main-stage">
+      <main :inert="isMobileViewport && mobileMenuOpen" class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 fashion-main-stage">
     
     <div v-if="isLoading" class="flex items-center justify-center h-full">
         <div class="text-center">
