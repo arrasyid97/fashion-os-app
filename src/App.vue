@@ -4765,6 +4765,27 @@ function handleMarketplaceImportCompleted(payload) {
     if (payload.stockDeltas) invalidateModuleCache('products');
 }
 
+function handleMarketplaceOrderDeleted(payload) {
+    const id = payload.transactionId;
+    const previous = (state.transaksi || []).find(tx => tx.id === id);
+    state.transaksi = (state.transaksi || []).filter(tx => tx.id !== id);
+    state.pendingSettlements = (state.pendingSettlements || []).filter(tx => tx.id !== id);
+    dashboardPeriodData.transactions = dashboardPeriodData.transactions.filter(tx => tx.id !== id);
+    dashboardTodayData.transactions = dashboardTodayData.transactions.filter(tx => tx.id !== id);
+    if (previous) applyDashboardSummaryV2TransactionDelta(previous, null);
+    for (const [productId, stock] of Object.entries(payload.stockAfter || {})) {
+        for (const list of [state.produk, state.inventoryPaginated]) {
+            const product = (list || []).find(p => (p.docId || p.id) === productId);
+            if (product) { product.physical_stock = Number(stock); product.stokFisik = Number(stock); }
+        }
+    }
+    invalidateModuleCache('sales');
+    invalidateModuleCache('products');
+    dataFetched.transactions = false;
+    dataFetched.allTransactionsLoaded = false;
+    dataFetched.pendingSettlements = false;
+}
+
 async function refreshMarketplaceDispatchProducts() {
     if (!currentUser.value) return;
     invalidateModuleCache('products');
@@ -20208,7 +20229,7 @@ void [
 </div></div></div>
 
 <div v-if="activePage === 'transaksi'">
-    <MarketplaceTransactionHistory :transactions="state.transaksi || []" :marketplaces="state.settings.marketplaces || []" />
+    <MarketplaceTransactionHistory :transactions="state.transaksi || []" :marketplaces="state.settings.marketplaces || []" :user-id="currentUser?.uid || ''" @deleted="handleMarketplaceOrderDeleted" />
 </div>
 
 <div v-if="activePage === 'impor-pesanan-shopee' || activePage === 'impor-pesanan-tiktok'">
