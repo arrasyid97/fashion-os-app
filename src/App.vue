@@ -10560,6 +10560,7 @@ async function openFabricReceipt(group) {
 
 async function submitFabricPurchase() {
     if (!currentUser.value) return alert('Anda harus login untuk mencatat pembelian kain.');
+    if (isSavingFabric.value) return;
     const form = uiState.modalData;
     const items = (form.items || []).map(item => ({
         categoryId: String(item.categoryId || '').trim(),
@@ -10570,7 +10571,7 @@ async function submitFabricPurchase() {
         hargaBeliPerYard: Number(item.hargaBeliPerYard) || 0
     }));
     if (!form.tanggalBeli || !items.length || items.some(item =>
-        !item.categoryId || !item.namaKain || !item.warna || item.jumlahRoll <= 0 || item.totalYard <= 0 || item.hargaBeliPerYard <= 0
+        !item.categoryId || !item.namaKain || !item.warna || !Number.isSafeInteger(item.jumlahRoll) || item.jumlahRoll <= 0 || !Number.isFinite(item.totalYard) || item.totalYard <= 0 || !Number.isFinite(item.hargaBeliPerYard) || item.hargaBeliPerYard <= 0
     )) {
         return alert('Lengkapi tanggal dan setiap baris kain: jenis, warna, jumlah roll, total yard, serta harga per yard. Pastikan Kategori Kain sudah disiapkan di Pengaturan.');
     }
@@ -10581,21 +10582,34 @@ async function submitFabricPurchase() {
     }
 
     isSavingFabric.value = true;
-    fabricSavePhase.value = 'Menyimpan stok kain…';
+    fabricSavePhase.value = 'Menyimpan stok dan pengeluaran…';
     try {
-        const purchaseId = doc(collection(db, 'fabric_stock')).id;
+        const userId = currentUser.value.uid;
+        const purchaseId = form.purchaseId || doc(collection(db, 'fabric_stock')).id;
+        form.purchaseId = purchaseId;
+        const financeRef = doc(db, 'keuangan', 'FABRIC-' + purchaseId);
+        const purchaseValue = items.reduce((sum, item) => sum + item.totalYard * item.hargaBeliPerYard, 0);
+        const totalPayment = purchaseValue + adminFee;
+        if (!Number.isFinite(totalPayment) || totalPayment > Number.MAX_SAFE_INTEGER) {
+            throw new Error('Total pembelian melewati batas angka yang dapat disimpan.');
+        }
+        const purchaseDate = new Date(form.tanggalBeli);
+        const storeName = String(form.toko || '').trim();
         const receiptFile = fabricReceiptFile.value;
         const existingCodes = new Set(state.gudangKain.map(getFabricCode));
         const batch = writeBatch(db);
-        const newRows = items.map(item => {
-            const stockRef = doc(collection(db, 'fabric_stock'));
+        const newRows = items.map((item, index) => {
+            const stockId = form.items[index].stockId || doc(collection(db, 'fabric_stock')).id;
+            form.items[index].stockId = stockId;
+            const stockRef = doc(db, 'fabric_stock', stockId);
             const row = {
-                userId: currentUser.value.uid,
+                userId,
                 purchaseId,
-                tanggalBeli: new Date(form.tanggalBeli),
+                financeRecordId: financeRef.id,
+                tanggalBeli: purchaseDate,
                 namaKain: item.namaKain,
                 warna: item.warna,
-                toko: String(form.toko || '').trim(),
+                toko: storeName,
                 jumlahRoll: item.jumlahRoll,
                 jumlahBeliYard: item.totalYard,
                 sisaYard: item.totalYard,
@@ -10614,21 +10628,52 @@ async function submitFabricPurchase() {
             batch.set(stockRef, row);
             return { id: stockRef.id, ...row };
         });
+        const expenseCategory = (state.settings.categories || []).find(category =>
+            String(category.name || '').trim().toLowerCase() === 'pembelian kain' && category.type === 'produksi'
+        );
+        const fabricNames = [...new Set(items.map(item => item.namaKain))].join(', ');
+        const notes = [
+            'Pembelian kain ' + fabricNames + (storeName ? ' dari ' + storeName : '') + '.',
+            newRows.length + ' warna/batch.',
+            adminFee > 0 ? 'Termasuk biaya admin ' + formatCurrency(adminFee) + '.' : '',
+            String(form.catatan || '').trim()
+        ].filter(Boolean).join(' ');
+        const expense = {
+            userId,
+            jenis: 'pengeluaran',
+            tipeBiaya: 'produksi',
+            kategori: expenseCategory?.name || 'Pembelian Kain',
+            kategoriId: expenseCategory?.id || '',
+            jumlahPokok: purchaseValue,
+            adminFee,
+            jumlah: totalPayment,
+            tanggal: purchaseDate,
+            catatan: notes,
+            source: 'fabric_purchase',
+            fabricPurchaseId: purchaseId,
+            fabricStockIds: newRows.map(row => row.id),
+            dibuatPada: new Date()
+        };
+        // Commit the stock rows and their single linked expense atomically.
+        batch.set(financeRef, expense);
         await batch.commit();
-        state.gudangKain.unshift(...newRows);
+        if (currentUser.value?.uid !== userId) return;
+        const savedStockIds = new Set(newRows.map(row => row.id));
+        state.gudangKain = [...newRows, ...state.gudangKain.filter(row => !savedStockIds.has(row.id))];
+        state.keuangan = [{ id: financeRef.id, ...expense }, ...(state.keuangan || []).filter(row => row.id !== financeRef.id)];
         await persistFabricInventoryCache();
         const savedTotalYard = items.reduce((sum, item) => sum + item.totalYard, 0);
-        const savedPurchaseTotal = items.reduce((sum, item) => sum + item.totalYard * item.hargaBeliPerYard, 0) + adminFee;
+        const savedPurchaseTotal = totalPayment;
         fabricReceiptFile.value = null;
         hideModal();
         if (receiptFile) {
-            void attachFabricReceiptAfterPurchase(receiptFile, purchaseId, newRows, currentUser.value.uid);
+            void attachFabricReceiptAfterPurchase(receiptFile, purchaseId, newRows, userId);
         } else {
-            alert(`Pembelian kain tersimpan: ${newRows.length} warna/batch, ${savedTotalYard.toLocaleString('id-ID')} yard, ${formatCurrency(savedPurchaseTotal)}.`);
+            alert(`Pembelian kain dan pengeluaran produksi tersimpan: ${newRows.length} warna/batch, ${savedTotalYard.toLocaleString('id-ID')} yard, ${formatCurrency(savedPurchaseTotal)}.`);
         }
     } catch (error) {
         console.error('Gagal menyimpan pembelian kain:', error);
-        alert('Pembelian kain belum tersimpan. Periksa koneksi dan izin database, lalu coba lagi.');
+        alert('Pembelian kain dan pengeluaran belum tersimpan. Periksa koneksi dan izin database, lalu coba lagi.');
     } finally {
         isSavingFabric.value = false;
         fabricSavePhase.value = '';
@@ -20947,6 +20992,7 @@ SKU-BAJU-PUTIH-S"
                                 <tr v-if="riwayatPengeluaran.length === 0"><td colspan="4" class="p-4 text-center text-slate-500">Tidak ada data.</td></tr>
                                 <tr v-for="item in riwayatPengeluaran" :key="item.id" class="hover:bg-slate-50/50">
                                     <td class="px-4 py-3 align-top">
+                                        <p v-if="item.source === 'fabric_purchase'" class="mb-1 text-xs font-semibold text-indigo-700">Produksi · Pembelian kain otomatis</p>
                                         <p class="font-semibold text-slate-800">{{ item.kategori }}</p>
                                         <p class="text-xs">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</p>
                                     </td>
@@ -25585,6 +25631,7 @@ BAJU-PUTIH-M</pre>
                     <div class="flex items-center justify-between gap-3 text-sm text-slate-600"><dt>Biaya admin</dt><dd class="font-semibold">{{ formatCurrency(fabricPurchaseAdminFee) }}</dd></div>
                     <div class="flex items-center justify-between gap-3 font-bold text-indigo-950"><dt>Total pembayaran</dt><dd class="text-xl">{{ formatCurrency(fabricPurchasePaymentTotal) }}</dd></div>
                 </dl>
+                <p class="text-xs text-indigo-700 sm:col-span-2">Total pembayaran otomatis dicatat di Keuangan sebagai pengeluaran produksi.</p>
             </div>
         </div>
         <div class="mt-5 flex justify-end gap-3 border-t pt-4">
