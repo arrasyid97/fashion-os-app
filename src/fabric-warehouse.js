@@ -98,10 +98,11 @@ export async function completeFabricStock({ db, doc, collection, runTransaction,
         const current = snapshots.filter(snapshot => snapshot.exists()).map(snapshot => ({ ...snapshot.data(), id: snapshot.id }));
         if (current.some(row => row.userId !== userId) || selectedIds.some(id => !current.some(row => row.id === id))) throw new Error('Data kain tidak ditemukan atau bukan milik akun ini.');
         const active = current.filter(row => wanted.has(row.id) && !isFabricComplete(row));
-        if (!active.length) return { rows: [], expense: null, alreadyComplete: true };
+        const completed = current.filter(row => wanted.has(row.id) && isFabricComplete(row))
+            .map(row => ({ ...row, tanggalBeli: asFabricDate(row.tanggalBeli) }));
+        if (!active.length) return { rows: completed, expense: null, alreadyComplete: true };
         if (active.some(row => !Number.isFinite(Number(row.sisaYard)) || Number(row.sisaYard) < 0)) throw new Error('Sisa stok kain tidak valid. Periksa rincian terlebih dahulu.');
         const unlinked = active.filter(row => !row.financeRecordId);
-        if (unlinked.some(row => row.expenseTiming !== 'completion') && mode === 'auto') throw new Error('Untuk data lama, pilih apakah pengeluaran perlu dibuat atau sudah dicatat sebelumnya.');
         if (mode === 'existing' && unlinked.length && !existingExpenseId) throw new Error('Pilih pengeluaran produksi yang sudah ada.');
         const existingIds = new Set(active.map(row => row.financeRecordId).filter(Boolean));
         if (mode === 'existing' && unlinked.length) existingIds.add(existingExpenseId);
@@ -142,6 +143,6 @@ export async function completeFabricStock({ db, doc, collection, runTransaction,
             });
             return { ...row, ...fields, tanggalBeli: asFabricDate(row.tanggalBeli) };
         });
-        return { rows: updated, expense, alreadyComplete: false };
+        return { rows: [...updated, ...completed], expense, alreadyComplete: false };
     });
 }

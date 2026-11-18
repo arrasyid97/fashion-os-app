@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import MarketplaceShipmentImport from './components/MarketplaceShipmentImport.vue';
 import MarketplaceIncomeImport from './components/MarketplaceIncomeImport.vue';
 import PartnershipManagement from './components/PartnershipManagement.vue';
-import { isFabricComplete, asFabricDate, fabricPurchaseValue, allocateFabricAdmin, filterFabricHistory, summarizeFabricHistory, completeFabricStock } from './fabric-warehouse.js';
+import { isFabricComplete, asFabricDate, allocateFabricAdmin, filterFabricHistory, summarizeFabricHistory, completeFabricStock } from './fabric-warehouse.js';
 import MarketplaceTransactionHistory from './components/MarketplaceTransactionHistory.vue';
 
 // Impor dari file konfigurasi Firebase Anda
@@ -257,6 +257,9 @@ const fabricReceiptUploadTarget = ref(null);
 const fabricReceiptUploads = reactive({});
 const expandedFabricPurchaseGroups = ref([]);
 const fabricReceiptOpening = ref('');
+const fabricCompletionBusyIds = ref([]);
+const fabricCompletionNotice = ref('');
+const fabricCompletionError = ref(false);
 const fabricWarehouseView = ref('stock');
 const fabricHistoryPeriod = ref('all');
 const fabricHistoryStart = ref('');
@@ -7948,22 +7951,6 @@ const filteredGudangKainGroups = computed(() => {
     return result;
 });
 const fabricHistorySummary = computed(() => summarizeFabricHistory(filteredGudangKainGroups.value.flatMap(group => group.allRows)));
-const fabricCompletionRows = computed(() => {
-    const ids = new Set(uiState.modalData?.fabricIds || []);
-    return (state.gudangKain || []).filter(row => ids.has(row.id) && !isFabricComplete(row));
-});
-const fabricCompletionHasLegacy = computed(() => fabricCompletionRows.value.some(row => !row.financeRecordId && row.expenseTiming !== 'completion'));
-const fabricCompletionSummary = computed(() => {
-    const shares = allocateFabricAdmin(state.gudangKain || []);
-    const newRows = uiState.modalData?.financeMode === 'existing' ? [] : fabricCompletionRows.value.filter(row => !row.financeRecordId);
-    const principal = newRows.reduce((sum, row) => sum + fabricPurchaseValue(row), 0);
-    const admin = newRows.reduce((sum, row) => sum + (shares.get(row.id) || 0), 0);
-    return { principal, admin, total: principal + admin, yard: fabricCompletionRows.value.reduce((sum, row) => sum + Math.max(0, Number(row.sisaYard) || 0), 0) };
-});
-const fabricExistingProductionExpenses = computed(() => (state.keuangan || []).filter(row =>
-    ['pengeluaran', 'biaya'].includes(row.jenis) && (row.tipeBiaya || getExpenseTypeByCategory(row.kategori)) === 'produksi'
-).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal)));
-
 watch(() => uiState.gudangKainSearch, value => {
     if (String(value || '').trim()) {
         expandedFabricPurchaseGroups.value = filteredGudangKainGroups.value.map(group => group.key);
@@ -10776,43 +10763,34 @@ async function submitFabricCut() {
     }
 }
 
-async function openFabricCompletion(rows) {
+async function completeFabricImmediately(rows) {
     if (!currentUser.value || isSavingFabric.value) return;
     const active = rows.filter(row => !isFabricComplete(row));
     if (!active.length) return;
-    const legacy = active.some(row => !row.financeRecordId && row.expenseTiming !== 'completion');
-    const today = new Date();
-    const date = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-    showModal('completeFabric', { fabricIds: active.map(row => row.id), tanggalSelesai: date, financeMode: legacy ? '' : 'auto', existingExpenseId: '', purpose: '', loadingExpenses: legacy, error: '' });
-    await nextTick();
-    const form = uiState.modalData;
-    if (legacy) {
-        try { await fetchKeuanganData(); } finally {
-            if (uiState.modalType === 'completeFabric' && uiState.modalData === form) form.loadingExpenses = false;
-        }
-    }
-}
-
-async function submitFabricCompletion() {
-    if (!currentUser.value || isSavingFabric.value) return;
-    const form = uiState.modalData;
-    form.error = '';
     const userId = currentUser.value.uid;
-    if (!form.tanggalSelesai || !form.financeMode) { form.error = 'Pilih tanggal dan pencatatan pengeluaran terlebih dahulu.'; return; }
     isSavingFabric.value = true;
+    fabricCompletionBusyIds.value = active.map(row => row.id);
+    fabricCompletionError.value = false;
+    fabricCompletionNotice.value = 'Menyelesaikan ' + active.length + ' batch kain…';
     try {
-        const result = await completeFabricStock({ db, doc, collection, runTransaction, userId, rows: state.gudangKain, selectedIds: form.fabricIds,
-            date: new Date(form.tanggalSelesai + 'T12:00:00'), mode: form.financeMode, existingExpenseId: form.existingExpenseId, purpose: String(form.purpose || '').trim() });
+        const result = await completeFabricStock({ db, doc, collection, runTransaction, userId,
+            rows: state.gudangKain, selectedIds: [...fabricCompletionBusyIds.value], date: new Date() });
         if (currentUser.value?.uid !== userId) return;
         const updated = new Map(result.rows.map(row => [row.id, row]));
         state.gudangKain = state.gudangKain.map(row => updated.get(row.id) || row);
         if (result.expense) state.keuangan = [result.expense, ...(state.keuangan || []).filter(row => row.id !== result.expense.id)];
         await persistFabricInventoryCache();
-        if (uiState.modalType === 'completeFabric' && uiState.modalData === form) hideModal();
-        alert(result.alreadyComplete ? 'Kain ini sudah diselesaikan sebelumnya.' : result.rows.length + ' batch kain selesai. ' + (result.expense ? 'Pengeluaran produksi ' + formatCurrency(result.expense.jumlah) + ' sudah tercatat.' : 'Catatan pengeluaran yang sudah ada digunakan.') + ' Data pembelian tetap tersedia di Riwayat pembelian.');
+        fabricCompletionNotice.value = result.alreadyComplete ? 'Kain ini sudah selesai dan tidak dicatat ulang.' :
+            result.rows.length + ' batch selesai. ' + (result.expense ? 'Pengeluaran produksi sudah tercatat.' : 'Catatan pengeluaran yang sudah ada digunakan.');
     } catch (error) {
-        if (uiState.modalType === 'completeFabric' && uiState.modalData === form) form.error = error.message || 'Kain belum berhasil diselesaikan.';
-    } finally { isSavingFabric.value = false; }
+        if (currentUser.value?.uid === userId) {
+            fabricCompletionError.value = true;
+            fabricCompletionNotice.value = error.message || 'Kain belum berhasil diselesaikan. Coba lagi.';
+        }
+    } finally {
+        fabricCompletionBusyIds.value = [];
+        isSavingFabric.value = false;
+    }
 }
 
 async function deleteKain(kainId) {
@@ -20884,6 +20862,7 @@ SKU-BAJU-PUTIH-S"
                     </article>
                 </div>
 
+                <p v-if="fabricCompletionNotice" role="status" aria-live="polite" class="mb-4 rounded-lg p-3 text-sm" :class="fabricCompletionError ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-800'">{{ fabricCompletionNotice }}</p>
                 <div class="mb-5 flex flex-wrap gap-2" role="group" aria-label="Tampilan gudang kain">
                     <button @click="fabricWarehouseView = 'stock'" :aria-pressed="fabricWarehouseView === 'stock'" class="rounded-lg px-4 py-2 text-sm font-bold" :class="fabricWarehouseView === 'stock' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'">Stok aktif</button>
                     <button @click="fabricWarehouseView = 'history'" :aria-pressed="fabricWarehouseView === 'history'" class="rounded-lg px-4 py-2 text-sm font-bold" :class="fabricWarehouseView === 'history' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'">Riwayat pembelian</button>
@@ -20967,7 +20946,8 @@ SKU-BAJU-PUTIH-S"
                                     <td class="px-4 py-4 text-right font-semibold text-indigo-700">{{ formatCurrency(fabricWarehouseView === 'history' ? group.totalPembayaran : group.nilaiSisa) }}</td>
                                     <td class="px-4 py-4 text-center whitespace-nowrap" @click.stop>
                                         <button @click="toggleFabricPurchaseGroup(group.key)" :aria-expanded="isFabricPurchaseGroupExpanded(group.key)" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">{{ isFabricPurchaseGroupExpanded(group.key) ? 'Tutup rincian ▲' : 'Lihat rincian ▼' }}</button>
-                                        <button v-if="group.activeRows.length" @click="openFabricCompletion(group.activeRows)" :disabled="!isSubscriptionActive || isSavingFabric" class="mt-2 block w-full rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">Selesai grup</button>
+                                        <button v-if="group.activeRows.length" @click="completeFabricImmediately(group.activeRows)" :disabled="!isSubscriptionActive || isSavingFabric" class="mt-2 block w-full rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{{ group.activeRows.some(row => fabricCompletionBusyIds.includes(row.id)) ? 'Menyelesaikan…' : 'Selesai grup' }}</button>
+                                        <button v-else disabled class="mt-2 block w-full cursor-default rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Selesai</button>
                                     </td>
                                 </tr>
                                 <tr v-if="isFabricPurchaseGroupExpanded(group.key)" class="bg-slate-50/70">
@@ -20986,8 +20966,8 @@ SKU-BAJU-PUTIH-S"
                                                         <td class="p-3 text-right font-semibold text-indigo-700">{{ formatCurrency(Math.max(0, Number(kain.sisaYard) || 0) * Math.max(0, Number(kain.hargaBeliPerYard) || 0)) }}</td>
                                                         <td class="p-3 text-center whitespace-nowrap">
                                                             <button v-if="!isFabricComplete(kain)" @click="openFabricCutModal(kain)" class="rounded bg-indigo-50 px-2 py-1.5 font-bold text-indigo-700 hover:bg-indigo-100" :disabled="!isSubscriptionActive || isSavingFabric || Number(kain.sisaYard) <= 0">Catat potong</button>
-                                                            <button v-if="!isFabricComplete(kain)" @click="openFabricCompletion([kain])" :disabled="!isSubscriptionActive || isSavingFabric" class="ml-1 rounded bg-emerald-600 px-2 py-1.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">Selesai</button>
-                                                            <span v-else class="rounded-full bg-emerald-50 px-2 py-1 font-semibold text-emerald-700">Selesai · tercatat di Keuangan</span>
+                                                            <button v-if="!isFabricComplete(kain)" @click="completeFabricImmediately([kain])" :disabled="!isSubscriptionActive || isSavingFabric" class="ml-1 rounded bg-emerald-600 px-2 py-1.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{{ fabricCompletionBusyIds.includes(kain.id) ? 'Menyelesaikan…' : 'Selesai' }}</button>
+                                                            <button v-else disabled class="cursor-default rounded bg-emerald-50 px-2 py-1.5 font-bold text-emerald-700">Selesai</button>
                                                             <button v-if="!isFabricComplete(kain)" @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="ml-1 rounded bg-slate-100 px-2 py-1.5 font-bold hover:bg-slate-200" :disabled="!isSubscriptionActive">Edit</button>
                                                             <button v-if="!isFabricComplete(kain)" @click="deleteKain(kain.id)" class="ml-1 px-1 font-bold text-red-600 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
                                                         </td>
@@ -25728,29 +25708,6 @@ BAJU-PUTIH-M</pre>
             <label class="block text-sm font-medium">Harga beli per yard (Rp)<input type="number" min="0" step="0.01" v-model.number="uiState.modalData.hargaBeliPerYard" class="mt-1 w-full rounded-md border p-2" required></label>
         </div>
         <div class="flex justify-end gap-3 border-t pt-4"><button type="button" @click="hideModal" class="rounded-lg bg-slate-100 px-4 py-2">Batal</button><button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white">Simpan perubahan</button></div>
-    </form>
-</div>
-<div v-if="uiState.modalType === 'completeFabric'" class="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-2xl bg-white p-5 shadow-2xl sm:p-7">
-    <div class="mb-4 border-b pb-4"><h3 class="text-2xl font-bold text-slate-900">Selesaikan Pemakaian Kain</h3><p class="mt-2 text-sm text-slate-600">{{ fabricCompletionRows.length }} batch akan ditandai selesai. Sisa {{ fabricCompletionSummary.yard.toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} yard akan dicatat habis dipakai. Data pembelian tetap tersimpan di riwayat.</p></div>
-    <form @submit.prevent="submitFabricCompletion" class="flex min-h-0 flex-1 flex-col">
-        <div class="flex-1 space-y-4 overflow-y-auto pr-1">
-            <div class="flex flex-wrap gap-2"><span v-for="row in fabricCompletionRows" :key="row.id" class="rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700"><b class="font-mono">{{ getFabricCode(row) }}</b> · {{ row.warna }}</span></div>
-            <label class="block text-sm font-semibold text-slate-700">Tanggal selesai<input type="date" v-model="uiState.modalData.tanggalSelesai" required class="mt-1 block w-full rounded-lg border p-2.5"></label>
-            <label class="block text-sm font-semibold text-slate-700">Tujuan produksi / catatan <span class="font-normal text-slate-400">(opsional)</span><input type="text" v-model="uiState.modalData.purpose" placeholder="Contoh: Produksi gamis Salwa" class="mt-1 block w-full rounded-lg border p-2.5"></label>
-            <section v-if="fabricCompletionHasLegacy" class="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <p class="text-sm text-amber-900">Data lama ini belum terhubung ke pengeluaran. Pilih pencatatan yang sesuai.</p>
-                <label class="block text-sm font-semibold text-slate-700">Pencatatan pengeluaran<select v-model="uiState.modalData.financeMode" required class="mt-1 w-full rounded-lg border bg-white p-2.5"><option value="" disabled>Pilih pencatatan</option><option value="new">Belum dicatat — buat pengeluaran produksi</option><option value="existing">Sudah dicatat — gunakan pengeluaran yang ada</option></select></label>
-                <label v-if="uiState.modalData.financeMode === 'existing'" class="block text-sm font-semibold text-slate-700">Pengeluaran produksi yang sudah ada<select v-model="uiState.modalData.existingExpenseId" :disabled="uiState.modalData.loadingExpenses" required class="mt-1 w-full rounded-lg border bg-white p-2.5"><option value="" disabled>{{ uiState.modalData.loadingExpenses ? 'Memuat pengeluaran…' : 'Pilih pengeluaran' }}</option><option v-for="expense in fabricExistingProductionExpenses" :key="expense.id" :value="expense.id">{{ asFabricDate(expense.tanggal)?.toLocaleDateString('id-ID') }} · {{ expense.kategori }} · {{ formatCurrency(expense.jumlah) }} · {{ String(expense.catatan || '').slice(0, 90) }}</option></select></label>
-            </section>
-            <div class="space-y-2 rounded-xl bg-indigo-50 p-4 text-sm">
-                <div class="flex justify-between gap-3"><span>Nilai kain yang akan dicatat</span><b>{{ formatCurrency(fabricCompletionSummary.principal) }}</b></div>
-                <div class="flex justify-between gap-3"><span>Bagian biaya admin</span><b>{{ formatCurrency(fabricCompletionSummary.admin) }}</b></div>
-                <div class="flex justify-between gap-3 border-t border-indigo-200 pt-2 text-base font-bold text-indigo-950"><span>Pengeluaran produksi baru</span><span>{{ formatCurrency(fabricCompletionSummary.total) }}</span></div>
-                <p v-if="fabricCompletionRows.some(row => row.financeRecordId) || uiState.modalData.financeMode === 'existing'" class="text-xs text-indigo-700">Untuk kain yang sudah dicatat, pengeluaran lama digunakan kembali.</p>
-            </div>
-            <p v-if="uiState.modalData.error" class="rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">{{ uiState.modalData.error }}</p>
-        </div>
-        <div class="mt-5 flex justify-end gap-3 border-t pt-4"><button type="button" @click="hideModal" :disabled="isSavingFabric" class="rounded-lg bg-slate-100 px-4 py-2.5 font-bold text-slate-700 disabled:opacity-50">Batal</button><button type="submit" :disabled="isSavingFabric || !fabricCompletionRows.length || !uiState.modalData.financeMode" class="rounded-lg bg-emerald-600 px-4 py-2.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{{ isSavingFabric ? 'Menyimpan…' : 'Selesai dan simpan' }}</button></div>
     </form>
 </div>
 <div v-if="uiState.modalType === 'fabricCut'" class="bg-white rounded-2xl shadow-2xl p-5 sm:p-7 max-w-4xl w-full max-h-[92vh] flex flex-col">
