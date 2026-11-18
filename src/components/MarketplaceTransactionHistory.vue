@@ -14,13 +14,14 @@
 /* global defineProps, defineEmits */
 import {computed,ref} from 'vue';
 import {auth} from '../firebase.js';
+import {isReturnedOrder} from '../order-return.js';
 const props=defineProps({transactions:{type:Array,default:()=>[]},marketplaces:{type:Array,default:()=>[]},userId:{type:String,default:''}});
 const emit=defineEmits(['deleted']);
 const deletingId=ref(''),deleteError=ref(''),deleteMessage=ref(''),deletedIds=ref([]);
 const search=ref(''),channelFilter=ref('all'),statusFilter=ref('all'),norm=v=>String(v??'').trim().toLowerCase().replace(/[^a-z0-9]/g,'');
 function dateValue(v){if(v?.toDate)return v.toDate();if(v instanceof Date)return v;if(v?.seconds)return new Date(v.seconds*1000);const d=new Date(v||0);return Number.isNaN(d.getTime())?new Date(0):d}
 const transactions=computed(()=>[...props.transactions].sort((a,b)=>dateValue(b.tanggalTerkirim||b.tanggal||b.createdAt)-dateValue(a.tanggalTerkirim||a.tanggal||a.createdAt))),marketplaces=computed(()=>props.marketplaces);
-function statusKey(tx){const s=norm(tx.statusPencairan);if(s.includes('retur')||norm(tx.statusDataMarketplace)==='retur')return'returned';if(s.includes('hilang')||norm(tx.statusDataMarketplace)==='hilang')return'lost';if(s==='sudahcair'||tx.konfirmasiSuksesCairManual)return'paid';return'pending'}
+function statusKey(tx){if(isReturnedOrder(tx))return'returned';const s=norm(tx.statusPencairan);if(s.includes('retur')||norm(tx.statusDataMarketplace)==='retur')return'returned';if(s.includes('hilang')||norm(tx.statusDataMarketplace)==='hilang')return'lost';if(s==='sudahcair'||tx.konfirmasiSuksesCairManual)return'paid';return'pending'}
 function hpp(tx){return Number(tx.totalHpp)||(tx.items||[]).reduce((s,i)=>s+(Number(i.hpp)||0)*(Number(i.qty)||0),0)}
 const filtered=computed(()=>{const q=norm(search.value);return transactions.value.filter(tx=>{if(deletedIds.value.includes(tx.id))return false;if(channelFilter.value!=='all'&&String(tx.channelId)!==channelFilter.value)return false;if(statusFilter.value!=='all'&&statusKey(tx)!==statusFilter.value)return false;if(!q)return true;return[tx.marketplaceOrderId,tx.externalPackageId,tx.trackingNumber,tx.channel,...(tx.items||[]).flatMap(i=>[i.nama,i.sku,i.warna,i.ukuran,i.varian])].some(v=>norm(v).includes(q))})});
 const totalQty=computed(()=>filtered.value.reduce((s,tx)=>s+(tx.items||[]).reduce((q,i)=>q+(Number(i.qty)||0),0),0)),totalHpp=computed(()=>filtered.value.reduce((s,tx)=>s+hpp(tx),0));

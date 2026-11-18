@@ -76,12 +76,12 @@
                 <div v-if="selectedPendingTransactions.length" class="mt-2 divide-y rounded-lg border border-slate-200">
                     <div v-for="tx in selectedPendingTransactions" :key="tx.id" class="flex flex-wrap items-center justify-between gap-3 p-3">
                         <div><p class="font-mono text-sm font-semibold">{{ tx.marketplaceOrderId || 'ID tidak tersedia' }}</p><p class="text-xs text-slate-500">{{ tx.channel || tx.channelId }} · HPP {{ formatCurrency(transactionHpp(tx)) }}</p></div>
-                        <div class="flex gap-2"><button type="button" @click="markReturned(tx.marketplaceOrderId, tx.channelId)" class="rounded border border-amber-300 px-3 py-1 text-xs font-semibold text-amber-800">Konfirmasi retur</button><button type="button" @click="markLost(tx.marketplaceOrderId, tx.channelId)" class="rounded border border-red-300 px-3 py-1 text-xs font-semibold text-red-700">Konfirmasi hilang</button></div>
+                        <div class="flex gap-2"><button type="button" @click="markLost(tx.marketplaceOrderId, tx.channelId)" class="rounded border border-red-300 px-3 py-1 text-xs font-semibold text-red-700">Konfirmasi hilang</button></div>
                     </div>
                 </div>
                 <p v-else class="mt-2 text-sm text-slate-500">Tidak ada pesanan tertunda pada tanggal ini.</p>
                 <p v-if="resolutionMessage" class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ resolutionMessage }}</p>
-                <p class="mt-3 text-xs text-slate-500">Konfirmasi retur hanya menutup penantian dana. Stok retur tetap harus dicatat manual di Manajemen Retur setelah barang kembali.</p>
+                <p class="mt-3 text-xs text-slate-500">Retur dicatat melalui Penanganan Pesanan. Pesanan yang sudah diretur otomatis keluar dari daftar konfirmasi ini.</p>
             </div>
         </div>
     </section>
@@ -89,10 +89,11 @@
 
 <script setup>
 /* global defineProps, defineEmits */
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import * as XLSX from 'xlsx';
 import { db } from '../firebase.js';
-import { collection, getDocs, query, where, writeBatch, doc, setDoc } from 'firebase/firestore';
+import {isReturnedOrder} from '../order-return.js';
+import { collection, getDocs, query, where, writeBatch, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 const props = defineProps({
     userId: { type: String, default: '' },
@@ -413,7 +414,7 @@ async function saveIncome() {
             } else if (matches.length === 1) match = matches[0];
             else if (matches.length > 1) errors.push('Baris ' + row.row + ': pesanan punya beberapa paket; ID Paket/Resi diperlukan.');
             if (!match && !errors.some(e => e.startsWith('Baris ' + row.row + ':'))) errors.push('Baris ' + row.row + ': transaksi dari file pesanan terkirim tidak ditemukan.');
-            if (match) mapped.push({ row, transaction: match });
+            if (match && !isReturnedOrder(match)) mapped.push({ row, transaction: match });
         });
         if (errors.length) throw new Error(errors.slice(0, 12).join('\n') + (errors.length > 12 ? '\nDan ' + (errors.length - 12) + ' masalah lainnya.' : ''));
         const updated = [];
@@ -451,24 +452,27 @@ function pendingDateKey(tx) {
 function transactionHpp(tx) {
     return Number(tx.totalHpp) || (tx.items || []).reduce((sum, item) => sum + (Number(item.hpp) || 0) * (Number(item.qty) || 0), 0);
 }
-async function loadPendingTransactions() {
-    if (!props.userId) return;
-    pendingLoading.value = true;
-    try {
-        const snap = await getDocs(query(collection(db, 'transactions'), where('userId', '==', props.userId)));
-        pendingTransactions.value = snap.docs.map(item => ({ id: item.id, ...item.data() })).filter(tx => {
-            const status = norm(tx.statusPencairan);
-            return !status || status === 'belumcair' || status === 'waiting';
-        }).sort((a, b) => (pendingDateKey(a) || '').localeCompare(pendingDateKey(b) || ''));
-        if (!selectedPendingTransactions.value.length) {
-            const first = pendingTransactions.value.map(pendingDateKey).find(key => key.startsWith(calendarMonth.value));
-            if (first) selectedPendingDay.value = first;
-        }
-    } catch (error) {
-        console.error('Gagal memuat pesanan belum terselesaikan:', error);
-        manualError.value = error?.message || 'Daftar pesanan tertunda gagal dimuat.';
-    } finally { pendingLoading.value = false; }
+function applyPendingSnapshot(documents) {
+    const all=documents.map(item=>({id:item.id,...item.data()}));
+    pendingTransactions.value=all.filter(tx=>!isReturnedOrder(tx)&&['','belumcair','waiting'].includes(norm(tx.statusPencairan))).sort((a,b)=>(pendingDateKey(a)||'').localeCompare(pendingDateKey(b)||''));
+    const returned=new Set(all.filter(isReturnedOrder).map(tx=>tx.id));
+    manualRows.value=manualRows.value.filter(row=>!(row.transactions||[]).some(tx=>returned.has(tx.id)));
+    if(!selectedPendingTransactions.value.length){const first=pendingTransactions.value.map(pendingDateKey).find(key=>key.startsWith(calendarMonth.value));if(first)selectedPendingDay.value=first;}
 }
+async function loadPendingTransactions() {
+    if(!props.userId)return;pendingLoading.value=true;
+    try{const snap=await getDocs(query(collection(db,'transactions'),where('userId','==',props.userId)));applyPendingSnapshot(snap.docs);}
+    catch(error){resolutionMessage.value=error.message||'Pesanan belum dapat dimuat.';}
+    finally{pendingLoading.value=false;}
+}
+let stopPending=null;
+function subscribePendingTransactions(){
+    if(stopPending)stopPending();pendingTransactions.value=[];if(!props.userId)return;
+    const uid=props.userId;pendingLoading.value=true;
+    stopPending=onSnapshot(query(collection(db,'transactions'),where('userId','==',uid)),snap=>{if(uid!==props.userId)return;applyPendingSnapshot(snap.docs);pendingLoading.value=false;},error=>{if(uid===props.userId){resolutionMessage.value=error.message||'Daftar pesanan belum dapat diperbarui.';pendingLoading.value=false;}});
+}
+watch(()=>props.userId,subscribePendingTransactions);
+onBeforeUnmount(()=>{if(stopPending)stopPending();});
 function selectFirstPendingDay() {
     const first = pendingTransactions.value.map(pendingDateKey).find(key => key.startsWith(calendarMonth.value));
     selectedPendingDay.value = first || calendarMonth.value + '-01';
@@ -489,11 +493,12 @@ async function prepareConfirmedIds() {
         const channel = marketplaceById(selectedMarketplaceId.value);
         manualRows.value = ids.map(orderId => {
             const txs = found.filter(tx => norm(tx.marketplaceOrderId) === norm(orderId) && (norm(tx.channelId) === norm(channel?.id) || norm(tx.channel) === norm(channel?.name)));
-            const alreadySettled = txs.length > 0 && txs.every(tx => ['sudahcair', 'retur/pengembalian', 'retur', 'baranghilang'].includes(norm(tx.statusPencairan)));
-            const blocked = txs.some(tx => ['retur/pengembalian', 'retur', 'baranghilang'].includes(norm(tx.statusPencairan)));
+            if(txs.some(isReturnedOrder))return null;
+            const alreadySettled = txs.length > 0 && txs.every(tx => ['sudahcair', 'returpengembalian', 'retur', 'baranghilang'].includes(norm(tx.statusPencairan)));
+            const blocked = txs.some(tx => ['returpengembalian', 'retur', 'baranghilang'].includes(norm(tx.statusPencairan)));
             const absentFromReport = shopeeReport.value && !shopeeReport.value.orderIds.some(id => norm(id) === norm(orderId));
             return { id: norm(orderId), orderId, transactions: txs, hpp: txs.reduce((sum, tx) => sum + transactionHpp(tx), 0), alreadySettled, error: !txs.length ? 'ID tidak ditemukan' : blocked ? 'Sudah berstatus retur/hilang' : absentFromReport ? 'ID tidak ada di tab Seller Fee pada file ini' : '' };
-        });
+        }).filter(Boolean);
     } catch (error) { manualError.value = error.message || 'ID tidak bisa diperiksa.'; }
     finally { isPreparing.value = false; }
 }
@@ -558,15 +563,6 @@ async function savePayoutSummary() {
         payoutSummaryError.value = error?.message || 'Total pencairan gagal disimpan.';
     } finally { isSavingPayout.value = false; }
 }
-async function markReturned(orderId, channelId) {
-    if (!window.confirm('Konfirmasi bahwa pesanan ini sedang/terbukti retur? Ini tidak mengembalikan stok. Stok retur harus dicatat di Manajemen Retur setelah barang diterima.')) return;
-    try {
-        const txs = pendingTransactions.value.filter(tx => norm(tx.marketplaceOrderId) === norm(orderId) && norm(tx.channelId) === norm(channelId));
-        const batch = writeBatch(db);
-        txs.forEach(tx => batch.update(doc(db, 'transactions', tx.id), { statusPencairan: 'Retur/Pengembalian', statusDataMarketplace: 'retur', returDikonfirmasiManual: true }));
-        await batch.commit(); resolutionMessage.value = 'Pesanan ' + orderId + ' ditandai retur. Catat stok setelah barang benar-benar kembali.'; await loadPendingTransactions();
-    } catch (error) { resolutionMessage.value = error?.message || 'Status retur gagal disimpan.'; }
-}
 async function markLost(orderId, channelId) {
     if (!window.confirm('Konfirmasi barang hilang? Fashion OS akan menutup status tertunda dan mencatat HPP sebagai pengeluaran. Pastikan kamu sudah melacak pesanan ini di marketplace.')) return;
     try {
@@ -588,7 +584,7 @@ async function markLost(orderId, channelId) {
         await batch.commit(); resolutionMessage.value = 'Pesanan ' + orderId + ' ditandai hilang. Pengeluaran HPP ' + formatCurrency(hpp) + ' sudah dicatat.'; await loadPendingTransactions();
     } catch (error) { resolutionMessage.value = error?.message || 'Pencatatan barang hilang gagal.'; }
 }
-onMounted(loadPendingTransactions);
+onMounted(subscribePendingTransactions);
 
 function formatCurrency(value) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value) || 0);

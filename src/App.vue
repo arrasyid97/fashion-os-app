@@ -10,6 +10,8 @@ import PartnershipManagement from './components/PartnershipManagement.vue';
 import { isFabricComplete, asFabricDate, allocateFabricAdmin, filterFabricHistory, summarizeFabricHistory, completeFabricStock } from './fabric-warehouse.js';
 import MarketplaceTransactionHistory from './components/MarketplaceTransactionHistory.vue';
 import ReturnOrderSearch from './components/ReturnOrderSearch.vue';
+import OrderReturnForm from './components/OrderReturnForm.vue';
+import {isReturnedOrder,activeDashboardOrders} from './order-return.js';
 
 // Impor dari file konfigurasi Firebase Anda
 
@@ -4787,6 +4789,21 @@ function handleMarketplaceOrderDeleted(payload) {
     dataFetched.pendingSettlements = false;
 }
 
+function handleOrderReturnCompleted(payload) {
+    handleMarketplaceImportCompleted({ transactions: [payload.transaction], financeUpdate: true });
+    state.pendingSettlements = (state.pendingSettlements || []).filter(tx => !isReturnedOrder(tx));
+    if (payload.returnRecord) addReturnToLocalStores(payload.returnRecord);
+    for (const [productId, stock] of Object.entries(payload.stockAfter || {})) {
+        for (const list of [state.produk, state.inventoryPaginated]) {
+            const product = (list || []).find(p => (p.docId || p.id) === productId);
+            if (product) { product.physical_stock = Number(stock); product.stokFisik = Number(stock); }
+        }
+    }
+    invalidateModuleCache('sales'); invalidateModuleCache('products');
+    dataFetched.pendingSettlements = false; dataFetched.returns = false;
+    dashboardSummaryV2MemoryCache.clear();
+}
+
 async function refreshMarketplaceDispatchProducts() {
     if (!currentUser.value) return;
     invalidateModuleCache('products');
@@ -7110,7 +7127,7 @@ const dashboardFilteredData = computed(() => {
     ];
 
     return {
-        transaksi: filterDataByDate(transaksiData, ...filterOptions),
+        transaksi: filterDataByDate(activeDashboardOrders(transaksiData), ...filterOptions),
         keuangan: filterDataByDate(keuanganData, ...filterOptions),
         retur: filterDataByDate(returData, ...filterOptions)
     };
@@ -8402,7 +8419,8 @@ const filteredRetur = computed(() => {
             returnDocId: doc.id, 
             tanggal: doc.tanggal,
             channelId: doc.channelId,
-            originalTransactionId: doc.originalTransactionId // <--- PENTING: Tambahkan baris ini
+            originalTransactionId: doc.originalTransactionId,
+            marketplaceOrderId: doc.marketplaceOrderId || ''
         }))
     );
 
@@ -8414,7 +8432,8 @@ const filteredRetur = computed(() => {
             const product = getProductBySku(item.sku);
             const productName = product ? product.nama.toLowerCase() : '';
             return (
-                item.sku.toLowerCase().includes(searchQuery) ||
+                String(item.sku || '').toLowerCase().includes(searchQuery) ||
+                String(item.marketplaceOrderId || '').toLowerCase().includes(searchQuery) ||
                 (item.alasan && item.alasan.toLowerCase().includes(searchQuery)) ||
                 productName.includes(searchQuery)
             );
@@ -9006,7 +9025,7 @@ const dashboardWorkflowMetrics = computed(() => {
 ]);
 
 const pendingTransactions = (state.pendingSettlements || []).filter(transaction => {
-    if (!isActiveExportRecord(transaction)) return false;
+    if (!isActiveExportRecord(transaction) || isReturnedOrder(transaction)) return false;
     if (!String(transaction.marketplaceOrderId || '').trim()) return false;
     if (!String(transaction.channelId || transaction.channel || '').trim()) return false;
 
@@ -9044,7 +9063,7 @@ const dashboardPremiumData = computed(() => {
   const orderDate=value?.toDate?value.toDate():value?.seconds?new Date(value.seconds*1000):value?new Date(value):null;
   return {...transaction,tanggal:orderDate&&!Number.isNaN(orderDate.getTime())?orderDate:null};
  });
- const periodTransactions=filterDataByDate(transactionsByOrderDate,...activityFilterOptions).filter(transaction=>Boolean(String(transaction?.marketplaceOrderId||'').trim())&&Boolean(String(transaction?.channelId||transaction?.channel||'').trim()));
+ const periodTransactions=filterDataByDate(activeDashboardOrders(transactionsByOrderDate),...activityFilterOptions).filter(transaction=>Boolean(String(transaction?.marketplaceOrderId||'').trim())&&Boolean(String(transaction?.channelId||transaction?.channel||'').trim()));
  const normalizeDashboardStatus=value=>String(value||'').trim().toLocaleLowerCase('id-ID').replace(/[\s/_-]+/g,'');
  const resolvedStatuses=new Set(['id_sukses_terkonfirmasi','sudahcair','retur','returpengembalian','dikembalikan','pengembalian','baranghilang','hilang','dibatalkan','batal','cancelled','canceled']);
  const hasResolvedOutcome=transaction=>resolvedStatuses.has(normalizeDashboardStatus(transaction?.statusDataMarketplace))||resolvedStatuses.has(normalizeDashboardStatus(transaction?.statusPencairan));
@@ -21248,22 +21267,27 @@ SKU-BAJU-PUTIH-S"
                 <div class="flex flex-wrap justify-between items-center gap-4 mb-6 pb-6 border-b border-slate-200">
                     <div>
                         <h2 class="text-3xl font-bold text-slate-800">Penanganan Pesanan</h2>
-                        <p class="text-slate-500 mt-1">Kelola retur dan catatan masalah produk dari transaksi pelanggan.</p>
+                        <p class="text-slate-500 mt-1">Terima barang retur dan perbarui stok, status pesanan, serta Dashboard dari satu halaman.</p>
                     </div>
                     <div class="flex items-center gap-4">
                         <button @click="showModal('panduanRetur')" class="bg-indigo-100 text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-200 text-sm flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>
                             Informasi
                         </button>
-                        <button @click="showModal('addRetur', { tanggal: new Date().toISOString().split('T')[0], transactionIdSearch: '', foundTransaction: null, items: [] })" class="bg-orange-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-orange-600 shadow transition-colors" :disabled="!isSubscriptionActive">
-                            + Tambah Retur
-                        </button>
+
                     </div>
                 </div>
 
+                <OrderReturnForm class="mb-6" :user-id="currentUser?.uid || ''" :transactions="state.transaksi || []" :subscription-active="isSubscriptionActive" @completed="handleOrderReturnCompleted" />
+                <section class="mb-6 grid gap-3 sm:grid-cols-3">
+                    <article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><p class="text-xs font-semibold uppercase text-slate-500">Pesanan dalam riwayat terpilih</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ new Set(filteredRetur.map(item => item.originalTransactionId || item.returnDocId)).size }}</p></article>
+                    <article class="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><p class="text-xs font-semibold uppercase text-emerald-700">Barang kembali</p><p class="mt-2 text-2xl font-bold text-emerald-800">{{ filteredRetur.reduce((sum,item) => sum + (Number(item.qty) || 0), 0) }} pcs</p></article>
+                    <article class="rounded-xl border border-indigo-100 bg-indigo-50 p-4"><p class="text-xs font-semibold uppercase text-indigo-700">Alur pencatatan</p><p class="mt-2 font-bold text-indigo-900">Cari → Periksa → Simpan retur</p><p class="mt-1 text-xs text-indigo-700">Stok dan status pesanan diperbarui bersama.</p></article>
+                </section>
+                <div class="mb-4 border-t border-slate-100 pt-6"><h3 class="text-lg font-bold text-slate-900">Riwayat penanganan</h3><p class="mt-1 text-sm text-slate-500">Telusuri pesanan dan barang yang sudah dicatat kembali ke gudang.</p></div>
                 <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                     <div class="relative">
-                        <label for="retur-search" class="block text-sm font-medium text-slate-700 mb-1">Cari (ID Retur, SKU, Nama, Alasan)</label>
+                        <label for="retur-search" class="block text-sm font-medium text-slate-700 mb-1">Cari riwayat (ID pesanan, SKU, nama, alasan)</label>
                         <input 
                             v-model="uiState.returPageSearchQuery"
                             @input="handleReturPageSearch"
@@ -21366,13 +21390,13 @@ SKU-BAJU-PUTIH-S"
 </thead>
                         <tbody class="divide-y divide-slate-200/50">
                             <tr v-if="!returnHistoryLoading && filteredRetur.length === 0">
-                                <td colspan="6" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
+                                <td colspan="7" class="p-10 text-center text-slate-500">Tidak ada data retur yang sesuai dengan filter.</td>
                             </tr>
                             <tr v-for="(item, index) in filteredRetur" :key="`${item.returnDocId}-${item.sku}-${index}`" class="hover:bg-slate-50/50">
     <td class="px-6 py-4 whitespace-nowrap">{{ new Date(item.tanggal).toLocaleDateString('id-ID') }}</td>
     
     <td class="px-6 py-4 font-mono text-xs font-bold text-indigo-600">
-        {{ getTransactionDisplayId(item.originalTransactionId) }}
+        {{ item.marketplaceOrderId || getTransactionDisplayId(item.originalTransactionId) }}
     </td>
 
     <td class="px-6 py-4">{{ getMarketplaceById(item.channelId)?.name || 'N/A' }}</td>
@@ -27097,8 +27121,8 @@ BAJU-PUTIH-M</pre>
                 Alur Kerja Otomatis
             </h4>
             <ul class="list-disc list-inside ml-4 mt-2 space-y-1 text-sm">
-                <li>Ketika Anda mencatat retur, sistem akan mengembalikan stok ke **Inventaris Fisik Global** dan **alokasi stok di toko asalnya**.</li>
-                <li>Ini memastikan produk yang dikembalikan siap dijual kembali di platform yang sama.</li>
+                <li>Cari ID pesanan atau scan resi langsung di form Penanganan Pesanan, lalu periksa seluruh isi paket.</li>
+                <li>Setelah retur disimpan, stok fisik dikembalikan satu kali. ID keluar dari Konfirmasi Pesanan Berhasil dan tidak dihitung sebagai pesanan aktif atau berhasil di Dashboard.</li>
             </ul>
         </div>
         
@@ -27108,8 +27132,8 @@ BAJU-PUTIH-M</pre>
                 Peringatan Penting
             </h4>
             <ul class="list-disc list-inside ml-4 mt-2 space-y-1 text-sm">
-                <li>**Pembatalan Data:** Data retur yang sudah disimpan tidak dapat diubah (diedit). Hapus data yang salah dan catat ulang jika diperlukan.</li>
-                <li>**Penghapusan & Dampak Stok:** Menghapus data retur akan secara otomatis **mengurangi stok fisik dan alokasi stok** yang sebelumnya ditambahkan.</li>
+                <li>Pencatatan ini mencakup seluruh isi pesanan. Catat setelah barang diterima di gudang; riwayat retur sebelumnya diperiksa agar stok tidak ditambahkan dua kali.</li>
+                <li>Menghapus riwayat hanya menghapus catatan. Stok dan status pesanan tidak berubah; mencatat ulang ID yang sudah selesai tidak menambah stok lagi.</li>
             </ul>
         </div>
     </div>

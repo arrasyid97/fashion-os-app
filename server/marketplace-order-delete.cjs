@@ -11,6 +11,7 @@ async function checkLinked(db, transaction, userId, id) {
     }
 }
 function restoreQty(tx) {
+    if (tx.returnCompleted === true) return 0;
     if (tx.stockDeductionApplied === false) return 0;
     if (tx.stockDeductionApplied !== true) fail(409, 'Status pengurangan stok transaksi lama belum jelas. Pesanan belum dihapus agar stok tidak bertambah keliru.');
     if (!Array.isArray(tx.items) || !tx.items.length) fail(409, 'Rincian produk pesanan tidak lengkap.');

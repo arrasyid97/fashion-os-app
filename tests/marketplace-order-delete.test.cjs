@@ -26,6 +26,7 @@ function harness(){
  const failed=harness();const f=await failed.prepare();failed.fail=true;await assert.rejects(failed.delete(f),/commit failed/);assert(failed.rows.has('transactions/TX1'));assert.equal(failed.rows.get('products/P1').physical_stock,4);
  const linked=harness();linked.rows.set('returns/R1',{userId:'owner',originalTransactionId:'TX1'});await assert.rejects(linked.prepare(),e=>e.status===409);assert.equal(linked.rows.get('products/P1').physical_stock,4);
  const notDeducted=harness();notDeducted.rows.get('transactions/TX1').stockDeductionApplied=false;const nd=await notDeducted.prepare();assert.equal(nd.restoreQty,0);await notDeducted.delete(nd);assert.equal(notDeducted.rows.get('products/P1').physical_stock,4);
+ const returned=harness();returned.rows.get('transactions/TX1').returnCompleted=true;const rp=await returned.prepare();assert.equal(rp.restoreQty,0);await returned.delete(rp);assert.equal(returned.rows.get('products/P1').physical_stock,4,'deleting a returned order cannot return stock twice after history is removed');
  const descriptor=parse(fs.readFileSync('src/components/MarketplaceTransactionHistory.vue','utf8')).descriptor;const compiled=compileScript(descriptor,{id:'delete-test'}).content;
  for(const choices of [[false],[true,false],[true,true]]){
   const prompts=[],calls=[],events=[],storage=new Map();storage.set('fashion-os-dispatch-v2:owner:shopee',JSON.stringify({userId:'owner',platform:'shopee',orders:[],confirmed:['order001','other'],completedHere:['order001'],deferred:[]}));
