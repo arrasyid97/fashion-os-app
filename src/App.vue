@@ -4,7 +4,7 @@ import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
-import MarketplaceShipmentImport from './components/MarketplaceShipmentImport.vue';
+import MarketplaceOrderDispatch from './components/MarketplaceOrderDispatch.vue';
 import MarketplaceIncomeImport from './components/MarketplaceIncomeImport.vue';
 import PartnershipManagement from './components/PartnershipManagement.vue';
 import { isFabricComplete, asFabricDate, allocateFabricAdmin, filterFabricHistory, summarizeFabricHistory, completeFabricStock } from './fabric-warehouse.js';
@@ -75,7 +75,8 @@ import { 
 } from "firebase/auth";
 
 // --- STATE MANAGEMENT ---
-const storedActivePage = localStorage.getItem('fashionOs:lastActivePage') || localStorage.getItem('lastActivePage') || 'dashboard';
+const storedPageValue = localStorage.getItem('fashionOs:lastActivePage') || localStorage.getItem('lastActivePage') || 'dashboard';
+const storedActivePage = ['bulk_process', 'bulk_process_legacy'].includes(storedPageValue) ? 'impor-pesanan-shopee' : storedPageValue;
 const removedPageRoutes = ['promosi', 'audit-data', 'bulk_process_legacy', 'rekonsiliasi', 'barcode-generator'];
 const sidebarGroupForPage = {
     inventaris: 'produk',
@@ -86,6 +87,8 @@ const sidebarGroupForPage = {
     'gudang-kain': 'produksi',
     transaksi: 'penjualan',
     bulk_process: 'penjualan',
+    'impor-pesanan-shopee': 'penjualan',
+    'impor-pesanan-tiktok': 'penjualan',
     bulk_process_legacy: 'penjualan',
     'konfirmasi-berhasil': 'penjualan',
     retur: 'penjualan',
@@ -1594,6 +1597,8 @@ try {
                 break;
 
             case 'bulk_process':
+            case 'impor-pesanan-shopee':
+            case 'impor-pesanan-tiktok':
                 dataPromises.push(
                     fetchAllProductData(
                         userId
@@ -4746,17 +4751,24 @@ function handleMarketplaceImportCompleted(payload) {
             const product = (state.produk || []).find(item => (item.docId || item.id) === productId);
             const paginatedProduct = (state.inventoryPaginated || []).find(item => (item.docId || item.id) === productId);
             if (product) {
-                product.stokFisik = (Number(product.stokFisik ?? product.physical_stock) || 0) - Number(quantity || 0);
+                product.stokFisik = Object.prototype.hasOwnProperty.call(payload.stockAfter || {}, productId) ? Number(payload.stockAfter[productId]) : (Number(product.stokFisik ?? product.physical_stock) || 0) - Number(quantity || 0);
                 product.physical_stock = product.stokFisik;
             }
             if (paginatedProduct) {
-                paginatedProduct.stokFisik = (Number(paginatedProduct.stokFisik ?? paginatedProduct.physical_stock) || 0) - Number(quantity || 0);
+                paginatedProduct.stokFisik = Object.prototype.hasOwnProperty.call(payload.stockAfter || {}, productId) ? Number(payload.stockAfter[productId]) : (Number(paginatedProduct.stokFisik ?? paginatedProduct.physical_stock) || 0) - Number(quantity || 0);
                 paginatedProduct.physical_stock = paginatedProduct.stokFisik;
             }
         });
     }
 
-    invalidateModuleCache('transactions');
+    invalidateModuleCache('sales');
+    if (payload.stockDeltas) invalidateModuleCache('products');
+}
+
+async function refreshMarketplaceDispatchProducts() {
+    if (!currentUser.value) return;
+    invalidateModuleCache('products');
+    await fetchAllProductData(currentUser.value.uid);
 }
 
 function showNotesModal() {
@@ -10052,6 +10064,7 @@ function generateBagiHasilReport() {
 }
 
 function changePage(pageName) {
+    if (pageName === 'bulk_process' || pageName === 'bulk_process_legacy') pageName = 'impor-pesanan-shopee';
     activePage.value = pageName;
 
     // Simpan halaman terakhir secara langsung
@@ -10069,6 +10082,8 @@ function changePage(pageName) {
 
         transaksi: 'penjualan',
         bulk_process: 'penjualan',
+        'impor-pesanan-shopee': 'penjualan',
+        'impor-pesanan-tiktok': 'penjualan',
         'konfirmasi-berhasil': 'penjualan',
         retur: 'penjualan',
         'statistik-penjualan': 'penjualan',
@@ -19941,7 +19956,8 @@ void [
 </button>
 
 <div v-show="uiState.sidebarGroups.penjualan" class="ml-4 space-y-1">
-    <a href="#" @click.prevent="changePage('bulk_process')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'bulk_process' }">Impor Pesanan Terkirim</a>
+    <a href="#" @click.prevent="changePage('impor-pesanan-shopee')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'impor-pesanan-shopee' }">Impor Pesanan Shopee</a>
+    <a href="#" @click.prevent="changePage('impor-pesanan-tiktok')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'impor-pesanan-tiktok' }">Impor Pesanan TikTok</a>
     <a href="#" @click.prevent="changePage('konfirmasi-berhasil')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'konfirmasi-berhasil' }">Konfirmasi Pesanan Berhasil</a>
     <a href="#" @click.prevent="changePage('transaksi')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'transaksi' }">Riwayat Transaksi</a>
     <a href="#" @click.prevent="changePage('retur')" class="sidebar-link" :class="{ 'sidebar-link-active': activePage === 'retur' }">Penanganan Pesanan</a>
@@ -20195,14 +20211,17 @@ void [
     <MarketplaceTransactionHistory :transactions="state.transaksi || []" :marketplaces="state.settings.marketplaces || []" />
 </div>
 
-<div v-if="activePage === 'bulk_process'">
+<div v-if="activePage === 'impor-pesanan-shopee' || activePage === 'impor-pesanan-tiktok'">
     <div class="mx-auto max-w-7xl space-y-6 p-4 sm:p-8">
-        <MarketplaceShipmentImport
+        <MarketplaceOrderDispatch
+            :key="activePage"
+            :platform="activePage === 'impor-pesanan-shopee' ? 'shopee' : 'tiktok'"
             :products="state.produk || []"
             :marketplaces="state.settings.marketplaces || []"
             :user-id="currentUser?.uid || ''"
             :subscription-active="isSubscriptionActive"
             @completed="handleMarketplaceImportCompleted"
+            @refresh-products="refreshMarketplaceDispatchProducts"
         />
     </div>
 </div>
