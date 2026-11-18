@@ -9,6 +9,7 @@ import MarketplaceIncomeImport from './components/MarketplaceIncomeImport.vue';
 import PartnershipManagement from './components/PartnershipManagement.vue';
 import { isFabricComplete, asFabricDate, allocateFabricAdmin, filterFabricHistory, summarizeFabricHistory, completeFabricStock } from './fabric-warehouse.js';
 import MarketplaceTransactionHistory from './components/MarketplaceTransactionHistory.vue';
+import ReturnOrderSearch from './components/ReturnOrderSearch.vue';
 
 // Impor dari file konfigurasi Firebase Anda
 
@@ -4814,24 +4815,16 @@ function showNotesModal() {
     });
 }
 
-function handleReturSearch() {
-    const query = uiState.modalData.transactionIdSearch.trim().toLowerCase();
-    if (query.length < 2) {
-        uiState.returSearchRecommendations = [];
-        return;
-    }
-    // Cari berdasarkan ID Pesanan Marketplace atau ID internal
-    uiState.returSearchRecommendations = state.transaksi.filter(t =>
-        (t.marketplaceOrderId && t.marketplaceOrderId.toLowerCase().includes(query)) ||
-        (t.id && t.id.toLowerCase().includes(query))
-    );
+function clearReturTransaction() {
+    uiState.modalData.foundTransaction = null;
+    uiState.modalData.items = [];
 }
-
-function selectReturRecommendation(trx) {
-    uiState.modalData.transactionIdSearch = trx.marketplaceOrderId || trx.id;
-    uiState.returSearchRecommendations = [];
-    // Langsung jalankan fungsi pencarian transaksi setelah memilih
-    findTransactionForReturn();
+function selectReturTransaction(transaction) {
+    const tanggal = transaction.tanggal?.toDate ? transaction.tanggal.toDate() : new Date(transaction.tanggal);
+    const found = { ...transaction, tanggal };
+    uiState.modalData.transactionIdSearch = found.marketplaceOrderId || found.id;
+    uiState.modalData.foundTransaction = found;
+    uiState.modalData.items = (found.items || []).map(item => ({ ...item, returnQty: item.qty, selected: true, alasan: '', tindakLanjut: 'Ganti Baru' }));
 }
 
 async function submitVoucherNote() {
@@ -4892,70 +4885,6 @@ async function deleteVoucherNote(noteId) {
     } catch (error) {
         console.error("Gagal menghapus catatan:", error);
         alert("Gagal menghapus catatan.");
-    }
-}
-
-async function findTransactionForReturn() {
-    const orderId = uiState.modalData.transactionIdSearch.trim();
-    
-    if (!orderId) {
-        return alert("Silakan scan resi atau masukkan ID Pesanan Marketplace.");
-    }
-
-    // 1. CARI DI DATA LOKAL (State) DULU
-    let foundTrx = state.transaksi.find(t => 
-        t.marketplaceOrderId && t.marketplaceOrderId.toLowerCase() === orderId.toLowerCase()
-    );
-
-    // 2. JIKA TIDAK KETEMU DI LOKAL, CARI LANGSUNG KE FIREBASE
-    if (!foundTrx) {
-        try {
-            // Tampilkan indikator loading (opsional, tapi bagus untuk UX)
-            // uiState.isLoading = true; 
-
-            const q = query(
-                collection(db, "transactions"),
-                where("userId", "==", currentUser.value.uid),
-                where("marketplaceOrderId", "==", orderId) // Pencarian persis (Case sensitive biasanya)
-            );
-
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                const docSnap = querySnapshot.docs[0];
-                // Format datanya agar sama dengan format di state
-                foundTrx = { 
-                    id: docSnap.id, 
-                    ...docSnap.data(), 
-                    tanggal: docSnap.data().tanggal?.toDate ? docSnap.data().tanggal.toDate() : new Date(docSnap.data().tanggal)
-                };
-            }
-        } catch (error) {
-            console.error("Error mencari transaksi di database:", error);
-        } finally {
-            // uiState.isLoading = false;
-        }
-    }
-
-    // 3. PROSES HASIL PENCARIAN
-    if (foundTrx) {
-        uiState.modalData.foundTransaction = foundTrx;
-        
-        // Reset items agar bersih
-        uiState.modalData.items = foundTrx.items.map(item => ({
-            ...item,
-            returnQty: item.qty, // Default retur qty sama dengan qty beli
-            selected: true,      // Default tercentang
-            alasan: '',
-            tindakLanjut: 'Ganti Baru'
-        }));
-        
-        // Opsional: Beri notifikasi kecil bahwa data ditemukan
-        // alert("Transaksi ditemukan!"); 
-    } else {
-        alert("Transaksi dengan ID Pesanan tersebut tidak ditemukan (baik di riwayat lokal maupun database).");
-        uiState.modalData.foundTransaction = null;
-        uiState.modalData.items = [];
     }
 }
 
@@ -26331,35 +26260,7 @@ BAJU-PUTIH-M</pre>
 <div v-if="uiState.modalType === 'addRetur'" class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full h-full md:max-h-[90vh] flex flex-col">
     <h3 class="text-xl font-bold mb-4">Tambah Data Retur dari Transaksi</h3>
     
-    <div class="p-4 bg-slate-50 rounded-lg border flex flex-col md:flex-row gap-2 items-start">
-        <div class="flex-grow w-full relative">
-            <label class="block text-sm font-medium">1. Scan Resi atau Masukkan ID Pesanan Marketplace</label>
-            <input 
-                type="text" 
-                v-model="uiState.modalData.transactionIdSearch" 
-                @input="handleReturSearch"
-                placeholder="Ketik ID Pesanan Marketplace atau ID internal..." 
-                class="mt-1 w-full p-2 border rounded-md"
-                autocomplete="off"
-            >
-            <div v-if="uiState.returSearchRecommendations.length > 0" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                <div 
-                    v-for="trx in uiState.returSearchRecommendations" 
-                    :key="trx.id" 
-                    @click="selectReturRecommendation(trx)" 
-                    class="p-3 hover:bg-slate-100 cursor-pointer border-b last:border-b-0"
-                >
-                    <p class="font-semibold text-slate-800">{{ trx.marketplaceOrderId || trx.id }}</p>
-                    <p class="text-xs text-slate-500">{{ new Date(trx.tanggal).toLocaleDateString('id-ID') }} - {{ trx.channel }} - HPP {{ formatCurrency((trx.items || []).reduce((sum, item) => sum + (Number(item.hpp) || 0) * (Number(item.qty) || 0), 0)) }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="flex-shrink-0 w-full md:w-auto">
-            <label class="block text-sm font-medium opacity-0 hidden md:block">Aksi</label> <button @click="findTransactionForReturn" type="button" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 w-full mt-1">
-                Cari Transaksi
-            </button>
-        </div>
-    </div>
+    <ReturnOrderSearch :key="currentUser?.uid || ''" :user-id="currentUser?.uid || ''" :transactions="state.transaksi || []" @selected="selectReturTransaction" @clear="clearReturTransaction" />
     <div v-if="uiState.modalData.foundTransaction" class="flex-1 overflow-y-auto mt-4 pt-4 border-t">
         <div class="mb-4 p-3 bg-green-50 text-green-800 rounded-md border border-green-200">
             <p><strong>Transaksi Ditemukan:</strong> {{ uiState.modalData.foundTransaction.marketplaceOrderId }}</p>

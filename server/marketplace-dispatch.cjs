@@ -70,8 +70,7 @@ async function confirmDispatchBatch({ db, userId, input, now = new Date() }) {
         });
         const needs = new Map();
         newOrders.forEach(order => order.items.forEach(item => needs.set(item.productId, (needs.get(item.productId) || 0) + item.qty)));
-        const shortages = [...needs].filter(([id, qty]) => products.get(id).stock < qty).map(([id, qty]) => ({ productId: id, name: products.get(id).product_name || products.get(id).sku || id, stock: products.get(id).stock, requested: qty }));
-        if (shortages.length) fail(409, 'Stok terbaru belum cukup. Tambahkan stok atau tunda pesanan terkait sebelum konfirmasi.', 'stock_shortage', { shortages });
+        for (const [id, qty] of needs) if (!Number.isSafeInteger(products.get(id).stock - qty)) fail(400, 'Jumlah stok setelah pengurangan melewati batas angka.');
         const saved = newOrders.map(order => {
             const merged = new Map();
             order.items.forEach(item => {

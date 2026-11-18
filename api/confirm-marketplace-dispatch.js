@@ -1,6 +1,7 @@
 const admin = require('firebase-admin');
 const { confirmDispatchBatch, inspectDispatchOrders } = require('../server/marketplace-dispatch.cjs');
 const { prepareOrderDeletion, deleteMarketplaceOrder } = require('../server/marketplace-order-delete.cjs');
+const { returnSearchIndex, returnSearchTransaction } = require('../server/return-search.cjs');
 function getApp() {
     const name = 'marketplace-dispatch';
     const existing = admin.apps.find(app => app.name === name);
@@ -22,7 +23,7 @@ module.exports = async function handler(request, response) {
         const app = getApp();
         let user;
         try { user = await app.auth().verifyIdToken(token[1]); } catch (_) { return response.status(401).json({ message: 'Sesi berakhir. Silakan masuk kembali.' }); }
-        const actions = { check: inspectDispatchOrders, confirm: confirmDispatchBatch, prepare_delete: prepareOrderDeletion, delete: deleteMarketplaceOrder };
+        const actions = { check: inspectDispatchOrders, confirm: confirmDispatchBatch, prepare_delete: prepareOrderDeletion, delete: deleteMarketplaceOrder, return_index: returnSearchIndex, return_transaction: returnSearchTransaction };
         if (!Object.hasOwn(actions, request.body?.action)) return response.status(400).json({ message: 'Tindakan tidak valid.' });
         const action = actions[request.body.action];
         const result = await action({ db: app.firestore(), userId: user.uid, input: request.body });
