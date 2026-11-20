@@ -1,5 +1,33 @@
 export const isFabricComplete = row => row.statusPemakaian === 'selesai';
 
+// Delete stock documents atomically. Financial records, receipt bytes and cut
+// movements are historical records and are deliberately not deleted here.
+export async function deleteFabricStocks({ db, doc, runTransaction, userId, rows }) {
+    if (!userId || !Array.isArray(rows) || !rows.length || rows.length > 200) {
+        throw new Error('Pilih 1–200 batch kain untuk dihapus.');
+    }
+    const ids = rows.map(row => row?.id);
+    if (new Set(ids).size !== ids.length || ids.some(id => typeof id !== 'string' || !id || id.includes('/'))) {
+        throw new Error('Daftar batch kain tidak valid. Muat ulang lalu coba lagi.');
+    }
+    const refs = ids.map(id => doc(db, 'fabric_stock', id));
+    return runTransaction(db, async transaction => {
+        const snapshots = await Promise.all(refs.map(reference => transaction.get(reference)));
+        snapshots.forEach((snapshot, index) => {
+            if (!snapshot.exists()) return; // Retrying a successful deletion is safe.
+            const current = snapshot.data();
+            if (current.userId !== userId) throw new Error('Data kain bukan milik akun ini.');
+            if ((current.purchaseId || snapshot.id) !== (rows[index].purchaseId || rows[index].id)) {
+                throw new Error('Grup pembelian kain berubah. Muat ulang lalu coba lagi.');
+            }
+        });
+        snapshots.forEach((snapshot, index) => {
+            if (snapshot.exists()) transaction.delete(refs[index]);
+        });
+        return { ids, deletedCount: snapshots.filter(snapshot => snapshot.exists()).length };
+    });
+}
+
 export function asFabricDate(value) {
     if (!value) return null;
     const date = value.toDate ? value.toDate() : value.seconds != null ? new Date(value.seconds * 1000) : new Date(value);
