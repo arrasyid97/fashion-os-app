@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx'; // Import untuk fitur Export Excel
 import MarketplaceOrderDispatch from './components/MarketplaceOrderDispatch.vue';
 import MarketplaceIncomeImport from './components/MarketplaceIncomeImport.vue';
 import PartnershipManagement from './components/PartnershipManagement.vue';
-import { isFabricComplete, asFabricDate, allocateFabricAdmin, filterFabricHistory, summarizeFabricHistory, completeFabricStock } from './fabric-warehouse.js';
+import { isFabricComplete, asFabricDate, allocateFabricAdmin, filterFabricHistory, summarizeFabricHistory, completeFabricStock, deleteFabricStocks } from './fabric-warehouse.js';
 import MarketplaceTransactionHistory from './components/MarketplaceTransactionHistory.vue';
 import ReturnOrderSearch from './components/ReturnOrderSearch.vue';
 import OrderReturnForm from './components/OrderReturnForm.vue';
@@ -266,6 +266,7 @@ const fabricReceiptUploads = reactive({});
 const expandedFabricPurchaseGroups = ref([]);
 const fabricReceiptOpening = ref('');
 const fabricCompletionBusyIds = ref([]);
+const fabricDeletionBusyIds = ref([]);
 const fabricCompletionNotice = ref('');
 const fabricCompletionError = ref(false);
 const fabricWarehouseView = ref('stock');
@@ -10503,7 +10504,7 @@ async function attachFabricReceiptAfterPurchase(file, purchaseId, rows, userId) 
 }
 
 function chooseFabricReceiptForGroup(group) {
-    if (fabricReceiptUploads[group.purchaseId]) return;
+    if (isSavingFabric.value || fabricReceiptUploads[group.purchaseId]) return;
     fabricReceiptUploadTarget.value = {
         purchaseId: group.purchaseId,
         rows: (group.allRows || group.rows).map(row => ({ id: row.id }))
@@ -10780,21 +10781,45 @@ async function completeFabricImmediately(rows) {
     }
 }
 
-async function deleteKain(kainId) {
-    if (confirm(`Anda yakin ingin menghapus data kain dengan ID: ${kainId}? Stok akan hilang permanen.`)) {
-        try {
-            await deleteDoc(doc(db, "fabric_stock", kainId));
-            
-            // Update UI setelah berhasil dihapus dari Firebase
-            state.gudangKain = state.gudangKain.filter(k => k.id !== kainId);
-            await persistFabricInventoryCache();
-            alert('Data kain berhasil dihapus.');
-
-        } catch (error) {
-            console.error("Error menghapus data kain:", error);
-            alert("Gagal menghapus data kain dari database.");
-        }
+async function deleteFabricRows(rows, label) {
+    if (!currentUser.value || !isSubscriptionActive.value || isSavingFabric.value || !rows.length) return;
+    if (rows.some(row => fabricReceiptUploads[row.purchaseId || row.id])) {
+        return alert('Tunggu unggahan nota selesai sebelum menghapus kain.');
     }
+    const userId = currentUser.value.uid;
+    const selected = rows.map(row => ({ id: row.id, purchaseId: row.purchaseId || row.id }));
+    if (!confirm(`Hapus ${label} (${selected.length} batch)? Data stok dan riwayat pembelian yang dipilih akan dihapus permanen. Pengeluaran produksi serta riwayat pemotongan yang sudah tercatat tetap tersimpan.`)) return;
+    isSavingFabric.value = true;
+    fabricDeletionBusyIds.value = selected.map(row => row.id);
+    try {
+        const result = await deleteFabricStocks({ db, doc, runTransaction, userId, rows: selected });
+        if (currentUser.value?.uid !== userId) return;
+        const removed = new Set(result.ids);
+        state.gudangKain = state.gudangKain.filter(row => !removed.has(row.id));
+        const remainingGroups = new Set(state.gudangKain.map(row => row.purchaseId || row.id));
+        expandedFabricPurchaseGroups.value = expandedFabricPurchaseGroups.value.filter(key => remainingGroups.has(key));
+        await persistFabricInventoryCache();
+        alert('Data stok kain yang dipilih berhasil dihapus.');
+    } catch (error) {
+        console.error('Gagal menghapus stok kain:', error);
+        if (currentUser.value?.uid === userId) alert(error.message || 'Stok kain belum berhasil dihapus. Coba lagi.');
+    } finally {
+        fabricDeletionBusyIds.value = [];
+        isSavingFabric.value = false;
+    }
+}
+
+async function deleteKain(kainId) {
+    const row = state.gudangKain.find(kain => kain.id === kainId);
+    if (row) await deleteFabricRows([row], `kain ${getFabricCode(row)} · ${row.namaKain} · ${row.warna}`);
+}
+
+async function deleteFabricPurchaseGroup(group) {
+    // Use the complete inventory, including finished colors and dates excluded
+    // by the current history filter, rather than just the visible detail rows.
+    const key = group.purchaseId || group.key;
+    const rows = state.gudangKain.filter(row => (row.purchaseId || row.id) === key);
+    await deleteFabricRows(rows, `grup nota ${group.groupCode}`);
 }
 function exportLaporanSemuaToExcel() {
     const dataToExport = laporanSemuanyaData.value.tableData.map(item => ({
@@ -20936,7 +20961,7 @@ SKU-BAJU-PUTIH-S"
                                         <p v-if="group.receipt.notaNama" class="mt-1 max-w-40 truncate text-xs text-slate-500" :title="group.receipt.notaNama">{{ group.receipt.notaNama }}</p>
                                         <p v-if="group.receiptError && !fabricReceiptUploads[group.purchaseId]" class="mt-1 max-w-48 text-xs text-red-600">Nota belum tersimpan. Coba unggah ulang.</p>
                                         <p v-else-if="!group.receipt.notaReceiptId && !group.receipt.notaUrl && !fabricReceiptUploads[group.purchaseId]" class="mt-1 text-xs text-slate-400">Belum ada nota tersimpan</p>
-                                        <button v-if="!fabricReceiptUploads[group.purchaseId]" @click="chooseFabricReceiptForGroup(group)" :disabled="!isSubscriptionActive" class="mt-2 rounded-md bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">{{ group.receipt.notaReceiptId || group.receipt.notaUrl ? 'Ganti nota' : 'Unggah nota' }}</button>
+                                        <button v-if="!fabricReceiptUploads[group.purchaseId]" @click="chooseFabricReceiptForGroup(group)" :disabled="!isSubscriptionActive || isSavingFabric" class="mt-2 rounded-md bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">{{ group.receipt.notaReceiptId || group.receipt.notaUrl ? 'Ganti nota' : 'Unggah nota' }}</button>
                                     </td>
                                     <td class="px-4 py-4 text-center"><span class="whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">{{ group.sisaYard.toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} Yard</span></td>
                                     <td class="px-4 py-4 text-right font-medium text-green-600"><template v-if="fabricWarehouseView === 'history'"><p>{{ group.totalRolls }} roll</p><p class="mt-1 text-xs">{{ group.totalBoughtYard.toLocaleString('id-ID', { maximumFractionDigits: 2 }) }} yard</p></template><template v-else>{{ group.hargaPerYard == null ? 'Bervariasi' : formatCurrency(group.hargaPerYard) }}</template></td>
@@ -20945,6 +20970,7 @@ SKU-BAJU-PUTIH-S"
                                         <button @click="toggleFabricPurchaseGroup(group.key)" :aria-expanded="isFabricPurchaseGroupExpanded(group.key)" class="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">{{ isFabricPurchaseGroupExpanded(group.key) ? 'Tutup rincian ▲' : 'Lihat rincian ▼' }}</button>
                                         <button v-if="group.activeRows.length" @click="completeFabricImmediately(group.activeRows)" :disabled="!isSubscriptionActive || isSavingFabric" class="mt-2 block w-full rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{{ group.activeRows.some(row => fabricCompletionBusyIds.includes(row.id)) ? 'Menyelesaikan…' : 'Selesai grup' }}</button>
                                         <button v-else disabled class="mt-2 block w-full cursor-default rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Selesai</button>
+                                        <button type="button" @click="deleteFabricPurchaseGroup(group)" :disabled="!isSubscriptionActive || isSavingFabric || Boolean(fabricReceiptUploads[group.purchaseId])" class="mt-2 block w-full rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50">{{ group.allRows.some(row => fabricDeletionBusyIds.includes(row.id)) ? 'Menghapus…' : 'Hapus grup' }}</button>
                                     </td>
                                 </tr>
                                 <tr v-if="isFabricPurchaseGroupExpanded(group.key)" class="bg-slate-50/70">
@@ -20965,8 +20991,8 @@ SKU-BAJU-PUTIH-S"
                                                             <button v-if="!isFabricComplete(kain)" @click="openFabricCutModal(kain)" class="rounded bg-indigo-50 px-2 py-1.5 font-bold text-indigo-700 hover:bg-indigo-100" :disabled="!isSubscriptionActive || isSavingFabric || Number(kain.sisaYard) <= 0">Catat potong</button>
                                                             <button v-if="!isFabricComplete(kain)" @click="completeFabricImmediately([kain])" :disabled="!isSubscriptionActive || isSavingFabric" class="ml-1 rounded bg-emerald-600 px-2 py-1.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{{ fabricCompletionBusyIds.includes(kain.id) ? 'Menyelesaikan…' : 'Selesai' }}</button>
                                                             <button v-else disabled class="cursor-default rounded bg-emerald-50 px-2 py-1.5 font-bold text-emerald-700">Selesai</button>
-                                                            <button v-if="!isFabricComplete(kain)" @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="ml-1 rounded bg-slate-100 px-2 py-1.5 font-bold hover:bg-slate-200" :disabled="!isSubscriptionActive">Edit</button>
-                                                            <button v-if="!isFabricComplete(kain)" @click="deleteKain(kain.id)" class="ml-1 px-1 font-bold text-red-600 hover:underline" :disabled="!isSubscriptionActive">Hapus</button>
+                                                            <button v-if="!isFabricComplete(kain)" @click="showModal('editKain', { ...kain, tanggalBeli: new Date(kain.tanggalBeli).toISOString().split('T')[0] })" class="ml-1 rounded bg-slate-100 px-2 py-1.5 font-bold hover:bg-slate-200" :disabled="!isSubscriptionActive || isSavingFabric">Edit</button>
+                                                            <button type="button" @click="deleteKain(kain.id)" class="ml-1 px-1 font-bold text-red-600 hover:underline disabled:opacity-50" :disabled="!isSubscriptionActive || isSavingFabric || Boolean(fabricReceiptUploads[group.purchaseId])">{{ fabricDeletionBusyIds.includes(kain.id) ? 'Menghapus…' : 'Hapus' }}</button>
                                                         </td>
                                                     </tr>
                                                 </tbody>
