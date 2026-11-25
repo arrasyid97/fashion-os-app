@@ -11,6 +11,8 @@ import { isFabricComplete, asFabricDate, allocateFabricAdmin, filterFabricHistor
 import MarketplaceTransactionHistory from './components/MarketplaceTransactionHistory.vue';
 import ReturnOrderSearch from './components/ReturnOrderSearch.vue';
 import OrderReturnForm from './components/OrderReturnForm.vue';
+import FabricShoppingOperations from './components/FabricShoppingOperations.vue';
+import { fabricShoppingRequest } from './fabric-shopping-api.js';
 import {useMobileLayout} from './mobile-layout.js';
 const {isMobile:isMobileViewport,menuOpen:mobileMenuOpen,navigation:mobileNavigation,trigger:mobileMenuTrigger,openMenu:openMobileMenu,closeMenu:closeMobileMenu}=useMobileLayout();
 import {isReturnedOrder,activeDashboardOrders} from './order-return.js';
@@ -4805,6 +4807,27 @@ function handleOrderReturnCompleted(payload) {
     invalidateModuleCache('sales'); invalidateModuleCache('products');
     dataFetched.pendingSettlements = false; dataFetched.returns = false;
     dashboardSummaryV2MemoryCache.clear();
+}
+
+function handleFabricShoppingUpdated(payload) {
+    if (payload.expense && payload.expense.userId === currentUser.value?.uid) {
+        const expense = { ...payload.expense, tanggal: asFabricDate(payload.expense.tanggal) };
+        state.keuangan = [expense, ...(state.keuangan || []).filter(row => row.id !== expense.id)];
+    }
+    if (payload.deletedExpenseId) state.keuangan = (state.keuangan || []).filter(row => row.id !== payload.deletedExpenseId);
+    if (payload.expense || payload.deletedExpenseId) {
+        invalidateModuleCache('finance');
+        dataFetched.finance = false;
+        dashboardSummaryV2MemoryCache.clear();
+    }
+}
+
+async function refreshFabricShoppingStock() {
+    if (!currentUser.value) return;
+    invalidateModuleCache('production');
+    dataFetched.fabric = false;
+    dataFetched.production = false;
+    await fetchProductionData(currentUser.value.uid);
 }
 
 async function refreshMarketplaceDispatchProducts() {
@@ -10611,6 +10634,8 @@ async function submitFabricPurchase() {
                 purchaseId,
                 financeRecordId: '',
                 expenseTiming: 'completion',
+                shoppingOperationsVersion: 1,
+                shoppingOperationsRate: 100,
                 statusPemakaian: 'aktif',
                 tanggalBeli: purchaseDate,
                 namaKain: item.namaKain,
@@ -12516,20 +12541,24 @@ try {
 }
 
 async function deleteBiaya(id) {
-    if (!currentUser.value) return alert("Anda harus login untuk mengelola biaya.");
-    if (!confirm('Anda yakin ingin menghapus data pengeluaran ini?')) return;
-    try {
-        // PERBAIKAN: Hapus dari koleksi 'keuangan'
-        await deleteDoc(doc(db, "keuangan", id)); 
-        
-        // KRITIS: Memuat ulang semua data dari DB untuk menyegarkan state
-        await fetchKeuanganData(true); 
-        
-        alert('Data pengeluaran berhasil dihapus.');
-    } catch (error) {
-        console.error("Error menghapus biaya:", error);
-        alert("Gagal menghapus data pengeluaran.");
-    }
+    if (!currentUser.value) return alert('Anda harus login untuk mengelola biaya.');
+    const expense = (state.keuangan || []).find(row => row.id === id);
+    const shopping = expense?.source === 'fabric_shopping_operations';
+    const question = shopping ? 'Hapus pengeluaran operasional belanja kain ini? Status nota terkait akan kembali menjadi Belum dibayar.' : 'Anda yakin ingin menghapus data pengeluaran ini?';
+    if (!confirm(question)) return;
+    try {
+        if (shopping) {
+            const result = await fabricShoppingRequest(currentUser.value.uid, { action: 'cancel_payment', financeId: id });
+            handleFabricShoppingUpdated(result);
+        } else {
+            await deleteDoc(doc(db, 'keuangan', id));
+        }
+        await fetchKeuanganData(true);
+        alert('Data pengeluaran berhasil dihapus.');
+    } catch (error) {
+        console.error('Error menghapus biaya:', error);
+        alert(error.message || 'Gagal menghapus data pengeluaran.');
+    }
 }
 
 async function submitPemasukan() {
@@ -20888,7 +20917,10 @@ SKU-BAJU-PUTIH-S"
                 <div class="mb-5 flex flex-wrap gap-2" role="group" aria-label="Tampilan gudang kain">
                     <button @click="fabricWarehouseView = 'stock'" :aria-pressed="fabricWarehouseView === 'stock'" class="rounded-lg px-4 py-2 text-sm font-bold" :class="fabricWarehouseView === 'stock' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'">Stok aktif</button>
                     <button @click="fabricWarehouseView = 'history'" :aria-pressed="fabricWarehouseView === 'history'" class="rounded-lg px-4 py-2 text-sm font-bold" :class="fabricWarehouseView === 'history' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'">Riwayat pembelian</button>
+                    <button @click="fabricWarehouseView = 'operations'" :aria-pressed="fabricWarehouseView === 'operations'" class="rounded-lg px-4 py-2 text-sm font-bold" :class="fabricWarehouseView === 'operations' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'">Operasional belanja</button>
                 </div>
+                <FabricShoppingOperations v-if="fabricWarehouseView === 'operations'" :rows="state.gudangKain" :user-id="currentUser?.uid || ''" :subscription-active="isSubscriptionActive" @updated="handleFabricShoppingUpdated" @refresh-stock="refreshFabricShoppingStock" />
+                <template v-if="fabricWarehouseView !== 'operations'">
                 <section v-if="fabricWarehouseView === 'history'" class="mb-6 space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                     <div class="flex flex-wrap items-end gap-3">
                         <label class="block min-w-48 text-sm font-semibold text-slate-700">Periode pembelian
@@ -21010,6 +21042,7 @@ SKU-BAJU-PUTIH-S"
                         </tbody>
                     </table>
                 </div>
+                </template>
             </div>
         </div>
     </div>
